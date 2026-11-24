@@ -139,7 +139,7 @@ window.PageAssignments = (function () {
 
   // Comment popover state
   var _commentPopoverState = null;
-  var _critCommentState = null; // { cid, sid, aid, critId } while the criterion comment popover is open
+  var _critCommentState = null; // { cid, sid, aid, critId, draft, reuse } while a criterion comment field is open
 
   // Keyboard navigation state
   var _kbFocusEl = null;
@@ -2656,6 +2656,7 @@ window.PageAssignments = (function () {
     _refreshClassResultsSoon();
     _seedReturns(root);
     _drawnReturns = null;
+    _critCommentAfterDraw();
   }
 
   /* ── Assessment Form ────────────────────────────────────── */
@@ -8731,7 +8732,7 @@ window.PageAssignments = (function () {
         );
       }) +
       '</div>' +
-      (note ? '<div class="rsg-crit-note">' + esc(note) + '</div>' : '') +
+      _critNoteHtml(cid, aid, sid, crit, note) +
       (open
         ? '<div class="rsg-checklist" data-aid="' +
           aid +
@@ -9782,7 +9783,7 @@ window.PageAssignments = (function () {
       ) +
       '</div>' +
       (advanced || single ? '' : RubricWords.panelHtml(crit, levelOrderFor(cid), displayScore)) +
-      (note ? '<div class="rsg-crit-note">' + esc(note) + '</div>' : '') +
+      _critNoteHtml(cid, aid, sid, crit, note) +
       (open ? _checklistPanelHtml(cid, aid, sid, crit, displayScore) : '') +
       (single ? _rsgSinglePointNotesHtml(cid, aid, sid, crit) : '') +
       '</div></div>'
@@ -11291,236 +11292,323 @@ window.PageAssignments = (function () {
       '"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>Comment</button>'
     );
   }
-  function openCriterionComment(aid, sid, critId) {
-    var cid = activeCourse;
-    var crit = getRubricCriterion(aid, critId);
-    var student = getStudents(cid).find(function (s) {
-      return s.id === sid;
-    });
-    if (!crit || !student) return;
-    _critCommentState = { cid: cid, sid: sid, aid: aid, critId: critId };
-    renderCriterionCommentPopover();
-  }
+  /* The comment is typed in place, under the criterion's levels (Nov 24
+     2026; it was a box over the page). Comment, C on a focused row, or a
+     click on the saved comment opens the field. It saves as the teacher
+     types and when they leave it. Tab or Enter goes on to the next
+     criterion's comment, then the overall comment, then the next student or
+     group; Shift+Tab goes back; Shift+Enter is a new line; Escape or a click
+     elsewhere puts it away. On pair and group work the row is the group's,
+     so the field is named for the group and the comment fills every member.
+     While it's empty, comments already written on the same criterion for
+     other students or groups are offered under it (Same As). */
   // About two printed lines of a criterion comment on a quarter-sheet
   // handout. Sheets clip anything taller, so the count turns amber past it.
   var CRIT_COMMENT_QUARTER_FIT = 140;
   var CRIT_COMMENT_MAX = 500;
-  function _critCommentLevelHtml(cid, sid, aid, crit) {
-    if (!window.RubricPrint || typeof RubricPrint.criterionLevel !== 'function') return '';
-    var lv = RubricPrint.criterionLevel(getScores(cid)[sid] || [], aid, crit);
-    if (!lv || !lv.level) return '';
-    var text = scoreLevelText(lv.level, lv.mod);
-    return '<span class="crit-comment-level l' + lv.level + '">' + esc(text) + '</span>';
+  var _critCommentTimer = null;
+  // An overall comment reached by Tab from a criterion comment: its own Tab
+  // goes on to the next student's or group's first criterion comment.
+  var _critCommentFlowEl = null;
+
+  function _critCommentOpenFor(aid, sid, critId) {
+    var st = _critCommentState;
+    return !!st && st.aid === aid && st.sid === sid && st.critId === critId;
   }
-  // The next criterion comment button on the grid, in reading order: the
-  // same student's next criterion, then the next student's first.
-  function _nextCriterionCommentButton(st) {
-    var btns = Array.prototype.slice.call(document.querySelectorAll('.rsg-crit-comment[data-aid="' + st.aid + '"]'));
-    var at = -1;
-    btns.forEach(function (b, i) {
-      if (b.dataset.sid === st.sid && b.dataset.critid === st.critId) at = i;
+  function _critRowEl(aid, sid, critId) {
+    return document.querySelector(
+      '.rsg-criterion-row[data-assess="' + aid + '"][data-student="' + sid + '"][data-criterion="' + critId + '"]',
+    );
+  }
+  function _critCommentButton(aid, sid, critId) {
+    var row = _critRowEl(aid, sid, critId);
+    return row && row.querySelector('.rsg-crit-comment');
+  }
+  // Who the row is: a pair or group's name, or the student's first name.
+  function _critCommentWho(cid, aid, sid) {
+    var row = _groupRowFor(aid, sid);
+    if (row && row.view) return row.view.label;
+    var st = getStudents(cid).find(function (s) {
+      return s.id === sid;
     });
-    if (at < 0) return null;
-    for (var i = at + 1; i < btns.length; i++) {
-      if (btns[i].closest('.rsg-student.has-status')) continue;
-      if (!btns[i].getClientRects().length) continue;
-      return btns[i];
+    return st ? displayNameFirst(st) : '';
+  }
+  // Comments on the same criterion for other students or groups, nearest
+  // first (those above this row, then below), three at most, no repeats.
+  function _critCommentReuse(cid, aid, sid, crit) {
+    var a = _assessmentById(cid, aid);
+    var ids = sortStudents(getStudents(cid), 'lastName').map(function (s) {
+      return s.id;
+    });
+    var at = ids.indexOf(sid);
+    var order = ids
+      .slice(0, Math.max(at, 0))
+      .reverse()
+      .concat(ids.slice(at + 1));
+    var seen = {};
+    var out = [];
+    order.forEach(function (id) {
+      if (out.length >= 3) return;
+      // A group member's comment is their group's, offered once under its name.
+      var row = _groupRowFor(aid, id);
+      if (!(row && row.view) && a && isLinkedGroupMember(cid, aid, id)) return;
+      var text = getRubricCriterionComment(cid, id, aid, crit);
+      if (!text || seen[text]) return;
+      seen[text] = true;
+      out.push({ who: _critCommentWho(cid, aid, id), text: text });
+    });
+    return out;
+  }
+  // html-safe: criterion, student and group names and comments through esc; ids are ours; limits are numbers
+  function _critCommentEditorHtml(cid, aid, sid, crit) {
+    var st = _critCommentState;
+    var text = st.draft != null ? st.draft : getRubricCriterionComment(cid, sid, aid, crit);
+    var who = _critCommentWho(cid, aid, sid);
+    var label = 'Comment on ' + (crit.name || 'this criterion') + (who ? ' for ' + who : '');
+    var len = text.trim().length;
+    st.reuse = _critCommentReuse(cid, aid, sid, crit);
+    return (
+      '<div class="rsg-crit-edit" data-stop-prop="true">' +
+      '<div class="rsg-crit-edit-box"><textarea class="rsg-crit-input" id="crit-comment-input" rows="1" maxlength="' +
+      CRIT_COMMENT_MAX +
+      '" placeholder="' +
+      esc(label) +
+      '" aria-label="' +
+      esc(label) +
+      '" aria-describedby="crit-comment-count" title="Prints under this criterion on the rubric handout. About ' +
+      CRIT_COMMENT_QUARTER_FIT +
+      ' characters fit in two lines on a quarter sheet." aria-keyshortcuts="Enter" data-action-input="critCommentInput" data-action-blur="critCommentBlur">' +
+      esc(text) +
+      '</textarea><span class="rsg-crit-count' +
+      (len > CRIT_COMMENT_QUARTER_FIT ? ' is-long' : '') +
+      '" id="crit-comment-count">' +
+      len +
+      ' / ' +
+      CRIT_COMMENT_MAX +
+      '</span></div>' +
+      (st.reuse.length
+        ? '<div class="rsg-crit-reuse"' +
+          (text.trim() ? ' hidden' : '') +
+          '><span class="rsg-crit-reuse-label">Same As</span>' +
+          st.reuse
+            .map(function (r, i) {
+              return (
+                '<button type="button" class="rsg-crit-reuse-chip" data-action="critCommentReuse" data-i="' +
+                i +
+                '" title="' +
+                esc(r.text) +
+                '"><b>' +
+                esc(r.who) +
+                ':</b> ' +
+                esc(r.text) +
+                '</button>'
+              );
+            })
+            .join('') +
+          '</div>'
+        : '') +
+      '</div>'
+    );
+  }
+  // What sits under a criterion's levels: the open field, or the saved
+  // comment (the same HTML as before the field, when it isn't open).
+  function _critNoteHtml(cid, aid, sid, crit, note) {
+    if (_critCommentOpenFor(aid, sid, crit.id)) return _critCommentEditorHtml(cid, aid, sid, crit);
+    return note ? '<div class="rsg-crit-note">' + esc(note) + '</div>' : '';
+  }
+  function _growCritCommentInput(inp) {
+    inp.style.height = 'auto';
+    if (inp.scrollHeight) inp.style.height = Math.min(inp.scrollHeight + 2, 220) + 'px';
+  }
+  function _syncCritCommentChip(st) {
+    var btn = _critCommentButton(st.aid, st.sid, st.critId);
+    if (!btn) return;
+    var note = getRubricCriterionComment(st.cid, st.sid, st.aid, getRubricCriterion(st.aid, st.critId));
+    btn.classList.toggle('has-comment', !!note);
+    btn.classList.toggle('is-open', _critCommentState === st);
+    btn.setAttribute('aria-expanded', String(_critCommentState === st));
+    btn.title = note || 'Comment on this criterion (C)';
+  }
+  function _focusCritCommentInput() {
+    var inp = document.getElementById('crit-comment-input');
+    if (!inp) return;
+    _growCritCommentInput(inp);
+    inp.focus({ preventScroll: true });
+    if (inp.setSelectionRange) inp.setSelectionRange(inp.value.length, inp.value.length);
+    _scrollIntoViewIfNeeded(inp.closest('.rsg-crit-edit') || inp, { block: 'nearest' });
+  }
+  function openCriterionComment(aid, sid, critId) {
+    var cid = activeCourse;
+    if (_critCommentOpenFor(aid, sid, critId)) {
+      closeCriterionComment();
+      return;
     }
-    return null;
-  }
-  function renderCriterionCommentPopover() {
-    if (!_critCommentState) return;
-    var cid = _critCommentState.cid,
-      sid = _critCommentState.sid,
-      aid = _critCommentState.aid,
-      critId = _critCommentState.critId;
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
+    if (_critCommentState) closeCriterionComment();
+    var crit = getRubricCriterion(aid, critId);
     var student = getStudents(cid).find(function (s) {
       return s.id === sid;
     });
-    var crit = getRubricCriterion(aid, critId);
-    if (!assess || !student || !crit) return;
-    var note = getRubricCriterionComment(cid, sid, aid, crit);
-    _critCommentState.original = note;
-    var name = displayName(student);
-    var next = _nextCriterionCommentButton(_critCommentState);
-    var nextLabel = next ? (next.dataset.sid === sid ? 'Save and Next Criterion' : 'Save and Next Student') : '';
-    var overlay = document.getElementById('crit-comment-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'crit-comment-overlay';
-      overlay.className = 'comment-popover-overlay';
-      overlay.onclick = function (e) {
-        if (e.target === this) cancelCriterionComment();
-      };
-      document.body.appendChild(overlay);
-    }
-    // html-safe: student, criterion and assessment names and the note through esc; limits are numbers
-    overlay.innerHTML =
-      '<div class="comment-popover crit-comment-popover" role="dialog" aria-modal="true" aria-labelledby="crit-comment-title"><div class="comment-popover-header"><div class="crit-comment-heading"><div class="comment-popover-title" id="crit-comment-title">' +
-      esc(name) +
-      '</div><div class="crit-comment-context"><span class="crit-comment-crit">' +
-      esc(crit.name) +
-      '</span><span class="crit-comment-assess">' +
-      esc(assess.title) +
-      '</span>' +
-      _critCommentLevelHtml(cid, sid, aid, crit) +
-      '</div></div><button class="comment-popover-close" data-action="cancelCriterionComment" aria-label="Close">✕</button></div>' +
-      '<div class="crit-comment-body"><label class="crit-comment-label" for="crit-comment-input">Comment for ' +
-      esc(name) +
-      '</label><textarea class="crit-comment-input" id="crit-comment-input" rows="3" maxlength="' +
-      CRIT_COMMENT_MAX +
-      '" aria-describedby="crit-comment-hint crit-comment-count">' +
-      esc(note) +
-      '</textarea><div class="crit-comment-meta"><div class="crit-comment-hint" id="crit-comment-hint">Prints under this criterion on the rubric handout. About ' +
-      CRIT_COMMENT_QUARTER_FIT +
-      ' characters fit in two lines on a quarter sheet.</div><div class="crit-comment-count" id="crit-comment-count" aria-live="polite"></div></div></div>' +
-      '<div class="crit-comment-actions">' +
-      (note
-        ? '<button type="button" class="btn btn-danger crit-comment-remove" data-action="removeCriterionComment">Remove Comment</button>'
-        : '') +
-      '<span class="crit-comment-spacer"></span><button type="button" class="btn btn-ghost" data-action="cancelCriterionComment">Cancel</button>' +
-      (next
-        ? '<button type="button" class="btn btn-ghost crit-comment-next" data-action="saveCriterionCommentNext" aria-keyshortcuts="Meta+Enter Control+Enter">' +
-          nextLabel +
-          '</button>'
-        : '') +
-      '<button type="button" class="btn btn-primary crit-comment-save" data-action="saveCriterionComment" aria-keyshortcuts="Enter">Save</button></div></div>';
-    overlay.style.display = 'flex';
-    var inp = document.getElementById('crit-comment-input');
-    if (inp) inp.addEventListener('input', _syncCriterionCommentInput);
-    _syncCriterionCommentInput();
-    setTimeout(function () {
-      if (inp && inp.isConnected) {
-        inp.focus();
-        inp.setSelectionRange(inp.value.length, inp.value.length);
-      }
-    }, 50);
+    var row = _critRowEl(aid, sid, critId);
+    var main = row && row.querySelector('.rsg-criterion-main');
+    if (!crit || !student || !main) return;
+    _critCommentFlowEl = null;
+    var st = { cid: cid, sid: sid, aid: aid, critId: critId, draft: null };
+    _critCommentState = st;
+    var html = _critCommentEditorHtml(cid, aid, sid, crit);
+    // The field takes the saved comment's place: after the levels (and the
+    // level words), before an open checklist.
+    var note = main.querySelector('.rsg-crit-note');
+    var checklist = null;
+    Array.prototype.forEach.call(main.children, function (c) {
+      if (!checklist && c.classList.contains('rsg-checklist')) checklist = c;
+    });
+    var at = note ? [note, 'afterend'] : checklist ? [checklist, 'beforebegin'] : [main, 'beforeend'];
+    // html-safe: built by _critCommentEditorHtml
+    at[0].insertAdjacentHTML(at[1], html);
+    if (note) note.remove();
+    _syncCritCommentChip(st);
+    _focusCritCommentInput();
   }
-  // Grow the box with the text, update the count, and enable Save only
-  // when the comment has changed.
-  function _syncCriterionCommentInput() {
-    var inp = document.getElementById('crit-comment-input');
-    if (!inp || !_critCommentState) return;
-    inp.style.height = 'auto';
-    inp.style.height = Math.min(inp.scrollHeight + 2, 220) + 'px';
+  function _critCommentInput(inp) {
+    var st = _critCommentState;
+    if (!st) return;
+    st.draft = inp.value;
+    _growCritCommentInput(inp);
     var len = inp.value.trim().length;
     var count = document.getElementById('crit-comment-count');
     if (count) {
       count.textContent = len + ' / ' + CRIT_COMMENT_MAX;
       count.classList.toggle('is-long', len > CRIT_COMMENT_QUARTER_FIT);
     }
-    var save = document.querySelector('#crit-comment-overlay .crit-comment-save');
-    if (save) save.disabled = inp.value.trim() === (_critCommentState.original || '');
+    var reuse = inp.closest('.rsg-crit-edit').querySelector('.rsg-crit-reuse');
+    if (reuse) reuse.hidden = !!len;
+    clearTimeout(_critCommentTimer);
+    _critCommentTimer = setTimeout(_saveCriterionCommentDraft, 800);
   }
-  function _commitCriterionComment(text) {
+  // Writes what has been typed, if it differs from the saved comment.
+  function _saveCriterionCommentDraft() {
+    clearTimeout(_critCommentTimer);
+    _critCommentTimer = null;
+    var st = _critCommentState;
+    if (!st || st.draft == null) return;
+    var text = st.draft.trim();
+    var crit = getRubricCriterion(st.aid, st.critId);
+    if (!crit || text === getRubricCriterionComment(st.cid, st.sid, st.aid, crit)) return;
+    Grader.setCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
+    _syncCritCommentChip(st);
+  }
+  // Puts the field away, saved; the comment shows under the levels.
+  function closeCriterionComment() {
     var st = _critCommentState;
     if (!st) return;
-    if (text !== (st.original || '')) Grader.setCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
-    var btn = document.querySelector(
-      '.rsg-crit-comment[data-aid="' + st.aid + '"][data-sid="' + st.sid + '"][data-critid="' + st.critId + '"]',
-    );
-    if (btn) {
-      btn.classList.toggle('has-comment', !!text);
-      btn.title = text || 'Comment on this criterion (C)';
+    _saveCriterionCommentDraft();
+    _critCommentState = null;
+    var row = _critRowEl(st.aid, st.sid, st.critId);
+    var edit = row && row.querySelector('.rsg-crit-edit');
+    if (edit) {
+      var crit = getRubricCriterion(st.aid, st.critId);
+      var note = crit ? getRubricCriterionComment(st.cid, st.sid, st.aid, crit) : '';
+      if (note) {
+        var noteEl = document.createElement('div');
+        noteEl.className = 'rsg-crit-note';
+        noteEl.textContent = note;
+        edit.parentNode.insertBefore(noteEl, edit);
+      }
+      edit.remove();
     }
-    var row = btn && btn.closest('.rsg-criterion-row');
-    var levels = row && row.querySelector('.rsg-levels');
-    if (!levels) return;
-    var noteEl = row.querySelector('.rsg-crit-note');
-    if (!text) {
-      if (noteEl) noteEl.remove();
+    _syncCritCommentChip(st);
+  }
+  // Saves and forgets the open field without touching the page (the page
+  // is being left or drawn again from scratch).
+  function _dropCriterionComment() {
+    _saveCriterionCommentDraft();
+    _critCommentState = null;
+    _critCommentFlowEl = null;
+  }
+  // A redraw draws an open field again with what was typed (the row's
+  // HTML holds it); it keeps the keyboard, or is saved and forgotten when
+  // its row is no longer drawn.
+  function _critCommentAfterDraw() {
+    var st = _critCommentState;
+    if (!st) return;
+    if (!document.getElementById('crit-comment-input')) {
+      _dropCriterionComment();
       return;
     }
-    if (!noteEl) {
-      noteEl = document.createElement('div');
-      noteEl.className = 'rsg-crit-note';
-      levels.insertAdjacentElement('afterend', noteEl);
-    }
-    noteEl.textContent = text;
+    _syncCritCommentChip(st);
+    var active = document.activeElement;
+    if (!active || active === document.body) _focusCritCommentInput();
   }
-  function saveCriterionComment() {
-    if (!_critCommentState) return;
-    var inp = document.getElementById('crit-comment-input');
-    if (!inp) return;
-    _commitCriterionComment(inp.value.trim());
-    closeCriterionComment();
-  }
-  function saveCriterionCommentNext() {
-    if (!_critCommentState) return;
-    var inp = document.getElementById('crit-comment-input');
-    if (!inp) return;
-    var next = _nextCriterionCommentButton(_critCommentState);
-    _commitCriterionComment(inp.value.trim());
-    if (!next) {
-      closeCriterionComment();
-      return;
-    }
-    _scrollIntoViewIfNeeded(next, { block: 'nearest' });
-    openCriterionComment(next.dataset.aid, next.dataset.sid, next.dataset.critid);
-  }
-  function removeCriterionComment() {
-    if (!_critCommentState) return;
-    _commitCriterionComment('');
-    closeCriterionComment();
-  }
-  function _trapCriterionCommentTab(e, dialog) {
-    var items = Array.prototype.slice.call(dialog.querySelectorAll('textarea, button:not([disabled])'));
-    if (!items.length) return;
-    var first = items[0],
-      last = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    } else if (!dialog.contains(document.activeElement)) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
-  /* Cancel, ✕, Escape and a click outside: a comment typed and not saved is
-     only thrown away after the teacher says so, as the assessment form's
-     Cancel asks (Nov 3 sweep: Escape lost 48 typed characters). */
-  function cancelCriterionComment() {
+  function _critCommentReuseChoose(i) {
     var st = _critCommentState;
     var inp = document.getElementById('crit-comment-input');
-    if (!st || !inp || inp.value.trim() === (st.original || '').trim()) {
-      closeCriterionComment();
+    var pick = st && st.reuse && st.reuse[i];
+    if (!pick || !inp) return;
+    inp.value = pick.text;
+    _critCommentInput(inp);
+    _saveCriterionCommentDraft();
+    _focusCritCommentInput();
+  }
+  // Each criterion's Comment, then the overall comment, student by student
+  // (group by group), skipping Missing and Excused work.
+  function _critCommentStops(aid) {
+    var all = document.querySelectorAll(
+      '.rsg-crit-comment[data-aid="' + aid + '"], .rsg-overall-comment[data-aid="' + aid + '"]',
+    );
+    return Array.prototype.filter.call(all, function (el) {
+      if (el.classList.contains('grdr-chip')) return false;
+      if (el.closest('.rsg-student.has-status')) return false;
+      return !!el.getClientRects().length;
+    });
+  }
+  // Tab, Shift+Tab or Enter from a criterion comment (from), or Tab from an
+  // overall comment the comments led to.
+  function _critCommentMove(from, aid, dir) {
+    var stops = _critCommentStops(aid);
+    var next = stops[stops.indexOf(from) + dir];
+    if (_critCommentState) closeCriterionComment();
+    if (!next) {
+      if (from && from.isConnected) from.focus({ preventScroll: true });
       return;
     }
-    var student = getStudents(st.cid).find(function (x) {
-      return x.id === st.sid;
-    });
-    var crit = getRubricCriterion(st.aid, st.critId);
-    _formDialog(
-      'Discard This Comment?',
-      'Your comment' +
-        (student ? ' for ' + displayName(student) : '') +
-        (crit && crit.name ? ' on ' + crit.name : '') +
-        ' isn\u2019t saved.',
-      [
-        { label: 'Keep Editing', style: 'cancel' },
-        {
-          label: 'Discard',
-          style: 'danger',
-          run: function () {
-            if (_critCommentState === st) closeCriterionComment();
-          },
-        },
-      ],
-    );
-  }
-  function closeCriterionComment() {
-    _critCommentState = null;
-    var overlay = document.getElementById('crit-comment-overlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-      overlay.innerHTML = '';
+    if (next.classList.contains('rsg-overall-comment')) {
+      _critCommentFlowEl = next;
+      next.focus({ preventScroll: true });
+      _scrollIntoViewIfNeeded(next, { block: 'nearest' });
+      return;
     }
+    openCriterionComment(next.dataset.aid, next.dataset.sid, next.dataset.critid);
+  }
+  // Keys in the field. True when the key was the field's.
+  function _critCommentKey(e) {
+    var st = _critCommentState;
+    if (!st || document.activeElement.id !== 'crit-comment-input') return false;
+    if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+      e.preventDefault();
+      _critCommentMove(_critCommentButton(st.aid, st.sid, st.critId), st.aid, e.shiftKey ? -1 : 1);
+      return true;
+    }
+    if (e.key === 'Escape' && !e.defaultPrevented) {
+      e.preventDefault();
+      var btn = _critCommentButton(st.aid, st.sid, st.critId);
+      closeCriterionComment();
+      if (btn) btn.focus({ preventScroll: true });
+      return true;
+    }
+    return false;
+  }
+  // A click outside the open field puts it away (its own Comment toggles
+  // it). On the click, not the press: the rows under it move up as it
+  // closes, and a press would leave the click on another row. Selecting
+  // text that ends outside it doesn't count.
+  function _critCommentClickOutside(e) {
+    var st = _critCommentState;
+    if (!st || !e.target || !e.target.closest) return;
+    if (e.target.closest('.rsg-crit-edit')) return;
+    var inp = document.getElementById('crit-comment-input');
+    if (inp && document.activeElement === inp && inp.selectionStart !== inp.selectionEnd) return;
+    if (e.target.closest('.rsg-crit-comment') === _critCommentButton(st.aid, st.sid, st.critId)) return;
+    closeCriterionComment();
   }
 
   /* ── Module management ──────────────────────────────────── */
@@ -11870,6 +11958,7 @@ window.PageAssignments = (function () {
 
   /* ── Delegated click handler ────────────────────────────── */
   function _handleClick(e) {
+    _critCommentClickOutside(e);
     if (!e.target.closest('.rsg-group-members .grader-member-menu, .rsg-group-members .grader-member-more'))
       _closeGroupMenus();
     // A card's menu closes on any click but its own button's (an item's
@@ -11897,6 +11986,16 @@ window.PageAssignments = (function () {
 
     // A click in a module's name edits it; it doesn't open or close the folder.
     if (e.target.closest('.mod-folder-name-input')) return;
+
+    // A click on a criterion's saved comment opens it to edit.
+    var critNote = e.target.closest('.rsg-criterion-row .rsg-crit-note');
+    var noteBtn =
+      critNote &&
+      critNote.closest('.rsg-criterion-row').querySelector('.rsg-crit-comment[data-action="openCriterionComment"]');
+    if (noteBtn) {
+      openCriterionComment(noteBtn.dataset.aid, noteBtn.dataset.sid, noteBtn.dataset.critid);
+      return;
+    }
 
     var el = e.target.closest('[data-action]');
     if (!el) return;
@@ -12367,20 +12466,8 @@ window.PageAssignments = (function () {
       openCriterionComment: function () {
         openCriterionComment(el.dataset.aid, el.dataset.sid, el.dataset.critid);
       },
-      saveCriterionComment: function () {
-        saveCriterionComment();
-      },
-      saveCriterionCommentNext: function () {
-        saveCriterionCommentNext();
-      },
-      removeCriterionComment: function () {
-        removeCriterionComment();
-      },
-      closeCriterionComment: function () {
-        closeCriterionComment();
-      },
-      cancelCriterionComment: function () {
-        cancelCriterionComment();
+      critCommentReuse: function () {
+        _critCommentReuseChoose(parseInt(el.dataset.i, 10));
       },
       printRubrics: function () {
         // Grading one student: their rubric. Every student showing: everyone's.
@@ -12528,6 +12615,10 @@ window.PageAssignments = (function () {
       _queueOverallComment(el);
       return;
     }
+    if (el.dataset.actionInput === 'critCommentInput') {
+      _critCommentInput(el);
+      return;
+    }
     if (el.dataset.actionInput === 'critWeightLive') {
       updateCritWeight(parseInt(el.dataset.critIdx, 10), el.value);
       return;
@@ -12628,7 +12719,12 @@ window.PageAssignments = (function () {
       return;
     }
     if (el.dataset.actionBlur === 'rsgOverallComment') {
+      if (el === _critCommentFlowEl) _critCommentFlowEl = null;
       _saveOverallComment(el);
+      return;
+    }
+    if (el.dataset.actionBlur === 'critCommentBlur') {
+      _saveCriterionCommentDraft();
       return;
     }
     if (el.dataset.actionBlur === 'rsgWorkOn' || el.dataset.actionBlur === 'rsgBeyond') {
@@ -12777,25 +12873,15 @@ window.PageAssignments = (function () {
     }
     // The Rubric Bank window handles its own keys.
     if (window.RubricBank && RubricBank.isOpen()) return;
-    // While the criterion comment box is open, keys stay inside it: Escape
-    // closes, Tab cycles its controls, and scoring keys never reach the grid.
-    if (_critCommentState && document.activeElement.id !== 'crit-comment-input') {
-      var critDialog = document.querySelector('#crit-comment-overlay .crit-comment-popover');
-      if (e.key === 'Escape') {
-        // An Escape that closed the Discard question isn't a second one.
-        if (!e.defaultPrevented) cancelCriterionComment();
-        e.preventDefault();
-        return;
-      }
-      if (e.key === 'Tab' && critDialog) {
-        _trapCriterionCommentTab(e, critDialog);
-        return;
-      }
-      if (critDialog) return;
-    }
-    if (document.activeElement.id === 'crit-comment-input' && e.key === 'Tab') {
-      var dlg = document.querySelector('#crit-comment-overlay .crit-comment-popover');
-      if (dlg) _trapCriterionCommentTab(e, dlg);
+    // The criterion comment field's Tab, Enter and Escape (scoring keys
+    // never reach the grid while typing in it).
+    if (_critCommentKey(e)) return;
+    // An overall comment the criterion comments led to: Tab goes on to the
+    // next student's or group's first criterion comment, Shift+Tab back.
+    if (e.key === 'Tab' && _critCommentFlowEl && document.activeElement === _critCommentFlowEl) {
+      e.preventDefault();
+      var flowFrom = _critCommentFlowEl;
+      _critCommentMove(flowFrom, flowFrom.dataset.aid, e.shiftKey ? -1 : 1);
       return;
     }
     var ldgRow = document.activeElement.closest && document.activeElement.closest('.ldg-row.ldg-cmp');
@@ -12809,17 +12895,6 @@ window.PageAssignments = (function () {
     )
       return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-      // Criterion comment: Enter saves, Cmd/Ctrl+Enter saves and moves on,
-      // Shift+Enter is a new line.
-      if (e.key === 'Enter' && !e.shiftKey && document.activeElement.id === 'crit-comment-input') {
-        e.preventDefault();
-        if (e.metaKey || e.ctrlKey) saveCriterionCommentNext();
-        else saveCriterionComment();
-      }
-      if (e.key === 'Escape' && _critCommentState && !e.defaultPrevented) {
-        e.preventDefault();
-        cancelCriterionComment();
-      }
       // Handle points keyboard navigation
       if (document.activeElement.classList.contains('gb-pts-input')) {
         handlePointsKey(e, document.activeElement);
@@ -13237,7 +13312,7 @@ window.PageAssignments = (function () {
     _collapsedIds = new Set();
     rubricViewStates = {};
     _commentPopoverState = null;
-    _critCommentState = null;
+    _dropCriterionComment();
     _kbFocusEl = null;
     _statusDebounce = {};
     AC.configure(cid);
@@ -17439,13 +17514,13 @@ window.PageAssignments = (function () {
     Object.keys(_statusDebounce).forEach(function (k) {
       delete _statusDebounce[k];
     });
-    ['rubric-modal', 'comment-popover-overlay', 'crit-comment-overlay'].forEach(function (id) {
+    ['rubric-modal', 'comment-popover-overlay'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.remove();
     });
     if (_commentCapture) _commentCapture.destroy();
     _commentCapture = null;
-    _critCommentState = null;
+    _dropCriterionComment();
     _kbFocusEl = null;
     // The student it ended on, so the gradebook selects their cell.
     var lastSid = focusStudentId;
@@ -17517,7 +17592,7 @@ window.PageAssignments = (function () {
     _rubricDirty = false;
     _rubricAutoTags = [];
     _commentPopoverState = null;
-    _critCommentState = null;
+    _dropCriterionComment();
     _kbFocusEl = null;
     _statusDebounce = {};
     _searchTimer = null;
@@ -17694,8 +17769,7 @@ window.PageAssignments = (function () {
     _commentCapture = null;
     var overlay = document.getElementById('comment-popover-overlay');
     if (overlay) overlay.remove();
-    var critOverlay = document.getElementById('crit-comment-overlay');
-    if (critOverlay) critOverlay.remove();
+    _dropCriterionComment();
     if (window.RubricPrint) RubricPrint.destroy();
 
     // Remove globals
