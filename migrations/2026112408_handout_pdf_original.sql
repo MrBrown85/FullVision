@@ -1,4 +1,4 @@
--- A PDF handout also keeps the original PDF (2026-11-24). NOT APPLIED.
+-- A PDF handout also keeps the original PDF (2026-11-24). APPLIED Nov 24 2026.
 -- Colin, Nov 24: "When a teacher creates an assignment and attaches a pdf to it, it shouldn't only
 -- compress that pdf into an image. it should keep it as a pdf so that students can download and print
 -- them. they should also be able to see the image they already can." Contract:
