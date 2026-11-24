@@ -1,7 +1,8 @@
 /**
  * Quizzes through the student-submit edge function
  * (supabase/functions/student-submit/quiz-routes.ts; the contract is
- * migrations/local-test/quizzes-contract.md, "The student's side (MQ2)"),
+ * migrations/local-test/quizzes-contract.md, "The student's side (MQ2)" and
+ * "MQ3, the returned view"),
  * with a stand-in database.
  *
  * - Each route's one statement and its parameters, the hashed address in
@@ -98,14 +99,15 @@ const SAVE = { route: 'quiz-save', session: PHONE, enrollment_id: ME, assessment
 const SEND = { route: 'quiz-send', session: PHONE, enrollment_id: ME, assessment_id: QZ };
 
 describe('the routes', () => {
-  it('are the four the contract names, and each names one statement, typed as the SQL takes it', () => {
-    expect(Object.keys(QUIZ_ROUTES).sort()).toEqual(['quiz', 'quiz-list', 'quiz-save', 'quiz-send']);
+  it('are the five the contract names, and each names one statement, typed as the SQL takes it', () => {
+    expect(Object.keys(QUIZ_ROUTES).sort()).toEqual(['quiz', 'quiz-list', 'quiz-result', 'quiz-save', 'quiz-send']);
     expect(SQL).toEqual({
       quiz: 'select student_submit.quiz($1::text, $2::uuid, $3::uuid, $4::text, $5::text::boolean) as r',
       quizSave:
         'select student_submit.quiz_save($1::text, $2::uuid, $3::uuid, $4::uuid, $5::text::jsonb, $6::text) as r',
       quizSend: 'select student_submit.quiz_send($1::text, $2::uuid, $3::uuid, $4::text) as r',
       quizList: 'select student_submit.quiz_list($1::text, $2::uuid, $3::text) as r',
+      quizResult: 'select student_submit.quiz_result($1::text, $2::uuid, $3::uuid, $4::text) as r',
     });
   });
 
@@ -120,6 +122,10 @@ describe('the routes', () => {
       send: ['ok', 'try', 'sent_at', 'tries_left', 'can_try_again'],
       list: ['ok', 'quizzes'],
       listed: ['assessment_id', 'tries_left', 'can_answer', 'closed', 'has_open_try'],
+      result: ['ok', 'returned', 'shows', 'total', 'questions'],
+      total: ['earned', 'possible'],
+      right: ['your_answer', 'result'],
+      answers: ['answer', 'why'],
     });
   });
 
@@ -130,6 +136,7 @@ describe('the routes', () => {
       'quiz-save': [...SESSION, 'quiz_closed', 'sent', 'bad_answer', 'too_many'],
       'quiz-send': [...SESSION, 'quiz_closed', 'sent', 'too_many'],
       'quiz-list': SESSION,
+      'quiz-result': SESSION,
     });
   });
 });
@@ -547,6 +554,195 @@ describe('quiz-list', () => {
         ok: false,
         error: said,
       });
+    }
+  });
+});
+
+describe('quiz-result', () => {
+  const ASK = { route: 'quiz-result', session: PHONE, enrollment_id: ME, assessment_id: QZ };
+  const Q4 = '94949494-0000-4000-8000-000000000004';
+  /* A returned view, as the contract says the database sends it with shows answers and Add a Total. */
+  const VIEW = {
+    ok: true,
+    returned: true,
+    shows: 'answers',
+    total: { earned: 4.5, possible: 9 },
+    questions: [
+      { ...QUIZ.questions[0], your_answer: [C2], result: 'wrong', answer: [C1], why: 'Because ' + KEY_MARK },
+      { ...QUIZ.questions[1], your_answer: 3, result: 'wrong', answer: 31415.9265, why: null },
+      { ...QUIZ.questions[2], your_answer: 'Plants need light.', result: 'partly', answer: null, why: KEY_MARK },
+      {
+        id: Q4,
+        number: 4,
+        kind: 'true_false',
+        prompt: 'Plants make food.',
+        points: 1,
+        multiple: false,
+        choices: null,
+        your_answer: null,
+        result: null,
+        answer: true,
+        why: null,
+      },
+    ],
+  };
+  const right = v => ({
+    ...v,
+    shows: 'right',
+    questions: v.questions.map(({ answer: _a, why: _w, ...q }) => q),
+  });
+
+  it('asks student_submit.quiz_result with the session, the enrolment, the piece and the hashed address', async () => {
+    const t = setup(() => VIEW);
+    const r = await t.send(ASK);
+    expect(r).toEqual({ status: 200, body: VIEW });
+    expect(t.calls).toHaveLength(1);
+    expect(t.calls[0][0]).toBe(SQL.quizResult);
+    expect(t.calls[0][1].slice(0, 3)).toEqual([PHONE, ME, QZ]);
+    expect(t.calls[0][1][3]).toMatch(/^[0-9a-f]{64}$/);
+    expect(t.calls[0][1]).toHaveLength(4);
+    expect(t.logs).toEqual([{ route: 'quiz-result', outcome: 'ok', ms: expect.any(Number) }]);
+    // The log line holds no id, word, answer or address.
+    expect(JSON.stringify(t.logs)).not.toMatch(/[0-9a-f]{8}-0000|ZQX|producer|31415|203\.0/i);
+  });
+
+  it('every key at every level is one of the contract’s, in its order', async () => {
+    const r = (await setup(() => VIEW).send(ASK)).body;
+    expect(Object.keys(r)).toEqual(SENT.result);
+    expect(Object.keys(r.total)).toEqual(SENT.total);
+    for (const q of r.questions) expect(Object.keys(q)).toEqual([...SENT.question, ...SENT.right, ...SENT.answers]);
+    for (const c of r.questions[0].choices) expect(Object.keys(c)).toEqual(SENT.choice);
+  });
+
+  it('not returned is exactly ok and returned false, whatever else the database sends', async () => {
+    for (const said of [
+      { ok: true, returned: false },
+      { ok: true, returned: false, shows: 'answers', total: VIEW.total, questions: VIEW.questions, key: KEY_MARK },
+      { ok: true, shows: 'answers', questions: VIEW.questions },
+      { ok: true, returned: 'true', shows: 'answers', questions: VIEW.questions },
+    ]) {
+      const r = await setup(() => said).send(ASK);
+      expect(r).toEqual({ status: 200, body: { ok: true, returned: false } });
+      expect(JSON.stringify(r.body)).not.toMatch(/ZQX|31415|questions|total/);
+    }
+  });
+
+  it('shows right: each question with your_answer and result, never the key’s answer or why', async () => {
+    const r = await setup(() => ({ ...VIEW, shows: 'right' })).send(ASK);
+    expect(r.body).toEqual(right(VIEW));
+    for (const q of r.body.questions) expect(Object.keys(q)).toEqual([...SENT.question, ...SENT.right]);
+    expect(JSON.stringify(r.body)).not.toMatch(/ZQX|31415|"answer"|"why"/);
+  });
+
+  it('shows grade: no questions at all, even when the database sends them', async () => {
+    const r = await setup(() => ({ ...VIEW, shows: 'grade' })).send(ASK);
+    expect(r.body).toEqual({ ok: true, returned: true, shows: 'grade', total: VIEW.total });
+    expect(JSON.stringify(r.body)).not.toMatch(/ZQX|31415|questions|your_answer|result/);
+    const { total: _t, ...noTotal } = VIEW;
+    const g = await setup(() => ({ ...noTotal, shows: 'grade' })).send(ASK);
+    expect(g.body).toEqual({ ok: true, returned: true, shows: 'grade' });
+  });
+
+  it('no total without Add a Total', async () => {
+    const { total: _t, ...noTotal } = VIEW;
+    const r = await setup(() => noTotal).send(ASK);
+    expect(r.body).toEqual(noTotal);
+    expect(Object.keys(r.body)).toEqual(['ok', 'returned', 'shows', 'questions']);
+  });
+
+  it('a key the database might add, at any level, never reaches the phone', async () => {
+    const leaky = {
+      ...VIEW,
+      grade: { level: 3 },
+      marked: { earned: 4.5 },
+      attempt_id: OTHER_KID,
+      total: { ...VIEW.total, questions: { [Q1]: { earned: 0 } } },
+      questions: VIEW.questions.map(q => ({
+        ...q,
+        tolerance: 0.0271828,
+        tag_id: TAG,
+        position: 3,
+        given_points: 2,
+        note: 'ZQX-NOTE',
+        earned: 1,
+        choices: q.choices && q.choices.map(c => ({ ...c, right: c.id === C1, order: 1 })),
+      })),
+      others: [{ enrollment_id: OTHER_KID }],
+    };
+    const r = await setup(() => leaky).send(ASK);
+    expect(r.body).toEqual(VIEW);
+    expect(JSON.stringify(r.body)).not.toMatch(
+      /0\.0271828|tag_id|position|given_points|NOTE|marked|"earned":1,|7a7a7a7a|e9e9e9e9|"grade"/,
+    );
+  });
+
+  it('values are copied only as their kind', async () => {
+    const odd = {
+      ...VIEW,
+      total: { earned: '4.5', possible: null },
+      questions: [
+        {
+          ...VIEW.questions[1],
+          your_answer: { nested: true },
+          result: 'excellent',
+          answer: 'the answer in words',
+          why: { html: '<b>' },
+        },
+        { ...VIEW.questions[3], your_answer: [Q1, 'x'], result: 7, answer: [C1] },
+      ],
+    };
+    const r = (await setup(() => odd).send(ASK)).body;
+    expect(r).toEqual({
+      ok: true,
+      returned: true,
+      shows: 'answers',
+      total: { earned: null, possible: null },
+      questions: [
+        { ...QUIZ.questions[1], your_answer: null, result: null, answer: null, why: null },
+        { ...VIEW.questions[3], your_answer: null, result: null, answer: [C1], why: null },
+      ],
+    });
+  });
+
+  it('an unknown shows, a question with no id or an unknown kind is a server error, not a broken page', async () => {
+    for (const said of [
+      { ...VIEW, shows: 'everything' },
+      { ...VIEW, shows: null },
+      { ...VIEW, questions: [{ ...VIEW.questions[0], id: 'x' }] },
+      { ...VIEW, questions: [{ ...VIEW.questions[0], kind: 'essay' }] },
+      { ...VIEW, questions: Array.from({ length: 101 }, (_, i) => ({ ...VIEW.questions[3], number: i + 1 })) },
+    ]) {
+      expect(await setup(() => said).send(ASK)).toEqual({ status: 500, body: { ok: false, error: 'server' } });
+    }
+  });
+
+  it('a request of the wrong shape is bad_request and the database is not asked', async () => {
+    for (const body of [
+      { ...ASK, session: undefined },
+      { ...ASK, session: 'x'.repeat(129) },
+      { ...ASK, enrollment_id: 'me' },
+      { ...ASK, assessment_id: undefined },
+      { ...ASK, assessment_id: 12 },
+    ]) {
+      const t = setup(() => VIEW);
+      expect(await t.send(body)).toEqual({ status: 400, body: { ok: false, error: 'bad_request' } });
+      expect(t.calls).toEqual([]);
+    }
+  });
+
+  it('a refusal passes on by its code alone; one the route does not name is not_found', async () => {
+    for (const [error, said] of [
+      ['signed_out', 'signed_out'],
+      ['not_found', 'not_found'],
+      ['closed', 'closed'],
+      ['card_stopped', 'card_stopped'],
+      ['card_expired', 'card_expired'],
+      ['quiz_closed', 'not_found'],
+      ['too_many', 'not_found'],
+      ['not_returned', 'not_found'],
+    ]) {
+      const r = await setup(() => ({ ok: false, error, questions: VIEW.questions, retry_after_s: 5 })).send(ASK);
+      expect(r.body).toEqual({ ok: false, error: said });
     }
   });
 });

@@ -2757,6 +2757,27 @@ Since the apply, `docs/schema.generated.sql` (its md5 equal to live's snapshot, 
 
 Not verified here: PostgREST's schema cache and the app's calls through it, the edge function (not changed: `closed` is already in its whitelist).
 
+## Quizzes, the returned view (2026112407, 2026-11-24)
+
+One file, `../2026112407_quiz_returned.sql`, NOT APPLIED. Slice Q5a of `docs/plans/quizzes-plan.md`; the contract is `quizzes-contract.md`, "MQ3, the returned view". It needs 2026111807 (MQ2b) and the session-token change (2026112401), which a database rebuilt from the repo already has. It adds one read-only function, `student_submit.quiz_result` (`stable`, `security definer`, the path pinned, `service_role` only), for the route `quiz-result`: the returned view. It is the only `student_submit` function that names `quiz_key`. It answers `{ ok: true, returned: false }` and nothing else unless the piece is returned to the student with a grade shown, the student can no longer answer, a try is confirmed and returned since (in a class that keeps changes until Return, by the time; in a class that returns at once, by no draft waiting), and then only what the quiz's When Returned Students See allows. It writes nothing (no try, no `write_log` row) and takes no row lock. It changes no existing row, table, policy, constraint or function. 21,146 bytes, plain ASCII, no backslash. Pre-check `quiz-returned-live-precheck.sql`, post-check `quiz-returned-live-postcheck.sql` (22 rows), undo `quiz-returned-undo.sql`, live fingerprints `quiz-returned-live-fingerprints.sql` (one read-only select; no rows means every relied-on function matches).
+
+```bash
+$PSQL postgresql://postgres@127.0.0.1:54793/postgres -c "create database q5a_icu template template0 locale_provider icu icu_locale 'en-US' lc_collate 'en_US.UTF-8' lc_ctype 'en_US.UTF-8'"
+$PSQL postgresql://postgres@127.0.0.1:54793/postgres -c "create database q5a_c template template0 locale_provider libc lc_collate 'C' lc_ctype 'C'"
+DATABASE_URL=postgresql://postgres@127.0.0.1:54793/q5a_icu node scripts/db-rebuild.mjs --check     # and the same for q5a_c
+export PGPORT=54793 FV_ICU_DB=q5a_icu FV_C_DB=q5a_c PYTHONDONTWRITEBYTECODE=1
+PGDATABASE=q5a_icu python3 quiz_returned.py
+PGDATABASE=q5a_c python3 quiz_returned.py
+FV_NONSUPER=q5a_postgres PGDATABASE=q5a_icu python3 quiz_returned.py
+FV_DB_TEST_APPLY=migrations/2026112407_quiz_returned.sql DATABASE_URL=postgresql://postgres@127.0.0.1:54793/postgres npm run test:db
+```
+
+The script uses `quizzes_student.py`'s world on a template that has MQ2 and MQ2b as live has them. Since 2026112401 a card's sign-in gives the database only the hash of a token the edge function made; the script signs in the same way (`verify_card` with nine arguments, and `w.tok` holding the hash the function sends), so `quizzes_student.py` and `quizzes_student_list.py`, written before it, are not run here. Scores are written with `upsert_tag_score`, returned with `return_grades`, marked Missing and Excused with `set_score_status`, and a marking stored with `confirm_quiz`, in each order the app's outbox can deliver a score and a marking. Scenarios: `stages` (every student route at every stage, the writing ones in a transaction rolled back; the key's markers in no reply until returned and closed to that student, and then only under a question's `answer` and `why`), `shows`, `tries`, `order`, `undo`, `atonce`, `notfound`, `refused`, `nowrite`, `others` (the catalog: only `quiz_result` names `quiz_key`), `apply`, `lastcheck`, `undofile`, `collations`.
+
+Result on 2026-11-24, PostgreSQL 17.11 (embedded-postgres), on databases rebuilt with `--check` from `main` at `029e0232`: under ICU en-US **953 of 953**; under C **953 of 953**; as the non-superuser **966 of 966**. The post-check has 22 rows, every one ok. `npm run test:db` without the file: every rule test passed (75 student_submit functions; service_role may run 45); with it: every rule test passed (76; 46).
+
+Not verified here: gradebook-prod; the edge function deployed.
+
 ## Quizzes, the student page's list (2026111807, 2026-11-18)
 
 One file, `../2026111807_quizzes_student_list.sql`, APPLIED to gradebook-prod on 2026-11-18 from commit `04d50b81` (the text applied: 13,333 bytes, sha256 `d5f7d52e080d929ba00e9b808118fccca1afaaf5f51639d9fcc6fe3a0767127b`; since then only its first comment line says it is applied); post-check 13 of 13 ok; the `student-submit` edge function (v22) deployed from `04d50b81` after it. It needs 2026111806 (MQ2). It adds one read-only function, `student_submit.quiz_list` (`stable`, `security definer`, the path pinned, `service_role` only), for the route `quiz-list`: which pieces of the session's class are quizzes the student may open, by `quiz`'s own rule (`_quiz_window`), and for each `tries_left`, `can_answer`, `closed` and `has_open_try`. It begins with `_session_class`, reads no question, key or answer, writes nothing (no try, no `write_log` row) and takes no row lock. `student_submit.page` and its reply are not changed. It changes no existing row, table, policy, constraint or function. 13,333 bytes, plain ASCII, no backslash. Contract: `quizzes-contract.md`, "quiz_list".

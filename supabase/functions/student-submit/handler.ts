@@ -16,7 +16,7 @@
 // handout-routes.ts: handout-links; and a class's bulletins, in
 // bulletin-routes.ts: bulletins, bulletin-seen, bulletin-react and
 // bulletin-files; and a quiz, in quiz-routes.ts: quiz, quiz-save, quiz-send,
-// and quiz-list (which pieces are quizzes).
+// quiz-list (which pieces are quizzes) and quiz-result (the returned view).
 // The SQL functions (migrations/20261025_student_submit.sql, and
 // migrations/2026110904_student_sessions_page.sql for a card) hold every
 // rule; this file only checks the request's shape, refuses to run outside
@@ -39,7 +39,7 @@ import { FORM_ROUTES, makeFormRoutes } from './forms-routes.ts';
 import { HANDOUT_ROUTES, makeHandoutRoutes } from './handout-routes.ts';
 // Bulletins: the class's one-way feed, Seen and reactions, a bulletin's pages signed (bulletin-routes.ts).
 import { BULLETIN_ROUTES, makeBulletinRoutes } from './bulletin-routes.ts';
-// Quizzes: list the quizzes, open one, save each answer, send the try (quiz-routes.ts).
+// Quizzes: list the quizzes, open one, save each answer, send the try, the returned view (quiz-routes.ts).
 import { QUIZ_ROUTES, makeQuizRoutes } from './quiz-routes.ts';
 // A slip's open and verify, with the key (plan S3-S1).
 import { openSlip, verifySlip } from './slip-routes.ts';
