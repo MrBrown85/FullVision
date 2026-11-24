@@ -841,7 +841,21 @@ window.StudentPageView = (function () {
     '<svg class="sp-out-icon" ' +
     OUT_ICON +
     '><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg>';
+  var OPEN_ICON =
+    '<svg class="sp-out-icon" ' +
+    OUT_ICON +
+    '><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14h6M9 17h4"/></svg>';
   var OUT_ROWS = [
+    {
+      how: 'open',
+      act: 'handout-open',
+      name: 'Open as PDF',
+      icon: OPEN_ICON,
+      // Only a handout that keeps the teacher's original file (the route says so when the sheet opens).
+      when: function (got) {
+        return got.original === true;
+      },
+    },
     {
       how: 'save',
       act: 'handout-save',
@@ -894,7 +908,9 @@ window.StudentPageView = (function () {
           var mine = out && out.how === row.how ? out.state : '';
           var words =
             mine === 'working'
-              ? 'Getting Pages…'
+              ? mine && out.what === 'pdf'
+                ? 'Getting the PDF…'
+                : 'Getting Pages…'
               : mine === 'failed'
                 ? 'The handout didn’t load. Check your internet and try again.'
                 : row.name;

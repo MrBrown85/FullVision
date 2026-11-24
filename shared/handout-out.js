@@ -144,6 +144,12 @@
      who closes the sheet has changed their mind: that is not an error. */
   function save(pages, title) {
     return pdfFile(pages, title).then(function (file) {
+      return shareFile(file, title);
+    });
+  }
+
+  function shareFile(file, title) {
+    return Promise.resolve(file).then(function (file) {
       var nav = /** @type {any} */ (navigator);
       var canShare = false;
       try {
@@ -167,6 +173,33 @@
         },
       );
     });
+  }
+
+  // A PDF blob as it is: the share sheet or a download, as Save to Phone gives.
+  function saveBlob(blob, title) {
+    return shareFile(new File([blob], fileName(title), { type: 'application/pdf' }), title);
+  }
+
+  /* A PDF blob in the phone's own viewer (Zoom, search, Print). Called in the
+     press itself, as a tab may only be opened by one: a link to a blob: address
+     that opens a new tab. Android's Chrome has no viewer of its own and would
+     only download it, so there the share sheet offers the apps that read PDFs. */
+  function openPdf(blob, title) {
+    if (/Android/i.test(navigator.userAgent || '')) return saveBlob(blob, title);
+    var url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.hidden = true;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // The viewer has read it long before this.
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 300000);
+    return Promise.resolve('opened');
   }
 
   function clearSheet() {
@@ -224,5 +257,5 @@
     });
   }
 
-  return { print: print, save: save, fileName: fileName, pdfFile: pdfFile };
+  return { print: print, save: save, saveBlob: saveBlob, openPdf: openPdf, fileName: fileName, pdfFile: pdfFile };
 })();
