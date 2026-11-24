@@ -408,6 +408,7 @@ var CmReflectBuilder = (function () {
         { label: 'Move Heading Up', action: 'sqBUp', off: same(moveBy(qs, i, -1)) },
         { label: 'Move Heading Down', action: 'sqBDown', off: same(moveBy(qs, i, 1)) },
       ];
+    /** @type {any[]} */
     var out = [null, { label: 'Add a Question Below', action: 'sqBAddAt', data: { at: i + 1 } }];
     if (canStartHeading(qs, i))
       out.push({ label: 'Start a New Heading Here', action: 'sqBAddAt', data: { at: i, kind: 'section' } });
@@ -701,6 +702,7 @@ var CmReflectBuilder = (function () {
     var list = build.querySelector('.rb-qs');
     var lr = list.getBoundingClientRect();
     if (e.clientX < lr.left - 44 || e.clientX > lr.right) return _hideIns();
+    /** @type {any} */
     var best = null;
     _gaps().forEach(function (g) {
       var dd = Math.abs(e.clientY - g.y);
@@ -734,9 +736,11 @@ var CmReflectBuilder = (function () {
       '" data-kind="section">Add a Heading</button></div>';
     build.appendChild(box);
     _ins = { el: box, at: best.at, open: false, next: best.el };
-    box.querySelector('.rb-ins-plus').addEventListener('mouseenter', function () {
-      _part(true);
-    });
+    var plus = box.querySelector('.rb-ins-plus');
+    if (plus)
+      plus.addEventListener('mouseenter', function () {
+        _part(true);
+      });
     box.addEventListener('mouseleave', function () {
       _hideIns();
     });
