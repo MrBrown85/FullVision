@@ -610,13 +610,24 @@ window.ReportBlocks = (function () {
         const barPct = studentLevelBarPercent(cid, prof);
         // Gather per-tag assessment evidence. getTagScores turns points into
         // a level (18/20 is Extending, not level 18) and leaves out excused work.
-        const tagScores = getTagScores(cid, student.id, tag.id).filter(s => s.score > 0);
+        // The pieces are named in the order they count in (calc.js
+        // inCountingOrder), never where their entries are stored: a returned
+        // grade cleared since sits at the end of the returned grades, and
+        // must not move its piece to the end of the line (ROADMAP 1.9).
+        const tagScores = inCountingOrder(
+          cid,
+          getTagScores(cid, student.id, tag.id).filter(s => s.score > 0),
+        );
         const evidenceMap = {};
+        const pieceOrder = [];
         tagScores.forEach(s => {
-          if (!evidenceMap[s.assessmentId]) evidenceMap[s.assessmentId] = [];
+          if (!evidenceMap[s.assessmentId]) {
+            evidenceMap[s.assessmentId] = [];
+            pieceOrder.push(s.assessmentId);
+          }
           evidenceMap[s.assessmentId].push(s.score);
         });
-        const evidence = Object.keys(evidenceMap)
+        const evidence = pieceOrder
           .map(aId => {
             const a = assessments.find(x => x.id === aId);
             if (!a) return null;
