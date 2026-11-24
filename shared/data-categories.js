@@ -333,8 +333,8 @@ function _waitingForOtherWrites() {
   var res = { ok: false, why: 'waiting' };
   var q = window.v2Queue;
   try {
-    var stats = (q && typeof q.stats === 'function' && q.stats()) || {};
-    if ((stats.queued || 0) > 0) {
+    var stats = q && typeof q.stats === 'function' ? q.stats() : null;
+    if (stats && (stats.queued || 0) > 0) {
       if (stats.signedOut) res.waitingOn = 'signIn';
       else if (stats.owner === false) res.waitingOn = 'otherTab';
     }
