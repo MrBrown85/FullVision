@@ -392,6 +392,7 @@ var CmReflectBuilder = (function () {
         { label: 'Move Heading Up', action: 'sqBUp', off: same(moveBy(qs, i, -1)) },
         { label: 'Move Heading Down', action: 'sqBDown', off: same(moveBy(qs, i, 1)) },
       ];
+    /** @type {any[]} */
     var out = [
       null,
       { label: 'Move Up', action: 'sqBUp', off: i === 0 },
