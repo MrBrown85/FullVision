@@ -23,7 +23,7 @@ var QuestionCards = (function () {
     { kind: 'date', label: 'Date' },
     { kind: 'ranking', label: 'Ranking' },
     { kind: 'likert', label: 'Likert' },
-    { kind: 'section', label: 'Section Heading' },
+    { kind: 'section', label: 'Heading' },
   ];
   var MAX = {
     prompt: 1000,
@@ -177,15 +177,14 @@ var QuestionCards = (function () {
     var a = _o(opts).actions;
     var attrs = editable ? ' data-action="' + a.edit + '" data-i="' + i + '"' : '';
     var req = d.kind !== 'section' && d.required ? ' <span class="rb-req" aria-label="required">*</span>' : '';
-    var words =
-      d.kind === 'section' ? _ph(d.prompt, 'Section heading') : num + '. ' + _ph(d.prompt, 'Question ' + num) + req;
+    var words = d.kind === 'section' ? _ph(d.prompt, 'Heading') : num + '. ' + _ph(d.prompt, 'Question ' + num) + req;
     var prompt = editable
       ? '<button type="button" class="rb-v-prompt" data-action="' +
         a.edit +
         '" data-i="' +
         i +
         '" aria-label="Edit ' +
-        (d.kind === 'section' ? 'section heading' : 'question ' + num) +
+        (d.kind === 'section' ? 'heading' : 'question ' + num) +
         '">' +
         words +
         '</button>'
@@ -471,7 +470,7 @@ var QuestionCards = (function () {
     return (
       '<div class="rb-q-edit">' +
       '<div class="rb-q-bar"><span class="rb-q-label">' +
-      (section ? 'Section Heading' : 'Question ' + num) +
+      (section ? 'Heading' : 'Question ' + num) +
       '</span>' +
       kindPicker(d, i, opts) +
       toolbar(i, last, opts) +

@@ -1515,3 +1515,9 @@ Colin: Edit Questions was a janky dialog: a teacher could change the categories 
 6. **Edit Questions in the panel** goes to the part in One Student view with the cursor in the first statement and, once per device, a tip. The dialog stays only for a class with no students.
 7. **Found while building, fixed with it**: a heading row could print alone at the foot of a page with its statements on the next. A page now never ends on a table's heading row (a reflection's heading or a folder), and a teacher's own scale words wrap in their column instead of widening it.
 8. **Follow-up, not built**: Reflect's builder in Class Settings moves questions with ↑ ↓ buttons and calls its headings Section Headings. Making it work the same way (Nielsen's consistency) is its own piece of work.
+
+## Reflect's builder works the way One Report's editor does (2026-11-24)
+
+Follow-up to "The reflections' questions edited on the page", item 8. The council (Krug, Nielsen, WCAG 2.2 3.2.4) advised that the same action look and work the same way in both editors; Colin decides each change one at a time. Reflect keeps its draft and its Save and Cancel: a reflection may be on for students, and saving as each box is left would show them half-edited questions.
+
+1. **Headings are called Headings** (Colin, Nov 24): the Add a Question bar, the question type list and the card's label say Heading, not Section Heading, as One Report does. Students see only the heading's own words, so nothing changes for them. The stored kind stays `section`.

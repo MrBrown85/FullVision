@@ -5,6 +5,9 @@
  * previewHtml returned on the code before the move. Every string must match
  * exactly. Never regenerate the fixture after the move
  * (UPDATE_QUESTION_CARDS_FIXTURE=1 rewrites it; it was run once, before).
+ * One edit by hand since: "Section Heading" became "Heading" (DECISIONS,
+ * "Reflect's builder works the way One Report's editor does" 1), a find and
+ * replace of those words only.
  */
 import './setup.js';
 import { describe, expect, it } from 'vitest';

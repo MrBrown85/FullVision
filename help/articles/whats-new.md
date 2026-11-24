@@ -68,7 +68,7 @@ Between the top bar and the student cards, the Dashboard now has one row as tall
 
 ## Nov 16, 2026: Reflect
 
-The Questionnaires tab in Class Settings is now Reflect, and each item on it is a reflection. Students open reflections from the Reflect tab on their page after they sign in with their card; questionnaire slips are no longer printed. A reflection's On switch puts it in every student's Reflect tab until it is turned off, and a closing date is optional. See Answers shows what students wrote. New Reflection builds a reflection from Choice, Text, Rating, Date, Ranking, Likert and Section Heading questions, and Preview as a Student shows it as students will see it. A reflection built this way can be copied to another class or deleted until a student answers it.
+The Questionnaires tab in Class Settings is now Reflect, and each item on it is a reflection. Students open reflections from the Reflect tab on their page after they sign in with their card; questionnaire slips are no longer printed. A reflection's On switch puts it in every student's Reflect tab until it is turned off, and a closing date is optional. See Answers shows what students wrote. New Reflection builds a reflection from Choice, Text, Rating, Date, Ranking, Likert and Heading questions, and Preview as a Student shows it as students will see it. A reflection built this way can be copied to another class or deleted until a student answers it.
 
 ## Nov 14, 2026: The Student Page, Redesigned
 
