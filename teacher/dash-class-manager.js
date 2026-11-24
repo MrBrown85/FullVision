@@ -6627,7 +6627,17 @@ window.DashClassManager = (function () {
     waiting:
       'Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment.',
     waitingOrder: 'Other changes from this computer are still being sent, so nothing was saved. Try again in a moment.',
+    // The same, while the sign-in has expired, or another tab holds the outbox.
+    waitingSignIn:
+      'Your sign-in has expired, so other changes from this computer are waiting and nothing was saved. Your changes are kept on this computer. Save again after you sign in.',
+    waitingOrderSignIn:
+      'Your sign-in has expired, so other changes from this computer are waiting and nothing was saved. Try again after you sign in.',
+    waitingOtherTab:
+      'Other changes from this computer are waiting for another FullVision tab to send them, so nothing was saved. Your changes are kept on this computer. Save again once that tab has sent them.',
+    waitingOrderOtherTab:
+      'Other changes from this computer are waiting for another FullVision tab to send them, so nothing was saved. Try again once that tab has sent them.',
   };
+  var CM_CAT_WAITING_ON = { signIn: 'SignIn', otherTab: 'OtherTab' };
   var CM_CAT_REST = ' Everything else was copied.';
   function _cmCatNoticeText(st) {
     var n = st.notice;
@@ -6649,7 +6659,7 @@ window.DashClassManager = (function () {
       );
     }
     if (n.kind === 'changed') return st.typed && st.typed.length ? CM_CAT_NOTICES.changedTyped : CM_CAT_NOTICES.changed;
-    return CM_CAT_NOTICES[n.kind] || null;
+    return CM_CAT_NOTICES[n.kind + (CM_CAT_WAITING_ON[n.on] || '')] || null;
   }
   // The button beside the line: what it does, and its label.
   function _cmCatNoticeAction(st) {
@@ -7443,7 +7453,7 @@ window.DashClassManager = (function () {
       // knows it for this computer's own if it did.
       if (res.unknown) _cmCatTried(st, rows);
       st.keeping = true;
-      st.notice = { kind: res.why === 'waiting' ? 'waiting' : 'offline' };
+      st.notice = res.why === 'waiting' ? { kind: 'waiting', on: res.waitingOn || null } : { kind: 'offline' };
       _cmCatKeep(cid);
       _cmCatRedraw(cid);
     });
@@ -7556,7 +7566,8 @@ window.DashClassManager = (function () {
         } else {
           // Not sent: the row goes back where it was.
           undo();
-          st.notice = { kind: res.why === 'waiting' ? 'waitingOrder' : 'offlineOrder' };
+          st.notice =
+            res.why === 'waiting' ? { kind: 'waitingOrder', on: res.waitingOn || null } : { kind: 'offlineOrder' };
         }
         _cmCatRedraw(cid);
       });

@@ -1,5 +1,6 @@
 /**
- * The 14-day purge of saved copies leaves an unsaved category draft
+ * The 14-day purge of saved copies, and the removal of the oldest one when
+ * browser storage is full, leave an unsaved category draft
  * (gb-category-draft-<class>) alone. A class that is deleted still loses it.
  */
 import './setup.js';
@@ -33,6 +34,19 @@ describe('purging saved copies and category drafts', () => {
     expect(localStorage.getItem('gb-students-' + STALE)).toBeNull();
     expect(localStorage.getItem('gb-assessments-' + STALE)).toBeNull();
     expect(getCategoryDraft(STALE)).toBeNull();
+  });
+
+  it('storage full: the oldest saved copy goes, its draft stays', () => {
+    _saveClassMeta(STALE, { lastOpenedAt: OLD() });
+    localStorage.setItem('gb-students-' + STALE, '[]');
+    saveCategoryDraft(STALE, { rows: [{ name: 'Quizzes' }], opened: [] });
+    _saveClassMeta(FRESH, { lastOpenedAt: Date.now() });
+    localStorage.setItem('gb-students-' + FRESH, '[]');
+    expect(_evictOldestSavedCopy(FRESH)).toBe(true);
+    expect(localStorage.getItem('gb-students-' + STALE)).toBeNull();
+    expect(localStorage.getItem('gb-bundle-meta-' + STALE)).toBeNull();
+    expect(getCategoryDraft(STALE)).toEqual({ rows: [{ name: 'Quizzes' }], opened: [] });
+    expect(localStorage.getItem('gb-students-' + FRESH)).toBe('[]');
   });
 
   it('a draft goes when its save lands (the form clears it) and when the class is deleted', () => {
