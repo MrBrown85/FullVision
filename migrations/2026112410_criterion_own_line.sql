@@ -1,4 +1,4 @@
--- A line for one student under a criterion's group comment (2026-11-24). NOT APPLIED (needs Colin's OK, rule 1).
+-- A line for one student under a criterion's group comment (2026-11-24). APPLIED Nov 24 2026 on Colin's OK (pre-check no rows; post-check all 21 ok).
 -- On pair and group work the teacher grades the group once and the app copies each criterion's level, comment
 -- and Went Beyond to every member (shared/data.js _syncGroupFrom). This adds one more note per criterion that
 -- belongs to ONE student and is never copied to the group mates ("Hannah only: ..."). It prints on that
