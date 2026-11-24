@@ -468,46 +468,6 @@
       .ticks b {
         color: #ffffff;
       }
-      /* Facts */
-      .facts {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
-      }
-      .fact {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 22px;
-        padding: 24px 24px 26px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-      }
-      .fact b {
-        font-size: 40px;
-        line-height: 1;
-        font-weight: 850;
-        letter-spacing: -0.035em;
-      }
-      .fact:nth-child(1) b {
-        color: #7cc0ff;
-      }
-      .fact:nth-child(2) b {
-        color: var(--prf);
-      }
-      .fact:nth-child(3) b {
-        color: var(--dev);
-      }
-      .fact:nth-child(4) b {
-        color: #ff9a7b;
-      }
-      .fact span {
-        font-size: 15px;
-        line-height: 1.5;
-        color: var(--ink-2);
-      }
       /* Feature rows */
       .feat {
         display: grid;
@@ -654,6 +614,12 @@
         line-height: 1.5;
         color: var(--ink-2);
       }
+      /* Two choices side by side across a full-width section */
+      .choices.two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
       /* New: a small marker beside an eyebrow */
       .new {
         display: inline-block;
@@ -665,12 +631,18 @@
         color: #0b1a2a;
         background: linear-gradient(120deg, #f1b434, #d69a2d);
       }
+      .choice .new {
+        font-size: 11px;
+        line-height: 1.4;
+        color: #0b1a2a;
+        text-transform: uppercase;
+        vertical-align: 2px;
+      }
       /* Type: headings break into even lines, and no paragraph ends on one
          stranded word. A long lede stops at a readable measure. */
       .h1,
       .h2,
       .card h3,
-      .fact b,
       .choice b {
         text-wrap: balance;
       }
@@ -678,7 +650,6 @@
       .ticks li,
       .steps li,
       .card p,
-      .fact span,
       .choice span {
         text-wrap: pretty;
       }
@@ -1065,7 +1036,6 @@
         .phone-row .feat-text {
           justify-self: start;
         }
-        .facts,
         .cards {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -1099,9 +1069,9 @@
         .lede {
           font-size: 17px;
         }
-        .facts,
         .cards,
         .steps,
+        .choices.two,
         .faq {
           grid-template-columns: minmax(0, 1fr);
         }
@@ -1151,7 +1121,6 @@
           <nav class="navlinks" aria-label="Main">
             <a class="navlink" href="#grading">Assessment</a>
             <a class="navlink" href="#student-work">Student Work</a>
-            <a class="navlink" href="#bulletins">Bulletins</a>
             <a class="navlink" href="#reports">Reports</a>
             <a class="navlink" href="#schools">Privacy</a>
             <a class="navlink" href="#questions">Questions</a>
@@ -1205,26 +1174,6 @@
             </div>
           </div>
         </section>
-        <section aria-label="At a Glance" style="padding: 24px 0 72px">
-          <div class="wrap facts">
-            <div class="fact reveal">
-              <b data-count="226">226</b>
-              <span>BC courses, grades 8 to 12, with every competency in the Ministry’s own words.</span>
-            </div>
-            <div class="fact reveal" style="--d: 0.08s">
-              <b>Canada</b>
-              <span>Where class lists, assessments and comments are stored.</span>
-            </div>
-            <div class="fact reveal" style="--d: 0.16s">
-              <b>Offline</b>
-              <span>Assess and observe on your phone without Wi-Fi. It sends when you reconnect.</span>
-            </div>
-            <div class="fact reveal" style="--d: 0.24s">
-              <b>No AI Writing</b>
-              <span>Every comment is built from sentences you wrote and can read.</span>
-            </div>
-          </div>
-        </section>
         <section id="grading" class="band band-white">
           <div class="wrap feat">
             <div class="feat-text stack reveal">
@@ -1242,6 +1191,7 @@
                 <li>The Proficiency Scale with + and −, points, or letter grades for 10 to 12</li>
                 <li>Pair and group work, assessed together or one by one</li>
                 <li>A comment on any criterion, and one for the whole piece</li>
+                <li>Print Rubrics hands back a completed sheet for every student, ready for the photocopier</li>
               </ul>
             </div>
             <img
@@ -1251,48 +1201,8 @@
               alt="Rubric criteria with the boxes a teacher ticked and Suggested: Proficient beside each."
             />
           </div>
-          <div class="wrap feat flip">
-            <div class="feat-text stack reveal">
-              <p class="eyebrow">Printing</p>
-              <h2 class="h2">Hand Back a <em>Completed Rubric</em></h2>
-              <p class="lede">
-                Print Rubrics makes a sheet for every student: the level you chose on each criterion, their overall
-                level and room for your feedback.
-              </p>
-              <ul class="ticks">
-                <li>One, two or four to a page, with cut lines</li>
-                <li>Black and white, ready for the photocopier</li>
-                <li>Blank copies to hand out before the work begins</li>
-              </ul>
-            </div>
-            <div class="sheet-wrap reveal from-left">
-              <img
-                loading="lazy"
-                src="/assets/splash/rubric-print.jpg"
-                alt="One printed page of four completed rubrics, each with a student’s name, the level chosen on every criterion and their overall level."
-              />
-            </div>
-          </div>
         </section>
-        <section class="band">
-          <div class="wrap feat flip">
-            <div class="feat-text stack reveal">
-              <p class="eyebrow">Gradebook</p>
-              <h2 class="h2">Every Assignment for the Year <em>in One Table</em></h2>
-              <p class="lede">
-                Each student’s overall level sits beside their scores, newest first, so a Learning Update shows the year
-                to date. Missing work is recorded as Missing and is <b>never averaged in as a zero</b>.
-              </p>
-            </div>
-            <img
-              class="shot reveal from-left tilt"
-              loading="lazy"
-              src="/assets/splash/gradebook.jpg"
-              alt="The gradebook: each student’s overall level beside their scores, newest first."
-            />
-          </div>
-        </section>
-        <section id="student-work" class="band band-white">
+        <section id="student-work" class="band">
           <div class="wrap stack" style="gap: 48px">
             <div class="stack reveal" style="max-width: 780px">
               <p class="eyebrow">Student Work</p>
@@ -1330,9 +1240,25 @@
                 />
               </div>
             </div>
+            <div class="choices two reveal">
+              <div class="choice">
+                <b>Bulletins<span class="new">New</span></b>
+                <span
+                  >Announcements and reminders are the first tab on each student’s page. Post from your laptop or your
+                  phone, and see who has seen each one.</span
+                >
+              </div>
+              <div class="choice">
+                <b>Reflect<span class="new">New</span></b>
+                <span
+                  >Self-assessments and goals appear in each student’s Reflect tab, with no slips to print. Their words
+                  are there when you write their report.</span
+                >
+              </div>
+            </div>
           </div>
         </section>
-        <section id="paper" class="band">
+        <section id="paper" class="band band-white">
           <div class="wrap feat">
             <div class="feat-text stack reveal">
               <p class="eyebrow">Paper Work<span class="new">New</span></p>
@@ -1343,9 +1269,7 @@
               </p>
               <ul class="ticks">
                 <li>A pile in class-list order names itself; or type two letters of a name</li>
-                <li>Print sticker sheets once, and every scan after that sorts itself</li>
                 <li>Blank backs are left out, and a page fed in upside down turns with one click</li>
-                <li>One pile from two classes goes to both</li>
                 <li>
                   <b>Nothing reads the handwriting.</b> The scan is split on your computer, and only each student’s
                   pages upload.
@@ -1360,138 +1284,23 @@
             />
           </div>
         </section>
-        <section id="dashboard" class="band band-white">
-          <div class="wrap feat narrow">
-            <img
-              class="shot reveal from-left tilt"
-              loading="lazy"
-              src="/assets/splash/dashboard.jpg"
-              alt="The dashboard: a student’s question, the Inbox showing each student’s lab side by side, the class’s competencies and its bulletins."
-            />
-            <div class="feat-text stack reveal" style="--d: 0.1s">
-              <p class="eyebrow">Dashboard</p>
-              <h2 class="h2">What Needs Your Attention, <em>on One Screen</em></h2>
-              <p class="lede">
-                Questions from students, work waiting to be assessed, and missing work, across every class you teach.
-                The Inbox shows the work that has come in.
-              </p>
-              <ul class="ticks">
-                <li>By Assessment, Side by Side, Flip Through or Roll Call: the same work, four ways</li>
-                <li>Competencies switches between Curricular and Core; select a row to see its students</li>
-                <li>All Caught Up when nothing is left, and a scan dropped on the Inbox opens Add Work</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-        <section id="bulletins" class="band">
+        <section id="reports" class="band">
           <div class="wrap feat flip">
             <div class="feat-text stack reveal">
-              <p class="eyebrow">Bulletins<span class="new">New</span></p>
-              <h2 class="h2">Announcements and Reminders <em>Students Read First</em></h2>
-              <p class="lede">
-                Post to the class from your laptop or your phone. Bulletins is the first tab on each student’s page, and
-                you see who has seen each one.
-              </p>
-              <ul class="ticks">
-                <li>A link, a photo of the board, or a PDF</li>
-                <li>A reminder stays pinned until the day you choose, linked to an assessment</li>
-                <li>Let Students React: Got It, Done or I Have a Question</li>
-                <li>Only you see who has seen a bulletin or reacted</li>
-              </ul>
-            </div>
-            <div class="pair reveal from-left">
-              <img
-                class="shot tilt"
-                loading="lazy"
-                src="/assets/splash/bulletins.jpg"
-                alt="The Bulletins page: a pinned reminder seen by 25 of 27, and an announcement with a link and a PDF."
-              />
-              <div class="phone-wrap">
-                <img
-                  class="phone float b"
-                  loading="lazy"
-                  src="/assets/splash/student-bulletins.jpg"
-                  alt="Bulletins on a student’s phone: the pinned reminder at the top and a photo of the board."
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-        <section id="reflect" class="band band-white">
-          <div class="wrap feat">
-            <div class="feat-text stack reveal">
-              <p class="eyebrow">Reflect<span class="new">New</span></p>
-              <h2 class="h2">Self-Assessments and Goals, <em>on the Student’s Own Page</em></h2>
-              <p class="lede">
-                Turn a reflection on and it appears in every student’s Reflect tab, with no slips to print or collect.
-                See Answers shows what each student wrote, and their words are there when you write their report.
-              </p>
-              <ul class="ticks">
-                <li>Build your own from Choice, Text, Rating, Ranking and other questions</li>
-                <li>See who has answered, and who has not</li>
-                <li>Preview as a Student before you turn it on</li>
-              </ul>
-            </div>
-            <img
-              class="shot reveal from-right tilt"
-              loading="lazy"
-              src="/assets/splash/reflect.jpg"
-              alt="Reflections in Class Settings: Unit 2 Exit Reflection is on in students’ Reflect tab, answered by 19 of 27."
-            />
-          </div>
-        </section>
-        <section id="comments" class="band">
-          <div class="wrap feat flip">
-            <div class="feat-text stack reveal">
-              <p class="eyebrow">Report Comments</p>
+              <p class="eyebrow">Reports</p>
               <h2 class="h2">Write Report Comments <em>From Your Own Records</em></h2>
               <p class="lede">
                 While you write a comment, the student’s grades, your observations and their self-assessment are on the
-                same screen.
+                same screen. Every report fills in from your gradebook, and you choose what prints.
               </p>
               <ul class="ticks">
                 <li>A Comment Bank of written sentences, filled in from each student’s grades and work habits</li>
                 <li>Generate drafts a comment, using a sentence only when the student’s record supports it</li>
-                <li>Approve and Next opens the next student</li>
-              </ul>
-            </div>
-            <img
-              class="shot reveal from-left tilt"
-              loading="lazy"
-              src="/assets/splash/questionnaire.jpg"
-              alt="The Term Questionnaire: work habits, the student’s year at a glance, and the teacher comment."
-            />
-          </div>
-        </section>
-        <section id="reports" class="band band-white">
-          <div class="wrap feat">
-            <div class="feat-text stack reveal">
-              <p class="eyebrow">Reports</p>
-              <h2 class="h2">One Report, <em>Made From the Parts You Choose</em></h2>
-              <p class="lede">Every report fills in from your gradebook for the whole class. You choose what prints.</p>
-              <div class="choices">
-                <div class="choice">
-                  <b>Start From a Setup</b>
-                  <span
-                    >Grades, Report Card, Interim Update or Conference Pack. Each one switches on the parts that report
-                    needs.</span
-                  >
-                </div>
-                <div class="choice">
-                  <b>Then Make It Yours</b>
-                  <span
-                    >Switch parts on or off, drag them into order, leave an assessment off, reword a question, and edit
-                    the comment right on the page.</span
-                  >
-                </div>
-              </div>
-              <ul class="ticks">
-                <li>Each competency group, and its change since the last report</li>
+                <li>Start from Grades, Report Card, Interim Update or Conference Pack, then switch parts on or off</li>
                 <li>Black and white, on Letter or Legal</li>
-                <li>Long parts carry on to the next page</li>
               </ul>
             </div>
-            <div class="sheet-wrap reveal from-right">
+            <div class="sheet-wrap reveal from-left">
               <img
                 loading="lazy"
                 src="/assets/splash/progress-report.jpg"
@@ -1500,8 +1309,8 @@
             </div>
           </div>
         </section>
-        <section id="curriculum" class="band">
-          <div class="wrap feat flip">
+        <section id="curriculum" class="band band-white">
+          <div class="wrap feat">
             <div class="feat-text stack reveal">
               <p class="eyebrow">BC Curriculum</p>
               <h2 class="h2">The Curriculum in the <em>Ministry’s Own Words</em></h2>
@@ -1509,36 +1318,16 @@
                 Pick a course when you make a class. Its competencies arrive word for word, with an I Can statement for
                 each one, <b><span data-count="5029">5,029</span> in all</b>.
               </p>
-              <p class="lede">
-                It suits a teacher new to proficiency-based assessment and one who has used it for years: assess in as
-                much detail as you want.
-              </p>
-              <div class="choices">
-                <div class="choice">
-                  <b>Line by Line</b>
-                  <span
-                    >Tie each line of a rubric to a competency and score them one at a time. Every line counts toward
-                    its own competency.</span
-                  >
-                </div>
-                <div class="choice">
-                  <b>One Level for the Piece</b>
-                  <span
-                    >Or give the whole piece a single level, points or a letter grade. It still counts toward the
-                    competencies you chose.</span
-                  >
-                </div>
-              </div>
             </div>
             <img
-              class="shot reveal from-left tilt"
+              class="shot reveal from-right tilt"
               loading="lazy"
               src="/assets/splash/curriculum.jpg"
               alt="Choosing English Language Arts 8 competencies for a new class."
             />
           </div>
         </section>
-        <section id="phone" class="band band-white">
+        <section id="phone" class="band">
           <div class="wrap feat phone-row">
             <div class="feat-text stack reveal">
               <p class="eyebrow">On Your Phone</p>
@@ -1580,26 +1369,8 @@
                 <p>Stored in Canada and seen only by the teacher who owns the class.</p>
               </div>
               <div class="card reveal" style="--d: 0.16s">
-                <h3>No Student Accounts</h3>
-                <p>Students open their page with a printed card. No student email, password or sign-up.</p>
-              </div>
-              <div class="card reveal">
                 <h3>No AI Writing About Students</h3>
                 <p>Nothing is sent to an AI service. Every comment is the teacher’s own words.</p>
-              </div>
-              <div class="card reveal" style="--d: 0.08s">
-                <h3>Photos Stay With the Class</h3>
-                <p>
-                  Photos of student work are kept while the class exists and deleted with it, or once the class has gone
-                  a year without being opened. The grades and comments stay.
-                </p>
-              </div>
-              <div class="card reveal" style="--d: 0.16s">
-                <h3>Designations and Missing Work</h3>
-                <p>
-                  A student’s designation shows on the class list. Missing work is never counted as a zero. Each student
-                  gets a next step.
-                </p>
               </div>
             </div>
             <a href="/privacy.html" style="font-size: 17px; font-weight: 700; text-decoration: none"
