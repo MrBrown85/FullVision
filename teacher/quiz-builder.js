@@ -1401,7 +1401,44 @@ var QuizBuilder = (function () {
     return !!(S && S.picked);
   }
 
+  /**
+   * + New Quiz: titles the open new-assessment form Quiz (the word selected,
+   * so typing replaces it), chooses They Answer a Quiz and brings the Quiz
+   * card into view. Where the quiz answer is not known yet (the class's
+   * facts have not loaded) the form stays as it is and the choice is made
+   * when they have, for five seconds at most.
+   * h.open(): this form is still the open one. h.choose(): chooses the
+   * answer on the page's Student Work card (nothing when it draws none).
+   * h.done(): the form's start is marked again, so the choice is not an edit.
+   * @param {{ open: () => boolean, choose: () => void, done: () => void }} h
+   */
+  function startNew(h) {
+    var title = /** @type {HTMLInputElement | null} */ ($('af-title'));
+    if (title && !title.value) {
+      title.value = 'Quiz';
+      title.select();
+      h.done();
+    }
+    var tries = 0;
+    var attempt = function () {
+      if (!h.open()) return;
+      if (!picked()) {
+        h.choose();
+        // Send Work off: the page draws no Student Work card, and the Quiz card has its own.
+        if (!picked() && !document.querySelector('.af-card-work')) takeAnswer('quiz', null, function () {});
+      }
+      if (picked()) {
+        h.done();
+        var mount = $('quiz-mount');
+        if (mount) mount.scrollIntoView({ block: 'start', behavior: 'instant' });
+        if (title && title.value === 'Quiz') title.select();
+      } else if (++tries < 25) setTimeout(attempt, 200);
+    };
+    attempt();
+  }
+
   return {
+    startNew: startNew,
     answers: answers,
     chosen: chosen,
     takeAnswer: takeAnswer,
