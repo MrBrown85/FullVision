@@ -7791,6 +7791,7 @@ label.cm-cr-row {
    plan, board 2). Every name here is the builder's own: the Rubric Bank
    has rb-list, rb-menu and others. ── */
 .rb-build {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -7915,8 +7916,96 @@ body.rb-dragging * {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+/* Adding between two cards: the + on the line between them; pointing at
+   it parts the cards and offers its two choices in the gap. */
+.rb-q {
+  transition: margin-top 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.rb-q-parted {
+  margin-top: 20px;
+}
+.rb-ins {
+  position: absolute;
+  height: 0;
+  z-index: 6;
+}
+.rb-ins-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  background: var(--active);
+  border-radius: 1px;
+  transition: top 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.rb-ins-plus {
+  position: absolute;
+  left: -30px;
+  top: -10px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--active);
+  color: #fff;
+  font: 600 15px/20px var(--font-base);
+  text-align: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: top 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.rb-ins-acts {
+  position: absolute;
+  left: 8px;
+  top: -4px;
+  display: none;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--divider-medium);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+.rb-ins-acts button {
+  font: 600 var(--text-xs) / 1 var(--font-base);
+  color: var(--link);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.rb-ins-acts button:hover {
+  background: var(--overlay-hover);
+}
+/* Open: the line and the choices sit in the middle of the parted gap; a
+   bridge from the + lets the pointer reach them. */
+.rb-ins.open .rb-ins-line {
+  top: 9px;
+}
+.rb-ins.open .rb-ins-plus {
+  top: 0;
+}
+.rb-ins.open .rb-ins-acts {
+  display: flex;
+  top: -4px;
+}
+.rb-ins.open::before {
+  content: '';
+  position: absolute;
+  left: -40px;
+  right: 0;
+  top: -12px;
+  height: 44px;
+}
 @media (prefers-reduced-motion: reduce) {
-  .rb-q-shift {
+  .rb-q-shift,
+  .rb-q,
+  .rb-ins-line,
+  .rb-ins-plus {
     transition: none;
   }
 }

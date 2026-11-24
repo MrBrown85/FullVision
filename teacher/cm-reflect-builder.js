@@ -358,6 +358,22 @@ var CmReflectBuilder = (function () {
     return _shift(qs, b.start, b.end, before);
   }
 
+  /* What a question added before card `at` is: the type of the nearest
+     question above it, a Choice when there is none
+     (DECISIONS, "Reflect's builder works the way One Report's editor does" 3). */
+  function kindAbove(qs, at) {
+    for (var k = Math.min(at, (qs || []).length) - 1; k >= 0; k--) if (qs[k].kind !== 'section') return qs[k].kind;
+    return 'choice';
+  }
+
+  /* Whether "Start a New Heading Here" fits question i: not when it is
+     already the first question under its heading (or the very first). */
+  function canStartHeading(qs, i) {
+    var b = _blockAt(qs, i);
+    if (!b || !qs[i] || qs[i].kind === 'section') return false;
+    return i > (b.head ? b.start + 1 : b.start);
+  }
+
   /* ── Drawing ───────────────────────────────────────────────── */
 
   /* A saved reflection's questions as students see them (the card's Show Questions). */
@@ -393,11 +409,14 @@ var CmReflectBuilder = (function () {
         { label: 'Move Heading Down', action: 'sqBDown', off: same(moveBy(qs, i, 1)) },
       ];
     /** @type {any[]} */
-    var out = [
+    var out = [null, { label: 'Add a Question Below', action: 'sqBAddAt', data: { at: i + 1 } }];
+    if (canStartHeading(qs, i))
+      out.push({ label: 'Start a New Heading Here', action: 'sqBAddAt', data: { at: i, kind: 'section' } });
+    out.push(
       null,
       { label: 'Move Up', action: 'sqBUp', off: i === 0 },
       { label: 'Move Down', action: 'sqBDown', off: i === qs.length - 1 },
-    ];
+    );
     var mine = _blockAt(qs, i);
     var others = blocksOf(qs).filter(function (b) {
       return !mine || b.start !== mine.start;
@@ -572,11 +591,7 @@ var CmReflectBuilder = (function () {
       })
     )
       return false;
-    /* The box being typed in saves now, by the place it was drawn at: the
-       redraw takes it away, and a blur after the move would save its words
-       into whichever card has that place by then. */
-    var typing = /** @type {any} */ (typeof document !== 'undefined' ? document.activeElement : null);
-    if (typing && typing.blur && typing.closest && typing.closest('.rb-build')) typing.blur();
+    _settle();
     var open = _b.active >= 0 ? qs[_b.active] : null;
     var before = _tops();
     _b.questions = next;
@@ -629,6 +644,106 @@ var CmReflectBuilder = (function () {
     setTimeout(function () {
       b.textContent = text;
     }, 30);
+  }
+
+  /* The box being typed in saves now, by the place it was drawn at. A
+     redraw takes it away, and a blur after a card was added, removed or
+     moved would save its words into whichever card has that place by then
+     (Safari keeps the focus in the box when a button is clicked). */
+  function _settle() {
+    var typing = /** @type {any} */ (typeof document !== 'undefined' ? document.activeElement : null);
+    if (typing && typing.blur && typing.closest && typing.closest('.rb-build') && typing.dataset.rbPath != null)
+      typing.blur();
+  }
+
+  /* ── The + between two cards ───────────────────────────────
+     Pointing at the line between two cards (or above the first) shows a +
+     in the left margin; pointing at the + parts the cards and offers Add a
+     Question and Add a Heading, as One Report's + does. It is for the
+     pointer: the keyboard adds from ⋯. */
+
+  var PART = 20; // px the cards part by, on top of .rb-qs's 12px gap
+  /** @type {any} */
+  var _ins = null; // { el, at, y, open, next }
+
+  /* The places between cards: { at, y } in page coordinates, y the middle of the gap. */
+  function _gaps() {
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.rb-build[data-rb-open] .rb-qs > .rb-q'));
+    var out = [];
+    cards.forEach(function (/** @type {any} */ el, k) {
+      var r = el.getBoundingClientRect();
+      if (k === 0) out.push({ at: 0, y: r.top - GAP / 2, el: el });
+      else out.push({ at: k, y: (cards[k - 1].getBoundingClientRect().bottom + r.top) / 2, el: el });
+    });
+    return out;
+  }
+
+  function _hideIns() {
+    var ins = _ins;
+    _ins = null;
+    if (!ins) return;
+    if (ins.el.parentNode) ins.el.parentNode.removeChild(ins.el);
+    if (ins.next) ins.next.classList.remove('rb-q-parted');
+  }
+
+  function _part(open) {
+    if (!_ins || _ins.open === open) return;
+    _ins.open = open;
+    _ins.el.classList.toggle('open', open);
+    if (_ins.next) _ins.next.classList.toggle('rb-q-parted', open);
+  }
+
+  function _onPointerMove(e) {
+    if (!_b || _drag || e.pointerType === 'touch') return;
+    var t = /** @type {any} */ (e.target);
+    var build = t && t.closest ? t.closest('.rb-build[data-rb-open]') : null;
+    if (_ins && _ins.el.contains(t)) return;
+    if (!build || (t.closest && t.closest('.rb-qmenu'))) return _hideIns();
+    var list = build.querySelector('.rb-qs');
+    var lr = list.getBoundingClientRect();
+    if (e.clientX < lr.left - 44 || e.clientX > lr.right) return _hideIns();
+    /** @type {any} */
+    var best = null;
+    _gaps().forEach(function (g) {
+      var dd = Math.abs(e.clientY - g.y);
+      if (dd <= 8 && (!best || dd < best.d)) best = { at: g.at, y: g.y, d: dd, el: g.el };
+    });
+    if (!best) {
+      if (_ins && !_ins.open) _hideIns();
+      return;
+    }
+    if (_ins && _ins.at === best.at) return;
+    _hideIns();
+    var br = build.getBoundingClientRect();
+    var box = document.createElement('div');
+    box.className = 'rb-ins';
+    box.style.top = best.y - br.top + 'px';
+    box.style.left = lr.left - br.left + 'px';
+    box.style.width = lr.width + 'px';
+    var kind = esc(kindAbove(_b.questions, best.at));
+    var at = Number(best.at);
+    // html-safe: fixed markup; at is a number and kind passes through esc
+    box.innerHTML =
+      '<div class="rb-ins-line"></div><button type="button" class="rb-ins-plus" tabindex="-1" aria-hidden="true">+</button>' +
+      '<div class="rb-ins-acts">' +
+      '<button type="button" tabindex="-1" data-action="sqBAddAt" data-at="' +
+      at +
+      '" data-kind="' +
+      kind +
+      '">Add a Question</button>' +
+      '<button type="button" tabindex="-1" data-action="sqBAddAt" data-at="' +
+      at +
+      '" data-kind="section">Add a Heading</button></div>';
+    build.appendChild(box);
+    _ins = { el: box, at: best.at, open: false, next: best.el };
+    var plus = box.querySelector('.rb-ins-plus');
+    if (plus)
+      plus.addEventListener('mouseenter', function () {
+        _part(true);
+      });
+    box.addEventListener('mouseleave', function () {
+      _hideIns();
+    });
   }
 
   /* ⌥↑ ⌥↓ in the card being edited move it, the caret staying put. */
@@ -687,6 +802,7 @@ var CmReflectBuilder = (function () {
       at: -1,
     };
     _b.menu = -1;
+    _hideIns();
     moving.forEach(function (r) {
       r.el.classList.add('rb-q-lift');
     });
@@ -773,6 +889,7 @@ var CmReflectBuilder = (function () {
     if (_listening || typeof document === 'undefined') return;
     _listening = true;
     document.addEventListener('pointerdown', _onPointerDown);
+    document.addEventListener('pointermove', _onPointerMove);
     document.addEventListener('keydown', _onKey);
   }
 
@@ -887,6 +1004,7 @@ var CmReflectBuilder = (function () {
   function handleAction(action, el) {
     if (!_b || !/^sqB/.test(action)) return false;
     _sync();
+    _settle();
     var i = el.dataset.i != null && el.dataset.i !== '' ? Number(el.dataset.i) : -1;
     var d = i >= 0 ? _b.questions[i] : null;
     if (action !== 'sqBMenu') _b.menu = -1;
@@ -903,6 +1021,18 @@ var CmReflectBuilder = (function () {
         _b.active = _b.questions.length - 1;
         _rerender();
         _focus('#rb-' + n.k + '-prompt');
+        return true;
+      }
+      case 'sqBAddAt': {
+        var at = Math.max(0, Math.min(Number(el.dataset.at), _b.questions.length));
+        var added = _blank(el.dataset.kind === 'section' ? 'section' : kindAbove(_b.questions, at));
+        var tops = _tops();
+        _b.questions.splice(at, 0, added);
+        _b.active = at;
+        _hideIns();
+        _rerender();
+        _glide(tops);
+        _focus('#rb-' + added.k + '-prompt');
         return true;
       }
       case 'sqBCopy': {
@@ -1048,6 +1178,8 @@ var CmReflectBuilder = (function () {
     moveBy: moveBy,
     moveTo: moveTo,
     dropAt: dropAt,
+    kindAbove: kindAbove,
+    canStartHeading: canStartHeading,
     handleAction: handleAction,
     handleChange: handleChange,
     handleBlur: handleBlur,

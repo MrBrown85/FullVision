@@ -152,3 +152,57 @@ test('moves a card from its ⋯ menu and by dragging its ⠿, a heading with its
   await expect(page.locator('#rb-said')).toHaveText('Moved the heading H.');
   expect(errors).toEqual([]);
 });
+
+test('adds a card between two others: the + on the line between them, and ⋯', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await expect(page.locator('#app-loading')).toHaveCount(0);
+  await page.goto('/dashboard?manage=questionnaires');
+  await page.getByRole('button', { name: 'New Reflection' }).click();
+  const b = page.locator('.rb-build');
+  await b.getByLabel('Title').fill('Adding');
+  const on = b.locator('.rb-q-on');
+  const prompt = on.locator('[data-rb-path="prompt"]');
+  const add = name => b.locator('.rb-add').getByRole('button', { name, exact: true }).click();
+  const state = () => page.evaluate(() => CmReflectBuilder._state().questions.map(d => d.kind + ':' + d.prompt));
+  await on.locator('select.rb-kind').selectOption('rating');
+  await prompt.fill('a');
+  await add('Text');
+  await prompt.fill('b');
+  await add('Text');
+  await prompt.fill('c');
+
+  // Point at the line between a and b: a + in the margin; pointing at it offers the two choices.
+  const first = await b.locator('.rb-q').nth(0).boundingBox();
+  const second = await b.locator('.rb-q').nth(1).boundingBox();
+  await page.mouse.move(first.x + 200, (first.y + first.height + second.y) / 2);
+  const plus = b.locator('.rb-ins-plus');
+  await expect(plus).toBeVisible();
+  await plus.hover();
+  await expect(b.locator('.rb-q').nth(1)).toHaveClass(/rb-q-parted/);
+  await b.locator('.rb-ins-acts').getByText('Add a Question').click();
+  // A Rating, like the question above, open with the cursor in it.
+  await expect(b.locator('.rb-q').nth(1)).toHaveClass(/rb-q-on/);
+  await expect(prompt).toBeFocused();
+  await prompt.fill('new');
+  await prompt.blur();
+  expect(await state()).toEqual(['rating:a', 'rating:new', 'text:b', 'text:c']);
+  await expect(b.locator('.rb-ins')).toHaveCount(0);
+
+  // ⋯ on c: Start a New Heading Here puts a heading above it.
+  await b.getByRole('button', { name: 'Edit question 4' }).click();
+  await on.getByRole('button', { name: 'More options' }).click();
+  await on.getByRole('menuitem', { name: 'Start a New Heading Here' }).click();
+  await expect(prompt).toBeFocused();
+  await prompt.fill('Last Part');
+  // ⋯ on the heading has no add; Add a Question Below on c adds a Text under it.
+  await b.getByRole('button', { name: 'Edit question 4' }).click();
+  await on.getByRole('button', { name: 'More options' }).click();
+  await on.getByRole('menuitem', { name: 'Add a Question Below' }).click();
+  await prompt.fill('d');
+  await prompt.blur();
+  expect(await state()).toEqual(['rating:a', 'rating:new', 'text:b', 'section:Last Part', 'text:c', 'text:d']);
+  expect(errors).toEqual([]);
+});

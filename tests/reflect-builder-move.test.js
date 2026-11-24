@@ -1,5 +1,5 @@
 /**
- * Moving a card in the Reflect builder (teacher/cm-reflect-builder.js),
+ * Moving and adding a card in the Reflect builder (teacher/cm-reflect-builder.js),
  * as One Report moves a statement (DECISIONS, "Reflect's builder works the
  * way One Report's editor does" 2): a question one card at a time, a
  * heading with the questions under it.
@@ -93,5 +93,26 @@ describe('dropAt (a drag)', () => {
   it('a drop where it already is changes nothing', () => {
     expect(names(B().dropAt(qs, at(qs, 'H'), at(qs, 'K')))).toBe(names(qs));
     expect(names(B().dropAt(qs, at(qs, 'b'), at(qs, 'b')))).toBe(names(qs));
+  });
+});
+
+describe('adding (DECISIONS 3)', () => {
+  const qs = cards('a b H c d K e');
+  qs[0].kind = 'rating';
+  qs[3].kind = 'likert';
+  it('a new question takes the type of the nearest question above it, a Choice when there is none', () => {
+    expect(B().kindAbove(qs, 0)).toBe('choice');
+    expect(B().kindAbove(qs, 1)).toBe('rating');
+    expect(B().kindAbove(qs, at(qs, 'H') + 1)).toBe('text');
+    expect(B().kindAbove(qs, at(qs, 'd'))).toBe('likert');
+    expect(B().kindAbove(cards('H K'), 2)).toBe('choice');
+  });
+  it('Start a New Heading Here fits a question that is not already first under its heading', () => {
+    expect(B().canStartHeading(qs, at(qs, 'a'))).toBe(false);
+    expect(B().canStartHeading(qs, at(qs, 'b'))).toBe(true);
+    expect(B().canStartHeading(qs, at(qs, 'H'))).toBe(false);
+    expect(B().canStartHeading(qs, at(qs, 'c'))).toBe(false);
+    expect(B().canStartHeading(qs, at(qs, 'd'))).toBe(true);
+    expect(B().canStartHeading(qs, at(qs, 'e'))).toBe(false);
   });
 });

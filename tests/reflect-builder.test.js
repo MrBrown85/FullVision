@@ -247,6 +247,7 @@ describe('building a reflection on the Reflect tab (Demo Mode)', () => {
       'Add a Subtitle',
       'Shuffle Options',
       'Show as a Drop-Down',
+      'Add a Question Below',
       'Move Up',
       'Move Down',
     ]);
