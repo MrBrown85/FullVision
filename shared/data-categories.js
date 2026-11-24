@@ -301,7 +301,11 @@ var CATEGORY_SAME_MOMENT_MS = 10000; // a queued list sent within this of being 
                                            answer came.
      { ok: false, why: 'waiting' }         not saved: online, but this
                                            device's other changes did not go
-                                           first
+                                           first. `waitingOn`: 'signIn' when
+                                           they wait for the teacher to sign
+                                           in again, 'otherTab' when another
+                                           tab holds the outbox and has not
+                                           sent them
      { ok: false, why: 'refused', error }  the server said no
    A class no server holds (Demo Mode, one not created yet) saves as it
    always did. Never throws. */
@@ -323,6 +327,22 @@ function reorderCategoriesNow(cid, ids, opened) {
   }
   return _categoryWriteNow(cid, 'reorder_categories', { p_ids: (ids || []).filter(_isUuid) }, opened, null);
 }
+/* Why this device's other writes did not go in time. Signed out comes
+   first: no tab sends while the sign-in has expired. */
+function _waitingForOtherWrites() {
+  var res = { ok: false, why: 'waiting' };
+  var q = window.v2Queue;
+  try {
+    var stats = (q && typeof q.stats === 'function' && q.stats()) || {};
+    if ((stats.queued || 0) > 0) {
+      if (stats.signedOut) res.waitingOn = 'signIn';
+      else if (stats.owner === false) res.waitingOn = 'otherTab';
+    }
+  } catch (e) {
+    /* the plain answer */
+  }
+  return res;
+}
 async function _categoryWriteNow(cid, name, params, opened, tried) {
   var noAnswer = { ok: false, why: 'offline' };
   try {
@@ -333,7 +353,7 @@ async function _categoryWriteNow(cid, name, params, opened, tried) {
     var gone = await _unsentWritesGone(CATEGORY_WRITE_WAIT_MS);
     if (_isOffline()) return noAnswer;
     // Online, and this device's other writes are still waiting to go.
-    if (!gone) return { ok: false, why: 'waiting' };
+    if (!gone) return _waitingForOtherWrites();
   } catch (e) {
     return noAnswer;
   }

@@ -1976,6 +1976,134 @@ describe('categories: the server’s list is read before the whole list is saved
     await done();
   });
 
+  /* The other write waits because the sign-in has expired: the outbox
+     pauses until the teacher signs in again. */
+  async function anotherWriteWaitsForSignIn() {
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      if (name === 'update_course')
+        return Promise.resolve({ data: null, error: { message: 'JWT expired', code: 'PGRST301' }, status: 401 });
+      return send(name, params);
+    };
+    act('cmSetRoundPercent', { value: 'whole' });
+    await settle();
+    await window.v2Queue.flush();
+    expect(window.v2Queue.stats().signedOut).toBe(true);
+    const wait = CATEGORY_WRITE_WAIT_MS;
+    CATEGORY_WRITE_WAIT_MS = 200;
+    return async () => {
+      CATEGORY_WRITE_WAIT_MS = wait;
+      server.fake.rpc = send;
+      await window.v2Queue.resume();
+      await goOnline();
+    };
+  }
+  /* The other write waits in an outbox another tab holds, and that tab has
+     not sent it (asleep, or its own connection failing). */
+  async function anotherTabHoldsTheOutbox() {
+    const mine = window.v2Queue;
+    mine.release();
+    window.v2Queue = undefined;
+    runInThisContext(QUEUE_SOURCE, { filename: 'shared/offline-queue.js' });
+    const other = window.v2Queue;
+    tabs.push(other);
+    other.configure({ send: () => Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } }) });
+    window.v2Queue = mine;
+    mine.claim(); // waits behind the other tab
+    await settle();
+    expect(mine.stats().owner).toBe(false);
+    act('cmSetRoundPercent', { value: 'whole' });
+    await settle();
+    const wait = CATEGORY_WRITE_WAIT_MS;
+    CATEGORY_WRITE_WAIT_MS = 200;
+    return async () => {
+      CATEGORY_WRITE_WAIT_MS = wait;
+      other.release(); // the other tab closes: this one takes the outbox
+      await settle();
+      expect(mine.stats().owner).toBe(true);
+      await goOnline();
+    };
+  }
+  const WAITING_SIGN_IN =
+    'Your sign-in has expired, so other changes from this computer are waiting and nothing was saved. Your changes are kept on this computer. Save again after you sign in.';
+  const WAITING_SIGN_IN_ORDER =
+    'Your sign-in has expired, so other changes from this computer are waiting and nothing was saved. Try again after you sign in.';
+  const WAITING_OTHER_TAB =
+    'Other changes from this computer are waiting for another FullVision tab to send them, so nothing was saved. Your changes are kept on this computer. Save again once that tab has sent them.';
+  const WAITING_OTHER_TAB_ORDER =
+    'Other changes from this computer are waiting for another FullVision tab to send them, so nothing was saved. Try again once that tab has sent them.';
+
+  async function saveWhileWaiting() {
+    input('cmCatWeightLive', { idx: '0' }, 70);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    act('cmCatSave');
+    await vi.advanceTimersByTimeAsync(700);
+    vi.useRealTimers();
+    await settle();
+  }
+  async function dragWhileWaiting() {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const moved = DashClassManager.reorderCategory(1, 0);
+    await vi.advanceTimersByTimeAsync(700);
+    vi.useRealTimers();
+    await moved;
+    await settle();
+  }
+
+  it('Save Categories while the sign-in has expired and another write waits: it says to sign in', async () => {
+    await openApp();
+    const done = await anotherWriteWaitsForSignIn();
+    await saveWhileWaiting();
+    expect(draft().notice).toBe(WAITING_SIGN_IN);
+    expect(draft().action).toBe('Discard My Changes');
+    expect(draft().rows.map(r => r.weight)).toEqual([70, 30]);
+    expect(kept().rows.map(r => r.weight)).toEqual([70, 30]);
+    expect(server.categories.map(c => c.weight)).toEqual([60, 40]);
+    await done();
+    act('cmCatSave');
+    await quiet();
+    expect(draft().notice).toBe(null);
+    expect(server.categories.map(c => c.weight)).toEqual([70, 30]);
+  });
+
+  it('a drag while the sign-in has expired and another write waits: the row goes back, and it says to sign in', async () => {
+    await openApp();
+    const done = await anotherWriteWaitsForSignIn();
+    await dragWhileWaiting();
+    expect(draft().notice).toBe(WAITING_SIGN_IN_ORDER);
+    expect(draft().action).toBe(null);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests']);
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Tests']);
+    await done();
+  });
+
+  it('Save Categories while another tab holds the outbox with a write waiting: it names the other tab', async () => {
+    await openApp();
+    const done = await anotherTabHoldsTheOutbox();
+    await saveWhileWaiting();
+    expect(draft().notice).toBe(WAITING_OTHER_TAB);
+    expect(draft().action).toBe('Discard My Changes');
+    expect(draft().rows.map(r => r.weight)).toEqual([70, 30]);
+    expect(kept().rows.map(r => r.weight)).toEqual([70, 30]);
+    expect(server.categories.map(c => c.weight)).toEqual([60, 40]);
+    await done();
+    act('cmCatSave');
+    await quiet();
+    expect(draft().notice).toBe(null);
+    expect(server.categories.map(c => c.weight)).toEqual([70, 30]);
+  });
+
+  it('a drag while another tab holds the outbox with a write waiting: the row goes back, and it names the other tab', async () => {
+    await openApp();
+    const done = await anotherTabHoldsTheOutbox();
+    await dragWhileWaiting();
+    expect(draft().notice).toBe(WAITING_OTHER_TAB_ORDER);
+    expect(draft().action).toBe(null);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests']);
+    await done();
+  });
+
   it('a connection that answers with an error is no check: nothing is saved', async () => {
     await openApp();
     server.fake.on('list_categories', () => ({ data: null, error: { message: 'permission denied', code: '42501' } }));
