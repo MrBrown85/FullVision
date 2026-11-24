@@ -8595,12 +8595,13 @@ button.rb-v-prompt {
   background: rgba(0, 122, 255, 0.16);
 }
 @media (prefers-color-scheme: dark) {
+  /* As the grader's Return All: 4.87:1 at rest, 4.63:1 on hover. */
   .btn.dash-questions-answer {
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--active);
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--link);
   }
   .btn.dash-questions-answer:hover {
-    background: rgba(10, 132, 255, 0.28);
+    background: rgba(10, 132, 255, 0.18);
   }
 }
 
