@@ -2796,6 +2796,18 @@ function sectionCountedEvidence(cid, studentId, sectionId) {
   return out.sort(_evidenceCompare(cid));
 }
 
+/* Score entries in the order they count in (_evidenceCompare): by date,
+   work on one date by _pieceRank, and one piece's scores in the order the
+   piece lists what it measures. A sorted copy; the list given is left as it
+   is. For a screen that lists a student's evidence, so the order never rests
+   on where an entry is stored: re-entering a score moves it to the end of
+   the score list, and a returned grade cleared since goes to the end of the
+   student's returned grades (GradeState.returnedScores). Two entries under
+   one key of one piece keep the order given. It orders; it changes no score. */
+function inCountingOrder(cid, entries) {
+  return (entries || []).slice().sort(_evidenceCompare(cid));
+}
+
 /** Count the number of scored evidence entries across all tags in a section.
  * @param {string} cid - Course ID
  * @param {string} studentId - Student ID
@@ -4537,6 +4549,7 @@ function classSpreadRangeText(cid, assessment, spread) {
 window.Calc = {
   withReturnedOnly,
   samePieceDateOrder,
+  inCountingOrder,
   medianOf,
   classColumnSpread,
   classColumnLevelCounts,
