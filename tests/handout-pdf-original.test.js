@@ -427,6 +427,44 @@ describe('signed in, in a class whose student page is on', () => {
     expect(getAssessmentResources(CID, CAUSES, { ready: true })).toMatchObject([{ kind: 'pdf', status: 'ready' }]);
     expect(getAssessmentResources(CID, CAUSES, { ready: true })[0].hasOriginal).toBe(false);
     expect(callsTo('remove_assessment_resource')).toEqual([]);
+    // No dead letter is left, so the sync dot stays clear.
+    expect(window.v2Queue.stats().deadLettered).toBe(0);
+    expect(window.getSyncDotState()).not.toMatchObject({ status: 'error' });
+    expect(Object.keys(JSON.parse(localStorage.getItem('gb-handout-uploads') || '{}'))).toEqual([]);
+  });
+
+  it('the handout removed before the original starts (P0002) is given up the same quiet way', async () => {
+    await openClass();
+    fake.on('start_handout_original', () => ({
+      data: null,
+      error: { code: 'P0002', message: 'handout not found', status: 404 },
+    }));
+    await addAssessmentHandout(CID, CAUSES, 'Density Lab', shrunk(1), pdfFile());
+    await quiet();
+    expect(store.count()).toBe(0);
+    expect(window.v2Queue.stats().deadLettered).toBe(0);
+    expect(window.getSyncDotState()).not.toMatchObject({ status: 'error' });
+  });
+
+  it('an upload storage refuses (two hours gone, a wrong type) gives the original up: no failed photo, no bytes kept', async () => {
+    await openClass();
+    const refuse = fake.storage.from;
+    fake.storage.from = bucket => ({
+      ...refuse(bucket),
+      upload: async (path, blob, opts) =>
+        bucket === 'handout-files'
+          ? { data: null, error: { message: 'new row violates row-level security policy', statusCode: '403' } }
+          : refuse(bucket).upload(path, blob, opts),
+    });
+    await addAssessmentHandout(CID, CAUSES, 'Density Lab', shrunk(2), pdfFile());
+    await quiet();
+    expect(callsTo('start_handout_original')).toHaveLength(1);
+    expect(callsTo('finish_handout_original')).toEqual([]);
+    expect(store.count()).toBe(0);
+    expect(window.PhotoQueue.stats().failed).toBe(0);
+    expect(window.getSyncDotState()).not.toMatchObject({ status: 'error' });
+    expect(Object.keys(JSON.parse(localStorage.getItem('gb-handout-uploads') || '{}'))).toEqual([]);
+    expect(getAssessmentResources(CID, CAUSES, { ready: true })).toMatchObject([{ kind: 'pdf', hasOriginal: false }]);
   });
 
   it('a file the server finds of another type or size, or gone, is given up; the handout stays', async () => {

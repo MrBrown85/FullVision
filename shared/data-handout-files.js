@@ -346,12 +346,38 @@ function _handoutOriginalNext(all, rec, cid, rid) {
   return all[key];
 }
 
+/* The photo queue's word (a subscriber, wired in _wireWorkQueue): an original the storage refused (the two hours
+   ran out, a wrong type) is marked failed and would stay, on the sync dot and on this device. It is optional, so
+   its record and its bytes go quietly and the handout works from its pages. */
+function _handoutOriginalWatch(evt) {
+  var ids = evt && evt.kind === 'failed' && evt.meta && Array.isArray(evt.meta.ids) ? evt.meta.ids : [];
+  if (!ids.length) return;
+  var all = _handoutUploads();
+  Object.keys(all).forEach(function (k) {
+    var rec = all[k];
+    if (
+      rec &&
+      rec.kind === 'pdf-original' &&
+      (rec.ids || []).some(function (id) {
+        return ids.indexOf(id) >= 0;
+      })
+    ) {
+      _handoutOriginalGiveUp(rec, null);
+    }
+  });
+}
+
 /* The outbox's word on start_handout_original: refused or lost, the original is given up
-   quietly; the handout works from its pages. */
+   quietly (refused for a removed handout, an over-size file, anything): no dead letter stays; the handout works
+   from its pages. */
 function _handoutOriginalEvent(kind, key, data) {
   if (kind === 'flush:success') return _handoutOriginalStarted(key, data);
   var rec = _handoutUploads()[key];
-  if (rec && rec.kind === 'pdf-original') _handoutOriginalGiveUp(rec, null);
+  if (!rec || rec.kind !== 'pdf-original') return;
+  _handoutOriginalGiveUp(rec, null);
+  // A dead letter would show on the sync dot; the original is optional (the handout works from its pages), so it goes.
+  var out = window.v2Queue;
+  if (out && typeof out.dismissDeadLetter === 'function') out.dismissDeadLetter(key);
 }
 
 /* The photo queue's commit for the original: it is in storage; finish_handout_original

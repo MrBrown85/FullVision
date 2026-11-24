@@ -1549,6 +1549,8 @@ function _wireWorkQueue() {
       },
     });
     if (typeof q.subscribe === 'function') q.subscribe(_updateSyncIndicator);
+    if (typeof q.subscribe === 'function' && typeof _handoutOriginalWatch === 'function')
+      q.subscribe(_handoutOriginalWatch);
   }
   return q;
 }

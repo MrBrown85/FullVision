@@ -8,7 +8,7 @@
 -- == PART 1, the full removal: the rest of this file ==
 -- Puts the six replaced functions and the shape check back word for word, drops the five new functions and the
 -- two columns, and takes application/pdf out of the bucket's types. It stops with nothing changed while any
--- PDF row has an original (remove those handouts first: each removal queues its original), while a queued
+-- PDF row has an original uploading or ready (remove those handouts first: each removal queues its original; a dropped one holds nothing in storage and is cleared), while a queued
 -- original is not yet gone from handout-files, while the bucket holds a .pdf, or if a function is neither as
 -- before nor as the file left it. Dropping the columns leaves two dropped-column slots on assessment_resource.
 -- Run whole, the file is PART 0 and PART 1 in one transaction. On a database where the file was never
@@ -68,9 +68,9 @@ begin
         end if;
     end loop;
     if exists (select 1 from pg_attribute where attrelid = 'public.assessment_resource'::regclass and attname = 'original_status' and not attisdropped) then
-        select count(*) into _n from public.assessment_resource where original_status is not null;
+        select count(*) into _n from public.assessment_resource where original_status in ('uploading', 'ready');
         if _n > 0 then
-            raise exception 'assessment_resource still holds % PDF original(s): remove those handouts first (each removal queues its original). Nothing was changed.', _n;
+            raise exception 'assessment_resource still holds % PDF original(s) uploading or ready: remove those handouts first (each removal queues its original). Nothing was changed.', _n;
         end if;
         select string_agg(conname || ' ' || pg_get_constraintdef(oid), ' | ' order by conname collate "C") into _c
           from pg_constraint where conrelid = 'public.assessment_resource'::regclass
@@ -264,6 +264,8 @@ drop function if exists public._handout_original_path(uuid, uuid);
 do $table$
 begin
     if exists (select 1 from pg_attribute where attrelid = 'public.assessment_resource'::regclass and attname = 'original_status' and not attisdropped) then
+        -- A dropped original has nothing in storage (its name was queued, and the guard above waited for that).
+        update public.assessment_resource set original_status = null, original_started_at = null where original_status = 'dropped';
         alter table public.assessment_resource
             drop constraint assessment_resource_shape_check,
             add constraint assessment_resource_shape_check check (
