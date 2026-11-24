@@ -1,9 +1,7 @@
 /**
  * A slip's open and verify with the card key (supabase/functions/student-submit/slip-routes.ts,
- * plan S3-S1). The database is handed tags; the plain code goes only on open's second call, when the
- * database asks for it (a slip printed before 2026111160, not yet converted), and the typed password
- * only on verify's second call, or from a page that sends no code. `fallback` never reaches the phone.
- * A slip's token reaches the database only as its hash (2026112403): open is given the hash of a token the
+ * plan S3-S1). The database is handed tags and never the plain code or password; since 2026112406 there
+ * is no second call for a slip from before the key. A slip's token reaches the database only as its hash (2026112403): open is given the hash of a token the
  * function made, and the phone that token.
  */
 import { describe, expect, it } from 'vitest';
@@ -52,11 +50,9 @@ describe('a slip’s open', () => {
   it('a slip found by its tag: one call, the plain code never sent', async () => {
     const h = setup(() => ({ ok: true, new_token: true }));
     expect((await h.send({ route: 'open', code: 'k7m-4qx' })).body).toEqual({ ok: true, token: TOKEN });
-    expect(h.calls).toHaveLength(1);
-    expect(h.calls[0][1].slice(0, 3)).toEqual([slipCodeTag('K7M4QX'), keyId(), null]);
-    // The new token's hash, last; the token itself never.
-    expect(h.calls[0][1][4]).toBe(sha256(TOKEN));
+    expect(h.calls).toEqual([['open', [slipCodeTag('K7M4QX'), keyId(), expect.any(String), sha256(TOKEN)]]]);
     expect(JSON.stringify(h.calls)).not.toContain(TOKEN);
+    expect(JSON.stringify(h.calls)).not.toContain('K7M4QX');
   });
 
   it('a token the database names is never passed on; no new_token, no token', async () => {
@@ -64,22 +60,18 @@ describe('a slip’s open', () => {
     expect((await h.send({ route: 'open', code: 'K7M4QX' })).body).toEqual({ ok: true });
   });
 
-  it('the database asks for the plain code: a second call with it, and fallback is not passed on', async () => {
-    const h = setup((sql, p, n) =>
-      n === 1 ? { ok: false, error: 'not_found', fallback: true } : { ok: true, new_token: true },
-    );
-    expect((await h.send({ route: 'open', code: 'K7M-4QX' })).body).toEqual({ ok: true, token: TOKEN });
-    expect(h.calls.map(c => c[1][2])).toEqual([null, 'K7M4QX']);
-    const miss = setup((sql, p, n) => ({ ok: false, error: 'not_found', ...(n === 1 ? { fallback: true } : {}) }));
-    expect((await miss.send({ route: 'open', code: 'ABC234' })).body).toEqual({ ok: false, error: 'not_found' });
-    expect(miss.logs.map(l => l.outcome)).toEqual(['not_found']);
-    expect(JSON.stringify(miss.logs)).not.toContain('ABC234');
+  it('a code nobody holds: one call, not_found, the code in no log', async () => {
+    const h = setup(() => ({ ok: false, error: 'not_found' }));
+    expect((await h.send({ route: 'open', code: 'ABC234' })).body).toEqual({ ok: false, error: 'not_found' });
+    expect(h.calls).toHaveLength(1);
+    expect(h.logs.map(l => l.outcome)).toEqual(['not_found']);
+    expect(JSON.stringify(h.logs)).not.toContain('ABC234');
   });
 
-  it('not a slip’s code: no tag, one call, so the database counts a bad format as before', async () => {
-    const h = setup(() => ({ ok: false, error: 'not_found', fallback: true }));
+  it('not a slip’s code: no tag, one call, so the database counts a bad format', async () => {
+    const h = setup(() => ({ ok: false, error: 'not_found' }));
     await h.send({ route: 'open', code: 'K7M4Q1' });
-    expect(h.calls).toEqual([['open', [null, keyId(), null, expect.any(String), sha256(TOKEN)]]]);
+    expect(h.calls).toEqual([['open', [null, keyId(), expect.any(String), sha256(TOKEN)]]]);
   });
 
   it('no key: a server error, and nothing is asked', async () => {
@@ -93,35 +85,24 @@ describe('a slip’s open', () => {
 });
 
 describe('a slip’s verify', () => {
-  it('with the code: the password’s tag first, bound to the code; the typed password only when asked', async () => {
-    const h = setup((sql, p, n) =>
-      n === 1 ? { ok: false, error: 'wrong_identity', fallback: true } : { ok: true, parts: [] },
-    );
+  it('with the code: the password’s tag, bound to the code, in one call; the typed password never sent', async () => {
+    const h = setup(() => ({ ok: true, parts: [] }));
     const res = await h.send({ route: 'verify', token: TOKEN, code: 'K7M4QX', password: '4821' });
     expect(res.body).toEqual({ ok: true, parts: [] });
-    expect(h.calls[0][1]).toEqual([
-      TOKEN,
-      null,
-      null,
-      null,
-      slipCodeTag('K7M4QX'),
-      slipPasswordTag('K7M4QX', '4821'),
-      expect.any(String),
-    ]);
-    expect(h.calls[1][1][3]).toBe('4821');
+    expect(h.calls).toEqual([['verify', [TOKEN, null, null, slipPasswordTag('K7M4QX', '4821'), expect.any(String)]]]);
+    expect(JSON.stringify(h.calls)).not.toContain('4821');
     expect(JSON.stringify(h.logs)).not.toContain('4821');
   });
 
-  it('matched by its tag: one call, the typed password never sent', async () => {
+  it('a birthday or student number goes as typed: it is checked where it lives', async () => {
     const h = setup(() => ({ ok: true, parts: [] }));
-    await h.send({ route: 'verify', token: TOKEN, code: 'K7M4QX', password: '4821' });
-    expect(h.calls).toHaveLength(1);
-    expect(h.calls[0][1][3]).toBeNull();
+    await h.send({ route: 'verify', token: TOKEN, code: 'K7M4QX', student_number: '0123456' });
+    expect(h.calls[0][1]).toEqual([TOKEN, null, '0123456', null, expect.any(String)]);
   });
 
-  it('a page that sends no code: no tags, the password as typed, as before', async () => {
-    const h = setup(() => ({ ok: true, parts: [] }));
+  it('no code with the password: no tag can be made, so nothing of the password is sent', async () => {
+    const h = setup(() => ({ ok: false, error: 'wrong_identity', tries_left: 4 }));
     await h.send({ route: 'verify', token: TOKEN, password: '4821' });
-    expect(h.calls[0][1]).toEqual([TOKEN, null, null, '4821', null, null, expect.any(String)]);
+    expect(h.calls[0][1]).toEqual([TOKEN, null, null, null, expect.any(String)]);
   });
 });

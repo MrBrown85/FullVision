@@ -33,8 +33,6 @@ function setup(extra = {}) {
     region: 'region' in extra ? extra.region : 'ca-central-1',
     ipKey: 'test-key',
     db: {
-      open: async () => ({ ok: false }),
-      verify: async () => ({ ok: false }),
       check: async () => ({ ok: false }),
       submit: async () => ({ ok: false }),
       call: world.db.call,

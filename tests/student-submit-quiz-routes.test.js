@@ -41,8 +41,6 @@ function setup(answer) {
     region: 'ca-central-1',
     ipKey: 'k',
     db: {
-      open: async () => ({}),
-      verify: async () => ({}),
       check: async () => ({}),
       submit: async () => ({}),
       call: async (sql, params) => {
