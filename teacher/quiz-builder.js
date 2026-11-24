@@ -1402,9 +1402,9 @@ var QuizBuilder = (function () {
   }
 
   /**
-   * + New Quiz: titles the open new-assessment form Quiz (the word selected,
-   * so typing replaces it), chooses They Answer a Quiz and brings the Quiz
-   * card into view. Where the quiz answer is not known yet (the class's
+   * + New Quiz: titles the open new-assessment form Quiz, chooses They Answer a
+   * Quiz, brings the Quiz card into view and puts the cursor in the first
+   * question. Where the quiz answer is not known yet (the class's
    * facts have not loaded) the form stays as it is and the choice is made
    * when they have, for five seconds at most.
    * h.open(): this form is still the open one. h.choose(): chooses the
@@ -1416,7 +1416,6 @@ var QuizBuilder = (function () {
     var title = /** @type {HTMLInputElement | null} */ ($('af-title'));
     if (title && !title.value) {
       title.value = 'Quiz';
-      title.select();
       h.done();
     }
     var tries = 0;
@@ -1431,7 +1430,10 @@ var QuizBuilder = (function () {
         h.done();
         var mount = $('quiz-mount');
         if (mount) mount.scrollIntoView({ block: 'start', behavior: 'instant' });
-        if (title && title.value === 'Quiz') title.select();
+        var first = /** @type {HTMLInputElement | null} */ (
+          document.querySelector('#quiz-mount .quiz-edit .quiz-prompt')
+        );
+        if (first) first.focus({ preventScroll: true });
       } else if (++tries < 25) setTimeout(attempt, 200);
     };
     attempt();

@@ -128,6 +128,7 @@ describe('the + New Quiz button', () => {
     expect(document.getElementById('af-title').value).toBe('Quiz');
     expect(QuizBuilder.picked()).toBe(true);
     expect(QuizBuilder._model().qs.length).toBe(1);
+    expect(document.activeElement.classList.contains('quiz-prompt')).toBe(true);
     expect(dialog()).toBeNull();
   });
 });

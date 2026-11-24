@@ -535,10 +535,9 @@ test.describe('+ New Quiz', () => {
       await expect
         .poll(() => page.locator('#quiz-mount').evaluate(el => el.getBoundingClientRect().top < window.innerHeight))
         .toBe(true);
-      // The word is selected, so typing replaces it.
-      expect(
-        await page.locator('#af-title').evaluate(el => el.selectionStart === 0 && el.selectionEnd === el.value.length),
-      ).toBe(true);
+      // The cursor is in the first question's text field, and the title is Quiz as it was set.
+      await expect(page.locator('#quiz-mount .quiz-edit .quiz-prompt')).toBeFocused();
+      await expect(page.locator('#af-title')).toHaveValue('Quiz');
       await shot(page, 'new-quiz-form');
     });
   }
