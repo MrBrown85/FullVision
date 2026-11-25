@@ -192,7 +192,7 @@ window.CmStdHelp = (function () {
         picture: _cmHelpNextSteps(cid, sec, tag),
       },
     ];
-    var triggerEl = /** @type {HTMLElement | null} */ (document.activeElement);
+    var focusBack = FocusBack.from(document.activeElement);
     var overlay = document.createElement('div');
     overlay.className = 'confirm-overlay cm-help-overlay';
     overlay.setAttribute('role', 'dialog');
@@ -253,11 +253,7 @@ window.CmStdHelp = (function () {
     function close() {
       overlay.remove();
       document.removeEventListener('keydown', onKey);
-      try {
-        if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
-      } catch (e) {
-        /* trigger may be gone after a re-render */
-      }
+      focusBack();
     }
     function onKey(e) {
       if (e.key === 'Escape') {

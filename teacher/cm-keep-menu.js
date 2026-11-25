@@ -3,30 +3,37 @@
    stays when Class Settings is drawn again.
 
    The class's data arriving from the server draws the page again, up to a
-   second after a class is picked. That closed Class Actions or a student's
-   menu under the teacher's pointer, and it threw away what the teacher was
-   typing in a box and took the focus off it (Nov 25, 2026). DashClassManager
-   takes a mark before it draws and hands it back after.
+   second after a class is picked, and the Competencies tab draws once more
+   when its level wording has loaded. That closed Class Actions or a
+   student's menu under the teacher's pointer, threw away what the teacher
+   was typing in a box, and took the focus off whatever had it, so the next
+   key went nowhere (Nov 25, 2026). DashClassManager takes a mark before it
+   draws and hands it back after.
 
    A menu is found again by its button's place among the menu buttons and
    what the button says, in the same class, tab and mode, and the focus goes
    back to the same item. A click or Escape closes menus before anything is
    drawn, so a menu the teacher closed is never opened again.
 
-   A box is found again by its place among the boxes and what it is (its id,
-   name, hint and data), in the same class, tab and mode. It gets the focus
-   and the cursor back. It gets the unsaved typing back only when the page
-   still holds the value the typing began from: a draw that saved the box,
-   cancelled it, or brought a newer value from the server shows that value.
-   Typing put back this way is saved when the teacher leaves the box, as
-   typing is. The only thing this file remembers is what each box held when
-   the teacher went into it. */
+   The button, switch, menu or box with the focus is found again by its place
+   among its kind and what it is (its id, name, hint and data), in the same
+   class, tab and mode, and gets the focus back unless the draw put the focus
+   somewhere itself. One that is gone, hidden or greyed out leaves the focus
+   where the draw left it.
+
+   A box also gets the cursor back. It gets the unsaved typing back only when
+   the page still holds the value the typing began from: a draw that saved
+   the box, cancelled it, or brought a newer value from the server shows that
+   value. Typing put back this way is saved when the teacher leaves the box,
+   as typing is. The only thing this file remembers is what each box held
+   when the teacher went into it. */
 window.CmKeepMenu = (function () {
   'use strict';
 
   /** @typedef {{ at: number, says: string, item: number }} CmMenuMark */
-  /** @typedef {{ at: number, says: string, was: string, typed: string, from: number | null, to: number | null, scroll: number }} CmBoxMark */
-  /** @typedef {{ where: string, menu: CmMenuMark | null, box: CmBoxMark | null }} CmMark */
+  /** @typedef {{ was: string, typed: string, from: number | null, to: number | null, scroll: number }} CmBoxMark */
+  /** @typedef {{ tag: string, at: number, is: string, box: CmBoxMark | null }} CmFocusMark */
+  /** @typedef {{ where: string, menu: CmMenuMark | null, focus: CmFocusMark | null }} CmMark */
   /** @typedef {HTMLInputElement | HTMLTextAreaElement} CmBox */
 
   /** @returns {HTMLElement[]} */
@@ -91,22 +98,34 @@ window.CmKeepMenu = (function () {
     return from == null ? el.defaultValue : from;
   }
 
-  /** @returns {CmBox[]} */
-  function _boxes() {
-    return Array.prototype.filter.call(document.querySelectorAll('#main input, #main textarea'), _isBox);
+  /** Every control of one kind in Class Settings and its class list. @param {string} tag @returns {HTMLElement[]} */
+  function _all(tag) {
+    var t = tag.toLowerCase();
+    return Array.prototype.slice.call(document.querySelectorAll('#main ' + t + ', #sidebar-mount ' + t));
   }
 
-  /** @param {CmBox} el */
-  function _boxSays(el) {
-    return [el.tagName, el.type, el.id, el.getAttribute('name') || '', el.placeholder, JSON.stringify(el.dataset)].join(
-      '|',
-    );
+  /** What a control is, whatever it holds or shows. @param {HTMLElement} el */
+  function _is(el) {
+    /** @param {string} n */
+    var a = function (n) {
+      return el.getAttribute(n) || '';
+    };
+    var held = /^(radio|checkbox)$/.test(a('type')) ? a('value') : '';
+    return [
+      el.tagName,
+      a('type'),
+      el.id,
+      a('name'),
+      a('placeholder'),
+      a('role'),
+      a('href'),
+      held,
+      JSON.stringify(el.dataset),
+    ].join('|');
   }
 
-  /** @returns {CmBoxMark | null} */
-  function _markBox() {
-    var el = document.activeElement;
-    if (!_isBox(el) || !el.closest('#main')) return null;
+  /** @param {CmBox} el @returns {CmBoxMark} */
+  function _markBox(el) {
     /** @type {number | null} */
     var from = null;
     /** @type {number | null} */
@@ -117,23 +136,22 @@ window.CmKeepMenu = (function () {
     } catch (e) {
       /* a number box has no cursor to read */
     }
-    return {
-      at: _boxes().indexOf(el),
-      says: _boxSays(el),
-      was: _began(el),
-      typed: el.value,
-      from: from,
-      to: to,
-      scroll: el.scrollTop,
-    };
+    return { was: _began(el), typed: el.value, from: from, to: to, scroll: el.scrollTop };
   }
 
-  /** @param {CmBoxMark} m @returns {CmBox | null} */
-  function _boxAgain(m) {
-    var all = _boxes();
-    if (all[m.at] && _boxSays(all[m.at]) === m.says) return all[m.at];
+  /** @returns {CmFocusMark | null} */
+  function _markFocus() {
+    var el = /** @type {HTMLElement | null} */ (document.activeElement);
+    if (!el || el === document.body || !el.closest('#main, #sidebar-mount')) return null;
+    return { tag: el.tagName, at: _all(el.tagName).indexOf(el), is: _is(el), box: _isBox(el) ? _markBox(el) : null };
+  }
+
+  /** @param {CmFocusMark} m @returns {HTMLElement | null} */
+  function _again(m) {
+    var all = _all(m.tag);
+    if (all[m.at] && _is(all[m.at]) === m.is) return all[m.at];
     var same = all.filter(function (el) {
-      return _boxSays(el) === m.says;
+      return _is(el) === m.is;
     });
     return same.length === 1 ? same[0] : null;
   }
@@ -157,13 +175,8 @@ window.CmKeepMenu = (function () {
     );
   }
 
-  /** @param {CmBoxMark} m */
-  function _typeAgain(m) {
-    var active = document.activeElement;
-    if (active && active !== document.body) return; // the draw put the focus somewhere on purpose
-    var el = _boxAgain(m);
-    if (!el || el.disabled || el.readOnly) return;
-    el.focus({ preventScroll: true });
+  /** @param {CmBox} el @param {CmBoxMark} m */
+  function _typeAgain(el, m) {
     _from.set(el, el.value);
     if (m.typed !== m.was && el.value === m.was) {
       el.value = m.typed;
@@ -177,13 +190,23 @@ window.CmKeepMenu = (function () {
     el.scrollTop = m.scroll;
   }
 
+  /** @param {CmFocusMark} m */
+  function _focusAgain(m) {
+    var active = document.activeElement;
+    if (active && active !== document.body) return; // the draw put the focus somewhere on purpose
+    var el = _again(m);
+    if (!el || /** @type {HTMLButtonElement} */ (el).disabled) return;
+    el.focus({ preventScroll: true });
+    if (m.box && _isBox(el) && !el.readOnly && document.activeElement === el) _typeAgain(el, m.box);
+  }
+
   /**
-   * The open menu and the box being typed in, if there is one. `where` names the class, tab and mode on screen.
+   * The open menu and what has the focus, if anything. `where` names the class, tab and mode on screen.
    * @param {string} where
    * @returns {CmMark}
    */
   function mark(where) {
-    return { where: where, menu: _markMenu(), box: _markBox() };
+    return { where: where, menu: _markMenu(), focus: _markFocus() };
   }
 
   /**
@@ -195,7 +218,7 @@ window.CmKeepMenu = (function () {
   function restore(m, where, place) {
     if (!m || m.where !== where) return;
     if (m.menu) _reopenMenu(m.menu, place);
-    if (m.box) _typeAgain(m.box);
+    if (m.focus) _focusAgain(m.focus);
   }
 
   return { mark: mark, restore: restore };
