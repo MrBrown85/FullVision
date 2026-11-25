@@ -347,29 +347,29 @@
      tap grows. */
   html.fv-tablet .dash-row .dash-view-btn,
   html.fv-tablet .dash-row .dash-comp-seg .seg-btn,
-  html.fv-tablet .dash-row .dash-inbox-pick-btn,
-  html.fv-tablet .dash-row .dash-inbox-grade,
-  html.fv-tablet .dash-row .dash-inbox-add,
-  html.fv-tablet .dash-row .dash-inbox-flip-open,
-  html.fv-tablet .dash-row .dash-inbox-roll-all,
-  html.fv-tablet .dash-row .dash-inbox-flip-slider,
-  html.fv-tablet .dash-row .dash-comp-ln.is-split {
+  html.fv-tablet .dash-row .dash-comp-ln.is-split,
+  html.fv-tablet .dash-row .dash-inbox-switch .seg-btn,
+  html.fv-tablet .dash-row .dash-inbox-action,
+  html.fv-tablet .dash-row .dash-inbox-stack-title,
+  html.fv-tablet .dash-row .dash-inbox-return-btn,
+  html.fv-tablet .dash-row .dash-inbox-rc-nav,
+  html.fv-tablet .dash-row .dash-inbox-rc-title,
+  html.fv-tablet .dash-row .dash-inbox-rc-key,
+  html.fv-tablet .dash-row .dash-inbox-rc-st {
     min-height: 44px;
+  }
+  html.fv-tablet .dash-row .dash-inbox-rc-nav {
+    min-width: 44px;
+  }
+  /* Roll Call's rows are a finger's size too; the grid scrolls when the class is longer. */
+  html.fv-tablet .dash-row .dash-inbox-rc-grid {
+    grid-template-rows: repeat(var(--dash-inbox-rc-rows, 7), 44px);
   }
   /* A Level Mix row on the iPad's full-width tile is board F's one line
      (name, bar, number; dash-competencies.css), its button 44 px: six rows
      fit the 520 px tile and none is hidden under its foot. */
   html.fv-tablet .dash-row .dash-comp-lnbox {
     flex-basis: 48px;
-  }
-  /* A row's title keeps the row's 109 px: it answers a tap 10 px above and
-     below its line (padding the margin gives back), where nothing else takes
-     one. */
-  html.fv-tablet .dash-row .dash-inbox-name {
-    padding-top: 10px;
-    padding-bottom: 10px;
-    margin-top: -10px;
-    margin-bottom: -10px;
   }
   html.fv-tablet .dash-row .dash-comp-head > a,
   html.fv-tablet .dash-row .dash-core-head > a,

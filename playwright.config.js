@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test';
 
 // Set PORT to run a second worktree's browser tests at the same time, e.g. PORT=8348 npx playwright test
 const PORT = Number(process.env.PORT) || 8347;
+// The test files' own dates (Node) in BC time too, as the browser's below.
+process.env.TZ = 'America/Vancouver';
 
 export default defineConfig({
   testDir: './e2e',
@@ -15,6 +17,8 @@ export default defineConfig({
   workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
+    // The browser's clock reads BC time, on the Mac and on GitHub alike (vitest.config.js says why).
+    timezoneId: 'America/Vancouver',
     baseURL: 'http://localhost:' + PORT,
     headless: true,
     screenshot: 'only-on-failure',

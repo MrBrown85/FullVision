@@ -1,12 +1,12 @@
 /**
- * The Dashboard's Inbox tile, By Assessment (D4 of
- * docs/plans/dashboard-inbox-plan.md). Demo Mode,
- * Science 8, the student page and Send Work on, so the sample work shows:
- * Light Refraction Lab has work waiting.
+ * The Dashboard's Inbox tile (D4 of docs/plans/dashboard-inbox-plan.md,
+ * redrawn by docs/plans/inbox-redesign-plan.md): what holds for the tile
+ * whichever view it shows. Demo Mode, Science 8, the student page and Send
+ * Work on, so the sample work shows: Light Refraction Lab has work waiting.
+ * (The stacks, Roll Call and the empty state have their own specs.)
  */
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
-import { FONTS, useFont } from './wide-font.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -75,50 +75,41 @@ const box = (page, sel) =>
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-test('the rows match the model, and the top bar and the Inbox give one To Grade', async ({ page }) => {
+test('the stacks match the queue, and the top bar and the Inbox give one To Grade', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await open(page);
   const got = await page.evaluate(() => {
     const cid = getActiveCourse();
     const ids = getStudents(cid).map(s => s.id);
-    const m = DashInboxModel.build(cid, { seen: localStorage.getItem('fv-dash-inbox-seen:' + cid) });
+    const q = DashInboxQueue.build(cid, { seen: localStorage.getItem('fv-dash-inbox-seen:' + cid) });
     return {
-      shown: [...document.querySelectorAll('.dash-inbox-row')].map(r => ({
+      shown: [...document.querySelectorAll('.dash-inbox-stack')].map(r => ({
         aid: r.getAttribute('data-aid'),
-        counts: r.querySelector('.dash-inbox-main').textContent,
+        n: Number(r.querySelector('.dash-inbox-stack-count').textContent),
       })),
-      model: m.rows.map(p => ({
-        aid: p.aid,
-        counts:
-          p.in +
-          ' in · ' +
-          p.tograde +
-          ' to grade · ' +
-          p.notin +
-          ' not in' +
-          (p.toreturn ? ' · ' + p.toreturn + ' to return' : ''),
-      })),
-      sumRows: m.pieces.reduce((n, p) => n + p.tograde, 0),
+      queue: q.stacks.map(p => ({ aid: p.aid, n: p.tograde })),
+      sum: [...document.querySelectorAll('.dash-inbox-stack-count')].reduce((n, el) => n + Number(el.textContent), 0),
       topBar: Number(document.querySelector('.dash-glance-tograde .dash-glance-value').textContent),
       classCount: GraderWork.classWorkCounts(cid, ids).tograde,
     };
   });
   expect(got.shown.length).toBeGreaterThan(0);
-  expect(got.shown).toEqual(got.model);
+  expect(got.shown).toEqual(got.queue);
   expect(got.shown[0].aid).toBe(LIGHT);
-  expect(got.sumRows).toBe(got.topBar);
-  expect(got.sumRows).toBe(got.classCount);
+  expect(got.sum).toBe(got.topBar);
+  expect(got.sum).toBe(got.classCount);
   expect(got.topBar).toBeGreaterThan(0);
-  // No count in the header; one view pill; one link.
+  // No count in the header; the two-way switch; one link.
   await expect(page.locator('.dash-inbox-head')).not.toContainText(/\d/);
-  await expect(page.locator('.dash-inbox-head .dash-view-btn')).toHaveText('By Assessment');
+  await expect(page.locator('.dash-inbox-head .dash-view-btn')).toHaveCount(0);
+  await expect(page.locator('.dash-inbox-head [data-dash-inbox="mode"][aria-pressed="true"]')).toHaveText('To Grade');
   expect(errors).toEqual([]);
 });
 
-test('the title opens the Work Wall', async ({ page }) => {
+test("a stack's title opens the Work Wall", async ({ page }) => {
   await open(page);
-  await page.locator('.dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-name').click();
+  await page.locator('.dash-inbox-stack-title[data-aid="' + LIGHT + '"]').click();
   await expect(page.locator('#work-wall-overlay')).toBeVisible();
   await expect(page.locator('#work-wall-overlay')).toContainText('Light Refraction Lab');
   await page.locator('#work-wall-overlay .ww-back').click();
@@ -126,141 +117,11 @@ test('the title opens the Work Wall', async ({ page }) => {
   await expect(page.locator('#dash-inbox')).toBeVisible();
 });
 
-test('Grade Submissions opens the grader on the first student in the order the work came in', async ({ page }) => {
+test('a redraw keeps the tile, the chosen view and an open stack, and asks for no picture twice', async ({ page }) => {
   await open(page);
-  const first = await page.evaluate(aid => {
-    const cid = getActiveCourse();
-    const p = DashInboxModel.build(cid, { seen: null }).pieces.find(x => x.aid === aid);
-    const st = getStudents(cid).find(s => s.id === DashInboxModel.gradeOrder(cid, aid)[0]);
-    return { name: displayName(st), n: p.tograde };
-  }, LIGHT);
-  await page.locator('.dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-grade').click();
-  const dialog = page.locator('.grader-dialog');
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.grader-student')).toContainText(first.name.split(' ')[0]);
-  await expect(page.locator('.grader-show [data-show="tograde"]')).toHaveAttribute('aria-pressed', 'true');
-  // The same number the row said (a pair counts once).
-  await expect(page.locator('.grader-show [data-show="tograde"] .grader-show-n')).toHaveText(String(first.n));
-  await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  // Closing draws the Dashboard again with the tile in place.
-  await expect(page.locator('#dash-inbox')).toBeVisible();
-});
-
-test('a counts line too long for its box loses its quiet words, never Late, in the page font or a wide one', async ({
-  page,
-}) => {
-  await open(page);
-  for (const wide of [false, true]) {
-    const r = await page.evaluate(wide => {
-      const host = document.createElement('div');
-      host.style.cssText = 'position:fixed;left:0;top:0;width:260px;z-index:9999;background:#fff';
-      if (wide) host.style.cssText += ';font-family:Verdana,"DejaVu Sans",sans-serif;letter-spacing:0.04em';
-      host.innerHTML =
-        '<p class="dash-inbox-counts">' +
-        DashInbox.countsHtml({ in: 12, tograde: 4, notin: 20, toreturn: 2, late: 3, addedByTeacher: 9, onPaper: 4 }) +
-        '</p>';
-      document.body.appendChild(host);
-      const p = host.querySelector('.dash-inbox-counts').getBoundingClientRect();
-      const late = host.querySelector('.dash-inbox-late').getBoundingClientRect();
-      const out = {
-        pRight: p.right,
-        lateRight: late.right,
-        lateText: host.querySelector('.dash-inbox-late').textContent,
-      };
-      host.remove();
-      return out;
-    }, wide);
-    expect(r.lateText).toBe('· Late 3');
-    expect(r.lateRight, wide ? 'wide font' : 'own font').toBeLessThanOrEqual(r.pRight + 0.5);
-  }
-});
-
-test('a paper hand-in with no scan is a sheet that holds its name and its words', async ({ page }) => {
-  await open(page);
-  await page.evaluate(aid => {
-    const cid = getActiveCourse();
-    const work = getCourseSubmissions(cid);
-    const st = getStudents(cid).find(
-      s => !work.submissions.some(x => x.assessment_id === aid && x.enrollment_id === s.id),
-    );
-    // A long name, to see it wrap rather than run out of the sheet.
-    st.firstName = 'Maximilian-Alexander';
-    st.lastName = 'Featherstonehaugh-Smythe';
-    work.submissions.push({
-      id: 'paper-x',
-      assessment_id: aid,
-      enrollment_id: st.id,
-      version: 1,
-      state: 'sent',
-      sent_by: 'teacher',
-      on_paper: true,
-      is_late: false,
-      note: null,
-      sent_at: '2999-01-01T00:00:00Z',
-      created_at: '2999-01-01T00:00:00Z',
-      files: [],
-    });
-    saveDemoStudentWork(cid, work);
-    PageDashboard.render();
-  }, LIGHT);
-  const sheet = page.locator('.dash-inbox-sheet').first();
-  await expect(sheet).toBeVisible();
-  // The sheet is measured twice: in the page's own font, and in a wider one
-  // (Verdana, with a little more space between letters), as a Windows laptop
-  // or a Chromebook may draw it. Both must hold.
-  const FONTS = {
-    own: '',
-    wide: 'body, .dash-inbox-sheet, .dash-inbox-sheet * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }',
-  };
-  for (const [fontName, css] of Object.entries(FONTS)) {
-    await page.evaluate(c => {
-      let t = document.getElementById('__font');
-      if (!t) {
-        t = document.createElement('style');
-        t.id = '__font';
-        document.head.appendChild(t);
-      }
-      t.textContent = c;
-    }, css);
-    const m = await sheet.evaluate(el => {
-      const r = el.getBoundingClientRect();
-      const name = el.querySelector('.dash-inbox-sheet-name');
-      const note = el.querySelector('.dash-inbox-sheet-note');
-      const lines = n => Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).lineHeight));
-      // Each note line's words, measured as drawn: none runs out of the note's box.
-      const noteBox = note.getBoundingClientRect();
-      const words = [...note.children].map(c => {
-        const range = document.createRange();
-        range.selectNodeContents(c);
-        return range.getBoundingClientRect().right - noteBox.right;
-      });
-      return {
-        w: r.width,
-        h: r.height,
-        fits: el.scrollHeight <= el.clientHeight + 1,
-        nameLines: lines(name),
-        noteLines: lines(note),
-        over: Math.max(...words),
-        label: el.getAttribute('aria-label'),
-      };
-    });
-    const at = fontName + ' font';
-    expect(m.w, at).toBeGreaterThanOrEqual(66);
-    expect(m.h, at).toBeGreaterThanOrEqual(80);
-    expect(m.fits, at).toBe(true);
-    expect(m.noteLines, at).toBeLessThanOrEqual(2);
-    expect(m.nameLines, at).toBeLessThanOrEqual(2);
-    expect(m.over, at).toBeLessThanOrEqual(0.5);
-    expect(m.label, at).toMatch(/Featherstonehaugh-Smythe: Handed In on Paper$/);
-  }
-  await page.evaluate(() => document.getElementById('__font').remove());
-  await shot(page, 'inbox-paper-sheet');
-});
-
-test('a redraw keeps the tile and asks for no picture twice', async ({ page }) => {
-  await open(page);
-  const pics = page.locator('#dash-inbox .dash-inbox-img');
+  await page.locator('.dash-inbox-stack[data-aid="' + LIGHT + '"]').click();
+  await expect(page.locator('.dash-inbox-spread')).toBeVisible();
+  const pics = page.locator('#dash-inbox img[data-work-pic]');
   await expect
     .poll(async () => pics.evaluateAll(imgs => imgs.filter(i => i.complete && i.naturalWidth > 0).length))
     .toBeGreaterThan(0);
@@ -278,112 +139,33 @@ test('a redraw keeps the tile and asks for no picture twice', async ({ page }) =
     PageDashboard.render();
   });
   await expect(page.locator('#dash-inbox')).toBeVisible();
+  await expect(page.locator('.dash-inbox-spread')).toBeVisible();
   expect(await pics.count()).toBe(n);
   await expect.poll(async () => pics.evaluateAll(imgs => imgs.filter(i => i.getAttribute('src')).length)).toBe(n);
   expect(await page.evaluate(() => window.__asked)).toBe(0);
+  // The view the teacher chose is the view drawn again.
+  await page.locator('[data-dash-inbox="mode"][data-mode="rollcall"]').click();
+  await expect(page.locator('.dash-inbox-rollcall')).toBeVisible();
+  await page.evaluate(() => PageDashboard.render());
+  await expect(page.locator('.dash-inbox-rollcall')).toBeVisible();
+  await expect(page.locator('[data-dash-inbox="mode"][data-mode="rollcall"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('the view menu is not visible at rest, opens on the pill and closes on Escape', async ({ page }) => {
+test('the tile is 299 px beside Bulletins and the row tall without it, with nothing sideways', async ({ page }) => {
   await open(page);
-  const menu = page.locator('#dash-view-menu-inbox');
-  const hidden = async () =>
-    menu.evaluate(el => {
-      const cs = getComputedStyle(el);
-      const r = el.getBoundingClientRect();
-      return cs.display === 'none' || cs.visibility === 'hidden' || (r.width === 0 && r.height === 0);
-    });
-  expect(await hidden()).toBe(true);
-  await page.locator('#dash-view-btn-inbox').click();
-  expect(await hidden()).toBe(false);
-  await expect(menu.locator('[role="menuitemradio"]').first()).toContainText('By Assessment');
-  await expect(menu).toContainText('One row per assessment, newest work first.');
-  await page.keyboard.press('Escape');
-  expect(await hidden()).toBe(true);
-  // The ring and the rest of the tile's own overlays are not drawn at rest either.
-  expect(await page.locator('#dash-inbox').evaluate(el => getComputedStyle(el).boxShadow)).not.toContain(
-    '0px 0px 0px 3px',
-  );
-});
-
-test('beside a Bulletins tile the Inbox is 299 px: whole rows, pictures of 80 px or more, nothing sideways', async ({
-  page,
-}) => {
-  await open(page);
-  const tile = await box(page, '#dash-inbox');
-  expect(Math.round(tile.height)).toBe(299);
-  const m = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.dash-inbox-row')].map(r => {
-      const b = r.getBoundingClientRect();
-      return { top: b.top, bottom: b.bottom };
-    });
-    const list = document.getElementById('dash-inbox-list');
-    const lb = list.getBoundingClientRect();
-    const pics = [...document.querySelectorAll('#dash-inbox .dash-inbox-img')].map(
-      i => i.getBoundingClientRect().height,
-    );
-    const sheets = [...document.querySelectorAll('#dash-inbox .dash-inbox-sheet')].map(
-      i => i.getBoundingClientRect().height,
-    );
-    const main = document.getElementById('main');
-    return {
-      rows,
-      list: { top: lb.top, bottom: lb.bottom, scrolls: list.scrollHeight > list.clientHeight },
-      pics,
-      sheets,
-      sideways: [
-        document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        main.scrollWidth - main.clientWidth,
-        list.scrollWidth - list.clientWidth,
-      ],
-      pageH: document.documentElement.scrollHeight,
-    };
-  });
-  for (let i = 1; i < m.rows.length; i++) expect(m.rows[i].top).toBeGreaterThanOrEqual(m.rows[i - 1].bottom - 0.5);
-  // The first row sits whole inside the list.
-  expect(m.rows[0].top).toBeGreaterThanOrEqual(m.list.top - 0.5);
-  expect(m.rows[0].bottom).toBeLessThanOrEqual(m.list.bottom + 0.5);
-  expect(m.pics.length).toBeGreaterThan(0);
-  m.pics.concat(m.sheets).forEach(h => expect(h).toBeGreaterThanOrEqual(80));
-  expect(m.sideways).toEqual([0, 0, 0]);
-  // The tile did not make the row taller: it is still 510 px beside Bulletins.
+  expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(299);
+  const sideways = await page.evaluate(() => [
+    document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    document.getElementById('main').scrollWidth - document.getElementById('main').clientWidth,
+  ]);
+  expect(sideways).toEqual([0, 0]);
   expect(Math.round((await box(page, '.dash-row')).height)).toBe(510);
-  const bulletins = await box(page, '.dash-row-bulletins');
-  expect(bulletins.top).toBeGreaterThanOrEqual(tile.bottom + 11);
   await shot(page, 'inbox-299-light');
 });
 
-test('with no Bulletins tile the Inbox is the row tall, and its rows and pages grow to fill it', async ({ page }) => {
+test('with no Bulletins tile the Inbox is the row tall', async ({ page }) => {
   await open(page, { tile: false });
-  const tile = await box(page, '#dash-inbox');
-  expect(Math.round(tile.height)).toBe(510);
-  // Board A and Heights: the rows with pages share the list, and the pages
-  // grow with the row (no band of empty tile under one row).
-  for (const font of FONTS) {
-    await useFont(page, font);
-    const list = await box(page, '#dash-inbox-list');
-    const rows = await page
-      .locator('#dash-inbox .dash-inbox-row')
-      .evaluateAll(els => els.reduce((a, el) => a + el.getBoundingClientRect().height, 0));
-    expect(Math.abs(rows - list.height), font).toBeLessThanOrEqual(1.5);
-    const row = await box(page, '.dash-inbox-row:not(.is-slim)');
-    expect(row.height, font).toBeGreaterThan(109);
-    const pic = await box(page, '.dash-inbox-pic');
-    expect(pic.height, font).toBeGreaterThan(88);
-    // A page is never wider than two fifths of its row, so the words keep their room.
-    expect(pic.width, font).toBeLessThanOrEqual(row.width * 0.4 + 0.5);
-    // The words and the button stay inside the row.
-    const past = await page
-      .locator('.dash-inbox-row:not(.is-slim)')
-      .first()
-      .evaluate(r => {
-        const b = r.getBoundingClientRect();
-        return [...r.querySelectorAll('.dash-inbox-info, .dash-inbox-grade')].some(e => {
-          const x = e.getBoundingClientRect();
-          return x.right > b.right + 0.5 || x.bottom > b.bottom + 0.5;
-        });
-      });
-    expect(past, font).toBe(false);
-  }
+  expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(510);
   await shot(page, 'inbox-510-light');
 });
 
@@ -405,118 +187,10 @@ test("a browser that kept 'fv-build-dashRow' as 0 still gets the row and the Inb
   await open(page, { oldFlag: '0' });
   await expect(page.locator('.dash-row')).toHaveCount(1);
   await expect(page.locator('#dash-inbox')).toBeVisible();
-  await expect(page.locator('.dash-glance-tograde')).toHaveAttribute('data-dash-inbox-jump', '1');
 });
-
-/* A row is at least 109 px; with several pieces in, each is that tall (the
-   rows share the list and grow only when there is room). This holds a row at
-   its 109 px. With Late, You Added and on paper all on its counts line
-   the line wraps to a third line where the words column is narrowest (the
-   roster shown beside the row at 1100 wide; the reviewer saw it at 769):
-   the row then leaves out its Newest line and nothing runs past it (D9). */
-for (const [w, h] of [
-  [769, 1024],
-  [1024, 768],
-  [1100, 800],
-  [1280, 800],
-]) {
-  test(`at ${w} x ${h} a row with Late, You Added and on paper stays inside its 109 px`, async ({ page }) => {
-    await page.setViewportSize({ width: w, height: h });
-    await open(page);
-    // The row at its least, as on a busy day with four pieces in.
-    await page.addStyleTag({ content: '#dash-inbox .dash-inbox-row:not(.is-slim) { flex: 0 0 109px !important; }' });
-    await page.evaluate(() => {
-      const cid = getActiveCourse();
-      const work = getCourseSubmissions(cid);
-      const ids = getStudents(cid).map(s => s.id);
-      const light = work.submissions.filter(x => x.assessment_id === 'sci8a21');
-      // Added by the teacher, on paper, and late, among Light Refraction Lab's own.
-      light[0].sent_by = 'teacher';
-      light[1].on_paper = true;
-      light[1].files = [];
-      light[2].is_late = true;
-      // More in, so every number has two digits.
-      ids.forEach((sid, i) => {
-        if (i > 20 || work.submissions.some(x => x.assessment_id === 'sci8a21' && x.enrollment_id === sid)) return;
-        work.submissions.push(
-          Object.assign({}, light[3], {
-            id: 'fit-' + sid,
-            enrollment_id: sid,
-            is_late: i % 2 === 0,
-            sent_by: i % 3 ? 'student' : 'teacher',
-            on_paper: i % 5 === 0,
-            files: i % 5 === 0 ? [] : light[3].files,
-          }),
-        );
-      });
-      saveDemoStudentWork(cid, work);
-      // Two assessed and not returned yet, so the counts say "to return" too.
-      GraderWork.workCounts(cid, 'sci8a21', ids)
-        .ids.tograde.slice(-2)
-        .forEach(sid => Grader.setOverallComment(cid, sid, 'sci8a21', 'Seen.'));
-      PageDashboard.render();
-    });
-    const row = page.locator('#dash-inbox .dash-inbox-row[data-aid="sci8a21"]');
-    await expect(row.locator('.dash-inbox-counts')).toContainText('to return');
-    await expect(row.locator('.dash-inbox-late')).toBeVisible();
-    await expect(row.locator('.dash-inbox-quiet')).toContainText('You Added');
-    await expect(row.locator('.dash-inbox-quiet')).toContainText('on paper');
-    for (const font of FONTS) {
-      await useFont(page, font);
-      const m = await row.evaluate(r => {
-        const cs = getComputedStyle(r);
-        const box = r.getBoundingClientRect();
-        const inner = { top: box.top + parseFloat(cs.paddingTop), bottom: box.bottom - parseFloat(cs.paddingBottom) };
-        const shown = [...r.querySelectorAll('.dash-inbox-info > *, .dash-inbox-grade, .dash-inbox-pics')].filter(
-          el => getComputedStyle(el).display !== 'none',
-        );
-        const late = r.querySelector('.dash-inbox-late').getBoundingClientRect();
-        return {
-          h: Math.round(box.height),
-          past: Math.max(...shown.map(el => el.getBoundingClientRect().bottom - inner.bottom)),
-          above: Math.max(...shown.map(el => inner.top - el.getBoundingClientRect().top)),
-          lateIn: late.bottom <= inner.bottom + 0.5 && late.height > 0,
-          lines: Math.round(r.querySelector('.dash-inbox-counts').getBoundingClientRect().height / 19.5),
-          tight: r.classList.contains('is-tight'),
-          newest: r.querySelector('.dash-inbox-newest').textContent.trim(),
-          newestShown: getComputedStyle(r.querySelector('.dash-inbox-newest')).display !== 'none',
-          label: r.querySelector('.dash-inbox-name').getAttribute('aria-label'),
-          title: r.querySelector('.dash-inbox-name').getAttribute('title') || '',
-          sideways: r.scrollWidth - r.clientWidth,
-        };
-      });
-      // Where the words column is narrowest the counts take three lines: the case this guards.
-      if (w === 1100 && font === 'page') expect(m.lines).toBe(3);
-      if (w === 1100) expect(m.tight, font).toBe(true);
-      // Newest, out of sight on a tight row, is still in the piece name's accessible name and its title.
-      if (!m.newestShown) {
-        expect(m.label, font).toContain(m.newest);
-        expect(m.title, font).toContain(m.newest);
-      } else expect(m.label, font).not.toContain('Newest:');
-      expect(m.h, font).toBe(109);
-      expect(m.past, font).toBeLessThanOrEqual(0.5);
-      expect(m.above, font).toBeLessThanOrEqual(0.5);
-      expect(m.lateIn, font).toBe(true);
-      expect(m.sideways, font).toBeLessThanOrEqual(0);
-    }
-  });
-}
 
 test('with Send Work off the slot keeps Recent Assessments', async ({ page }) => {
   await open(page, { sendWork: false });
   await expect(page.locator('#dash-inbox')).toHaveCount(0);
   await expect(page.locator('.dash-recent')).toBeVisible();
-});
-
-test('the view menu keeps one fixed order, whatever order the scripts load in', async ({ page }) => {
-  await open(page);
-  await page.locator('#dash-view-btn-inbox').click();
-  const keys = await page.locator('#dash-view-menu-inbox [data-view]').evaluateAll(els => els.map(e => e.dataset.view));
-  const want = ['assessment', 'side', 'flip', 'roll'];
-  expect(keys).toContain('roll');
-  expect(keys[0]).toBe('assessment');
-  // An ordered match: each shown view comes in the fixed order.
-  const ranks = keys.map(k => want.indexOf(k));
-  expect(ranks.every(r => r >= 0)).toBe(true);
-  expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
 });

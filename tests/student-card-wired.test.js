@@ -28,7 +28,7 @@ import {
 import { codeTag } from './helpers/card-key-fake.js';
 import { CARD_ROUTES, cardReply } from '../supabase/functions/student-submit/card-routes.ts';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const KEY = 'fv-s-session';
 const SIGNED_OUT = 'You are signed out. Scan or type your card to open your page again.';
 

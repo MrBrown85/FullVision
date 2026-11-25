@@ -16,13 +16,13 @@
 
 /* The bottom bar with Bulletins in it, sized by StudentBulletinsView.fitTabs
    from the bar as drawn: its own width (in the page and in the preview's phone
-   frame alike), the tabs actually in it, and each label's longest word. Each
-   tab is as wide as its longest word needs (Assignments more, Reflect less),
-   so the label size is the bar's width, less 2 px a side for each tab, over
-   the words' widths: one size for every label, 12 px at most. The 2 px are
-   kept on the screen at every Text Size (divided by the zoom), so a bigger
-   Text Size never draws the labels smaller. Before it has measured, the bar is
-   s/page-view.css's. */
+   frame alike), the tabs actually in it, and each label's longest word. The
+   tabs are equal, so the icons are evenly spaced; each label is as wide as its
+   longest word, centred under its icon, and may reach past its tab but never
+   into a neighbour's label or off the bar. One label size for every label,
+   12 px at most. The 2 px a side are kept on the screen at every Text Size
+   (divided by the zoom), so a bigger Text Size never draws the labels smaller.
+   Before it has measured, the bar is s/page-view.css's. */
 .sp-view .sp-tabs-bottom.sp-bulletin-tabs:has(> .sp-tab[data-tab='bulletins']) > .sp-tab {
   padding-left: var(--sp-bulletin-tab-pad, 2px);
   padding-right: var(--sp-bulletin-tab-pad, 2px);
@@ -32,6 +32,9 @@
 }
 .sp-view .sp-tabs-bottom.sp-bulletin-tabs:has(> .sp-tab[data-tab='bulletins']) .sp-tab-label {
   font-size: var(--sp-bulletin-tab-font, 10px);
+  /* Its width is set by fitTabs; wider than the tab, it reaches both ways. */
+  flex-shrink: 0;
+  text-align: center;
 }
 
 .sp-view .sp-bulletin-tab {

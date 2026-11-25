@@ -39,11 +39,23 @@ function caughtUp() {
     ),
   );
 }
+// What the tile holds: D5's empty space (DashInbox.emptyHtml, the To Grade view's own fallback) when nothing
+// is to grade, else the tile as drawn, stacks and all.
+function tileHtml() {
+  if (GraderWork.classWorkCounts(CID, ids()).tograde > 0) return DashInbox.html(CID);
+  return (
+    '<section class="dash-inbox" id="dash-inbox"><div class="dash-inbox-body"><ul class="dash-inbox-list" id="dash-inbox-list">' +
+    DashInbox.emptyHtml(CID, { caughtUp: true }) +
+    '</ul></div></section>'
+  );
+}
 function mountTile() {
-  const html = DashInbox.html(CID);
+  const html = tileHtml();
   const dom = parseHTML('<!DOCTYPE html><html><body><main id="main">' + html + '</main></body></html>');
   globalThis.document = dom.document;
-  DashInboxDrop.mount(dom.document.getElementById('dash-inbox'), CID, DashInbox.model());
+  DashInboxDrop.mount(dom.document.getElementById('dash-inbox'), CID, {
+    caughtUp: !dom.document.querySelector('.dash-inbox-stack'),
+  });
   return dom.document;
 }
 function dragEvent(doc, type, dt) {
@@ -143,13 +155,13 @@ describe('which assessment', () => {
 describe('All Caught Up', () => {
   it('0 to grade, 7 to return: the drop area, then the two lines under it, and not "All Caught Up"', () => {
     caughtUp();
-    const html = DashInbox.html(CID);
+    const html = tileHtml();
     // As the top bar: work waits to be returned, so nothing is caught up.
     expect(GraderWork.classWorkCounts(CID, ids())).toMatchObject({ tograde: 0, toreturn: 7 });
     expect(html).not.toContain('All Caught Up');
     expect(html).toContain('Drop the Scan, a Folder or Files');
     expect(html).toContain('Photos or PDFs. Files are matched to students by name.');
-    expect(html).not.toContain('dash-inbox-row');
+    expect(html).not.toContain('dash-inbox-stack');
     const doc = mountTile();
     expect([...doc.querySelectorAll('.dash-inbox-drop-pick')].map(b => b.textContent)).toEqual(
       window.AddWorkSplit
@@ -190,7 +202,7 @@ describe('All Caught Up', () => {
     const a = getAssessments(CID).find(x => x.id === LIGHT);
     a.title = '<i>Hi</i>';
     caughtUp();
-    const html = DashInbox.html(CID);
+    const html = tileHtml();
     expect(html).not.toContain('<i>Hi');
     expect(html).toContain('&lt;i&gt;Hi&lt;/i&gt;');
   });
@@ -227,7 +239,7 @@ describe('a drop on the tile', () => {
     const cover = doc.querySelector('.dash-inbox-drop-cover');
     expect(cover.hidden).toBe(true);
     const dt = { types: ['Files'], files: [{ name: 'x.jpg' }], items: [] };
-    const row = doc.querySelector('.dash-inbox-row');
+    const row = doc.querySelector('.dash-inbox-stack');
     row.dispatchEvent(dragEvent(doc, 'dragenter', dt));
     expect(cover.hidden).toBe(false);
     expect(cover.textContent).toBe(
@@ -245,7 +257,7 @@ describe('a drop on the tile', () => {
     const doc = mountTile();
     const open = vi.spyOn(AddWorkClass, 'open');
     const dt = { types: ['text/plain'], files: [], items: [] };
-    const row = doc.querySelector('.dash-inbox-row');
+    const row = doc.querySelector('.dash-inbox-stack');
     row.dispatchEvent(dragEvent(doc, 'dragenter', dt));
     const over = dragEvent(doc, 'dragover', dt);
     row.dispatchEvent(over);
@@ -269,7 +281,7 @@ describe('a drop on the tile', () => {
       during = drop.eventPhase;
       return true;
     });
-    doc.querySelector('.dash-inbox-row').dispatchEvent(drop);
+    doc.querySelector('.dash-inbox-stack').dispatchEvent(drop);
     expect(drop.defaultPrevented).toBe(true);
     expect(open).toHaveBeenCalledTimes(1);
     const [cid, aid, opts] = open.mock.calls[0];

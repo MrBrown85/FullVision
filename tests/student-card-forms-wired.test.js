@@ -21,7 +21,7 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, fakeStudentSubmit, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const Q = '00000091-0000-4000-8000-000000000000';
 const R = '00000092-0000-4000-8000-000000000000';
 const words = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);

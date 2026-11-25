@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const words = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
 const bodies = (page, route) => page.calls.filter(c => c.body.route === route).map(c => c.body);
 const viewOf = page => page.T.viewOf(page.T.state());

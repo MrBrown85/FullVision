@@ -13,10 +13,14 @@ labels:
   - Bulletins
   - Let Students React
   - Inbox
-  - By Assessment
-  - Grade Submissions
-  - Side by Side
-  - Flip Through
+  - To Grade
+  - Start Grading
+  - Not In
+  - Late
+  - Return
+  - Handed In on Paper
+  - Add a Scan or Photo
+  - Add Work
   - Roll Call
   - All Caught Up
   - Recent Assessments
@@ -61,6 +65,10 @@ next:
   - add-your-students
 ---
 
+## Nov 24, 2026: The Inbox, Redrawn
+
+The Dashboard's **Inbox** now shows only what is waiting for you. **To Grade** has one stack for each assessment with work to assess, newest work first, with a count, a dot when a student has sent work since you last looked, and **Late** when any of it is late. Select a stack to spread it into its pages, with the names of students who are **Not In** after them; select a page to open the grader on that student. **Start Grading** opens the grader on the first stack, and when you finish an assessment the grader carries on into the next one. A pile of assessed work lies face down with **Return**. **Roll Call** shows the whole class for one assessment, with who has work to assess, who has had it back and who is not in. For a student who is not in, **Handed In on Paper** records the paper, and **Add a Scan or Photo** opens the grader on that student. With nothing waiting, the Inbox is one line that says **All Caught Up**, and **Add Work** lists the assessments that are taking work; a scan or files dropped on the Inbox open Add Work for the Class with them placed. The view menu, By Assessment, Side by Side and Flip Through are gone.
+
 ## Nov 24, 2026: Print or Keep a Handout
 
 A student who opens a PDF handout on their page can now press **Print** to print every page, or **Save to Phone** to keep the whole handout as one PDF file. On an iPhone, Save to Phone opens the share sheet, which has Print, Save to Files and Google Drive. Both work in Preview as Student too. Nothing is sent anywhere.
@@ -75,7 +83,7 @@ A quiz is a new way for students to do an assessment. On the assessment form, **
 
 ## Nov 18, 2026: The Dashboard's Middle Row
 
-Between the top bar and the student cards, the Dashboard now has one row as tall as the window allows; the student cards start below it. On the left, in a class whose students send work, the **Inbox** shows the work that has come in. **By Assessment** lists each assessment with work to assess, newest first, with **Grade Submissions** to open the grader on it. **Side by Side**, **Flip Through** and **Roll Call** show the same work as pages side by side, one student at a time, or the whole class. With nothing left to assess, the Inbox says **All Caught Up**, and a scan or files dropped on it open Add Work for the Class with them placed. In a class that does not take work, the left tile is **Recent Assessments**. On the right, one **Competencies** tile switches between **Curricular** and **Core**; select a row to see its students. To Grade in the top bar now goes to the Inbox.
+Between the top bar and the student cards, the Dashboard now has one row as tall as the window allows; the student cards start below it. On the left, in a class whose students send work, the **Inbox** shows the work that has come in. By Assessment lists each assessment with work to assess, newest first, with Grade Submissions to open the grader on it. Side by Side, Flip Through and **Roll Call** show the same work as pages side by side, one student at a time, or the whole class. With nothing left to assess, the Inbox says **All Caught Up**, and a scan or files dropped on it open Add Work for the Class with them placed. In a class that does not take work, the left tile is **Recent Assessments**. On the right, one **Competencies** tile switches between **Curricular** and **Core**; select a row to see its students. To Grade in the top bar now goes to the Inbox.
 
 ## Nov 16, 2026: Reflect
 

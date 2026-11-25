@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const KEY = 'fv-s-session';
 const HUM = id(3); // Cece's enrollment in a second class
 const LOCKED = 'This card is locked after too many wrong tries. Ask your teacher to unlock it.';
