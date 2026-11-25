@@ -1194,15 +1194,18 @@ window.DashOverview = (function () {
      built (docs/plans/bulletins-plan.md, not built yet). */
   function leftColumnHtml(opts) {
     var cid = opts.cid;
-    var inboxHome =
-      window.DashInbox && window.GraderWork && GraderWork.workOnInClass && GraderWork.workOnInClass(cid)
-        ? DashInbox.html(cid, { classCounts: classWorkCounts })
-        : DashRecent.html(cid, opts.allStudents || []);
     var bulletins =
       window.BuildFlags && BuildFlags.on('bulletins') && window.DashBulletins ? DashBulletins.html(cid) : '';
+    var inboxHome =
+      window.DashInbox && window.GraderWork && GraderWork.workOnInClass && GraderWork.workOnInClass(cid)
+        ? DashInbox.html(cid, { classCounts: classWorkCounts, bulletins: !!bulletins })
+        : DashRecent.html(cid, opts.allStudents || []);
+    // The redrawn Inbox with nothing waiting is one line and Bulletins takes the room.
+    var quiet = !!(bulletins && window.DashInbox && DashInbox.quiet && DashInbox.quiet());
     return (
       '<div class="dash-row-left' +
       (bulletins ? ' has-bulletins' : '') +
+      (quiet ? ' has-quiet-inbox' : '') +
       '"><div class="dash-row-slot dash-row-inbox">' +
       inboxHome +
       '</div>' +
