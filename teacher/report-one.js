@@ -958,6 +958,22 @@ window.ReportOne = (function () {
     gr: '.gr-table > .gr-row:not(.gr-head)',
     table: 'table > tbody > tr',
   };
+  /* What a reflection prints under its table: the items to tick, then
+     each question with its lines. Each is cut from the next as a table's
+     rows are, so the part starts where there is room and goes on. */
+  var TAIL_SEL = '.report-reflect-checks, .report-reflect-q';
+  /* The pieces a part can be cut between, in print order: its table's
+     rows, then what prints under the table. */
+  function _items(root, split) {
+    var rows = Array.prototype.slice.call(root.querySelectorAll(SPLIT_SEL[split] || SPLIT_SEL.table));
+    if (split !== 'table' || !rows.length) return rows;
+    var table = rows[0].closest('table');
+    return rows.concat(
+      Array.prototype.filter.call(root.querySelectorAll(TAIL_SEL), function (x) {
+        return !table.contains(x);
+      }),
+    );
+  }
 
   /* Each cell at its width in the stage: px, and for a part that can be
      cut between its rows, each row's height and the rest (chrome). */
@@ -977,8 +993,12 @@ window.ReportOne = (function () {
       // One table only: a block that lays its rows out in two tables is
       // not cut.
       if (split === 'table' && el.querySelectorAll('table').length !== 1) return;
-      var rows = el.querySelectorAll(SPLIT_SEL[split]);
+      var rows = _items(el, split);
       if (rows.length < 2) return;
+      // A table's pieces are measured as they print (layoutStudent): its
+      // heading, and what prints only with its first or last rows, differ
+      // piece to piece.
+      c.measured = split === 'table';
       var tops = Array.prototype.map.call(rows, function (r) {
         return r.getBoundingClientRect().top;
       });
@@ -1031,15 +1051,29 @@ window.ReportOne = (function () {
     var tpl = document.createElement('div');
     // html-safe: html is this part's own render (partHtml), parsed in a detached div
     tpl.innerHTML = html;
-    var all = tpl.querySelectorAll(SPLIT_SEL[split] || 'table > tbody > tr');
+    var all = _items(tpl, split);
     var total = all.length;
     var holder = total ? all[0].closest('table, .gr-table') : null;
-    Array.prototype.forEach.call(all, function (r, i) {
-      if (i < part.start || i >= part.end) r.remove();
+    var kept = all.slice(part.start, part.end);
+    var holds = function (node, list) {
+      return list.some(function (r) {
+        return node === r || (node.contains && node.contains(r));
+      });
+    };
+    // What follows the table: what prints under it goes with its own
+    // piece; anything else (a line under the table) prints with the last.
+    var under = [];
+    for (var up = holder; up && up.parentNode && up.parentNode !== tpl; up = up.parentNode) {
+      for (var sib = up.nextSibling; sib; sib = sib.nextSibling) under.push(sib);
+    }
+    under.forEach(function (x) {
+      if (holds(x, all) ? !holds(x, kept) : part.end < total) x.remove();
+    });
+    all.forEach(function (r) {
+      if (kept.indexOf(r) < 0) r.remove();
     });
     var title = _titleEl(tpl);
     for (var node = holder; node && node.parentNode && node.parentNode !== tpl; node = node.parentNode) {
-      if (part.end < total) while (node.nextSibling) node.nextSibling.remove();
       if (part.start > 0) {
         var before = node.previousSibling;
         while (before) {
@@ -1049,11 +1083,30 @@ window.ReportOne = (function () {
         }
       }
     }
+    // A piece with none of the table's rows prints no table.
+    if (holder && !holds(holder, kept)) holder.remove();
     if (part.start > 0) {
       var t = _titleEl(tpl);
       if (t) t.textContent = t.textContent.replace(/\s*\(continued\)$/, '') + ' (continued)';
     }
     return tpl.innerHTML;
+  }
+
+  /* The height rows [start, end) of a part print at as one piece, drawn in
+     the stage as the page draws it; each piece is measured once. */
+  function _pieceMeasure(stage, c) {
+    var total = c.rows.length;
+    var seen = {};
+    return function (start, end) {
+      if (start <= 0 && end >= total) return c.px;
+      var k = start + ':' + end;
+      if (seen[k] == null) {
+        // html-safe: _pieceHtml cuts this part's own render (partHtml); the key is a registry key
+        stage.innerHTML = _cellTag(c.key, c.size, _pieceHtml(c.key, c.html, { start: start, end: end }), 0);
+        seen[k] = stage.firstChild.offsetHeight;
+      }
+      return seen[k];
+    };
   }
 
   function _cellTag(key, size, html, minH) {
@@ -1159,7 +1212,9 @@ window.ReportOne = (function () {
     var packRows = [
       rows.map(function (row) {
         return row.map(function (c) {
-          return { id: c.key, size: c.size, px: c.px, rows: c.rows, chrome: c.chrome, keep: c.keep };
+          var cell = { id: c.key, size: c.size, px: c.px, rows: c.rows, chrome: c.chrome, keep: c.keep };
+          if (c.measured) cell.pieceH = _pieceMeasure(stage, c);
+          return cell;
         });
       }),
     ];
@@ -1380,6 +1435,7 @@ window.ReportOne = (function () {
     setWording: setWording,
     clearStudent: clearStudent,
     partHtml: partHtml,
+    pieceHtml: _pieceHtml,
     rowsOf: rowsOf,
     layoutStudent: layoutStudent,
     layoutWith: layoutWith,

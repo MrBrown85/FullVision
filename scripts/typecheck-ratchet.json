@@ -2,6 +2,7 @@
   "checked": [
     "teacher/obs-roster.js",
     "teacher/card-show.js",
+    "teacher/report-one-word-ops.js",
     "teacher/report-one-words.js",
     "teacher/report-one-copy.js",
     "teacher/report-one-undo.js",
