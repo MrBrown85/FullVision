@@ -1,6 +1,6 @@
 # The phone's new look (2026-11-24)
 
-**Status.** L1, L2, Undo after a return (the first part of L3) and the Write a Bulletin sheet (the first part of L2b) are built on `main` behind the switch. Nothing else is built. Not released.
+**Status.** L1, L2, L5, L6, Undo after a return (the first part of L3) and the Write a Bulletin sheet (the first part of L2b) are built on `main` behind the switch. Not released.
 
 **Why.** Colin, Nov 24: the phone's grading view is cluttered, and a teacher who is not a software user would be overwhelmed by it. The phone is a tool to be used in the moment: grade, observe, post. One strong control for each decision, the rest behind one tap, no grey lines of explanation.
 
@@ -70,13 +70,21 @@ It lives in `grade-look.js` (`hold`, `held`, `flush`, `undo`); `tab-grade.js` ha
 
 Colin, Nov 24: the Let Students React box alone at the left of its row looks wrong, and "Posts to Science 8: every student's phone." is filler. The line is gone from the sheet and from Post a Photo. Let Students React is a row like the sheet's others, its switch at the right, as Observe's sheet has it. Styles only.
 
+## The Students card and the profile (L5, L6, switch on)
+
+Built in `teacher-mobile/student-look.js`; `card-widgets.js` and `student-detail.js` each ask it once, when the switch is on.
+
+- **The card** is the student's My Learning: the name (a tap for every student), the overall level in words with four bars up to it (a Letter class shows its letter, no bars), + Observe and Profile, To Grade and To Return as before, then the five newest pieces with a result and All N Pieces. A piece's result is the class's own wording (`assessmentCellValue`), so a class set to show numbers shows "2.7", not "Proficient". In a class whose student page is on, a blue dot marks a piece returned and not opened since (`seen_at`), with "N Not Opened" over the list. With the switch on, the card's widget choices are set aside.
+- **The profile**: who they are (how to say their name, pronouns, IEP and the other designations, Flagged, open concerns, languages, how they learn best) and + Observe; their private note behind a tap; their goal and check-in; About Me; What You've Noticed (the newest observation, then All N); their reflections; then All Work and Competencies. Each "All" row and each reflection opens in place (`<details>`). A part with nothing in it is left out.
+- **Choices made without Colin** (he had delegated the board's details): the button reads "Profile", as on the board; All N Pieces opens the profile, where All Work is one tap; Reflections says "None Answered" rather than "No Card Yet", which needs a server read; long About Me answers are shown whole, not cut to five lines; the old profile's "Seen in Observations" table and To Grade box are not on it.
+
 ## Colin's answers owed
 
 Each is asked when its slice comes up; none holds up L1 or L2.
 
 1. **For Revision in an As Soon As I Save class (L3).** The student already sees the grade there.
 2. **+ Follow Up on the phone's observation cards (L2b).** The board takes it off the card; "Observation follow-ups" 3 puts it on every card. It stays on until he says.
-3. **"Profile" or "View Profile" on the Students card (L5).**
+3. **"Profile" or "View Profile" on the Students card (L5).** Built as "Profile", as on the board.
 4. **A card made on the spot from the profile (L7).** A card's code cannot be read again once it is made, so this needs a look at who can make one and when.
 
 ## Tests, each slice

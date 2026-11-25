@@ -345,6 +345,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/markup.js',
   '/teacher-mobile/crit-own.js',
   '/teacher-mobile/grade-look.js',
+  '/teacher-mobile/student-look.js',
   '/teacher-mobile/tab-grade.js',
   '/teacher-mobile/level-sheet.js',
   '/teacher-mobile/pull-refresh.js',
