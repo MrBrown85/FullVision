@@ -371,6 +371,7 @@ describe('teacher-only: no report, Comment Bank, export or student page reader s
       'shared/offline-queue.js', // a follow-up queues behind its observation; a change to a deleted one is done
       'shared/seed-data.js',
       'teacher-mobile/shell.js', // the delete question
+      'teacher-mobile/student-look.js', // the phone profile's Open Concerns chip (teacher-only)
       'teacher-mobile/tab-observe.js',
       'teacher/obs-roster.js', // the Open Concerns count
       'teacher/page-assignments.js', // the delete question

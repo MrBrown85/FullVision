@@ -8,6 +8,7 @@
     "shared/rubric-scale.js",
     "teacher-mobile/crit-own.js",
     "teacher-mobile/grade-look.js",
+    "teacher-mobile/student-look.js",
     "teacher-mobile/level-sheet.js",
     "teacher-mobile/pull-refresh.js",
     "teacher-mobile/tab-bar.js",

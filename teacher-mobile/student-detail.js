@@ -798,6 +798,37 @@ window.MStudentDetail = (function () {
       { id: 'evidence', label: 'Evidence', stat: obs.length + (obs.length === 1 ? ' Observation' : ' Observations') },
       { id: 'profile', label: 'Learner Profile', stat: goalCount + (goalCount === 1 ? ' Goal' : ' Goals') },
     ];
+    // The new look (teacher-mobile/student-look.js): the student's own words
+    // first, then All Work and Competencies, each opening in place.
+    if (window.MStudentLook && MStudentLook.on()) {
+      var obsCtxL = ObsCard.context(cid);
+      return (
+        '<div class="m-screen m-screen-hidden m-sl-screen" id="m-screen-student-detail">' +
+        MC.navBar({ id: 'student-detail', title: '', backLabel: 'Students' }) +
+        '<div class="m-screen-content"><div class="m-sl-page" id="m-st-panel-profile">' +
+        MStudentLook.profile({
+          st: st,
+          cid: cid,
+          badges: badges,
+          voice:
+            typeof StudentVoice !== 'undefined' && StudentVoice.loaded(cid)
+              ? StudentVoice.profile(StudentVoice.entries(cid, sid))
+              : null,
+          answerText: _answerText,
+          obs: obs,
+          allObs: getStudentQuickObs(cid, sid),
+          obsHtml: function (ob) {
+            return MObserve.cardHtml(cid, Object.assign({ studentId: sid }, ob), obsCtxL, {
+              showStudent: false,
+              when: 'date',
+            });
+          },
+          assessHtml: '<div class="m-st-list">' + assessHtml + '</div>',
+          compsHtml: focusHTML + sectionCards,
+        }) +
+        '</div></div></div>'
+      );
+    }
     var activeTab = savedTab();
     var tabsBlock =
       _tabBar(tabs, activeTab) +
@@ -859,6 +890,8 @@ window.MStudentDetail = (function () {
       desc = null;
     }
     if (!desc || !desc.sid) return;
+    // The new look draws the whole profile as one panel.
+    if (window.MStudentLook && MStudentLook.on()) ids = ['profile'];
     var tmp = document.createElement('div');
     if (!window.MStudents || !MStudents.renderDetail) return;
     // html-safe: MStudents.renderDetail escapes its text (checked where the shell places it).
