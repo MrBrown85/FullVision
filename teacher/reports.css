@@ -37,28 +37,31 @@
 .student-picker-btn {
   height: var(--control-h);
   font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  /* A picker like the term and class pickers: the same chevron. */
-  background: var(--surface) var(--select-chevron) no-repeat right 10px center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 4px 28px 4px 10px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  /* Grey like the Report picker and the other bars' buttons, with the same
+     chevron. A fixed width, so a longer label never moves the bar. */
+  background: rgba(118, 118, 128, 0.12) var(--select-chevron) no-repeat right 10px center;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 30px 0 12px;
   cursor: pointer;
   color: var(--text);
-  min-width: 150px;
+  width: 168px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  transition: border 0.12s;
+  transition: background-color 0.15s;
 }
 .student-picker-btn:hover {
-  border-color: var(--active);
+  background-color: rgba(118, 118, 128, 0.2);
+}
+.student-picker-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
 }
 .student-picker-dropdown {
   display: none;
@@ -1783,10 +1786,6 @@
     padding-left: 7px;
     padding-right: 7px;
   }
-  .report-toolbar .student-picker-btn {
-    min-width: 0;
-    max-width: 150px;
-  }
 }
 
 /* ── Blocks adapt to their box ─────────────────────────────────
@@ -2447,32 +2446,93 @@
   }
 }
 
-/* The toolbar: the Ready count and the two icons */
-.qn-ready {
-  color: var(--text-2);
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-.tb-icon-btn {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  width: var(--control-h);
-  height: var(--control-h);
-  border-radius: var(--radius-sm);
+/* The toolbar (teacher/report-toolbar.js): the right-hand group, the Ready
+   count with its track, and the two buttons that share one width. */
+.rtb-end {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: var(--text-2);
-  cursor: pointer;
+  gap: 8px;
 }
-.tb-icon-btn:hover {
+.rtb-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: 176px;
+  height: var(--control-h);
+  padding: 0 4px;
+  flex-shrink: 0;
   color: var(--text);
-  background: var(--overlay-hover);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.tb-icon-btn:focus-visible {
+.rtb-track {
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(118, 118, 128, 0.2);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.rtb-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--active-fill);
+  transition: width 0.2s var(--ease-out);
+}
+.rtb-ready.is-done {
+  color: var(--score-3-text);
+}
+.rtb-ready.is-done .rtb-fill {
+  background: var(--score-3);
+}
+.report-toolbar .rtb-more-wrap,
+.report-toolbar .atb-icon-btn {
+  flex-shrink: 0;
+}
+.report-toolbar .rtb-more-wrap .assess-menu {
+  min-width: 290px;
+}
+/* Approve and Next and Print Reports: one size and one width, so the right
+   edge does not move between the tabs. */
+.report-toolbar .tb-action-btn {
+  width: 152px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+/* The student arrows and Parts: grey, like the ⋯ and Filter buttons. */
+.report-toolbar .tq-toolbar-arrow {
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
+}
+.report-toolbar .tq-toolbar-arrow:hover {
+  background: rgba(118, 118, 128, 0.2);
+}
+.report-toolbar .tq-toolbar-arrow:focus-visible,
+.report-toolbar .tb-toggle-btn:focus-visible {
   outline: 2px solid var(--active);
-  outline-offset: 1px;
+  outline-offset: 2px;
+}
+.report-toolbar .tb-toggle-btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
+}
+.report-toolbar .tb-toggle-btn:hover {
+  background: rgba(118, 118, 128, 0.2);
+}
+.report-toolbar .tb-toggle-btn.active,
+.report-toolbar .tb-toggle-btn[aria-pressed='true'] {
+  background: var(--active-light);
+  color: var(--link);
 }
 
 /* The roster (ui.js setSidebarAnnotator): All · Not Ready above the list */
@@ -5830,7 +5890,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 
 /* With 44 px controls on a phone, the toolbar's right-hand group (Ready
-   count, Edit Student, the info button and Approve and Next) wraps inside
+   count, ⋯ and Approve and Next) wraps inside
    the page instead of running past its right edge. */
 @media (max-width: 600px) {
   .report-toolbar > div:last-child {

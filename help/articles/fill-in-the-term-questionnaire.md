@@ -31,6 +31,8 @@ labels:
   - Save
   - Browse Sentences
   - Where This Information Comes From
+  - Edit Student
+  - Print Reports
 next:
   - generate-report-comments
   - print-report-cards
@@ -55,7 +57,7 @@ shots:
 4. Review **At a Glance**: the strongest skill, the next step, the biggest change since the last report, the best piece and any missing or late work. **Observations** lists the year's notes. The student's Voice card shows the goal and About Me answers. Notes marked Private are never printed.
 5. Under **Teacher Comment**, type the comment, or choose **Generate Comment** to draft it from the Comment Bank. Each sentence appears as a row under **Sentences**, where it can be reworded, edited or dragged to a new place.
 6. Under **Attendance**, enter **Classes Absent** and **Times Late**. Attendance is optional and is left out of the comment until entered.
-7. Choose **Approve and Next**. The comment is saved as approved, the student is ticked in the class list and the next student opens. ⌘ Return (Ctrl+Enter on Windows) does the same.
+7. Choose **Approve and Next**. The comment is saved as approved, the student is ticked in the class list and the next student opens. ⌘ Return (Ctrl+Enter on Windows) does the same. The count beside it shows how many students are Ready. When every student is Ready the count turns green and the button reads **Print Reports** and opens it.
 
 ## Earlier Reports
 
@@ -65,4 +67,4 @@ The tabs above the comment switch between **This Report** and each earlier repor
 
 A sentence typed for one student can be saved for others. On the sentence's row, open **Options** and choose **Add to My Bank**. Set **Belongs Under** to the part of the comment it fits, then choose **Save**. In the saved sentence, the words in brackets, such as [Name], change for each student. Saved sentences are marked Yours in **Browse Sentences**.
 
-The question mark in the toolbar opens **Where This Information Comes From**, a list of where each part of the screen gets its content.
+The ⋯ button in the toolbar holds **Edit Student**, which opens the student's name, pronouns, designations and contacts, and **Where This Information Comes From**, a list of where each part of the screen gets its content.

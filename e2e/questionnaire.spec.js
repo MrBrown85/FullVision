@@ -91,10 +91,9 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   // Many reads in one open: give the CI runner room.
   test.setTimeout(90_000);
   await open(page);
-  // The toolbar: Approve and Next, the two icons; no Questions, no Save and Next.
+  // The toolbar: Approve and Next and ⋯ (Edit Student, Where This Information Comes From); no Questions, no Save and Next.
   await expect(page.locator('#tq-approve-next')).toHaveText('Approve and Next ›');
-  await expect(page.locator('#tq-edit-student-btn')).toBeVisible();
-  await expect(page.locator('#tq-info-btn')).toBeVisible();
+  await expect(page.locator('#tq-more-btn')).toBeVisible();
   await expect(page.locator('#tq-questions-btn, #tq-save-next, #tq-approve, .qn-bottom')).toHaveCount(0);
   await expect(page.locator('#tq-bank, .qn-ev-tabs, [data-tq-card]')).toHaveCount(0);
 
@@ -121,8 +120,9 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   // No overflow at 1440 × 900.
   expect(await overflow(page)).toEqual([]);
 
-  // The circled question mark opens Where This Information Comes From; Tab and Shift-Tab stay inside it.
-  await page.locator('#tq-info-btn').click();
+  // ⋯'s Where This Information Comes From opens its sheet; Tab and Shift-Tab stay inside it.
+  await page.locator('#tq-more-btn').click();
+  await page.locator('[data-action="tqInfo"]').click();
   const sheet = page.getByRole('dialog', { name: 'Where This Information Comes From' });
   await expect(sheet).toBeVisible();
   const cards = sheet.locator('.qn-info-card');
@@ -161,7 +161,7 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   }
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
-  await expect(page.locator('#tq-info-btn')).toBeFocused();
+  await expect(page.locator('#tq-more-btn')).toBeFocused();
 
   // Earlier reports are read only.
   await page.locator('[data-action="tqCommentTab"]').nth(1).click();
@@ -502,9 +502,10 @@ test('Cece’s Voice: the answers, the private one marked, a quoted answer says 
   await expect(good.locator('.qn-chip-quoted')).toHaveText('In the comment');
 });
 
-test('the Edit Student icon opens the dialog; a save redraws the name', async ({ page }) => {
+test('⋯ Edit Student opens the dialog; a save redraws the name', async ({ page }) => {
   await open(page);
-  await page.locator('#tq-edit-student-btn').click();
+  await page.locator('#tq-more-btn').click();
+  await page.locator('[data-action="tqEditStudent"]').click();
   const dialog = page.getByRole('dialog', { name: 'Edit Student' });
   await expect(dialog).toBeVisible();
   await dialog.locator('#edit-pref').fill('Cecilia');
