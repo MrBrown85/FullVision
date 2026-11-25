@@ -243,7 +243,8 @@ window.DashOverview = (function () {
         parts.push('<span class="dash-glance-old dash-obs-when is-overdue">Oldest ' + days + ' Days</span>');
       if (asked) parts.push('<b>' + asked + '</b> ' + (asked === 1 ? 'Question' : 'Questions'));
     }
-    // With the Inbox on the page a click goes to it (DashInbox.click); the link stays for a new tab.
+    // With the Inbox on the page a click starts the grading, or with nothing to grade goes to the
+    // Inbox (DashInbox.click); the link stays for a new tab.
     var toInbox = !!window.DashInbox;
     return (
       '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0"' +
@@ -258,7 +259,7 @@ window.DashOverview = (function () {
           c.toreturn +
           ' not returned' +
           (asked ? ', ' + asked + (asked === 1 ? ' question' : ' questions') : '') +
-          (toInbox ? ': go to the Inbox' : ': open Assignments'),
+          (toInbox ? (c.tograde ? ': start grading' : ': go to the Inbox') : ': open Assignments'),
       ) +
       '">' +
       '<span class="dash-glance-label">To Grade</span>' +

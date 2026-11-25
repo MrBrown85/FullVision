@@ -161,3 +161,86 @@ describe('the tile', () => {
 
 // The top bar as the page draws it; the To Grade cell is inside.
 const glance = () => DashOverview.glanceHtml({ cid: CID, allStudents: getStudents(CID), classAvg: 0, missing: [] });
+
+describe("the top bar's To Grade cell", () => {
+  const cell = () => parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
+
+  it('starts the grading with the tile built and work waiting', () => {
+    const a = cell();
+    expect(a.hasAttribute('data-dash-inbox-jump')).toBe(true);
+    expect(a.getAttribute('aria-label')).toMatch(/: start grading$/);
+    // The look and the text are as before.
+    expect(a.querySelector('.dash-glance-label').textContent).toBe('To Grade');
+    expect(a.getAttribute('data-href')).toBe('/assignments?course=' + CID + '&show=tograde');
+  });
+
+  it('opens Assignments with no tile built', () => {
+    const was = window.DashInbox;
+    delete window.DashInbox;
+    try {
+      const a = cell();
+      expect(a.hasAttribute('data-dash-inbox-jump')).toBe(false);
+      expect(a.getAttribute('aria-label')).toMatch(/: open Assignments$/);
+    } finally {
+      window.DashInbox = was;
+    }
+  });
+
+  it('goes to the Inbox whatever an old fv-build-dashRow on the device says (D9: the row is on)', () => {
+    for (const v of ['0', '1', 'no']) {
+      localStorage.setItem('fv-build-dashRow', v);
+      expect(cell().hasAttribute('data-dash-inbox-jump')).toBe(true);
+      expect(DashInbox.shows(CID)).toBe(true);
+    }
+    localStorage.removeItem('fv-build-dashRow');
+  });
+
+  it('a click opens the grader on the first work waiting, with every assessment behind it', () => {
+    const doc = mountTile();
+    const cellEl = parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
+    doc.body.appendChild(doc.importNode ? doc.importNode(cellEl, true) : cellEl);
+    const was = window.PageAssignments;
+    const opened = [];
+    window.PageAssignments = { openGrader: (...args) => opened.push(args) };
+    try {
+      const r = clickOn(doc, '.dash-glance-tograde');
+      expect(r.handled).toBe(true);
+      expect(r.prevented).toBe(true);
+    } finally {
+      window.PageAssignments = was;
+    }
+    const queue = DashInboxQueue.order(CID);
+    expect(queue.length).toBeGreaterThan(0);
+    expect(opened).toHaveLength(1);
+    const [cid, aid, sid, opts] = opened[0];
+    expect([cid, aid, sid]).toEqual([CID, queue[0].aid, queue[0].studentIds[0]]);
+    expect(opts.show).toBe('tograde');
+    expect(opts.studentIds).toEqual(queue[0].studentIds);
+    expect(opts.queue).toEqual(queue);
+    // The grader is the answer: the Inbox is not rung as well.
+    expect(doc.getElementById('dash-inbox').classList.contains('is-ring')).toBe(false);
+  });
+
+  it('with nothing to grade a click scrolls to the Inbox and rings it; with none on the page the link is left alone', () => {
+    getAssessments(CID).forEach(a =>
+      GraderWork.workCounts(CID, a.id, ids()).ids.tograde.forEach(sid =>
+        Grader.setOverallComment(CID, sid, a.id, 'Seen.'),
+      ),
+    );
+    expect(cell().getAttribute('aria-label')).toMatch(/: go to the Inbox$/);
+    const doc = mountTile();
+    const cellEl = parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
+    doc.body.appendChild(doc.importNode ? doc.importNode(cellEl, true) : cellEl);
+    const r = clickOn(doc, '.dash-glance-tograde');
+    expect(r.handled).toBe(true);
+    expect(r.prevented).toBe(true);
+    expect(doc.getElementById('dash-inbox').classList.contains('is-ring')).toBe(true);
+    // A click to open a new tab is the link's.
+    expect(clickOn(doc, '.dash-glance-tograde', { metaKey: true }).handled).toBe(false);
+    // No Inbox in the page: the click is not taken.
+    doc.getElementById('dash-inbox').remove();
+    const none = clickOn(doc, '.dash-glance-tograde');
+    expect(none.handled).toBe(false);
+    expect(none.prevented).toBe(false);
+  });
+});
