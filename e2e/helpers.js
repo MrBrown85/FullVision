@@ -1475,7 +1475,7 @@ export async function seedScores(page, scores) {
                 assessmentId: aid,
                 tagId: tid,
                 score: entry.score,
-                date: entry.date || new Date().toISOString().slice(0, 10),
+                date: entry.date || new Date().toLocaleDateString('en-CA'),
                 type: entry.type || 'summative',
                 note: entry.note || '',
                 created: entry.created || new Date().toISOString(),

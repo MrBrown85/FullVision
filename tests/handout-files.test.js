@@ -812,7 +812,7 @@ describe('the viewer', () => {
 /* ── The student page: a real card opens a file through `handout-file` ── */
 
 describe('on a real card', () => {
-  const TODAY = new Date().toISOString().slice(0, 10);
+  const TODAY = new Date().toLocaleDateString('en-CA');
   const RES = '00000099-0000-4000-8000-000000000001';
 
   async function realCard(kind) {

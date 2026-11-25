@@ -282,7 +282,7 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
     await classActions(page).click();
     await expect(actionsMenu(page).locator('[data-action="cmDownloadBackup"]')).toHaveText('Download Class Backup');
     const [download] = await Promise.all([page.waitForEvent('download'), clickAction(page, 'cmDownloadBackup')]);
-    const today = await page.evaluate(() => new Date().toISOString().slice(0, 10));
+    const today = await page.evaluate(() => new Date().toLocaleDateString('en-CA'));
     expect(download.suggestedFilename()).toBe('gradebook-sci8-' + today + '.json');
 
     const fs = await import('node:fs');

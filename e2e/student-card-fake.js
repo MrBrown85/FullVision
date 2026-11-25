@@ -18,7 +18,7 @@ import { findLowContrastText } from './contrast-check.js';
    Set S0W1S_SHOTS to a folder to save a picture of each state, light and
    dark. */
 
-export const TODAY = new Date().toISOString().slice(0, 10);
+export const TODAY = new Date().toLocaleDateString('en-CA');
 export const KEY = 'fv-s-session';
 export const SHOTS = process.env.S0W1S_SHOTS || '';
 export const PHONE = { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true };

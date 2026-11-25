@@ -18,7 +18,7 @@ import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 import { PAGE_JPEG, THUMB_JPEG } from './helpers/fake-send-world.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const KEY = 'fv-s-session';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const HOLD = 2 * 60 * 60 * 1000;

@@ -173,7 +173,8 @@ function reportingTermSchools() {
  * is unknown or the presets are for a different school year than `date`
  * (default today) falls in. */
 function reportingTermPreset(schoolId, date) {
-  var year = reportingSchoolYear(date || new Date().toISOString().slice(0, 10));
+  // Today on this device (BC), not UTC's: UTC is tomorrow from 5 p.m.
+  var year = reportingSchoolYear(date || new Date().toLocaleDateString('en-CA'));
   if (year && year !== REPORTING_TERM_PRESETS.schoolYear) return null;
   var school = REPORTING_TERM_PRESETS.schools.find(function (s) {
     return s.id === (schoolId || REPORTING_TERM_PRESETS.defaultSchool);
