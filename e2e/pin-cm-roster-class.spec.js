@@ -379,3 +379,98 @@ test('Signed in, Archive Class and Delete Class send archive_course and delete_c
   expect(await rpcCalls(page, 'delete_course')).toEqual([{ p_course_id: CID_B }]);
   await expect(page.locator('.cm-head-title')).toHaveText('Science 9');
 });
+
+/* The class's reflections are read when Class Settings opens on it, for the
+   Reflect tab's count. When they arrived, all of Class Settings was drawn
+   again, which closed a menu opened in the meantime: under load the test
+   above lost its Archive Class item that way (Nov 25, 2026). Here the server
+   holds the reflections back until the menu is open. */
+test('Signed in, reflections that arrive late fill in the Reflect count and leave an open menu open', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAuth(page);
+  await seedTwoClasses(page);
+  await gotoApp(page, '/dashboard?manage=students');
+  await expect(page.locator('.cm-head-title')).toHaveText('Science 9');
+  await page.evaluate(() => {
+    const real = window.v2.listCourseQuestionnaires;
+    window.__e2eLetGo = null;
+    window.v2.listCourseQuestionnaires = cid =>
+      new Promise(resolve => {
+        window.__e2eLetGo = () => resolve(real.call(window.v2, cid));
+      });
+  });
+  await page.locator(`.cm-class-item[data-cid="${CID_B}"]`).click();
+  await expect(page.locator('.cm-head-title')).toHaveText('Science 10');
+  const count = page.locator('#cm-tab-questionnaires .cm-tab-count');
+  await expect(page.locator('#cm-tab-questionnaires')).toBeVisible();
+  await expect(count).toHaveCount(0);
+
+  await classActions(page).click();
+  const archive = actionsMenu(page).locator('[data-action="cmToggleArchive"]');
+  await expect(archive).toBeVisible();
+  await page.waitForFunction(() => typeof window.__e2eLetGo === 'function');
+  await page.evaluate(() => window.__e2eLetGo());
+  await expect(count).toHaveText('0');
+  await expect(archive).toBeVisible();
+
+  // On the Reflect tab itself, which shows Loading until then, the list is drawn when they arrive.
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => {
+    window.__e2eLetGo = null;
+    Questionnaires._reset();
+  });
+  await page.locator('#cm-tab-questionnaires').click();
+  await expect(page.locator('#cm-tabpanel')).toContainText('Loading reflections…');
+  await page.waitForFunction(() => typeof window.__e2eLetGo === 'function');
+  await page.evaluate(() => window.__e2eLetGo());
+  await expect(page.locator('#cm-tabpanel')).not.toContainText('Loading reflections…');
+  await expect(page.getByRole('button', { name: 'New Reflection' })).toBeVisible();
+});
+
+/* The class's data arriving from the server draws Class Settings again, up
+   to a second after a class is picked. A menu open at that moment closed
+   under the pointer: 36 of 60 timed runs lost Class Actions that way, and
+   the Archive Class test above lost it under load (Nov 25, 2026). */
+test('Signed in, a menu that is open when Class Settings is drawn again stays open, with the focus on its item', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAuth(page);
+  await seedTwoClasses(page);
+  await gotoApp(page, '/dashboard?manage=students');
+  await page.locator(`.cm-class-item[data-cid="${CID_B}"]`).click();
+  await expect(page.locator('.cm-head-title')).toHaveText('Science 10');
+  const button = classActions(page);
+  const menu = actionsMenu(page);
+  const redraw = () => page.evaluate(() => DashClassManager.renderClassManager());
+
+  await button.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  const focused = await page.evaluate(() => document.activeElement.textContent);
+  expect(focused).toBeTruthy();
+  // A mark on the menu: the draw puts a new one in its place.
+  await menu.evaluate(el => {
+    el.dataset.before = '1';
+  });
+  await redraw();
+  await expect(menu).toBeVisible();
+  await expect(menu).not.toHaveAttribute('data-before', '1');
+  await expect(button).toHaveAttribute('aria-expanded', 'true');
+  expect(await page.evaluate(() => document.activeElement.textContent)).toBe(focused);
+  // Its items still work.
+  await clickAction(page, 'cmToggleArchive');
+  await expect(page.locator('.cm-head-meta')).toContainText('· Archived');
+  await expect(menu).toBeHidden();
+
+  // A menu the teacher closed stays closed through a draw.
+  await button.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await redraw();
+  await expect(menu).toBeHidden();
+  await expect(button).toHaveAttribute('aria-expanded', 'false');
+});

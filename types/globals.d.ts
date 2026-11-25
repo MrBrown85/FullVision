@@ -109,6 +109,7 @@ interface Window {
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
+  CmKeepMenu: unknown;
   CmTerms: unknown;
   DashCompetencies: unknown;
   DashRecent: unknown;
