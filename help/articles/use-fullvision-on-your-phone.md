@@ -3,7 +3,7 @@ title: Use FullVision on Your Phone
 section: Phone App
 order: 1
 summary: The phone app is FullVision laid out for a phone screen, with four tabs for looking up students, recording observations, entering scores and posting bulletins. It opens automatically when a teacher signs in on a phone.
-checked: 2026-11-18
+checked: 2026-11-25
 pages:
   - /dashboard
 demo: /teacher-mobile/
@@ -16,6 +16,7 @@ labels:
   - Sweep
   - Recent
   - All
+  - To Grade
   - Missing
   - Excused
   - Late
@@ -37,7 +38,7 @@ shots:
 
 ## Open the Phone App
 
-1. On a phone, open fullvision.ca and sign in. The phone app opens with the class on the **Students** tab.
+1. On a phone, open fullvision.ca and sign in. The phone app opens on the **Students** tab the first time, and after that on the tab last used.
 2. To use the full desktop layout on the phone instead, choose the ⋯ at the top right, then **Switch to Desktop**. The phone keeps this choice until the next sign-out.
 3. With more than one class, choose the class's name at the top of any tab and pick another class from the list.
 
@@ -53,7 +54,9 @@ The class's observations are listed newest first. Choose the + button to write a
 
 ## Grade
 
-The class's assessments are listed under **Recent** or **All**. Choose an assessment to score one student at a time. Swipe, or select a student's initials along the top, to change student. **Missing**, **Excused** and **Late** set a student's status for that assessment.
+The class's assessments are listed under **Recent** or **All**. In a class whose students send work from their own page, the first list is **To Grade** instead: the assessments with work waiting. Choose an assessment to score one student at a time.
+
+The student's name is at the top. Swipe to go to the next student, or choose the name to pick a student from the class list. Choose a level for each criterion; work scored in points has a box for the number instead. To set **Late**, **Missing** or **Excused** for that student, choose the ⋯ at the top right.
 
 ## Bulletins
 
