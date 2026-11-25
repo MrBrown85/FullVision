@@ -32,6 +32,7 @@
     "teacher/dash-inbox-queue.js",
     "teacher/dash-inbox-stacks.js",
     "teacher/dash-inbox-rollcall.js",
+    "teacher/dash-inbox-targets.js",
     "teacher/cm-grading-bars.js",
     "teacher/report-one-zoom.js",
     "teacher/student-overview.js",

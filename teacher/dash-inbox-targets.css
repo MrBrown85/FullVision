@@ -1,0 +1,227 @@
+/* The redrawn Inbox with nothing waiting (board R5) and a scan held over it
+   (board R6), slice I4 of docs/plans/inbox-redesign-plan.md. Behind the build
+   switch inboxStacks: these classes are drawn only with it on. Sizes follow
+   the board; colours are the app's tokens. */
+
+/* ── The one-line tile ─────────────────────────────────── */
+/* The column gives the Inbox 64 px and Bulletins the rest; the tile grows to
+   its usual share (DashInbox.glideColumn) while the targets show. */
+.dash-row-left.has-quiet-inbox {
+  grid-template-rows: 64px minmax(0, 1fr);
+}
+.dash-inbox.is-quiet {
+  padding: 0 16px;
+  overflow: hidden;
+}
+.dash-inbox.is-quiet.is-targets {
+  padding-bottom: 12px;
+  overflow: visible;
+}
+.dash-inbox.is-quiet .dash-inbox-head {
+  flex: 0 0 62px;
+  height: 62px;
+  margin-bottom: 0;
+  gap: 8px;
+}
+.dash-inbox.is-quiet .dash-inbox-action {
+  padding-inline: 10px;
+}
+
+.dash-inbox-caught-up {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 7px;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--score-3-text);
+}
+.dash-inbox-caught-up svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--score-3);
+}
+.dash-inbox-chips {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.dash-inbox-chip {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  max-width: 250px;
+  min-height: 36px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1.5px dashed var(--text-3);
+  border-radius: 999px;
+}
+.dash-inbox-chip:hover {
+  background: var(--active-light);
+}
+.dash-inbox-chip-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-inbox-chip b {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--link);
+}
+/* A chip that does not fit is left out, the last first (DashInbox fits them). */
+.dash-inbox-chip.is-cut {
+  display: none;
+}
+.dash-inbox.is-quiet .dash-inbox-head a {
+  margin-left: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.dash-inbox.is-quiet .dash-inbox-chips:empty,
+.dash-inbox.is-quiet .dash-inbox-chips.is-cut {
+  display: none;
+}
+.dash-inbox.is-quiet .dash-inbox-chips:empty + .dash-inbox-action,
+.dash-inbox.is-quiet .dash-inbox-chips.is-cut + .dash-inbox-action {
+  margin-left: auto;
+}
+
+/* ── The targets ───────────────────────────────────────── */
+.dash-inbox-targets {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  padding-top: 2px;
+  background: var(--surface);
+}
+.dash-inbox-targets[hidden] {
+  display: none;
+}
+.dash-inbox-targets.is-rest {
+  position: static;
+  flex: 1 1 auto;
+  min-height: 0;
+  z-index: auto;
+}
+.dash-inbox-targets-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+}
+.dash-inbox-targets-label {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--link);
+}
+.dash-inbox-targets-note {
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-inbox-targets-close {
+  margin-left: auto;
+  min-width: 32px;
+  min-height: 32px;
+}
+.dash-inbox-targets-list {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  grid-auto-rows: minmax(92px, 180px);
+  align-content: start;
+  gap: 12px;
+  margin: 0;
+  padding: 6px 8px 8px 6px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.dash-inbox-targets-list > li {
+  display: flex;
+  min-width: 0;
+}
+.dash-inbox-target {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px;
+  font: inherit;
+  text-align: center;
+  color: var(--text);
+  cursor: pointer;
+  background: var(--bg);
+  border: 2px dashed var(--text-3);
+  border-radius: 10px;
+  transition:
+    transform 150ms var(--ease-out),
+    background 150ms var(--ease-out);
+}
+.dash-inbox-target.is-other {
+  background: var(--surface);
+}
+.dash-inbox-target-title {
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.dash-inbox-target-count {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dash-inbox-target:hover,
+.dash-inbox-target.is-over {
+  background: var(--active-light);
+  border: 2.5px solid var(--active-fill);
+}
+.dash-inbox-target.is-over {
+  transform: scale(1.04);
+  box-shadow: var(--shadow-md, var(--shadow-sm));
+}
+.dash-inbox-target.is-over .dash-inbox-target-count {
+  color: var(--link);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-inbox-target {
+    transition: none;
+  }
+  .dash-inbox-target.is-over {
+    transform: none;
+  }
+}
+@media (max-width: 900px) {
+  .dash-row-left.has-quiet-inbox .dash-row-inbox {
+    height: 64px;
+  }
+}

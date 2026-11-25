@@ -400,10 +400,11 @@ window.DashInbox = (function () {
   }
 
   /** @param {string} cid
-   * @param {{ classCounts?: (cid: string, ids: string[]) => any }} [ctx] the draw's shared count of the class's work
+   * @param {{ classCounts?: (cid: string, ids: string[]) => any, bulletins?: boolean }} [ctx] the draw's shared count of the class's work, and whether Bulletins is drawn under the tile
    * @returns {string} */
   function html(cid, ctx) {
     _files = {};
+    _quiet = false;
     _cid = cid;
     var seen = seenOf(cid);
     _model = DashInboxModel.build(cid, { seen: seen, classCounts: ctx && ctx.classCounts });
@@ -434,10 +435,99 @@ window.DashInbox = (function () {
     );
   }
 
+  /* Nothing waiting (board R5): To Grade, nothing to grade and nothing to
+     return. The tile is one 64 px line and Bulletins takes the room; where
+     Bulletins is not drawn the tile keeps the column and its body is the
+     targets a scan can be dropped on. */
+  /** @type {boolean} */
+  var _quiet = false;
+
+  /** The targets file, when it is loaded.
+   * @returns {any} */
+  function _T() {
+    return /** @type {any} */ (window).DashInboxTargets;
+  }
+
+  /** @param {any} view @param {any} queue */
+  function _quietNow(view, queue) {
+    return !!(view.key === 'stacks' && queue.on && queue.caughtUp && !(queue.returns && queue.returns.length) && _T());
+  }
+
+  /** The one-line tile.
+   * @param {string} cid @param {string} swtch @param {any} queue @param {boolean} rest the targets are the body */
+  function _quietHtml(cid, swtch, queue, rest) {
+    var tick =
+      '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.4 8.3 6.9 10.7 11.6 5.6" fill="none" stroke="var(--surface)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var chips = (queue.taking || [])
+      .slice(0, 2)
+      .map(function (/** @type {any} */ t) {
+        return (
+          '<button type="button" class="dash-inbox-chip" data-dash-inbox="chip" data-aid="' +
+          esc(t.aid) +
+          '" aria-label="' +
+          esc(t.title + ', ' + t.notin + ' Not In. See Who.') +
+          '"><span class="dash-inbox-chip-title">' +
+          esc(t.title) +
+          '</span><b>' +
+          t.notin +
+          ' Not In</b></button>'
+        );
+      })
+      .join('');
+    return (
+      '<section class="dash-inbox is-stacks is-quiet' +
+      (rest ? ' is-rest' : '') +
+      '" id="dash-inbox" tabindex="-1" aria-labelledby="dash-inbox-title">' +
+      '<div class="dash-section-title dash-inbox-head"><h2 class="dash-inbox-title" id="dash-inbox-title">Inbox</h2>' +
+      swtch +
+      '<span class="dash-inbox-caught-up">' +
+      tick +
+      'All Caught Up</span>' +
+      '<span class="dash-inbox-chips">' +
+      chips +
+      '</span>' +
+      '<button type="button" class="btn dash-inbox-action" data-dash-inbox="targets-open">Add Work</button>' +
+      '<a role="link" tabindex="0" data-href="' +
+      esc('/assignments?course=' + encodeURIComponent(cid)) +
+      '">Assignments →</a></div>' +
+      '<div class="dash-inbox-body">' +
+      (rest ? _T().html(cid) : '') +
+      '</div></section>'
+    );
+  }
+
+  /** Whether the last draw was the one-line tile (the column sizes itself to it).
+   * @returns {boolean} */
+  function quiet() {
+    return _quiet;
+  }
+
+  /** The column's rows as laid out now ('' with no layout, as in a test).
+   * @param {Element} col */
+  function _rowsOf(col) {
+    return typeof getComputedStyle === 'function' ? getComputedStyle(col).gridTemplateRows : '';
+  }
+
+  /** The left column glides to the split `change` gives it, in 200 ms (none
+   * under reduced motion).
+   * @param {() => void} change */
+  function glideColumn(change) {
+    var col = document.querySelector('.dash-row-left');
+    if (!col || _reduced() || !(/** @type {any} */ (col).animate)) return change();
+    var from = _rowsOf(col);
+    change();
+    var to = _rowsOf(col);
+    if (from === to) return;
+    /** @type {any} */ (col).animate([{ gridTemplateRows: from }, { gridTemplateRows: to }], {
+      duration: 200,
+      easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+    });
+  }
+
   /** The redrawn tile (switch on): the title, the two-way switch, the link,
    * and the view's one header button; no view menu.
    * @param {string} cid @param {any} view @param {string | null} seen
-   * @param {{ classCounts?: (cid: string, ids: string[]) => any } | undefined} ctx
+   * @param {{ classCounts?: (cid: string, ids: string[]) => any, bulletins?: boolean } | undefined} ctx
    * @returns {string} */
   function _redrawnHtml(cid, view, seen, ctx) {
     var queue = (_queue = DashInboxQueue.build(cid, { seen: seen, classCounts: ctx && ctx.classCounts }));
@@ -458,6 +548,9 @@ window.DashInbox = (function () {
         })
         .join('') +
       '</div>';
+    var quiet = _quietNow(view, queue);
+    _quiet = quiet;
+    if (quiet) return _quietHtml(cid, swtch, queue, !(ctx && ctx.bulletins));
     var action = view.header ? view.header(cid, _model, queue) : '';
     return (
       '<section class="dash-inbox is-stacks" id="dash-inbox" tabindex="-1" aria-labelledby="dash-inbox-title">' +
@@ -585,19 +678,48 @@ window.DashInbox = (function () {
     else name.removeAttribute('title');
   }
 
+  /* The one-line tile's chips: at the window's narrow widths not all fit
+     beside the switch, All Caught Up, Add Work and the link. The last chip
+     goes first (two, then one, then none); the rest never go. */
+  /** @param {HTMLElement} tile */
+  function fitChips(tile) {
+    if (!tile.classList.contains('is-quiet')) return;
+    var head = /** @type {HTMLElement | null} */ (tile.querySelector('.dash-inbox-head'));
+    if (!head) return;
+    var chips = Array.prototype.slice.call(head.querySelectorAll('.dash-inbox-chip'));
+    chips.forEach(function (/** @type {HTMLElement} */ c) {
+      c.classList.remove('is-cut');
+    });
+    var box = head.querySelector('.dash-inbox-chips');
+    if (box) box.classList.remove('is-cut');
+    var shown = chips.length;
+    for (var i = chips.length - 1; i >= 0 && head.scrollWidth > head.clientWidth + 0.5; i--) {
+      chips[i].classList.add('is-cut');
+      shown--;
+      // The empty box has no width but still takes a gap.
+      if (!shown && box) box.classList.add('is-cut');
+    }
+  }
+
   /** @param {HTMLElement} tile */
   function _watchFit(tile) {
     if (_fitWatch) _fitWatch.disconnect();
     _fitWatch = null;
     fitRows(tile);
-    // Only By Assessment has rows; another view needs no watch.
-    if (typeof ResizeObserver === 'undefined' || !tile.querySelector('.dash-inbox-row:not(.is-slim)')) return;
+    fitChips(tile);
+    // Only By Assessment has rows and the one-line tile has chips; another view needs no watch.
+    if (
+      typeof ResizeObserver === 'undefined' ||
+      !(tile.querySelector('.dash-inbox-row:not(.is-slim)') || tile.querySelector('.dash-inbox-chip'))
+    )
+      return;
     var was = tile.getBoundingClientRect();
     _fitWatch = new ResizeObserver(function () {
       var now = tile.getBoundingClientRect();
       if (Math.abs(now.width - was.width) < 0.5 && Math.abs(now.height - was.height) < 0.5) return;
       was = now;
       fitRows(tile);
+      fitChips(tile);
     });
     _fitWatch.observe(tile);
   }
@@ -615,9 +737,31 @@ window.DashInbox = (function () {
     }
     _mounted = null;
     if (window.DashInboxDrop) DashInboxDrop.unmount();
+    if (_T()) _T().unmount();
+    var col = document.querySelector('.dash-row-left');
+    _colWas = _stacksOn() && col && document.getElementById('dash-inbox') ? { cid: _drawn, rows: _rowsOf(col) } : null;
     var list = document.getElementById('dash-inbox-list');
     _scroll = list ? list.scrollTop : 0;
     _snap = _drawn && document.getElementById('dash-inbox') ? { cid: _drawn, at: _positions() } : null;
+  }
+
+  /** The left column's rows as they stood before the draw: the column glides from them.
+   * @type {{ cid: string | null, rows: string } | null} */
+  var _colWas = null;
+
+  /** The column, drawn with another split (work came in, or went), glides from the old one.
+   * @param {string} cid */
+  function _glideColumn(cid) {
+    var was = _colWas;
+    _colWas = null;
+    var col = document.querySelector('.dash-row-left');
+    if (!was || was.cid !== cid || !col || _reduced() || !(/** @type {any} */ (col).animate)) return;
+    var to = _rowsOf(col);
+    if (was.rows === to) return;
+    /** @type {any} */ (col).animate([{ gridTemplateRows: was.rows }, { gridTemplateRows: to }], {
+      duration: 200,
+      easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+    });
   }
 
   /** Rows and pictures that stand elsewhere than they did glide from there.
@@ -669,6 +813,7 @@ window.DashInbox = (function () {
     }
     _watchFit(tile);
     _glide(cid);
+    _glideColumn(cid);
     var view = viewOf(cid);
     _mounted = view;
     if (view.mount) view.mount(tile, cid, _model, _queue);
@@ -676,7 +821,14 @@ window.DashInbox = (function () {
     // from mount, through pics()); let go of any the old page held alone.
     if (_pics) _pics.sweep();
     // A drop of files anywhere on the tile, in every view (D5).
-    if (window.DashInboxDrop) DashInboxDrop.mount(tile, cid, _model);
+    // With the redrawn To Grade view the targets take the tile's drag and clicks; D5's page-wide refusal stays.
+    var targets = !!(_stacksOn() && view.key === 'stacks' && _T());
+    if (window.DashInboxDrop) DashInboxDrop.mount(tile, cid, _model, { own: targets });
+    if (targets)
+      _T().mount(tile, cid, {
+        quiet: _quiet && !tile.classList.contains('is-rest'),
+        rest: _quiet && tile.classList.contains('is-rest'),
+      });
     _fresh(cid);
   }
 
@@ -705,6 +857,8 @@ window.DashInbox = (function () {
     }
     _mounted = null;
     if (window.DashInboxDrop) DashInboxDrop.leave(cid);
+    if (_T()) _T().leave();
+    _colWas = null;
     if (_pics) _pics.releaseAll();
     _snap = null;
     _scroll = 0;
@@ -761,6 +915,15 @@ window.DashInbox = (function () {
       redraw();
       return true;
     }
+    if (kind === 'targets-open' || kind === 'targets-close' || kind === 'target' || kind === 'target-other') {
+      var T = /** @type {any} */ (window).DashInboxTargets;
+      return !!T && T.click(el, { cid: cid, redraw: redraw });
+    }
+    if (kind === 'chip') {
+      var RC = /** @type {any} */ (window).DashInboxRollCall;
+      if (RC && RC.show) RC.show(cid, aid);
+      return true;
+    }
     if (kind === 'start' || kind === 'returnall' || kind.indexOf('stack-') === 0) {
       var S = /** @type {any} */ (window).DashInboxStacks;
       return !!S && S.click(el, { cid: cid, redraw: redraw });
@@ -797,6 +960,8 @@ window.DashInbox = (function () {
     leave: leave,
     jump: jump,
     click: click,
+    quiet: quiet,
+    glideColumn: glideColumn,
     countsText: countsText,
     countsHtml: countsHtml,
     whenText: whenText,

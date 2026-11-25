@@ -102,8 +102,9 @@ window.DashInboxDrop = (function () {
   /** The pieces Add Work can take files for that take work now, most recently
    * assigned first, three at most.
    * @param {string} cid
+   * @param {number} [limit] how many at most (three, as the tile's own box takes)
    * @returns {any[]} */
-  function choices(cid) {
+  function choices(cid, limit) {
     var GW = /** @type {any} */ (window).GraderWork;
     var AW = /** @type {any} */ (window).AddWorkClass;
     if (!cid || !GW || !AW) return [];
@@ -123,7 +124,7 @@ window.DashInboxDrop = (function () {
       if (p !== q) return p < q ? 1 : -1;
       return y.i - x.i;
     });
-    return list.slice(0, MAX_CHOICES).map(function (/** @type {any} */ x) {
+    return list.slice(0, limit && limit > 0 ? limit : MAX_CHOICES).map(function (/** @type {any} */ x) {
       var w = _window(cid, x.a) || {};
       return {
         aid: x.a.id,
@@ -133,6 +134,18 @@ window.DashInboxDrop = (function () {
         closes: w.closes_on || '',
       };
     });
+  }
+
+  /** How many are not in for each piece taking work, by assessment id (GraderWork's count).
+   * @param {string} cid
+   * @returns {Record<string, number>} */
+  function notInBy(cid) {
+    /** @type {Record<string, number>} */
+    var out = {};
+    ((_counts(cid) || {}).pieces || []).forEach(function (/** @type {any} */ p) {
+      out[p.aid] = p.notin || 0;
+    });
+    return out;
   }
 
   /** The next one due: the soonest due date from today on, else the newest.
@@ -540,9 +553,18 @@ window.DashInboxDrop = (function () {
     return !!_tile && !!e.target && _tile.contains(/** @type {any} */ (e.target));
   }
 
+  // Whatever else wants to hear that a drag ended or was given up (the redrawn Inbox's targets).
+  /** @type {(() => void) | null} */
+  var _endHook = null;
+  /** @param {(() => void) | null} fn */
+  function onEnd(fn) {
+    _endHook = fn;
+  }
+
   // The drag ended, or was given up, or something else happened: the cover goes.
   function _ended() {
     if (_cover && !_cover.hidden) _hideCover();
+    if (_endHook) _endHook();
   }
   /** @param {DragEvent} e */
   function _pageLeave(e) {
@@ -657,9 +679,12 @@ window.DashInboxDrop = (function () {
     });
   }
 
-  /** Once the page is drawn: the cover and the listeners on this tile.
-   * @param {HTMLElement} tile @param {string} cid @param {any} model */
-  function mount(tile, cid, model) {
+  /** Once the page is drawn: the cover and the listeners on this tile. With
+   * `own`, the redrawn Inbox's targets take the tile's drag and clicks: only
+   * the page-wide listeners (a file let go elsewhere is refused) are set.
+   * @param {HTMLElement} tile @param {string} cid @param {any} model
+   * @param {{ own?: boolean }} [opts] */
+  function mount(tile, cid, model, opts) {
     unmount();
     if (!tile) return;
     _tile = tile;
@@ -667,7 +692,8 @@ window.DashInboxDrop = (function () {
     _m = model;
     var t = target(cid, model);
     _drawn = t ? { aid: t.aid, label: t.label } : null;
-    var body = tile.querySelector('.dash-inbox-body');
+    var own = !!(opts && opts.own);
+    var body = own ? null : tile.querySelector('.dash-inbox-body');
     if (body) {
       var cover = document.createElement('div');
       cover.className = 'dash-inbox-drop-cover';
@@ -685,13 +711,15 @@ window.DashInboxDrop = (function () {
       body.appendChild(cover);
       _cover = cover;
     }
-    _showNotice();
-    tile.addEventListener('dragenter', _enter);
-    tile.addEventListener('dragover', _over);
-    tile.addEventListener('dragleave', _leave);
-    tile.addEventListener('drop', _drop);
-    tile.addEventListener('click', _click);
-    tile.addEventListener('keydown', _key);
+    if (!own) {
+      _showNotice();
+      tile.addEventListener('dragenter', _enter);
+      tile.addEventListener('dragover', _over);
+      tile.addEventListener('dragleave', _leave);
+      tile.addEventListener('drop', _drop);
+      tile.addEventListener('click', _click);
+      tile.addEventListener('keydown', _key);
+    }
     _page(true);
     // A new draw: no page drag is going on.
     _inner = false;
@@ -750,6 +778,9 @@ window.DashInboxDrop = (function () {
     nextTaking: nextTaking,
     coverText: coverText,
     hasFiles: hasFiles,
+    fromOutside: _fromOutside,
+    notInBy: notInBy,
+    onEnd: onEnd,
     choose: choose,
     mount: mount,
     unmount: unmount,
