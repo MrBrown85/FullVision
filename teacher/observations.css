@@ -12,18 +12,6 @@
   padding: 0;
 }
 
-.obs-btn-arrow {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")
-    no-repeat center;
-  width: 10px;
-  height: 6px;
-  display: inline-block;
-  margin-left: auto;
-}
-.active .obs-btn-arrow {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23007AFF'/%3E%3C/svg%3E");
-}
-
 /* ── Popover (shared) ──────────────────────────────────────── */
 .obs-popover {
   position: absolute;
@@ -122,20 +110,9 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-/* ── Tag trigger button ──────────────────────────────────────── */
 
-/* ══════════════════════════════════════════════════════════════
-   TOOLBAR — Search, filter chips and count in one row
-   ══════════════════════════════════════════════════════════════ */
-.obs-toolbar {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--surface);
-  border-bottom: 0.5px solid var(--divider-medium);
-  flex-shrink: 0;
-}
+/* The Term Questionnaire's observations search (report-questionnaire.js,
+   reports.css .qno-search) is drawn with these. */
 .obs-search-wrap {
   position: relative;
   display: flex;
@@ -156,7 +133,6 @@
   height: 13px;
 }
 .obs-search-input {
-  /* The height of the filter chips beside it. */
   height: var(--chip-h);
   font-family: var(--font-base);
   font-size: var(--text-sm);
@@ -180,79 +156,90 @@
 .obs-search-input::placeholder {
   color: var(--text-3);
 }
-.obs-toolbar-count {
-  flex-shrink: 0;
-  margin-left: auto;
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  font-weight: 500;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-/* ── Filter chips: between search and count, wrapping in place ── */
-.obs-filter-strip {
-  display: flex;
-  flex: 1 1 auto;
+
+/* ══════════════════════════════════════════════════════════════
+   TOOLBAR — Search, Show and the filter chips (obs-toolbar.js)
+   The same "Three Things" bar as the Assignments and Gradebook pages: the
+   parts they share (Search with its Filter button, Show's badges, the
+   chips) are in styles.css, the panel's frame in gradebook.css. Every
+   control is --control-h tall, a chip --chip-h. The filter panel floats over
+   the feed, under Search.
+   ══════════════════════════════════════════════════════════════ */
+.obs-toolbar {
   flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.obs-strip-popover-wrap {
   position: relative;
+  z-index: 1;
+  gap: 8px;
+  /* Search is 280 wide when there is room, and gives way to 160 first. */
+  --atb-search-min: 160px;
+  --atb-search-max: 280px;
 }
-.obs-filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: var(--chip-h);
-  padding: 0 10px 0 12px;
+/* The panel: Student and Tag (a search box over a list that scrolls), Type
+   with Date, Context with Assessment and Quoted. A column keeps the width it
+   was drawn at, so a search that hides rows does not narrow it. */
+.obp-panel .gbf-cols {
+  max-height: var(--obp-cols-h, none);
+  overflow-y: auto;
+}
+.obp-col {
+  min-width: 180px;
+  max-width: none;
+}
+/* Every row is the panel's 34px, in a short column and in a list that
+   scrolls alike: the Gradebook's rows grow across a row, not down a column. */
+.obp-col .assess-filter-item {
+  flex: 0 0 auto;
+}
+.obp-find {
+  display: block;
+  width: calc(100% - 8px);
+  height: 28px;
+  margin: 2px 4px 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
   font-family: var(--font-base);
   font-size: var(--text-sm);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  outline: none;
+}
+.obp-find::placeholder {
+  color: var(--text-3);
+}
+.obp-find:focus {
   background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  transition:
-    background-color 0.15s,
-    border-color 0.15s,
-    color 0.15s;
-  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px var(--active);
 }
-.obs-filter-chip:hover {
-  border-color: var(--text-3);
-  color: var(--text);
+.obp-panel .obp-list {
+  height: 272px;
+  max-height: none;
 }
-.obs-filter-chip.active {
-  border-color: var(--active);
-  background: var(--active-light);
-  color: var(--link);
-  font-weight: 600;
+.obp-gap {
+  margin-top: 8px;
 }
-.obs-filter-chip .obs-btn-arrow {
-  margin-left: 0;
+.obp-section {
+  margin-top: 4px;
 }
-.obs-option-popover {
-  width: 220px;
-}
-.obs-popover-date-row {
+/* From and To, under Custom Dates. */
+.obp-dates {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--border);
+  padding: 4px 10px 2px;
   font-size: var(--text-sm);
   color: var(--text-2);
 }
-.obs-popover-date-row label {
+.obp-dates[hidden] {
+  display: none;
+}
+.obp-dates label {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
-.obs-popover-date-row input {
+.obp-dates input {
   font-family: var(--font-base);
   font-size: var(--text-sm);
   border: 1px solid var(--border);
@@ -262,24 +249,22 @@
   background: var(--surface);
 }
 
-.obs-filter-clear {
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  cursor: pointer;
-  border: none;
-  background: none;
-  padding: 2px 6px;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  transition:
-    color 0.12s,
-    text-decoration-color 0.12s;
-  white-space: nowrap;
-  margin-left: auto;
+/* Point to preview: while the pointer or the keyboard rests on an unpressed
+   Open Concerns, the cards that are not open concerns dim (a Concern with a
+   Resolved follow-up is closed). The delay keeps the feed still as the
+   pointer crosses the bar. */
+.page-layout:has(.atb-show [data-show='concerns']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  #obs-feed
+  :is(.obs-card:not([data-sentiment='concern']), .obs-card:has(.obs-fu-closed)) {
+  opacity: 0.35;
 }
-.obs-filter-clear:hover {
-  color: var(--priority);
-  text-decoration-color: var(--priority);
+@media (prefers-reduced-motion: no-preference) {
+  #obs-feed .obs-card {
+    transition:
+      box-shadow 0.12s,
+      border-color 0.12s,
+      opacity 150ms ease 120ms;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -712,30 +697,38 @@ body.obs-roster #sb-show-btn {
   color: #fff;
   background: var(--score-2);
 }
-.obs-roster-toggle:focus-visible,
-.obs-concern-btn:focus-visible {
+.obs-roster-toggle:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
-.obs-concern-slot:empty {
-  display: none;
-}
-.obs-concern-btn {
-  display: inline-flex;
-  align-items: center;
-  height: var(--chip-h);
-  padding: 0 12px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--score-2-text);
-  background: var(--score-2-bg);
-  border: none;
-  border-radius: var(--radius-xl);
+
+/* The type block and the tags on this page's cards are buttons (ObsCard.html,
+   filters: true): they set the Type and Tag filters. */
+button.obs-type {
+  padding: 0;
+  border: 0;
+  font-family: inherit;
   cursor: pointer;
 }
-.obs-concern-btn.active {
-  color: #fff;
-  background: var(--score-2);
+button.obs-type:hover {
+  filter: brightness(0.94);
+}
+button.obs-type:focus-visible,
+button.obs-card-dim:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+button.obs-card-dim {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+.obs-card-meta button.obs-card-dim {
+  padding: 0 2px;
+  border-radius: 4px;
+  color: var(--text-2);
+}
+.obs-card-meta button.obs-card-dim:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
 }

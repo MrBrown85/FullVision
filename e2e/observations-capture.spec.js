@@ -36,7 +36,7 @@ test.describe('Observations — keyboard, undo and views', () => {
     const card = page.locator('.obs-card', { hasText: 'Asked a sharp question about density' });
     await expect(card).toBeVisible();
     await expect(page.locator('#capture-input')).toHaveValue('');
-    await expect(page.locator('#obs-count')).toHaveText('1 observation');
+    await expect(page.locator('#obs-feed .obs-card')).toHaveCount(1);
   });
 
   test('Shift+Enter adds a line instead of sending', async ({ page }) => {
@@ -92,15 +92,15 @@ test.describe('Observations — keyboard, undo and views', () => {
     await page.clock.runFor(7000);
     await expect(page.locator('#undo-toast')).toHaveCount(0);
     expect((await storedObs(page)).map(o => o.text)).not.toContain('Left the bench tidy');
-    await expect(page.locator('#obs-count')).toHaveText('0 observations');
+    await expect(page.locator('#obs-feed .obs-card')).toHaveCount(0);
   });
 
   test('a student link from the dashboard picks and filters to that student', async ({ page }) => {
     await page.goto(`/observations?course=${TEST_COURSE.id}&student=stu-002`);
     await page.waitForSelector('#capture-input');
     await expect(page.locator('#obs-capture .obsc-chip-student')).toContainText('Bob');
-    await expect(page.locator('#filter-student-btn')).toHaveClass(/active/);
-    await expect(page.locator('#filter-student-btn')).toContainText('Bob');
+    await expect(page.locator('.obs-toolbar .atb-filter-btn')).toHaveClass(/has-filters/);
+    await expect(page.locator('#obs-chips .atb-chip-label')).toHaveText(['Bob Baker']);
   });
 
   test('one card list with no sticky-note view; the day header counts its notes', async ({ page }) => {

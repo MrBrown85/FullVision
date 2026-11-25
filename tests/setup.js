@@ -353,6 +353,7 @@ load('teacher/dash-inbox-stacks.js');
 load('teacher/dash-inbox-targets.js');
 load('teacher/dash-observations.js');
 load('teacher/obs-roster.js');
+load('teacher/obs-toolbar.js');
 load('teacher/dash-student-cards.js');
 load('teacher/dash-insights.js');
 load('teacher/assign-collab.js');

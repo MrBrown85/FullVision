@@ -1,6 +1,6 @@
 /**
  * Observation follow-ups (docs/DECISIONS.md, "Observation follow-ups") in
- * Demo Mode: the Observations page's Open Concerns button, the card that opens to its
+ * Demo Mode: the Observations page's Open Concerns option in Show, the card that opens to its
  * timeline, + Follow Up with its four choices, a Resolved follow-up closing
  * the concern, the edit window's list and its delete question, and the same
  * on the phone. Demo Mode's sample class has one concern with two
@@ -27,10 +27,10 @@ test.describe('Observation follow-ups on a computer', () => {
     await page.goto('/observations?course=sci8');
     // Demo Mode seeds its sample class after the page opens.
     await page.waitForFunction(() => getOpenConcerns('sci8').length > 0);
-    const btn = page.locator('.obs-concern-btn');
+    const btn = page.locator('.atb-show [data-show="concerns"]');
     const n = await openConcerns(page);
     expect(n).toBeGreaterThan(0);
-    await expect(btn).toHaveText(n + ' Open Concern' + (n === 1 ? '' : 's'));
+    await expect(btn).toHaveText('Open Concerns' + n);
     await expect(btn).toHaveAttribute('aria-pressed', 'false');
     await btn.click();
     await expect(btn).toHaveAttribute('aria-pressed', 'true');
@@ -99,11 +99,11 @@ test.describe('Observation follow-ups on a computer', () => {
     await expect(card.locator('.obs-fu-closed')).toHaveText('Resolved');
     await expect(card.locator('.obs-fu-item').last()).toContainText('Met with Ethan and his mom');
     expect(await openConcerns(page)).toBe(before - 1);
-    // The Open Concerns button counts it at once, and goes at none.
+    // The Open Concerns badge counts it at once, and is not shown at none.
     const left = before - 1;
-    if (left)
-      await expect(page.locator('.obs-concern-btn')).toHaveText(left + ' Open Concern' + (left === 1 ? '' : 's'));
-    else await expect(page.locator('.obs-concern-btn')).toHaveCount(0);
+    const badge = page.locator('.atb-show [data-show="concerns"] .atb-badge');
+    if (left) await expect(badge).toHaveText(String(left));
+    else await expect(badge).toBeHidden();
 
     // Kept on the device.
     await page.reload();
