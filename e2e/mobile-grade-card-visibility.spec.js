@@ -9,6 +9,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { jumpTo } from './phone-jump.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -57,7 +58,7 @@ test('opening the grader lays out the card on screen, not the class', async ({ p
 test('a card reached is drawn', async ({ page }) => {
   await openGrader(page);
   const far = (await page.locator('.m-swiper-card').count()) - 2;
-  await page.locator('#m-thumb-strip .m-thumb').nth(far).click();
+  await jumpTo(page, far);
   const card = page.locator('.m-swiper-card').nth(far);
   await expect(card.locator('.m-score-btn').first()).toBeInViewport();
   const sid = await card.getAttribute('data-sid');
@@ -65,9 +66,10 @@ test('a card reached is drawn', async ({ page }) => {
 });
 
 test('a card keeps its scroll after a tab switch', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 520 }); // so the card scrolls
   await openGrader(page);
   const far = (await page.locator('.m-swiper-card').count()) - 2;
-  await page.locator('#m-thumb-strip .m-thumb').nth(far).click();
+  await jumpTo(page, far);
   const card = page.locator('.m-swiper-card').nth(far);
   await expect(card.locator('.m-score-btn').first()).toBeInViewport();
   const top = await card.evaluate(el => {
@@ -89,10 +91,7 @@ test('a card keeps its scroll after a tab switch', async ({ page }) => {
         .evaluate(el => el.scrollTop),
     )
     .toBe(top);
-  await page
-    .locator('#m-thumb-strip .m-thumb')
-    .nth(far + 1)
-    .click();
+  await jumpTo(page, far + 1);
   await expect
     .poll(() =>
       page
@@ -104,19 +103,20 @@ test('a card keeps its scroll after a tab switch', async ({ page }) => {
 });
 
 test('a card keeps its scroll when the cards move away and back', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 520 }); // so the card scrolls
   await openGrader(page);
   const card = page.locator('.m-swiper-card').nth(1);
-  await page.locator('#m-thumb-strip .m-thumb').nth(1).click();
+  await jumpTo(page, 1);
   await expect(card.locator('.m-score-btn').first()).toBeInViewport();
   const top = await card.evaluate(el => {
     el.scrollTop = 300;
     return el.scrollTop;
   });
   expect(top).toBeGreaterThan(0);
-  await page.locator('#m-thumb-strip .m-thumb').nth(6).click();
+  await jumpTo(page, 6);
   const sid = await card.getAttribute('data-sid');
   await expect.poll(() => page.evaluate(s => window._fvSkipped[s], sid)).toBe(true);
-  await page.locator('#m-thumb-strip .m-thumb').nth(1).click();
-  await expect(card.locator('.m-grade-student-name')).toBeVisible();
+  await jumpTo(page, 1);
+  await expect(card.locator('.m-score-btn').first()).toBeVisible();
   expect(await card.evaluate(el => el.scrollTop)).toBe(top);
 });

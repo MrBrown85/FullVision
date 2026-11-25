@@ -65,11 +65,13 @@ test('a scrolled page goes back to the top; a screen still scrolls in itself', a
   expect(s.barBottom).toBe(s.innerHeight);
 });
 
-test('the large title scrolls away with the list; the list does not jump', async ({ page }) => {
+// The new look has no large title on Bulletins (the tab names it): the list scrolls without a jump.
+test('the list scrolls under the bar; the list does not jump', async ({ page }) => {
   await enterDemo(page);
   await page.locator('#m-tab-bar [data-tab="bulletins"]').click();
   const content = page.locator('#m-screen-bulletins .m-screen-content');
-  await expect(content.locator('.m-title-large')).toBeVisible();
+  await expect(content.locator('#m-bulletin-feed')).toBeVisible();
+  await expect(content.locator('.m-title-large')).toBeHidden();
   // Enough below the title to scroll, whatever the demo class has posted.
   const before = await content.evaluate(c => {
     const pad = document.createElement('div');
@@ -82,12 +84,7 @@ test('the large title scrolls away with the list; the list does not jump', async
     c.dispatchEvent(new Event('scroll'));
   });
   await expect(page.locator('#m-nav-bar-bulletins')).toHaveClass(/m-nav-bar-scrolled/);
-  const after = await content.evaluate(c => ({
-    h: c.scrollHeight,
-    top: c.scrollTop,
-    titleH: c.querySelector('.m-title-large').getBoundingClientRect().height,
-  }));
+  const after = await content.evaluate(c => ({ h: c.scrollHeight, top: c.scrollTop }));
   expect(after.h).toBe(before);
   expect(after.top).toBe(30);
-  expect(after.titleH).toBeGreaterThan(30);
 });

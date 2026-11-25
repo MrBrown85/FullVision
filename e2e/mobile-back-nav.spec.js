@@ -22,7 +22,7 @@ const screens = page => page.locator('#m-nav-stack .m-screen');
 const state = page => page.evaluate(() => JSON.stringify(history.state));
 
 async function openTopStudent(page) {
-  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
   await expect(page.locator('#m-screen-student-detail')).toBeVisible();
   await expect(page.locator('#m-screen-student-detail')).not.toHaveClass(/m-push-enter-active/);
 }
@@ -96,13 +96,15 @@ test('the screen under a pushed one dims, and Back from grading slides back to t
   // The push has ended: the dim is gone again and the screen is hidden.
   expect(Number(dimmed)).toBe(0);
 
-  await page.locator('#m-screen-student-detail [data-action="m-student-grade"]').click();
+  // A piece from All Work, which opens in place.
+  await page.locator('#m-screen-student-detail summary', { hasText: 'All Work' }).click();
+  await page.locator('#m-screen-student-detail .m-assess-compact').first().click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   await page.locator('#m-nav-bar-grade-swiper [data-action="m-back"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toHaveClass(/m-pop-exit-active/);
   await expect(page.locator('#m-screen-grade-swiper')).toHaveCount(0);
   await expect(page.locator('.m-tab-item[data-tab="students"]')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#m-screen-student-detail .m-hero-name')).toBeVisible();
+  await expect(page.locator('#m-screen-student-detail .m-sl-id-name')).toBeVisible();
 });
 
 // A class switch used to leave each tab's open screens saved, so the Grade

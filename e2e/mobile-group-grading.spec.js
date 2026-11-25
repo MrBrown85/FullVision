@@ -42,7 +42,7 @@ test('a card per group, and grading it fills every member', async ({ page }) => 
   await expect(thumbs.nth(0)).toHaveText('G1');
   await expect(thumbs.nth(2)).toHaveText('G3');
   await expect(thumbs).toHaveCount(3 + info.total - 12);
-  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('Group 1 · 1 of ' + (3 + info.total - 12));
+  await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-title-text')).toHaveText('Group 1');
   const card = page.locator('.m-swiper-card').first();
   await expect(card.locator('.m-group-title')).toHaveText('Group 1');
   await expect(card.locator('.m-group-member')).toHaveCount(4);
@@ -67,7 +67,9 @@ test('a card per group, and grading it fills every member', async ({ page }) => 
 test('Grade Separately from the sheet, and Back to Group Grade', async ({ page }) => {
   const info = await open(page);
   const card = page.locator('.m-swiper-card').first();
-  await card.locator('.m-group-more').nth(1).click();
+  // A member's ⋯ (Grade Separately) is in the grader's More sheet now.
+  await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+  await page.locator('#m-sheet-container .m-more-sheet .m-group-more').nth(1).click();
   await expect(page.locator('.m-group-sheet')).toContainText('Grade Separately');
   await page.locator('.m-group-sheet-btn', { hasText: 'Grade Separately' }).click();
   await expect(page.locator('#m-thumb-strip .m-thumb').nth(1)).toHaveAttribute('data-sid', info.ids[1]);
@@ -85,8 +87,10 @@ test('Missing stays per student', async ({ page }) => {
   const info = await open(page);
   const card = page.locator('.m-swiper-card').first();
   await card.locator('.m-score-btn[data-score="3"]').first().click();
-  await page.locator(`.m-group-pill[data-val="NS"][data-sid="${info.ids[3]}"]`).click();
-  await expect(page.locator(`.m-group-pill[data-val="NS"][data-sid="${info.ids[3]}"]`)).toHaveClass(/m-status-active/);
+  // Each member's Missing, Excused and Late are in the grader's More sheet.
+  await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+  await page.locator(`#m-sheet-container .m-group-pill[data-val="NS"][data-sid="${info.ids[3]}"]`).click();
+  await expect(card.locator(`.m-group-pill[data-val="NS"][data-sid="${info.ids[3]}"]`)).toHaveClass(/m-status-active/);
   const cleared = await page.evaluate(
     ({ cid, aid, ids }) => (getScores(cid)[ids[3]] || []).some(e => e.assessmentId === aid && e.score > 0),
     info,

@@ -1,12 +1,12 @@
 # The phone's new look (2026-11-24)
 
-**Status.** L1, L2, L5, L6, Undo after a return (the first part of L3) and the Write a Bulletin sheet (the first part of L2b) are built on `main` behind the switch. Not released.
+**Status.** On for everyone since Nov 25 (Colin: "Deal with it"): L1, L2, L5, L6, Undo after a return (the first part of L3) and the Write a Bulletin sheet (the first part of L2b). Not built: the rest of L2b, L3, L4 and L7. L8's cleanup is still to do: the old layout's code and styles are not deleted yet, and the help pictures show the old screens.
 
 **Why.** Colin, Nov 24: the phone's grading view is cluttered, and a teacher who is not a software user would be overwhelmed by it. The phone is a tool to be used in the moment: grade, observe, post. One strong control for each decision, the rest behind one tap, no grey lines of explanation.
 
 **Board.** "Phone Grader, Redesigned" (https://claude.ai/artifact/9183YbyUHWKjotWVWo2Guq). Rows: the grader, its stress tests, three gaps filled, the same tabs tweaked with the profile, the profile's stress tests, and Pleasant Surprises.
 
-**Switch.** `phoneLook` in `shared/build-flags.js`, off. When it is on, `<html>` carries the class `m-look`.
+**Switch.** `phoneLook` in `shared/build-flags.js`, on for everyone. With it on, `<html>` carries the class `m-look`. Turning it back off (its default to false) is the way back if something is wrong.
 
 ## The method: write as little as the board needs
 
@@ -77,6 +77,14 @@ Built in `teacher-mobile/student-look.js`; `card-widgets.js` and `student-detail
 - **The card** is the student's My Learning: the name (a tap for every student), the overall level in words with four bars up to it (a Letter class shows its letter, no bars), + Observe and Profile, To Grade and To Return as before, then the five newest pieces with a result and All N Pieces. A piece's result is the class's own wording (`assessmentCellValue`), so a class set to show numbers shows "2.7", not "Proficient". In a class whose student page is on, a blue dot marks a piece returned and not opened since (`seen_at`), with "N Not Opened" over the list. With the switch on, the card's widget choices are set aside.
 - **The profile**: who they are (how to say their name, pronouns, IEP and the other designations, Flagged, open concerns, languages, how they learn best) and + Observe; their private note behind a tap; their goal and check-in; About Me; What You've Noticed (the newest observation, then All N); their reflections; then All Work and Competencies. Each "All" row and each reflection opens in place (`<details>`). A part with nothing in it is left out.
 - **Choices made without Colin** (he had delegated the board's details): the button reads "Profile", as on the board; All N Pieces opens the profile, where All Work is one tap; Reflections says "None Answered" rather than "No Card Yet", which needs a server read; long About Me answers are shown whole, not cut to five lines; the old profile's "Seen in Observations" table and To Grade box are not on it.
+
+## Turned on (Nov 25)
+
+Colin asked why the release changed nothing teachers could see, and said to turn it on. Turning it on changed these, each fixed before it merged:
+
+- **Tests.** The unit tests see the switch as each test sets it (`tests/setup-mobile.js`): the old layout's code is still checked until L8 deletes it. The browser tests run the phone as it ships. They go to a student through the class list and to Competencies or Rubric through ⋯ (`e2e/phone-jump.js`), read the bar as the student's name, and send a held return at once where they need it sent. `e2e/mobile-student-tabs.spec.js` is gone with the profile's tabs.
+- **Fixed in the look:** the round − + and comment buttons and the checklist's chevron are 44 px to a finger (drawn as the same 34 px circles); the level track's segments are 44 px; Write a Bulletin is back on white (the tint was 4.0:1); the profile's bar names the student again as it scrolls; the profile shows To Grade again (S7-F4); the card's list says More Below when it runs past the bottom.
+- **What teachers lose with the old screens:** the bar's "3 of 27" count (the progress line shows where they are), the profile's tabs (All Work and Competencies open in place), Grade Newest on the profile (All Work's first row), and the card's widget choices.
 
 ## Colin's answers owed
 

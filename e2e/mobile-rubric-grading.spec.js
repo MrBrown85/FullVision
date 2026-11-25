@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { scoreBy } from './phone-jump.js';
 
 /* Phone grading by rubric criterion (Rubric Bank plan §5, PR 10). An
    assessment with a rubric of its own opens in Rubric view: one row per
@@ -49,7 +50,14 @@ test.describe('Phone grading by rubric criterion', () => {
   test('a rubric assessment opens by criterion; Competencies switches back', async ({ page }) => {
     await openLab(page, false, 'Science Fair Proposal');
     const card = firstCard(page);
-    await expect(page.getByRole('button', { name: 'Rubric', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    // Competencies or Rubric is under ⋯.
+    await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+    await expect(page.locator('#m-sheet-container .m-seg-btn', { hasText: 'Rubric' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.locator('#m-sheet-backdrop').click({ position: { x: 10, y: 10 } });
+    await expect(page.locator('#m-sheet-container .m-more-sheet')).toHaveCount(0);
     await expect(card.locator('.m-crit-group')).toHaveCount(3);
     await expect(card.locator('.m-crit-name').first()).toHaveText('Variable Identification');
     await expect(card.locator('.m-checks-btn')).toHaveCount(0);
@@ -73,7 +81,7 @@ test.describe('Phone grading by rubric criterion', () => {
     expect(new Set(saved).size).toBe(1);
     expect(saved[0]).toBe(Number(target));
 
-    await page.getByRole('button', { name: 'Competencies', exact: true }).click();
+    await scoreBy(page, 'Competencies');
     await expect(firstCard(page).locator('.m-crit-group')).toHaveCount(0);
     await expect(firstCard(page).locator('.m-score-group').first()).toBeVisible();
   });

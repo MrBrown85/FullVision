@@ -8,6 +8,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { mockAuth } from './helpers.js';
+import { jumpTo } from './phone-jump.js';
 
 test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 
@@ -392,7 +393,8 @@ test('a grade, then Return on the phone is return_work', async ({ page }) => {
   await page.locator('[data-action="m-grade-assess"][data-open="draft"]').first().click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   await page.locator('[data-action="m-grade-return-next"]').click();
-  await expect.poll(async () => (await calls(page, 'return_work')).length).toBe(1);
+  // Return and Next is held seven seconds for Undo, then sent.
+  await expect.poll(async () => (await calls(page, 'return_work')).length, { timeout: 12000 }).toBe(1);
   expect((await calls(page, 'return_work'))[0].p_enrollment_ids).toEqual([ALICE]);
   expect(await calls(page, 'return_grades')).toEqual([]);
   expect(errors).toEqual([]);
@@ -406,7 +408,7 @@ test('Add Work from a Not In card: the photo goes to the server and the work is 
   await page.locator('.m-seg-btn[data-val="all"]').click();
   await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + BOB + '"]').click();
+  await jumpTo(page, BOB);
   const card = page.locator('.m-swiper-card[data-sid="' + BOB + '"]');
   await card.locator('[data-action="m-add-work"]').click();
   const screen = page.locator('#m-addwork');
@@ -468,7 +470,7 @@ test('Mark Up on the phone saves to the server when Done is pressed', async ({ p
   await openGradeTab(page);
   await page.locator('.m-seg-btn[data-val="all"]').click();
   await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + ALICE + '"]').click();
+  await jumpTo(page, ALICE);
   const card = page.locator('.m-swiper-card[data-sid="' + ALICE + '"]');
   await card.locator('.m-work-full').click();
   await page.locator('#m-sheet-container [data-action="m-markup-open"]').first().click();
