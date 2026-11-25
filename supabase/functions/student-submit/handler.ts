@@ -14,8 +14,7 @@
 // request's shape, refuses to run outside ca-central-1, turns the caller's IP
 // into a keyed hash, turns a card's code into its tag (the database cannot
 // read it), and answers with what the database said. Slips and phone reports
-// are gone (migrations/2026112414): their routes answer bad_request, but for open and check, which answer
-// not_found until the released student page stops asking them.
+// are gone (migrations/2026112414): their routes answer bad_request.
 //
 // Kept free of Deno and database imports so the tests run it under Node
 // with stand-in database calls. index.ts wires the real ones.
@@ -338,10 +337,6 @@ export function makeHandler(opts: Options) {
         } else {
           result = cardReply(card, await opts.db.call(card.sql, [...params, hash]));
         }
-      } else if (route === 'open' || route === 'check') {
-        // The released student page (until the release after 2026112414) tries a slip when a code is no card,
-        // and reads not_found as "That code didn't work". Slips are gone: say so, and ask the database nothing.
-        result = { ok: false, error: 'not_found' };
       } else {
         return reply(400, { ok: false, error: 'bad_request' }, origin);
       }
