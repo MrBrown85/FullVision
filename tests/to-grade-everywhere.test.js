@@ -154,15 +154,20 @@ describe('the gradebook’s cells', () => {
     seed({ labOnly: true });
     mount(() => seed({ labOnly: true }), { course: CID });
     const td = document.querySelector('.gb-scores-cell[data-sid="' + IDS[0] + '"][data-aid="' + LAB + '"]');
-    expect(td.querySelector('.gb-to-grade').textContent).toBe('To Grade');
-    expect(td.querySelector('.gb-work-camera')).not.toBeNull();
+    // Missing's chip in blue with the tray, no words, so the column keeps its width.
+    expect(td.querySelector('.gb-to-grade svg.gb-tray')).not.toBeNull();
+    expect(td.querySelector('.gb-to-grade').textContent).toBe('');
+    // The camera sits in the cell's corner, outside the value.
+    expect(td.querySelector(':scope > .gb-work-camera')).not.toBeNull();
+    expect(td.querySelector('.gb-scores-val .gb-work-camera')).toBeNull();
     expect(td.getAttribute('aria-label')).toMatch(/, sent, not graded, has photos$/);
     expect(td.getAttribute('title')).toMatch(/^Sent [A-Z][a-z]{2} \d{1,2} · 1 photo\. Click to open in the grader\.$/);
     // A returned piece with photos keeps its level and shows the camera.
     const done = document.querySelector('.gb-scores-cell[data-sid="' + IDS[4] + '"][data-aid="' + LAB + '"]');
     expect(done.querySelector('.gb-to-grade')).toBeNull();
-    expect(done.querySelector('.gb-work-camera')).not.toBeNull();
-    expect(document.querySelector('.gb-key').textContent).toContain('Sent, not graded');
+    expect(done.querySelector(':scope > .gb-work-camera')).not.toBeNull();
+    const keyItem = [...document.querySelectorAll('.gb-key-item')].find(x => x.querySelector('.gb-to-grade'));
+    expect(keyItem.textContent).toBe('To Grade');
   });
 
   it('with Send Work off the gradebook is as it was', () => {

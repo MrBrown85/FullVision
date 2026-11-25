@@ -10337,25 +10337,19 @@ button.grader-member-name {
   font-size: 13px;
   white-space: nowrap;
 }
-/* The gradebook's To Grade: a filled blue chip, the camera inside when
-   the work came in as photos. */
+/* The gradebook's To Grade: Missing's chip (gradebook.css .gb-status) in
+   blue, with the Inbox's tray in place of a word, so it fits the column. */
 .gb-to-grade {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 10px;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 18px;
+  border-radius: 4px;
   background: var(--active-fill);
   color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
   vertical-align: middle;
-}
-.gb-to-grade .gb-work-camera {
-  margin: 0;
-  color: inherit;
 }
 .gb-work-camera {
   display: inline-flex;
@@ -10946,8 +10940,7 @@ button.grader-member-name {
 .grader-revision-line:empty {
   display: none;
 }
-.grader-revising-mark,
-.gb-revising {
+.grader-revising-mark {
   display: inline-flex;
   align-items: center;
   border-radius: 12px;
@@ -10961,17 +10954,11 @@ button.grader-member-name {
   padding: 0 10px;
   font-size: var(--text-sm);
 }
+/* The gradebook's Revising: a grey arrow turning back, in the cell's corner
+   (gradebook.css, "A cell's corner marks") and in the key. */
 .gb-revising {
-  display: block;
-  width: fit-content;
-  margin: 2px auto 0;
-  padding: 0 6px;
-  font-size: 10px;
-  line-height: 16px;
-}
-.gb-key-item .gb-revising {
   display: inline-flex;
-  margin: 0 4px 0 0;
+  color: var(--text-2);
 }
 .grader-revision-msg {
   margin: 0;
