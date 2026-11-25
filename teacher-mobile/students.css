@@ -647,3 +647,40 @@
     color: #ffa8a1;
   }
 }
+
+/* All Work in the profile: rows on the card itself, not cards in a card.
+   The title wraps beside its score; the date, category and competencies
+   sit under it. */
+.m-sp-row-body .m-st-note {
+  margin: 0 0 4px;
+}
+.m-sp-row-body .m-assess-compact {
+  margin: 0;
+  padding: 12px 0;
+  border-radius: 0;
+  background: none;
+}
+.m-sp-row-body .m-assess-compact + .m-assess-compact {
+  border-top: 0.5px solid var(--divider-medium);
+}
+.m-sp-row-body .m-assess-top {
+  align-items: flex-start;
+  gap: 12px;
+}
+.m-sp-row-body .m-assess-title {
+  font-size: 16px;
+  line-height: 1.3;
+}
+.m-sp-row-body .m-assess-top .m-st-score {
+  margin-top: -1px;
+  font-size: 14px;
+  min-width: 44px;
+  text-align: center;
+}
+.m-sp-row-body .m-st-assess-sub {
+  margin-top: 4px;
+}
+.m-sp-row-body .m-assess-date {
+  font-size: 13px;
+  color: var(--text-2);
+}

@@ -634,9 +634,6 @@ window.MStudentDetail = (function () {
         MC.esc(a.title) +
         '">' +
         '<div class="m-assess-top">' +
-        '<span class="m-assess-date">' +
-        MC.esc(_shortDay(a.date)) +
-        '</span>' +
         '<span class="m-assess-title">' +
         MC.esc(a.title) +
         (status === 'NS'
@@ -652,6 +649,9 @@ window.MStudentDetail = (function () {
         '</span>' +
         '</div>' +
         '<div class="m-st-assess-sub">' +
+        '<span class="m-assess-date">' +
+        MC.esc(_shortDay(a.date)) +
+        '</span>' +
         (showsCategoryBadge(cid, a)
           ? '<span class="m-type-badge ' + badge.className + '">' + MC.esc(badge.label) + '</span>'
           : '') +
