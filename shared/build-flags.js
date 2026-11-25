@@ -13,9 +13,9 @@
    is on wins over what the device has.
 
    phoneLook (the phone's new look, docs/plans/phone-look-plan.md) is on
-   for everyone since Colin's word on Nov 25: the phone's <html> carries the
-   class m-look and teacher-mobile/look.css restyles what is already drawn.
-   The old layout's code stays until L8 deletes it. */
+   since Nov 25 and nothing asks for it any more: the phone draws the new
+   look and nothing else. The name stays for the same reason as the
+   others. */
 (function () {
   /** @type {Record<string, boolean>} */
   var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true, phoneLook: true };

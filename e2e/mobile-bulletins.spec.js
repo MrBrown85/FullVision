@@ -204,8 +204,6 @@ async function fitProblems(page, root, width) {
       box.querySelectorAll('*').forEach(el => {
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden') return;
-        // Words kept for a screen reader only (the new look's .m-look-sr) are cut on purpose.
-        if (el.closest('.m-look-sr')) return;
         const cs = getComputedStyle(el);
         const clips = cs.overflowX === 'hidden' || cs.overflowX === 'clip' || cs.textOverflow === 'ellipsis';
         if (clips && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim())

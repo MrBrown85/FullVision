@@ -21,11 +21,6 @@
   /** @type {any[]} */
   var _units = [];
 
-  /* look.css still styles the Students, Observe and Bulletins screens under
-     this class, until each is drawn natively and its rules leave that file.
-     It was set here when the switch was on; the switch is on for everyone. */
-  if (document.documentElement) document.documentElement.classList.add('m-look');
-
   /** @param {string} s */
   function _esc(s) {
     return W.MComponents.esc(s);

@@ -169,8 +169,10 @@ test('the grading bar names the student on screen, and follows the class list', 
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="grade"]').click();
 
-  // The Grade list has no large title: its bar title shows at rest.
-  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-title-inline')).toHaveCSS('opacity', '1');
+  // The Grade list's top bar names the class, at rest.
+  const className = await page.evaluate(() => COURSES[getActiveCourse()].name);
+  await expect(page.locator('#m-nav-bar-grade-picker .m-tabbar-name')).toHaveText(className);
+  await expect(page.locator('#m-nav-bar-grade-picker .m-tabbar-name')).toBeVisible();
 
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
   await page.locator('#m-grade-list .m-tg-row', { hasText: 'Science Fair Proposal' }).click();

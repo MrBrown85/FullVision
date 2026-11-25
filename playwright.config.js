@@ -54,13 +54,14 @@ export default defineConfig({
             testMatch: /(bulletins-teacher|dashboard-bulletins-tile|reflect-builder)\.spec\.js$/,
             use: { browserName: 'webkit' },
           },
-          /* Teachers' phones are mostly iPhones: the phone app's Bulletins tab
-             and the grader in the new look in WebKit (each spec sets the
+          /* Teachers' phones are mostly iPhones: the phone's grader, Students
+             card, profile, tabs and Bulletins in WebKit (each spec sets the
              phone's size). Run: FV_WEBKIT=1 npx playwright test
              --project=webkit-phone */
           {
             name: 'webkit-phone',
-            testMatch: /(mobile-bulletins|mobile-phone-look)\.spec\.js$/,
+            testMatch:
+              /(mobile-bulletins|phone-grader|mobile-students-card|mobile-student-profile|mobile-tabs-fit)\.spec\.js$/,
             use: { browserName: 'webkit' },
           },
         ]
