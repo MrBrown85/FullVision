@@ -40,7 +40,7 @@ test('Students: hide one student’s overall grade, see the exception, Undo, and
   const card = page.locator('.sc-card');
   const filters = card.getByRole('radiogroup', { name: 'Show' });
   await expect(card.getByRole('heading', { name: 'Students', exact: true })).toBeVisible();
-  await expect(filters.getByRole('radio', { name: /^Exceptions/ })).toHaveText('Exceptions 0');
+  await expect(filters.getByRole('radio', { name: /^Grade Exceptions/ })).toHaveText('Grade Exceptions 0');
   await expect(page.locator('#sps-except')).toHaveCount(0);
 
   // The name is a button: it opens the student's panel.
@@ -51,7 +51,7 @@ test('Students: hide one student’s overall grade, see the exception, Undo, and
   await expect(panel.getByRole('heading', { name: 'What ' + at.first + ' Sees' })).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Preview as ' + at.first })).toBeVisible();
   const grade = panel.getByRole('radiogroup', { name: 'Overall Grade' });
-  await expect(grade.getByRole('radio', { name: 'Same as Class (Shown)' })).toHaveAttribute('aria-checked', 'true');
+  await expect(grade.getByRole('radio', { name: 'Use Class Setting (Shown)' })).toHaveAttribute('aria-checked', 'true');
 
   // Hide: the exception shows on the filter, the class's row and the student's row, with Undo.
   await grade.getByRole('radio', { name: 'Hide' }).click();
@@ -60,17 +60,17 @@ test('Students: hide one student’s overall grade, see the exception, Undo, and
   await expect(panel.locator('#sps-grade-hint')).toHaveText(
     at.first + '’s overall grade stays off their page. Each piece’s result and feedback still show.',
   );
-  await expect(filters.getByRole('radio', { name: /^Exceptions/ })).toHaveText('Exceptions 1');
+  await expect(filters.getByRole('radio', { name: /^Grade Exceptions/ })).toHaveText('Grade Exceptions 1');
   await expect(page.locator('#sps-except')).toHaveText('Hidden for ' + at.first);
   const row = card.locator('.sc-table tbody tr', { has: page.getByRole('button', { name: at.name, exact: true }) });
   await expect(row.locator('.sps-grade')).toHaveText('Hidden');
   const toast = page.locator('#undo-toast');
   await expect(toast).toContainText(at.first + '’s overall grade is hidden.');
   await toast.getByRole('button', { name: 'Undo' }).click();
-  await expect(filters.getByRole('radio', { name: /^Exceptions/ })).toHaveText('Exceptions 0');
+  await expect(filters.getByRole('radio', { name: /^Grade Exceptions/ })).toHaveText('Grade Exceptions 0');
   await expect(page.locator('#sps-except')).toHaveCount(0);
   await expect(row.locator('.sps-grade')).toHaveText('Shown · Class');
-  await expect(grade.getByRole('radio', { name: 'Same as Class (Shown)' })).toHaveAttribute('aria-checked', 'true');
+  await expect(grade.getByRole('radio', { name: 'Use Class Setting (Shown)' })).toHaveAttribute('aria-checked', 'true');
 
   // Escape closes the panel, and the focus goes back to the name.
   await page.keyboard.press('Escape');
@@ -82,7 +82,7 @@ test('Students: hide one student’s overall grade, see the exception, Undo, and
   await grade.getByRole('radio', { name: 'Hide' }).click();
   await page.keyboard.press('Escape');
   await page.locator('#sps-except').click();
-  await expect(filters.getByRole('radio', { name: /^Exceptions/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(filters.getByRole('radio', { name: /^Grade Exceptions/ })).toHaveAttribute('aria-checked', 'true');
   await expect(card.locator('.sc-name')).toHaveText([at.name]);
 
   // Preview as the student: My Learning has no overall grade, and Doesn't See says why.

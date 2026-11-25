@@ -636,17 +636,13 @@ var StudentCards = (function () {
     showConfirm(q.title, q.message, q.ok, 'danger', yes);
   }
 
-  // The question Print New Card asks (design section 4).
+  // The question Replace Card asks (design section 4; renamed Nov 24 2026: "Print New Card" hid that the old card stops).
   function newCardQuestion(first) {
     return {
-      title: 'Print a New Card for ' + first + '?',
+      title: 'Replace ' + first + '\u2019s Card?',
       message:
-        'The card ' +
-        first +
-        ' has now stops working as soon as the new one is made. Everything ' +
-        first +
-        ' has sent stays.',
-      ok: 'Print New Card',
+        first + '\u2019s card stops working as soon as the new one is made. Everything ' + first + ' has sent stays.',
+      ok: 'Replace and Print',
     };
   }
 
@@ -710,7 +706,13 @@ var StudentCards = (function () {
   function newCardsQuestion(stop, first) {
     var all = stop + first;
     return {
-      title: all === 1 ? 'Print a New Card for 1 Student?' : 'Print New Cards for ' + all + ' Students?',
+      title: stop
+        ? all === 1
+          ? 'Replace 1 Student\u2019s Card?'
+          : 'Replace Cards for ' + all + ' Students?'
+        : all === 1
+          ? 'Make a Card for 1 Student?'
+          : 'Make Cards for ' + all + ' Students?',
       message:
         (stop ? (stop === 1 ? '1 card stops working now. ' : stop + ' cards stop working now. ') : '') +
         (first
@@ -719,7 +721,7 @@ var StudentCards = (function () {
             : first + ' students get their first card. '
           : '') +
         'Everything they have sent stays.',
-      ok: all === 1 ? 'Print 1 New Card' : 'Print ' + all + ' New Cards',
+      ok: stop ? 'Replace and Print' : 'Make and Print',
     };
   }
 
@@ -898,10 +900,10 @@ var StudentCards = (function () {
         ? '<button type="button" class="cm-action-btn sc-row-btn" data-action="spCardsNewCard" data-student="' +
           esc(st.id) +
           '" aria-label="' +
-          esc('Print a New Card for ' + name) +
+          esc('Replace ' + name + '\u2019s Card') +
           '"' +
           dis +
-          '>Print New Card</button>'
+          '>Replace Card</button>'
         : '') +
       '</td></tr>'
     );
@@ -1162,11 +1164,11 @@ var StudentCards = (function () {
     // With the Students panel, Print New Card is in the panel a name opens.
     var how = _sps()
       ? names.length === 1
-        ? '. Choose their name, then Print New Card, to try again.'
-        : '. Choose each name, then Print New Card, to try again.'
+        ? '. Choose their name, then Replace Card, to try again.'
+        : '. Choose each name, then Replace Card, to try again.'
       : names.length === 1
-        ? '. Use Print New Card on their row to try again.'
-        : '. Use Print New Card on their rows to try again.';
+        ? '. Use Replace Card on their row to try again.'
+        : '. Use Replace Card on their rows to try again.';
     return names.length === 1
       ? '1 student still has their old card: ' + names[0] + how
       : names.length + ' students still have their old card: ' + names.join(', ') + how;

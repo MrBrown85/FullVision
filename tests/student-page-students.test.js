@@ -233,7 +233,7 @@ describe('signed in', () => {
     // The list has no Overall Grade and no Exceptions, and the panel no What … Sees.
     const box = await list(REAL);
     expect([...box.querySelectorAll('.sc-table thead th')].map(text)).not.toContain('Overall Grade');
-    expect(filtersOf(box).map(f => f[0])).not.toContain('Exceptions 0');
+    expect(filtersOf(box).map(f => f[0])).not.toContain('Grade Exceptions 0');
     const p = panel(S[0], REAL);
     expect(p.querySelector('#sps-sees-title')).toBe(null);
     expect(text(p.querySelector('#sps-done-title'))).toBe('What Jordan Has Done');
@@ -436,7 +436,7 @@ describe('the Students list', () => {
     let box = await list();
     expect(filtersOf(box)).toEqual([
       ['All 3', 'sc-chip active'],
-      ['Exceptions 0', 'sc-chip'],
+      ['Grade Exceptions 0', 'sc-chip'],
       ['Not Printed 3', 'sc-chip sc-chip-warn'],
       ['Locked 0', 'sc-chip'],
       ['Never Opened 0', 'sc-chip'],
@@ -445,7 +445,7 @@ describe('the Students list', () => {
     await setStudentPageOptions(CID, ['s3'], { paused: true }, KEY());
     StudentCards.setFilter(CID, 'exceptions');
     box = parse(StudentCards.render(CID));
-    expect(filtersOf(box)[1]).toEqual(['Exceptions 2', 'sc-chip sc-chip-warn active']);
+    expect(filtersOf(box)[1]).toEqual(['Grade Exceptions 2', 'sc-chip sc-chip-warn active']);
     expect(column(box, 1)).toEqual(['Priya Byrne', 'Liam Chen']);
   });
 
@@ -495,14 +495,23 @@ describe('the Students list', () => {
       const bar = parse(StudentCards.render(CID)).querySelector('.sps-bar');
       expect(text(bar.querySelector('.sps-bar-count'))).toBe('2 Selected');
       expect([...bar.querySelectorAll('button')].map(text)).toEqual([
-        'Hide Overall Grade',
-        'Show Overall Grade',
-        'Same as Class',
-        'Pause Pages',
-        'Open Pages',
-        'Print New Cards',
-        'Clear',
+        'Show',
+        'Hide',
+        'Use Class Setting',
+        'Pause',
+        'Resume',
+        'Replace Cards',
+        'Clear Selection',
       ]);
+      // Each says in full what it acts on, and what it does on hover.
+      expect([...bar.querySelectorAll('.sps-bar-group')].map(g => g.getAttribute('aria-label'))).toEqual([
+        'Overall Grade',
+        'Student Page',
+        'Card',
+      ]);
+      expect(bar.querySelector('[data-value="print"]').getAttribute('title')).toBe(
+        'Makes a new card for each. Their old card stops working at once.',
+      );
       StudentPageStudents.handleAction('spStudentBulk', {
         dataset: { value: 'hide' },
         closest: () => ({ dataset: { cid: CID } }),
@@ -573,7 +582,7 @@ describe('the Students list', () => {
     expect(
       [...p.querySelectorAll('[data-action="spStudentGrade"]')].map(b => [text(b), b.getAttribute('aria-checked')]),
     ).toEqual([
-      ['Same as Class (Shown)', 'true'],
+      ['Use Class Setting (Shown)', 'true'],
       ['Show', 'false'],
       ['Hide', 'false'],
     ]);
@@ -620,10 +629,10 @@ describe('the Students list', () => {
       });
       const bar = parse(StudentCards.render(CID)).querySelector('.sps-bar');
       expect([...bar.querySelectorAll('button')].map(text)).toEqual([
-        'Pause Pages',
-        'Open Pages',
-        'Print New Cards',
-        'Clear',
+        'Pause',
+        'Resume',
+        'Replace Card',
+        'Clear Selection',
       ]);
       StudentPageStudents.handleAction('spStudentBulk', {
         dataset: { value: 'hide' },
