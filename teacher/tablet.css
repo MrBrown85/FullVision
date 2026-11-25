@@ -403,6 +403,23 @@
     height: 48px;
   }
 
+  /* ── Bulletins: the write bar and the box ───────────────────────── */
+
+  /* Every button, field and the switch's row a finger can hit; the rows
+     wrap rather than squeeze (e2e/bulletins-bar.spec.js). */
+  html.fv-tablet .bulletin-bar-open,
+  html.fv-tablet .bulletin-field,
+  html.fv-tablet .bulletin-page .tb-action-btn,
+  html.fv-tablet .bulletin-kinds .seg-btn {
+    min-height: 44px;
+  }
+  html.fv-tablet .bulletin-react-row {
+    min-height: 44px;
+  }
+  html.fv-tablet textarea.bulletin-field {
+    min-height: 84px;
+  }
+
   @media (max-width: 799px) {
     html.fv-tablet .sps-panel {
       width: 100%;
