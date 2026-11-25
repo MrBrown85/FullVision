@@ -619,12 +619,6 @@ window.MStudentDetail = (function () {
       var cell = assessmentCellValue(cid, sid, a);
       var badge = _assessmentBadgeData(cid, a);
       var status = statuses[sid + ':' + a.id];
-      var toward = [];
-      (a.tagIds || []).forEach(function (tid) {
-        var tag = getTagById(cid, tid);
-        var name = tag ? tag.label || tag.shortName || tag.code || '' : '';
-        if (name && toward.indexOf(name) < 0) toward.push(name);
-      });
       assessHtml +=
         '<div class="m-assess-compact" role="button" tabindex="0" data-action="m-assess-grade" data-sid="' +
         MC.esc(sid) +
@@ -655,7 +649,6 @@ window.MStudentDetail = (function () {
         (showsCategoryBadge(cid, a)
           ? '<span class="m-type-badge ' + badge.className + '">' + MC.esc(badge.label) + '</span>'
           : '') +
-        (toward.length ? '<span class="m-st-toward">' + MC.esc(toward.join(', ')) + '</span>' : '') +
         '</div>' +
         '</div>';
     });

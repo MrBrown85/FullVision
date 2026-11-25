@@ -649,8 +649,9 @@
 }
 
 /* All Work in the profile: rows on the card itself, not cards in a card.
-   The title wraps beside its score; the date, category and competencies
-   sit under it. */
+   The title wraps beside its score; the date and category sit under it.
+   No list of competencies: the grader shows them, and a grey line here
+   was not read at a glance (Colin, Nov 25). */
 .m-sp-row-body .m-st-note {
   margin: 0 0 4px;
 }
@@ -681,6 +682,6 @@
   margin-top: 4px;
 }
 .m-sp-row-body .m-assess-date {
-  font-size: 13px;
-  color: var(--text-2);
+  font-size: 14px;
+  color: var(--text);
 }
