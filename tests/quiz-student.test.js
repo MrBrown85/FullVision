@@ -11,7 +11,12 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+// The page's day is the device's local day (courseToday), not UTC's: after
+// 4 or 5 p.m. in BC, UTC is already tomorrow and "due today" was not.
+const TODAY = (d =>
+  d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(
+  new Date(),
+);
 const ON = { 'fv-build-quizzes': '1' };
 const routes = page => page.calls.map(c => c.body.route);
 
