@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
-import { gotoApp, clickAction, getText } from './helpers.js';
+import { gotoApp, clickAction, clickToolbarItem, getText } from './helpers.js';
 
 /* Pins what the gradebook does today with edits that must outlast a reload,
    in Demo Mode on Science 8: typed scores and a Complete/Incomplete mark,
@@ -253,7 +253,10 @@ test('an Overall Comment typed in the grader dialog is still there after a reloa
 
 test("one student's Export CSV row matches the Scores view", async ({ page }) => {
   await openScores(page);
-  const [download] = await Promise.all([page.waitForEvent('download'), clickAction(page, 'exportScoresCSV')]);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    clickToolbarItem(page, 'more', 'exportScoresCSV'),
+  ]);
   const csv = (await (await download.createReadStream()).toArray()).join('');
   const lines = csv
     .trim()

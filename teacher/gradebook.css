@@ -12,16 +12,19 @@
 /* Sidebar toggle hidden via JS in page-gradebook.js init() */
 
 /* ══════════════════════════════════════════════════════════════
-   TOOLBAR — Two-layer Apple-style design
-   Layer 1: View mode + search + actions (always visible)
-   Layer 2: Contextual filter strip (progressive disclosure)
+   TOOLBAR — Search, Show, New (gradebook-toolbar.js)
+   The same "Three Things" bar as the Assignments page: the parts they
+   share (Search with its Filter button, Show's badges, the chips, ⋯) are in
+   styles.css. The filter panel floats over the grid, under Search.
    ══════════════════════════════════════════════════════════════ */
-
-/* ── Layer 1: Primary bar ──────────────────────────────────── */
 .gb-toolbar {
   flex-wrap: wrap;
   position: relative;
   z-index: 1;
+  gap: 8px;
+  /* Search is 260 wide when there is room, and gives way to 160 first. */
+  --atb-search-min: 160px;
+  --atb-search-max: 260px;
 }
 /* Scores | Competencies keep their widths whichever is chosen: each button
    reserves its label's bold width, so nothing after them moves. */
@@ -35,134 +38,16 @@
   visibility: hidden;
   font-weight: 600;
 }
-/* Narrower windows keep one row: Export and Print Grades show their icons
-   (both keep their names for screen readers and on hover) and Search
-   narrows. */
-.gb-toolbar .gb-tb-icon {
-  display: none;
+.gb-toolbar .atb-end .assess-menu {
+  min-width: 180px;
 }
-@media (max-width: 1300px) {
-  .gb-toolbar .gb-tb-text {
-    display: none;
-  }
-  .gb-toolbar .gb-tb-icon {
-    display: inline-flex;
-  }
-  .gb-toolbar .gb-search-input,
-  .gb-toolbar .gb-search-input:focus {
-    width: 100px;
-  }
-}
-
-/* Filter trigger button — opens/closes filter strip */
-.gb-filter-trigger {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: var(--control-h);
-  padding: 5px 12px;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-  white-space: nowrap;
-  position: relative;
-}
-.gb-filter-trigger:hover {
-  border-color: var(--text-3);
-  color: var(--text);
-}
-.gb-filter-trigger.has-filters {
-  border-color: var(--active);
-  color: var(--active);
-}
-.gb-filter-trigger .filter-icon {
-  font-size: var(--text-base);
-  opacity: 0.6;
-}
-.gb-filter-trigger .filter-count.is-empty {
-  visibility: hidden;
-}
-.gb-filter-trigger .filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  background: var(--active-fill);
-  color: #fff;
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-}
-
-/* Search — clean pill */
-.gb-search-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-/* The students a dashboard link opened the gradebook on; a click shows all. */
-.gb-student-filter {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--link);
-  background: var(--focus-banner-bg);
-  border: 1px solid var(--focus-banner-border);
-  border-radius: 14px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.gb-search-icon {
-  position: absolute;
-  left: 9px;
-  display: flex;
-  color: var(--text-3);
-  pointer-events: none;
-}
-.gb-search-input {
-  height: var(--control-h);
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  padding: 5px 12px 5px 28px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--overlay-hover);
-  color: var(--text);
-  outline: none;
-  width: 130px;
-  transition:
-    width 0.2s,
-    padding-right 0.2s,
-    background-color 0.2s,
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-.gb-search-input:focus {
-  background: var(--surface);
-  border-color: var(--active);
-  width: 180px;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
-}
-.gb-search-input::placeholder {
-  color: var(--text-3);
-}
-/* × at the box's right end while it holds a search; Escape does the same. */
+/* × inside the field, just left of Filter, while the box holds a search;
+   Escape does the same. */
 .gb-search-clear {
-  position: absolute;
-  right: 4px;
+  flex-shrink: 0;
   width: 24px;
   height: 24px;
+  margin-right: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,115 +62,165 @@
 .gb-search-clear:hover {
   background: var(--overlay-hover);
 }
-.gb-search-wrap:has(.gb-search-clear) .gb-search-input {
-  padding-right: 30px;
-}
 
-/* ── Layer 2: Filter strip — slides open below primary bar ── */
-.gb-filter-strip {
-  display: none;
-  align-items: center;
-  gap: 10px;
-  /* In line with the toolbar above it. */
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.015);
-  border-bottom: 0.5px solid var(--divider-medium);
-  animation: filterSlideIn 0.2s ease-out;
-  flex-shrink: 0;
-}
-.gb-filter-strip.open {
+/* The filter panel: up to three columns (Category, Competencies, Modules),
+   each drawn only when the class has that thing. It is as wide as its
+   columns need, and each column scrolls on its own past about eleven rows. */
+.gbf-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: max-content;
+  max-width: calc(100vw - 16px);
   display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.16),
+    0 0 0 0.5px var(--divider-medium);
 }
-@keyframes filterSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.gb-filter-strip-label {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  font-weight: 500;
-  flex-shrink: 0;
-}
-.gb-filter-strip-group {
+.gbf-cols {
   display: flex;
-  gap: 4px;
+  align-items: stretch;
+}
+.gbf-col {
+  flex: 0 0 auto;
+  min-width: 220px;
+  max-width: 360px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gbf-col + .gbf-col {
+  border-left: 1px solid var(--divider-medium);
+}
+.gbf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: var(--gbf-list-h, 374px);
+  overflow-y: auto;
+}
+.gbf-panel .assess-filter-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.gbf-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gbf-folder {
+  display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 2px;
 }
-.gb-filter-strip-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
-  margin: 0 4px;
+.gbf-kid {
+  padding-left: 36px !important;
+}
+.gbf-chev {
   flex-shrink: 0;
-}
-
-/* Filter chips — color-accented pills */
-.gb-filter-chip {
+  width: 30px;
+  height: 30px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: var(--chip-h);
-  padding: 0 10px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-2);
   cursor: pointer;
-  transition:
-    background-color 0.12s,
-    border-color 0.12s,
-    color 0.12s;
-  white-space: nowrap;
 }
-.gb-filter-chip:hover {
-  border-color: var(--text-3);
+.gbf-chev:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
 }
-.gb-filter-chip.active {
-  background: var(--text);
-  color: #fff;
-  border-color: var(--text);
+.gbf-chev:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
 }
-.gb-filter-chip .chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.gbf-chev svg {
+  transition: transform 0.15s;
 }
-.gb-filter-chip.active .chip-dot {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+.gbf-chev[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+/* A folder with only some of its competencies ticked: a dash in its box. */
+.assess-filter-item.is-some .assess-filter-box {
+  border-color: var(--active);
+  background: var(--active)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 14px no-repeat;
+}
+.gbf-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px;
+  border-top: 1px solid var(--divider-medium);
+}
+.gbf-panel .gbf-clear {
+  flex: 0 0 auto;
+  width: auto;
+  height: 30px;
+  padding: 0 12px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--link);
 }
 
-/* Clear all link */
-.gb-filter-clear {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  cursor: pointer;
-  border: none;
-  background: none;
-  padding: 2px 6px;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  transition:
-    color 0.12s,
-    text-decoration-color 0.12s;
-  white-space: nowrap;
-  margin-left: auto;
+/* Point to preview (Scores view): while the pointer or the keyboard rests on
+   an unpressed To Grade, To Return or Questions, the cells it would not keep
+   dim, and the names of the students with none. The delay keeps the grid
+   still as the pointer crosses the bar. */
+.page-layout:has(.atb-show [data-show='tograde']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  :is(
+    #gb-data .gb-scores-cell:not(:has(.gb-to-grade)),
+    #gb-rowheads .gb-grid-rowhead:not(.gb-grid-rowhead-stats, [data-has~='tograde'])
+  ),
+.page-layout:has(.atb-show [data-show='toreturn']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  :is(
+    #gb-data .gb-scores-cell:not(.gb-draft),
+    #gb-rowheads .gb-grid-rowhead:not(.gb-grid-rowhead-stats, [data-has~='toreturn'])
+  ),
+.page-layout:has(.atb-show [data-show='questions']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  :is(
+    #gb-data .gb-scores-cell:not(:has(.gb-question)),
+    #gb-rowheads .gb-grid-rowhead:not(.gb-grid-rowhead-stats, [data-has~='questions'])
+  ) {
+  opacity: 0.3;
 }
-.gb-filter-clear:hover {
-  color: var(--priority);
-  text-decoration-color: var(--priority);
+@media (prefers-reduced-motion: no-preference) {
+  #gb-data .gb-scores-cell,
+  #gb-rowheads .gb-grid-rowhead {
+    transition: opacity 150ms ease;
+  }
+  .page-layout:has(.atb-show [data-show='tograde']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    :is(
+      #gb-data .gb-scores-cell:not(:has(.gb-to-grade)),
+      #gb-rowheads .gb-grid-rowhead:not(.gb-grid-rowhead-stats, [data-has~='tograde'])
+    ),
+  .page-layout:has(.atb-show [data-show='toreturn']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    :is(
+      #gb-data .gb-scores-cell:not(.gb-draft),
+      #gb-rowheads .gb-grid-rowhead:not(.gb-grid-rowhead-stats, [data-has~='toreturn'])
+    ),
+  .page-layout:has(.atb-show [data-show='questions']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    :is(
+      #gb-data .gb-scores-cell:not(:has(.gb-question)),
+      #gb-rowheads .gb-grid-rowhead:not(.gb-grid-rowhead-stats, [data-has~='questions'])
+    ) {
+    transition: opacity 150ms ease 120ms;
+  }
 }
 
 /* ── Table ─────────────────────────────────────────────────── */
@@ -2031,57 +1966,6 @@ th.gb-group-alt {
   height: 14px;
   border: 1.5px dashed var(--score-3);
   border-radius: 4px;
-}
-/* The toolbar's one pill: "9 to grade · 4 to return · 1 question", with
-   To Grade's tray when work came in. Each part is a count that is also its
-   filter; the one pressed is filled. */
-.gb-work-pill {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  height: var(--control-h);
-  padding: 0 6px 0 10px;
-  border-radius: 16px;
-  background: var(--demo-pill-bg);
-  color: var(--demo-pill-text);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  white-space: nowrap;
-}
-.gb-work-pill:not(:has(.gb-work-camera)) {
-  padding-left: 6px;
-}
-.gb-work-pill .gb-work-camera {
-  margin: 0 2px 0 0;
-  color: inherit;
-}
-.gb-pill-part {
-  height: calc(var(--control-h) - 8px);
-  padding: 0 4px;
-  border: none;
-  border-radius: 12px;
-  background: none;
-  color: inherit;
-  font: inherit;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.gb-pill-part:hover {
-  text-decoration: underline;
-}
-.gb-pill-part.active {
-  padding: 0 8px;
-  background: var(--demo-pill-text);
-  color: var(--demo-pill-bg);
-  text-decoration: none;
-}
-.gb-pill-part:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 1px;
-}
-.gb-work-pill-sep {
-  padding: 0 1px;
 }
 /* Return N Graded under a Competencies header. */
 .gb-return-drafts {

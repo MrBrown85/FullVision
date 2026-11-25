@@ -10,7 +10,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { useFont } from './wide-font.js';
-import { openToolbarMenu } from './helpers.js';
+import { openToolbarMenu, chipsWhole } from './helpers.js';
 
 // The wide stand-in is a style the page's own CSP would refuse.
 test.use({ bypassCSP: true, viewport: { width: 1440, height: 900 } });
@@ -161,6 +161,26 @@ test.describe('layout', () => {
       // A chip is 24px.
       for (const h of await page.locator('.atb-chip').evaluateAll(cs => cs.map(c => c.getBoundingClientRect().height)))
         expect(h === 0 || h === 24).toBe(true);
+    });
+    test(`a chip that does not fit is left off whole, never cut mid-word (${font} font)`, async ({ page }) => {
+      for (const width of [1280, 1440]) {
+        await openDemo(page, width);
+        await useFont(page, font);
+        await page.locator('.atb-filter-btn').click();
+        const items = page.locator('.assess-filter-menu .assess-filter-item:not(.assess-filter-clear)');
+        const n = await items.count();
+        for (let i = 0; i < n; i++) await page.locator('.assess-filter-menu .assess-filter-item').nth(i).click();
+        await page.keyboard.press('Escape');
+        const chips = await chipsWhole(page, '.assess-toolbar .atb-chips');
+        expect(chips).toHaveLength(n);
+        // Every chip on screen shows its full label; the rest are not on the row.
+        for (const c of chips) if (c.on) expect(c, `${width}: ${c.text}`).toMatchObject({ within: true, full: true });
+        if (width === 1280)
+          expect(
+            chips.some(c => !c.on),
+            'some are left off at 1280',
+          ).toBe(true);
+      }
     });
   }
 

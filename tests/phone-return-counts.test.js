@@ -93,7 +93,7 @@ function seed() {
 function gradebook() {
   mount(() => {}, { course: CID });
   showCompetencies();
-  const pill = document.querySelector('.gb-to-return');
+  const pill = document.querySelector('.atb-show [data-show="toreturn"] .atb-badge');
   const out = { pill: pill ? parseInt(pill.textContent, 10) : 0, columns: {}, dashed: {} };
   WORK.forEach(aid => {
     const button = Array.from(document.querySelectorAll('.gb-return-drafts')).find(

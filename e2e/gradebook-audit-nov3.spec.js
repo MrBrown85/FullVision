@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /* Gradebook fixes from the Nov 3 UI audit: headers sit over their own
    columns, the student card fits the window and names the student, its
-   counts don't read like scores, and the Filters button keeps its width.
+   counts don't read like scores, and the Filter button sits inside Search.
    Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -69,11 +69,8 @@ test('turning a filter on leaves the search box where it was', async ({ page }) 
   await openGradebook(page);
   const search = page.locator('.gb-search-input');
   const before = (await search.boundingBox()).x;
-  await page.locator('[data-action="toggleFilterStrip"]').click();
-  await page
-    .locator('.gb-filter-strip button, .gb-filter-strip [role="checkbox"], .gb-filter-strip input')
-    .first()
-    .click();
-  await expect(page.locator('.gb-filter-trigger .filter-count:not(.is-empty)')).toBeVisible();
+  await page.locator('.atb-filter-btn').click();
+  await page.locator('.gbf-panel [role="checkbox"]').first().click();
+  await expect(page.locator('.atb-filter-btn.has-filters')).toBeVisible();
   expect(Math.abs((await search.boundingBox()).x - before)).toBeLessThan(1);
 });

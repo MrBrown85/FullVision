@@ -44,7 +44,6 @@ window.PageGradebook = (function () {
   var searchText = ''; // what the box holds, spaces and capitals as typed
   var _averageStudents = null; // the class's students, for Class Average
   var sortCol = null;
-  var _filterStripOpen = false;
   var _printShownIds = null;
   // Draft and Returned (S1-F1): the "N to return" filter, and the drafts on
   // screen as the last render counted them (null where grades aren't held).
@@ -81,12 +80,6 @@ window.PageGradebook = (function () {
     active.blur();
   }
 
-  /* ── Filter strip toggle ────────────────────────────────── */
-  function toggleFilterStrip() {
-    _filterStripOpen = !_filterStripOpen;
-    var strip = document.getElementById('gb-filter-strip');
-    if (strip) strip.classList.toggle('open', _filterStripOpen);
-  }
   function clearAllFilters() {
     _flushActiveScoreEditor();
     filterCategories = [];
@@ -130,6 +123,25 @@ window.PageGradebook = (function () {
     var idx = filterSections.indexOf(secId);
     if (idx >= 0) filterSections.splice(idx, 1);
     else filterSections.push(secId);
+    render();
+  }
+  // Every competency in a folder on, or all off when all are already on.
+  function toggleFolderFilter(grpId) {
+    _flushActiveScoreEditor();
+    var gi = getGroupedSections(activeCourse).groups.find(function (g) {
+      return g.group.id === grpId;
+    });
+    if (!gi) return;
+    var ids = gi.sections.map(function (sec) {
+      return sec.id;
+    });
+    var all = ids.every(function (id) {
+      return filterSections.includes(id);
+    });
+    filterSections = filterSections.filter(function (id) {
+      return !ids.includes(id);
+    });
+    if (!all) filterSections = filterSections.concat(ids);
     render();
   }
   function toggleCategoryFilter(catId) {
@@ -397,158 +409,14 @@ window.PageGradebook = (function () {
 
     var html = '';
 
-    // ── Toolbar ──
-    var modules = getModules(cid);
-    var activeFilterCount = filterCategories.length + filterSections.length + filterModules.length;
-
-    html += '<div class="page-toolbar gb-toolbar">';
-    var courseOpts = getPickerCourses(activeCourse)
-      .map(function (c) {
-        return (
-          '<option value="' + c.id + '"' + (c.id === activeCourse ? ' selected' : '') + '>' + esc(c.name) + '</option>'
-        );
-      })
-      .join('');
-    html +=
-      '<select class="class-picker gb-course-select" data-action="switchCourse" aria-label="Select course">' +
-      courseOpts +
-      '</select>';
-
-    html +=
-      '<div class="seg gb-seg-control" role="tablist" aria-label="View mode">' +
-      '<button class="seg-btn gb-seg-btn' +
-      (viewMode === 'scores' ? ' active' : '') +
-      '" data-action="setView" data-mode="scores" data-label="Scores" role="tab" aria-selected="' +
-      (viewMode === 'scores') +
-      '">Scores</button>' +
-      '<button class="seg-btn gb-seg-btn' +
-      (viewMode === 'detailed' ? ' active' : '') +
-      '" data-action="setView" data-mode="detailed" data-label="Competencies" role="tab" aria-selected="' +
-      (viewMode === 'detailed') +
-      '">Competencies</button>' +
-      '</div>';
-
-    // The Rubric Columns picker sits in the Competencies corner, beside
-    // Newest First, so the toolbar is the same in both views.
+    // ── Toolbar ── (gradebook-toolbar.js)
+    // The Competencies view's Rubric Columns picker sits in the grid's
+    // corner, beside Newest First, so the toolbar is the same in both views.
     _hasRubricWork = allAssessments.some(function (a) {
       return rubricCriterionColumns(a, cid).length > 0;
     });
-
-    html +=
-      '<button class="gb-filter-trigger' +
-      (activeFilterCount > 0 ? ' has-filters' : '') +
-      '" data-action="toggleFilterStrip" aria-expanded="' +
-      _filterStripOpen +
-      '" aria-label="Toggle filters' +
-      (activeFilterCount > 0 ? ', ' + activeFilterCount + ' active' : '') +
-      '">' +
-      '<span class="filter-icon" aria-hidden="true">☰</span> Filters' +
-      // The count's place is kept when there is none, so turning a filter
-      // on doesn't push the search box along.
-      (activeFilterCount > 0
-        ? ' <span class="filter-count">' + activeFilterCount + '</span>'
-        : ' <span class="filter-count is-empty" aria-hidden="true">0</span>') +
-      '</button>';
-
-    html +=
-      '<div class="gb-search-wrap"><span class="gb-search-icon">' +
-      LINE_ICONS.search +
-      '</span><input class="gb-search-input" type="text" placeholder="Search…" value="' +
-      esc(searchText) +
-      '" data-action-input="gbSearch" aria-label="Search students">' +
-      (searchText
-        ? '<button type="button" class="gb-search-clear" data-action="clearSearch" aria-label="Clear search" title="Clear search">\u00D7</button>'
-        : '') +
-      '</div>';
-
-    if (filterStudentIds.length) {
-      html +=
-        '<button class="gb-student-filter" data-action="clearStudentFilter" aria-label="Show all students">Showing ' +
-        filterStudentIds.length +
-        ' Student' +
-        (filterStudentIds.length === 1 ? '' : 's') +
-        ' <span aria-hidden="true">\u00D7</span></button>';
-    }
-
-    html += _workPill();
-
-    html +=
-      '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
-      '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV" aria-label="Export">\u2913<span class="gb-tb-text"> Export</span></button>' +
-      '<button class="tb-action-btn tb-action-secondary" data-action="printGrades" aria-label="Print Grades" title="Print Grades"><span class="gb-tb-icon" aria-hidden="true">' +
-      LINE_ICONS.print +
-      '</span><span class="gb-tb-text">Print Grades</span></button>' +
-      '<a class="tb-action-btn" role="link" tabindex="0" data-href="/assignments?course=' +
-      activeCourse +
-      '&new=1">+ New Assessment</a>' +
-      '</div>';
-    html += '</div>';
+    html += GradebookToolbar.html(_toolbarState(cid));
     var toolbarEnd = html.length;
-
-    // ── Filter strip ──
-    html += '<div class="gb-filter-strip' + (_filterStripOpen ? ' open' : '') + '" id="gb-filter-strip">';
-    var sortedCategories = _getSortedCategories(cid);
-    if (sortedCategories.length > 0) {
-      html += '<span class="gb-filter-strip-label">Category</span><div class="gb-filter-strip-group">';
-      sortedCategories.forEach(function (cat, i) {
-        var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
-        var isActive = filterCategories.indexOf(cat.id) >= 0;
-        html +=
-          '<button class="gb-filter-chip' +
-          (isActive ? ' active' : '') +
-          '" data-action="toggleCategoryFilter" data-catid="' +
-          esc(cat.id) +
-          '"><span class="chip-dot" style="background:' +
-          t.fg +
-          '"></span>' +
-          esc(cat.name) +
-          '</button>';
-      });
-      html += '</div>';
-    }
-
-    html +=
-      (sortedCategories.length > 0 ? '<div class="gb-filter-strip-divider"></div>' : '') +
-      '<span class="gb-filter-strip-label">Competencies</span><div class="gb-filter-strip-group">';
-    sections.forEach(function (sec) {
-      var isActive = filterSections.includes(sec.id);
-      html +=
-        '<button class="gb-filter-chip' +
-        (isActive ? ' active' : '') +
-        '" data-action="toggleSectionFilter" data-secid="' +
-        sec.id +
-        '"><span class="chip-dot" style="background:' +
-        cssColor(sec.color) +
-        '"></span>' +
-        esc(sec.shortName || sec.name) +
-        '</button>';
-    });
-    html += '</div>';
-
-    if (modules.length > 0) {
-      html +=
-        '<div class="gb-filter-strip-divider"></div><span class="gb-filter-strip-label">Modules</span><div class="gb-filter-strip-group">';
-      modules.forEach(function (u) {
-        var isActive = filterModules.includes(u.id);
-        html +=
-          '<button class="gb-filter-chip' +
-          (isActive ? ' active' : '') +
-          '" data-action="toggleModuleFilter" data-moduleid="' +
-          u.id +
-          '"><span class="chip-dot" style="background:' +
-          cssColor(u.color) +
-          '"></span>' +
-          esc(u.name) +
-          '</button>';
-      });
-      html += '</div>';
-    }
-
-    if (activeFilterCount > 0) {
-      html += '<button class="gb-filter-clear" data-action="clearAllFilters">Clear All</button>';
-    }
-    html += '</div>';
-    var stripEnd = html.length;
 
     // ── Table ──
     var empty = _emptyState(cid, everyAssessment, allAssessments, assessments, students);
@@ -563,8 +431,36 @@ window.PageGradebook = (function () {
     _parts.view = viewMode;
     _parts.html = html;
     _parts.toolbar = html.slice(0, toolbarEnd);
-    _parts.frame = viewMode + html.slice(toolbarEnd, stripEnd) + (empty || _parts.head + key);
+    _parts.frame = viewMode + (empty || _parts.head + key);
     return _parts;
+  }
+
+  /* What the toolbar draws (gradebook-toolbar.js): Show's choice and the
+     counts on its options, and the filters. */
+  function _showState() {
+    return {
+      show: _toGradeOnly ? 'tograde' : _toReturnOnly ? 'toreturn' : _questionsOnly ? 'questions' : 'all',
+      avail: !!(_work || _drafts || _questions),
+      counts: {
+        tograde: _work ? _work.total : 0,
+        toreturn: _drafts ? _drafts.total : 0,
+        questions: _questions ? _questions.total : 0,
+      },
+    };
+  }
+  function _toolbarState(cid) {
+    return Object.assign(_showState(), {
+      cid: cid,
+      courses: getPickerCourses(activeCourse),
+      view: viewMode,
+      search: searchText,
+      students: filterStudentIds.length,
+      cats: _getSortedCategories(cid).map(function (cat, i) {
+        var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
+        return { id: cat.id, name: cat.name, color: t.fg };
+      }),
+      filters: { cats: filterCategories, secs: filterSections, mods: filterModules },
+    });
   }
 
   /* Write a draw (_build) to the page. */
@@ -588,6 +484,7 @@ window.PageGradebook = (function () {
     var refocusHeadAid = refocusHead ? refocusHead.dataset.aid : null;
     // html-safe: names, titles and category/section/module names are escaped; colours go through cssColor; grades come from calc.js.
     document.getElementById('main').innerHTML = html;
+    GradebookToolbar.afterDraw();
     initScrollShadows();
     initGridScrollSync();
     if (keepScroll) restoreGridScroll(keepScroll);
@@ -1029,82 +926,6 @@ window.PageGradebook = (function () {
   function _askedOn(r) {
     var at = r.follow_up && !r.follow_up_answer ? r.sense_now_at || r.sent_at : r.sent_at;
     return at ? formatShortDate(String(at).slice(0, 10)) : '';
-  }
-
-  /* The toolbar's one pill (the board "Gradebook With Submissions"):
-     "9 to grade · 4 to return · 1 question", with To Grade's tray when work
-     came in. Each part is still its own filter; '' when all are 0. */
-  // html-safe: the parts are numbers and fixed words; the tray is our icon
-  function _workPill() {
-    var parts = [_toGradeButton(), _toReturnButton(), _questionsButton()].filter(Boolean);
-    if (!parts.length) return '';
-    return (
-      '<span class="gb-work-pill">' +
-      (_work && _work.total ? '<span class="gb-work-camera">' + WORK_TRAY + '</span>' : '') +
-      parts.join('<span class="gb-work-pill-sep" aria-hidden="true">·</span>') +
-      '</span>'
-    );
-  }
-
-  // html-safe: a number and fixed words
-  function _questionsButton() {
-    if (!_questions || !_questions.total) return '';
-    return (
-      '<button type="button" class="gb-pill-part gb-questions-btn' +
-      (_questionsOnly ? ' active' : '') +
-      '" data-action="toggleQuestions" aria-pressed="' +
-      _questionsOnly +
-      '" title="' +
-      (_questionsOnly
-        ? 'Showing only the work with a question waiting. Click to show everything.'
-        : 'Show only the students and assessments with a question waiting for you.') +
-      '">' +
-      _questions.total +
-      (_questions.total === 1 ? ' question' : ' questions') +
-      (_questionsOnly ? ' <span aria-hidden="true">×</span>' : '') +
-      '</button>'
-    );
-  }
-
-  // html-safe: a number and fixed words
-  function _toGradeButton() {
-    if (!_work || !_work.total) return '';
-    return (
-      '<button type="button" class="gb-pill-part gb-to-grade-btn' +
-      (_toGradeOnly ? ' active' : '') +
-      '" data-action="toggleToGrade" aria-pressed="' +
-      _toGradeOnly +
-      '" title="' +
-      (_toGradeOnly
-        ? 'Showing only the work waiting to grade. Click to show everything.'
-        : 'Show only the students and assessments with work waiting to grade.') +
-      '">' +
-      _work.total +
-      ' to grade' +
-      (_toGradeOnly ? ' <span aria-hidden="true">×</span>' : '') +
-      '</button>'
-    );
-  }
-
-  /* The toolbar's "N to return": the drafts on screen, summed over the
-     columns. Pressed, it is the filter; nothing is drawn when N is 0. */
-  function _toReturnButton() {
-    if (!_drafts || !_drafts.total) return '';
-    return (
-      '<button type="button" class="gb-pill-part gb-to-return' +
-      (_toReturnOnly ? ' active' : '') +
-      '" data-action="toggleToReturn" aria-pressed="' +
-      _toReturnOnly +
-      '" title="' +
-      (_toReturnOnly
-        ? 'Showing only the drafts to return. Click to show everything.'
-        : 'Show only the students and assessments with a draft to return.') +
-      '">' +
-      _drafts.total +
-      ' to return' +
-      (_toReturnOnly ? ' <span aria-hidden="true">\u00d7</span>' : '') +
-      '</button>'
-    );
   }
 
   // The student ids of the rows on screen, top to bottom.
@@ -2100,11 +1921,26 @@ window.PageGradebook = (function () {
       .join('');
     var basisRow = _basisRow(cid, s.id);
     _nameTipHtml[s.id] = GradebookChrome.nameTip(cid, s, sections);
+    // What this student has waiting, for Show's point to preview (gradebook.css).
+    var has = [
+      ['tograde', _work],
+      ['toreturn', _drafts],
+      ['questions', _questions],
+    ]
+      .filter(function (k) {
+        return k[1] && k[1].bySid[s.id];
+      })
+      .map(function (k) {
+        return k[0];
+      })
+      .join(' ');
     return (
       '<div class="gb-grid-rowhead' +
       altClass +
       (basisRow ? ' gb-row-basis' : '') +
-      '">' +
+      '"' +
+      (has ? ' data-has="' + has + '"' : '') +
+      '>' +
       _rowheadNameOpen(cid, s) +
       esc(displayName(s)) +
       desTags +
@@ -2425,7 +2261,7 @@ window.PageGradebook = (function () {
     });
     var trs = data.querySelectorAll('tr');
     if (!a || trs.length !== d.sids.length + 1 || heads.children.length !== d.sids.length + 1) return null;
-    var pill = _workPill();
+    var show = GradebookToolbar.showHtml(_showState());
     var button = _returnDraftsButton(cid, a);
     GradebookChrome.recountPiece(_drafts, _work, cid, a, d.ids);
     d.t.scores = getScores(cid);
@@ -2458,9 +2294,17 @@ window.PageGradebook = (function () {
     d.stats = null;
     var statsHead = _statsHead(cid, d.view);
     if (statsHead !== d.statsHead) _put(heads.lastElementChild, (d.statsHead = statsHead));
-    if (_workPill() !== pill) {
-      var bar = document.querySelector('#main > .gb-toolbar');
-      if (bar) GradebookChrome.swapHtml(bar.querySelector('.gb-work-pill'), _workPill(), bar.lastElementChild);
+    // The counts on Show follow in place; an option that comes or goes redraws the bar's Show.
+    if (GradebookToolbar.showHtml(_showState()) !== show) {
+      if (!GradebookToolbar.syncShow(_showState())) {
+        var bar = document.querySelector('#main > .gb-toolbar');
+        if (bar)
+          GradebookChrome.swapHtml(
+            bar.querySelector('.atb-show'),
+            GradebookToolbar.showHtml(_showState()),
+            bar.querySelector('.atb-chips, .atb-end'),
+          );
+      }
       d.toolbar = null;
     }
     if (d.view === 'detailed' && _returnDraftsButton(cid, a) !== button) {
@@ -3795,6 +3639,8 @@ window.PageGradebook = (function () {
 
   function _handleKeydown(e) {
     if (_graderOpen()) return;
+    // The filter panel's and ⋯'s keys: Escape, the arrows.
+    if (GradebookToolbar.keydown(e)) return;
     // Escape closes a tooltip first (WCAG 1.4.13: dismissible without moving).
     if (e.key === 'Escape' && _tipSource) _hideTip();
     // Escape in the search box clears it; the box keeps the focus.
@@ -4317,6 +4163,9 @@ window.PageGradebook = (function () {
       });
     }
 
+    // The toolbar's own: the filter panel, a folder in it, the ⋯ menu.
+    if (GradebookToolbar.click(e)) return;
+
     // A click on a slanted column title opens its menu, after the
     // double-click time so a double-click (Score Mode) doesn't also open it.
     if (_inSlantedHeads(e.target)) {
@@ -4351,51 +4200,56 @@ window.PageGradebook = (function () {
         setView(el.dataset.mode);
       },
       toggleNewestFirst: toggleNewestFirst,
-      toggleFilterStrip: function () {
-        toggleFilterStrip();
-      },
       clearStudentFilter: function () {
         filterStudentIds = [];
         // Drop ?students= from the address so a reload shows everyone too.
         Router.setUrl('/gradebook?course=' + activeCourse);
         render();
       },
+      // A filter changed: the page draws again, and the keyboard stays on its row.
       toggleCategoryFilter: function () {
+        var back = GradebookToolbar.keep(el);
         toggleCategoryFilter(el.dataset.catid);
+        back();
       },
       toggleSectionFilter: function () {
+        var back = GradebookToolbar.keep(el);
         toggleSectionFilter(el.dataset.secid);
+        back();
+      },
+      // A folder's box ticks every competency in it, or lets them all go once all are ticked.
+      toggleFolderFilter: function () {
+        var back = GradebookToolbar.keep(el);
+        toggleFolderFilter(el.dataset.grpid);
+        back();
       },
       toggleModuleFilter: function () {
+        var back = GradebookToolbar.keep(el);
         toggleModuleFilter(el.dataset.moduleid);
+        back();
       },
       clearAllFilters: function () {
+        var back = GradebookToolbar.keep(el);
         clearAllFilters();
+        back();
       },
       clearSearch: function () {
         onSearch('', 0);
       },
-      // Draft and Returned (S1-F1). The button is redrawn with the page, so
-      // the new one takes the focus.
-      toggleToGrade: function () {
+      // Show: All, To Grade, To Return (S1-F1) or Questions, one at a time; the pressed
+      // one clicked again, or All, shows everything. The bar is redrawn with the
+      // page, so the new button takes the focus.
+      setShow: function () {
         _flushActiveScoreEditor();
-        _toGradeOnly = !_toGradeOnly;
+        var show = el.dataset.show;
+        var was = _showState().show;
+        _toGradeOnly = show === 'tograde' && was !== show;
+        _toReturnOnly = show === 'toreturn' && was !== show;
+        _questionsOnly = show === 'questions' && was !== show;
         render();
-        var again = document.querySelector('.gb-to-grade-btn');
-        if (again) again.focus({ preventScroll: true });
-      },
-      toggleQuestions: function () {
-        _flushActiveScoreEditor();
-        _questionsOnly = !_questionsOnly;
-        render();
-        var again = document.querySelector('.gb-questions-btn');
-        if (again) again.focus({ preventScroll: true });
-      },
-      toggleToReturn: function () {
-        _flushActiveScoreEditor();
-        _toReturnOnly = !_toReturnOnly;
-        render();
-        var again = document.querySelector('.gb-to-return');
+        var again =
+          document.querySelector('.atb-show [data-show="' + show + '"]') ||
+          document.querySelector('.atb-show [data-show="all"]');
         if (again) again.focus({ preventScroll: true });
       },
       // A Competencies header's Return N Graded.
@@ -4481,7 +4335,7 @@ window.PageGradebook = (function () {
     searchQuery = '';
     searchText = '';
     sortCol = null;
-    _filterStripOpen = false;
+    GradebookToolbar.reset();
     _scrollKey = null;
     _tipSource = null;
 

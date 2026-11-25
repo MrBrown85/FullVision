@@ -48,7 +48,7 @@ test('Reflect on Feedback off: no question anywhere', async ({ page }) => {
   await expect(page.locator('#dash-questions')).toHaveCount(0);
   await gradebook(page);
   await expect(page.locator('.gb-question')).toHaveCount(0);
-  await expect(page.locator('.gb-questions-btn')).toHaveCount(0);
+  await expect(page.locator('.atb-show [data-show="questions"]')).toHaveCount(0);
   await page.goto('/student?id=' + JORDAN + '&course=' + cid + '&tab=profile');
   await expect(page.locator('.lp-layout')).toBeVisible();
   await expect(page.locator('#lp-feedback')).toHaveCount(0);
@@ -82,7 +82,7 @@ test('a question shows in three places and one answer clears all three', async (
   await cell.scrollIntoViewIfNeeded();
   await expect(cell.locator('.gb-question')).toHaveCount(1);
   await expect(cell).toHaveAttribute('title', /^Asked you a question /);
-  await expect(page.locator('.gb-questions-btn')).toHaveText('1 question');
+  await expect(page.locator('.atb-show [data-show="questions"]').locator('.atb-badge')).toHaveText('1');
   await shot(page, 'S10-F4-gradebook-question-1366');
 
   // The Learner Profile.
@@ -108,7 +108,7 @@ test('a question shows in three places and one answer clears all three', async (
 
   await gradebook(page);
   await expect(page.locator('.gb-scores-cell .gb-question')).toHaveCount(0);
-  await expect(page.locator('.gb-questions-btn')).toHaveCount(0);
+  await expect(page.locator('.atb-show [data-show="questions"]')).toHaveCount(0);
   await page.goto('/dashboard');
   await expect(page.locator('.dash-glance')).toBeVisible();
   await expect(page.locator('#dash-questions')).toHaveCount(0);

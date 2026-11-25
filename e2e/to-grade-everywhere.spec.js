@@ -59,7 +59,7 @@ test('Send Work off: no To Grade anywhere', async ({ page }) => {
   await expect(page.locator('.dash-glance-tograde')).toHaveCount(0);
   await page.goto('/gradebook');
   await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
-  await expect(page.locator('.gb-to-grade-btn')).toHaveCount(0);
+  await expect(page.locator('.atb-show [data-show="tograde"]')).toHaveCount(0);
 });
 
 test('the dashboard, the gradebook and Assignments give the same number', async ({ page }) => {
@@ -77,7 +77,7 @@ test('the dashboard, the gradebook and Assignments give the same number', async 
 
   await page.goto('/gradebook');
   await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
-  await expect(page.locator('.gb-to-grade-btn')).toHaveText(/^2 to grade/);
+  await expect(page.locator('.atb-show [data-show="tograde"]')).toHaveText(/^To Grade\s*2$/);
   const waiting = page.locator('.gb-scores-cell[data-aid="' + LAB + '"] .gb-to-grade');
   await expect(waiting).toHaveCount(2);
   await shot(page, 'S6-F4-gradebook-to-grade-1366');

@@ -1580,3 +1580,22 @@ export async function closeCompPicker(page) {
   if (await dlg.isVisible()) await dlg.locator('[data-action="closeCompPicker"]').click();
   await dlg.waitFor({ state: 'hidden' });
 }
+
+/* The chips on a bar: each is on the row and whole, or off it. A chip that is
+   on the row shows its full label; one that does not fit is left off whole. */
+export async function chipsWhole(page, rowSelector) {
+  return page.evaluate(sel => {
+    const row = document.querySelector(sel);
+    const r = row.getBoundingClientRect();
+    return [...row.querySelectorAll('.atb-chip')].map(c => {
+      const b = c.getBoundingClientRect();
+      const label = c.querySelector('.atb-chip-label');
+      return {
+        text: label.textContent,
+        on: b.top < r.bottom - 1 && b.bottom > r.top + 1,
+        within: b.left >= r.left - 0.5 && b.right <= r.right + 0.5,
+        full: label.scrollWidth <= label.clientWidth + 0.5 && c.scrollWidth <= c.clientWidth + 0.5,
+      };
+    });
+  }, rowSelector);
+}

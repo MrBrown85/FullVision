@@ -181,7 +181,7 @@ function dashboard() {
 
 function gradebook() {
   mount(() => seed(), { course: CID });
-  const n = parseInt(text(document.querySelector('.gb-to-grade-btn')), 10);
+  const n = parseInt(text(document.querySelector('.atb-show [data-show="tograde"] .atb-badge')), 10);
   unmount();
   return n;
 }

@@ -229,7 +229,7 @@ describe.each(CLASSES)('in %s, one score draws only its student again', (_, conf
   it('a first grade on held work adds a draft: "N to return" and Return N Graded follow', () => {
     open(config);
     showCompetencies();
-    const pill = () => document.querySelector('.gb-to-return');
+    const pill = () => document.querySelector('.atb-show [data-show="toreturn"] .atb-badge');
     const was = pill() ? pill().textContent : '';
     key(select(compCell(ESSAY, DEV, PLAN)), '3');
     if (config.return_grades) expect(pill().textContent).not.toBe(was);
@@ -239,10 +239,10 @@ describe.each(CLASSES)('in %s, one score draws only its student again', (_, conf
   it('a grade on sent work takes it off "N to grade"', () => {
     open(config);
     showCompetencies();
-    const toGrade = () => document.querySelector('.gb-to-grade-btn');
+    const toGrade = () => document.querySelector('.atb-show [data-show="tograde"]');
     // Send Work shows only with the student page on.
     const on = !!config.student_page_enabled;
-    expect(on ? toGrade().textContent : toGrade()).toBe(on ? '1 to grade' : null);
+    expect(on ? toGrade().querySelector('.atb-badge').textContent : toGrade()).toBe(on ? '1' : null);
     key(select(compCell(QUIZ, DEV)), '6');
     const box = document.querySelector('.gb-pts-input');
     box.value = '6';
