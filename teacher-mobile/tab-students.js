@@ -1,4 +1,4 @@
-/* m-students.js — Feature 1: Student Quick-Look */
+/* tab-students.js — the Students tab: the card stack, the All Students sheet and the profile */
 
 window.MStudents = (function () {
   'use strict';
@@ -33,29 +33,6 @@ window.MStudents = (function () {
     });
   }
 
-  /* ── Rich Student Card (for card stack) ───────────────────── */
-  // html-safe: MCardWidgets.assembleCard escapes every name and text and passes colours through cssColor.
-  function _renderStudentCard(st, cid, data) {
-    return MCardWidgets.assembleCard(st, cid, data);
-  }
-
-  /* The term whose questionnaire answers the cards show: the one the desktop
-     Reports page opens on. The term holding today, else the last one begun,
-     else the first; Report 1 for a class with no terms. */
-  function _cardTermId(cid) {
-    var terms = getReportingTerms(cid);
-    var today = courseToday(cid);
-    var pick =
-      reportingTermOn(cid, today) ||
-      terms
-        .filter(function (t) {
-          return t.starts_on <= today;
-        })
-        .pop() ||
-      terms[0];
-    return 'term-' + (pick ? pick.ordinal : 1);
-  }
-
   /* ── Init card stack after DOM render ─────────────────────── */
   var _stackInstance = null;
 
@@ -69,21 +46,10 @@ window.MStudents = (function () {
     students = sortStudents(students, _sortMode, cid);
     if (!students.length) return;
 
-    var sections = getSections(cid);
-    var allStatuses = getAssignmentStatuses(cid);
-    var allAssessments = getAssignedAssessments(cid);
-    var data = {
-      sections: sections,
-      statuses: allStatuses,
-      assessments: allAssessments,
-      termId: _cardTermId(cid),
-      widgetConfig: getCardWidgetConfig(),
-    };
-
     _stackInstance = MCardStack.create(container, students, {
       counterEl: document.getElementById('m-student-card-count'),
       renderCard: function (st) {
-        return _renderStudentCard(st, cid, data);
+        return MStudentCard.render(st, cid);
       },
       onTap: function () {
         /* taps handled by data-action delegation */
@@ -105,7 +71,7 @@ window.MStudents = (function () {
   }
   function _watchMoreBelow(container) {
     var check = function () {
-      container.querySelectorAll('.m-scard-widgets').forEach(_markMoreBelow);
+      container.querySelectorAll('.m-sc-scroll').forEach(_markMoreBelow);
     };
     requestAnimationFrame(check);
     if (_moreObserver) _moreObserver.disconnect();
@@ -121,7 +87,7 @@ window.MStudents = (function () {
         'scroll',
         function (e) {
           var box = e.target;
-          if (box && box.classList && box.classList.contains('m-scard-widgets')) _markMoreBelow(box);
+          if (box && box.classList && box.classList.contains('m-sc-scroll')) _markMoreBelow(box);
         },
         true,
       );

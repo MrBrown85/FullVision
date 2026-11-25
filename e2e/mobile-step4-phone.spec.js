@@ -138,9 +138,7 @@ test('sheet filters are not narrowed by Recent', async ({ page }) => {
     const cid = getActiveCourse();
     const cat = JSON.parse(localStorage.getItem('gb-grade-filters-' + cid)).category[0];
     const want = getAssessments(cid).filter(a => (a.categoryId || '__none') === cat).length;
-    const shown = [...document.querySelectorAll('#m-grade-list .m-cell')].filter(
-      c => c.style.display !== 'none',
-    ).length;
+    const shown = [...document.querySelectorAll('#m-grade-list .m-tg-row')].filter(c => !c.hidden).length;
     return { want, shown };
   });
   expect(counts.shown).toBe(counts.want);
@@ -161,9 +159,9 @@ test('Grade list titles are not cut by the category', async ({ page }) => {
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('[data-action="m-grade-seg"][data-val="all"]').click();
   const cut = await page.evaluate(() =>
-    [...document.querySelectorAll('#m-grade-list .m-cell')]
-      .filter(c => c.style.display !== 'none')
-      .map(c => c.querySelector('.m-cell-title'))
+    [...document.querySelectorAll('#m-grade-list .m-tg-row')]
+      .filter(c => !c.hidden)
+      .map(c => c.querySelector('.m-tg-title'))
       .filter(t => t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1)
       .map(t => t.textContent),
   );
@@ -220,7 +218,7 @@ test('Grade tab uses the desktop words', async ({ page }) => {
   await openPhone(page);
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('[data-action="m-grade-seg"][data-val="all"]').click();
-  const subs = await page.locator('#m-grade-list .m-cell-subtitle').allTextContents();
+  const subs = await page.locator('#m-grade-list .m-tg-line').allTextContents();
   expect(subs.join(' ')).toMatch(/competenc/);
   expect(subs.join(' ')).not.toMatch(/\btags?\b/);
 
@@ -234,36 +232,36 @@ test('Grade tab uses the desktop words', async ({ page }) => {
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   await page.waitForTimeout(500);
   const card = page.locator('.m-swiper-card').first();
-  await expect(card.locator('.m-status-pill')).toHaveText(['Missing', 'Excused', 'Late']);
-  await expect(card.locator('.m-score-btn[data-score="3"] .m-level-word').first()).toHaveText('Proficient');
+  // Late, Missing and Excused are spelled out, under ⋯.
+  await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+  await expect(page.locator('#m-sheet-container .m-more-sheet .m-status-pill')).toHaveText([
+    'Late',
+    'Missing',
+    'Excused',
+  ]);
+  // The hint shows exactly when Missing can't be picked.
+  const ns = page.locator('#m-sheet-container .m-status-pill[data-val="NS"]');
+  const locked = await ns.isDisabled();
+  await expect(page.locator('#m-sheet-container .m-more-hint')).toHaveCount(locked ? 1 : 0);
+  await page.evaluate(() => MComponents.dismissSheet());
+  // The level words stay out of the track (its codes), and are read out whole.
   await expect(card.locator('.m-score-btn[data-score="3"]').first()).toHaveAttribute(
     'aria-label',
     /^3[+\u2212]?, Proficient$/,
   );
+  await expect(card.locator('.m-score-btn[data-score="3"]').first()).toHaveText(/^PRF/);
 
-  // Each card's hint shows exactly when Missing can't be picked.
-  const hints = await page.evaluate(() =>
-    [...document.querySelectorAll('.m-swiper-card')].map(c => {
-      const ns = c.querySelector('.m-status-pill[data-val="NS"]');
-      const hint = c.querySelector('.m-status-hint');
-      return ns && hint ? ns.disabled === !hint.hidden : true;
-    }),
-  );
-  expect(hints.every(Boolean)).toBe(true);
-
-  // Excused, chosen, is grey like the desktop grader, not Missing's red.
+  // Excused, set, is grey like the desktop grader, not Missing's red.
   const [excBg, nsBg] = await page.evaluate(() => {
-    const row = document.querySelector('.m-swiper-card .m-status-row');
-    const probe = val => {
-      const b = document.createElement('button');
-      b.className = 'm-status-pill m-status-active';
-      b.dataset.val = val;
-      row.appendChild(b);
-      const bg = getComputedStyle(b).backgroundColor;
-      b.remove();
+    const probe = kind => {
+      const s = document.createElement('span');
+      s.className = 'm-grade-chip m-grade-chip-' + kind;
+      document.body.appendChild(s);
+      const bg = getComputedStyle(s).backgroundColor;
+      s.remove();
       return bg;
     };
-    return [probe('EXC'), probe('NS')];
+    return [probe('exc'), probe('ns')];
   });
   expect(excBg).not.toBe(nsBg);
 });
@@ -326,7 +324,7 @@ test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
 
   // Dragged from the level, not the name (a button, which a mouse press never drags).
   const box = await page.locator('.m-card-stack-item[data-depth="0"]').boundingBox();
-  const lv = await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-level').boundingBox();
+  const lv = await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-level').boundingBox();
   const y = lv.y + lv.height / 2;
   await page.mouse.move(box.x + box.width - 40, y);
   await page.mouse.down();
@@ -338,14 +336,14 @@ test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('[data-action="m-grade-assess"]', { hasText: 'Data Reading Quiz' }).first().click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-  const thumb = page.locator('#m-thumb-strip .m-thumb').first();
-  await expect(thumb).toHaveJSProperty('tagName', 'BUTTON'); // drawn as the progress line, in an inert strip
+  // The progress line is a line, not a row of buttons; the class list is how a name is reached.
+  await expect(page.locator('#m-grade-progress .m-prog-seg').first()).toHaveJSProperty('tagName', 'SPAN');
+  await expect(page.locator('#m-grade-progress button')).toHaveCount(0);
   const name = await page.evaluate(() => {
     const cid = getActiveCourse();
-    const sid = document.querySelector('#m-thumb-strip .m-thumb').dataset.sid;
+    const sid = document.querySelector('#m-grade-progress .m-prog-seg').dataset.sid;
     return displayNameWithLast(getStudents(cid).find(s => s.id === sid));
   });
-  await expect(thumb).toHaveAttribute('aria-label', name);
   await expect(page.locator('.m-pts-input').first()).toHaveAttribute('aria-label', new RegExp('^Points for ' + name));
   await page
     .locator('body')
@@ -377,7 +375,7 @@ test('phone controls are finger-sized', async ({ page }) => {
   await openPhone(page);
   await expect(page.locator('.m-tabbar-demo').first()).toBeInViewport();
   expect(await page.evaluate(small)).toEqual([]);
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   await page.waitForTimeout(500);
   expect(await page.evaluate(small)).toEqual([]);
   await page.locator('[data-action="m-back"]').first().click();
@@ -410,7 +408,7 @@ test('Observe starters say Post and can be undone', async ({ page }) => {
 test('student card says when more rows are below', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 560 }); // so the card's list runs past its bottom
   await openPhone(page);
-  const box = page.locator('.m-card-stack-item[data-depth="0"] .m-scard-widgets');
+  const box = page.locator('.m-card-stack-item[data-depth="0"] .m-sc-scroll');
   await expect(box).toHaveClass(/m-more-below/);
   const cue = await box.evaluate(el => getComputedStyle(el, '::after').content);
   expect(cue).toContain('More Below');
@@ -436,7 +434,7 @@ test('phone titles, chips and sparklines are not cut', async ({ page }) => {
     st[1].lastName = st[0].lastName;
   }, long);
 
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   await page.locator('#m-screen-student-detail summary', { hasText: 'All Work' }).click();
   await page.locator('#m-screen-student-detail summary', { hasText: 'Competencies' }).click();
   const cutRows = await page.evaluate(() =>
@@ -466,15 +464,17 @@ test('phone titles, chips and sparklines are not cut', async ({ page }) => {
     return el.scrollHeight <= el.clientHeight + 1 && r.top >= bar.top - 0.5 && r.bottom <= bar.bottom + 0.5;
   });
   expect(fits).toBe(true);
-  const chips = await page.locator('#m-thumb-strip .m-thumb').allTextContents();
-  expect(new Set(chips).size).toBe(chips.length);
+  // Each name on the class list is its own: two students who share initials are told apart by name.
+  await title.locator('.m-nav-title-text').click();
+  const names = await page.locator('#m-sheet-container .m-roster-row').allTextContents();
+  expect(new Set(names).size).toBe(names.length);
 });
 
 // Group 3 #78: an assessment row on the student screen opens that
 // assessment on that student; the Grade button says which piece it opens.
 test('student screen assessment rows open their grading', async ({ page }) => {
   await openPhone(page);
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   // All Work opens in place on the profile.
   await page.locator('#m-screen-student-detail summary', { hasText: 'All Work' }).click();
   const row = page.locator('#m-screen-student-detail .m-assess-compact[data-action="m-assess-grade"]').nth(2);
@@ -484,7 +484,7 @@ test('student screen assessment rows open their grading', async ({ page }) => {
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   await expect(page.locator('#m-screen-grade-swiper')).toHaveAttribute('data-restore', new RegExp(aid));
   await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-title-text')).toHaveText(name);
-  await expect(page.locator('#m-thumb-strip .m-thumb-current')).toHaveAttribute('data-sid', sid);
+  await expect(page.locator('#m-grade-progress .is-current')).toHaveAttribute('data-sid', sid);
   await page.locator('[data-action="m-back"]').first().click();
-  await expect(page.locator('#m-screen-student-detail .m-sl-id-name')).toHaveText(name);
+  await expect(page.locator('#m-screen-student-detail .m-sp-name')).toHaveText(name);
 });

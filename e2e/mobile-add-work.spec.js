@@ -64,7 +64,7 @@ async function openLab(page) {
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await expect(page.locator('#m-screen-grade-picker')).toBeVisible();
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
 }
 
@@ -88,9 +88,9 @@ test('Add Work from a not-in card: a photo, Save and Next, then the work is on t
   const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
   const add = card.locator('[data-action="m-add-work"]');
   await expect(add).toBeInViewport();
-  await expect(card.locator('.m-work-add-hint')).toHaveText(
-    'Photos or PDFs. Photos are made smaller before they upload.',
-  );
+  await expect(card.locator('.m-work-notin-title')).toHaveText('Nothing Handed In');
+  // No line about photo sizes under it.
+  await expect(card.locator('.m-work-add-hint')).toHaveCount(0);
   await shot(page, 'S7-F3-add-work-for-student');
 
   await add.click();
@@ -127,9 +127,7 @@ test('Add Work from a not-in card: a photo, Save and Next, then the work is on t
   await expect(card.locator('.m-work-page img')).toHaveAttribute('src', /^blob:/);
 });
 
-test('the student card’s To Grade list, View Profile’s, the red count, and Add Work, Then Grade It', async ({
-  page,
-}) => {
+test('the student card’s To Grade list, the red count, and Add Work, Then Grade It', async ({ page }) => {
   await openPhone(page, { clear: ['st2'] });
   const badge = page.locator('.m-tab-item[data-tab="grade"] .m-tab-badge');
   await expect(badge).toHaveText('1');
@@ -149,34 +147,36 @@ test('the student card’s To Grade list, View Profile’s, the red count, and A
   await expect(list).toBeInViewport();
   await shot(page, 'S7-F4-student-card-to-grade');
 
-  await top.locator('.m-sl-profile').click();
-  const detail = page.locator('#m-screen-student-detail');
-  await expect(detail.locator('.m-scard-tograde .m-scard-return-head')).toHaveText('To Grade');
-  await shot(page, 'S7-F4-view-profile-to-grade');
+  // To Grade is the card's: the profile does not carry it.
+  await top.locator('.m-sc-profile').click();
+  await expect(page.locator('#m-screen-student-detail .m-sp-name')).toBeVisible();
+  await expect(page.locator('#m-screen-student-detail .m-scard-tograde')).toHaveCount(0);
+  // The screen under goes once the slide is done; Back before that would leave it hidden.
+  await expect(page.locator('#m-screen-students-list')).toBeHidden();
+  await page.locator('#m-screen-student-detail .m-nav-bar-back').click();
 
   // Grade opens the grader on Noor's work only, a tab for each piece, the lab first.
-  const pieces = await detail.locator('.m-scard-tograde-row').count();
-  await detail.locator('.m-scard-tograde-row[data-action="m-assess-grade"][data-aid="' + LAB + '"]').click();
+  const pieces = await list.locator('.m-scard-tograde-row').count();
+  await list.locator('.m-scard-tograde-row[data-action="m-assess-grade"][data-aid="' + LAB + '"]').click();
   const grader = page.locator('#m-screen-grade-swiper');
   await expect(grader).toBeVisible();
   const noor = await fullName(page, 'st2');
   const first = noor.split(' ')[0];
-  await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back')).toHaveText(first);
+  // Back is the chevron alone, named for the student; the bar names them and counts nothing.
+  await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back')).toHaveAttribute('aria-label', first);
   await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText(noor);
-  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of ' + pieces + ' for ' + first);
+  await expect(page.locator('#m-nav-bar-grade-swiper')).not.toContainText(' of ' + pieces);
   const tabs = grader.locator('.m-work-tabs [role="tab"]');
   await expect(tabs).toHaveCount(pieces);
   await expect(tabs.first()).toHaveText('Cell Microscope Lab');
   await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
   await expect(grader.locator('.m-swiper-card')).toHaveCount(1);
-  await expect(grader.locator('#m-thumb-strip')).toBeHidden();
-  await expect(grader.locator('.m-swiper-card .m-grade-student-name')).toHaveText('Cell Microscope Lab');
-  await expect(grader.locator('.m-work-sent')).toHaveText(/^Submitted .+ · 2 photos$/);
+  await expect(grader.locator('#m-grade-progress')).toBeHidden();
+  await expect(grader.locator('.m-swiper-card .m-work-count')).toHaveText('1 of 2');
   await shot(page, 'S7-F4-grader-one-student');
   if (pieces > 1) {
     // A tab shows that piece in place.
     await tabs.nth(1).click();
-    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of ' + pieces + ' for ' + first);
     await expect(grader.locator('.m-work-tab-on')).toHaveCount(1);
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
     await expect(grader.locator('.m-swiper-card [data-action="m-add-work"]')).toBeVisible();
@@ -247,7 +247,7 @@ test('Grade From Paper on a not-in card: Set Logan To, a level, then Handed in o
   await shot(page, 'S7-F3-set-to-sheet');
   await sheet.locator('[data-action="m-work-setto"][data-level="3"]').click();
   await expect(page.locator('#m-toast')).toContainText(first + ' set to Proficient');
-  await expect(card.locator('.m-work-sent')).toHaveText('Handed in on paper');
+  await expect(card.locator('.m-work-onpaper')).toHaveText('Handed in on paper');
   const levels = await page.evaluate(
     ({ sid, LAB }) =>
       (getScores('sci8')[sid] || []).filter(e => e.assessmentId === LAB && e.score > 0).map(e => e.score),

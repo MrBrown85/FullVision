@@ -1,5 +1,5 @@
 /**
- * The phone's Settings sheet (switch class, Customize Card, Sign Out) opens
+ * The phone's Settings sheet (switch class, Sign Out) opens
  * after a sync. getLastSyncedAt() returns an ISO string, and the sheet used
  * to call .toISOString() on it, so the gear did nothing until a reload.
  */

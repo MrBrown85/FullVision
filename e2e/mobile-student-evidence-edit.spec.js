@@ -11,7 +11,7 @@ test('tapping an Evidence card opens the edit sheet; Save shows the fix in place
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   const screen = page.locator('#m-screen-student-detail');
   // What You've Noticed: the newest observation.
   const card = screen.locator('#m-st-panel-profile .m-obs-card').first();

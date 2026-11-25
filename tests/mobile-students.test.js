@@ -199,18 +199,18 @@ describe('MStudents.renderList', () => {
 });
 
 describe('MStudents.renderDetail', () => {
-  it('shows hero with student name and proficiency', () => {
+  it('names the student and gives + Observe; the grade is the card’s, not the profile’s', () => {
     mockDataLayer({});
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Cece');
-    expect(html).toContain('m-hero-prof');
-    expect(html).toContain('3.0');
-  });
-
-  it('shows proficiency label (Proficient, Emerging, etc.)', () => {
-    mockDataLayer({});
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Proficient');
+    expect(html).toContain('<h1 class="m-sp-name">Cece Adams</h1>');
+    expect(html).toContain('she/her');
+    expect(html).toContain('data-sp-action="observe"');
+    expect(html).toContain('>+ Observe<');
+    expect(html).not.toContain('m-hero');
+    expect(html).not.toContain('m-st-tab');
+    expect(html).not.toContain('Grade Newest');
+    expect(html).not.toContain('Focus Areas');
+    expect(html).not.toContain('Seen in Observations');
   });
 
   it('returns error when student not found', () => {
@@ -219,21 +219,11 @@ describe('MStudents.renderDetail', () => {
     expect(html).toContain('Student not found');
   });
 
-  // Step 4 group 3 #74: Goals is part of the Learner Profile, as on the
-  // desktop, whose tile counts goals.
-  it('shows the desktop tabs with their counts', () => {
-    mockDataLayer({
-      getStudentQuickObs: () => [{ id: 'ob1' }, { id: 'ob2' }, { id: 'ob3' }],
-    });
+  it('ends with All Work and Competencies, each a row that opens in place', () => {
+    mockDataLayer({});
     const html = MStudents.renderDetail(CID, 'stu1');
-    const labels = [...html.matchAll(/class="m-st-tab-label">([^<]+)</g)].map(m => m[1]);
-    expect(labels).toEqual(['Competencies', 'Assessments', 'Evidence', 'Learner Profile']);
-    expect(html).toContain('3 Observations');
-    expect(html).toContain('m-st-panel-evidence');
-    expect(html).toContain('0 Goals');
-    const profile = html.slice(html.indexOf('id="m-st-panel-profile"'));
-    expect(profile).toContain('Goals and Reflections');
-    expect(profile).toContain('Seen in Observations');
+    const rows = [...html.matchAll(/<details class="m-sp-row[^"]*"><summary><span class="m-sp-row-label">([^<]+)</g)];
+    expect(rows.map(m => m[1])).toEqual(['All Work', 'Competencies']);
   });
 
   // Step 4 group 3 #74: designations show by name, as on the desktop.
@@ -243,7 +233,7 @@ describe('MStudents.renderDetail', () => {
     expect(html).toContain('>G ' + BC_DESIGNATIONS.G.name + '<');
   });
 
-  it('shows how many are missing on the Assessments tab', () => {
+  it('shows how many are missing under All Work', () => {
     mockDataLayer({
       getAssignmentStatuses: () => ({ 'stu1:a1': 'NS', 'stu1:a2': 'NS' }),
       getAssessments: () => [
@@ -337,35 +327,6 @@ describe('Evidence count filtering', () => {
     expect(html).toContain('m-sec-tl-dot');
     var dotCount = (html.match(/m-sec-tl-dot/g) || []).length;
     expect(dotCount).toBe(3);
-  });
-});
-
-/* ── Focus areas ────────────────────────────────────────────── */
-describe('Focus areas card', () => {
-  it('shows focus areas when student has weak tags', () => {
-    mockDataLayer({
-      getFocusAreas: () => [
-        { tag: { id: 't1', label: 'Questioning' }, prof: 1.5, section: { color: '#2196F3' } },
-        { tag: { id: 't2', label: 'Evaluating' }, prof: 0, section: { color: '#4CAF50' } },
-      ],
-    });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Focus Areas');
-    expect(html).toContain('Questioning');
-    expect(html).toContain('1.5');
-    // Step 4 group 3 #42: no-evidence competencies are not focus areas.
-    expect(html).not.toContain('Evaluating');
-  });
-
-  it('hides focus areas when all tags are proficient', () => {
-    mockDataLayer({
-      getFocusAreas: () => [
-        { tag: { id: 't1', label: 'Tag 1' }, prof: 3.5, section: { color: '#888' } },
-        { tag: { id: 't2', label: 'Tag 2' }, prof: 4.0, section: { color: '#888' } },
-      ],
-    });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).not.toContain('Focus Areas');
   });
 });
 
@@ -600,7 +561,7 @@ describe('Student detail with multiple sections', () => {
 
 /* ── Detail screen: recent assessments ──────────────────────── */
 describe('Student detail recent assessments', () => {
-  it('lists every assessment on the Assessments tab, newest first', () => {
+  it('lists every assessment under All Work, newest first', () => {
     mockDataLayer({
       getAssessments: () => [
         { id: 'a1', title: 'Assess 1', type: 'summative', date: '2025-01-01', tagIds: [] },
@@ -612,7 +573,7 @@ describe('Student detail recent assessments', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    const panel = html.slice(html.indexOf('id="m-st-panel-assess"'), html.indexOf('id="m-st-panel-evidence"'));
+    const panel = html.slice(html.indexOf('All Work'), html.indexOf('Competencies</span>'));
     expect(panel).toContain('Assess 6');
     expect(panel).toContain('Assess 1');
     expect(panel.indexOf('Assess 6')).toBeLessThan(panel.indexOf('Assess 1'));
@@ -644,14 +605,15 @@ describe('Student detail recent assessments', () => {
     expect(html).toContain('No assessments yet');
   });
 
-  it('shows empty state when no observations', () => {
+  it('leaves What You’ve Noticed out when there are no observations', () => {
     mockDataLayer({
       getStudentQuickObs: () => [],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('No observations yet');
+    expect(html).not.toContain('Noticed');
   });
-  it('lists the observations on the Evidence tab, newest first, with text pills', () => {
+
+  it('shows the newest observation under What You’ve Noticed, then All N Observations', () => {
     // getStudentQuickObs is newest first.
     mockDataLayer({
       getStudentQuickObs: () => [
@@ -663,12 +625,26 @@ describe('Student detail recent assessments', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    const recent = html.slice(html.indexOf('id="m-st-panel-evidence"'), html.indexOf('id="m-st-panel-goals"'));
-    ['Fifth note', 'Fourth note', 'Third note', 'Second note', 'First note'].forEach(t => expect(recent).toContain(t));
-    expect(recent.indexOf('Fifth note')).toBeLessThan(recent.indexOf('Fourth note'));
-    expect(recent.indexOf('Second note')).toBeLessThan(recent.indexOf('First note'));
-    expect(recent).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
-    expect(recent).toContain('<span class="m-obs-context">');
+    const noticed = html.slice(html.indexOf('What You’ve Noticed'), html.indexOf('All Work'));
+    ['Fifth note', 'Fourth note', 'Third note', 'Second note', 'First note'].forEach(t => expect(noticed).toContain(t));
+    // The newest is on the card; the rest are behind "All 5 Observations".
+    const more = noticed.indexOf('All 5 Observations');
+    expect(more).toBeGreaterThan(noticed.indexOf('Fifth note'));
+    expect(noticed.indexOf('Fourth note')).toBeGreaterThan(more);
+    expect(noticed.indexOf('Fourth note')).toBeLessThan(noticed.indexOf('Third note'));
+    expect(noticed.indexOf('Second note')).toBeLessThan(noticed.indexOf('First note'));
+    expect(noticed).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
+    expect(noticed).toContain('<span class="m-obs-context">');
+  });
+
+  it('names a student with one open concern, and counts them when there are more', () => {
+    const concern = id => ({ id, text: 'Missed a deadline', created: '2026-10-15T10:00:00Z', sentiment: 'concern' });
+    mockDataLayer({ getStudentQuickObs: () => [concern('c1')] });
+    expect(MStudents.renderDetail(CID, 'stu1')).toContain('1 Open Concern ›');
+    mockDataLayer({ getStudentQuickObs: () => [concern('c1'), concern('c2')] });
+    expect(MStudents.renderDetail(CID, 'stu1')).toContain('2 Open Concerns ›');
+    mockDataLayer({ getStudentQuickObs: () => [] });
+    expect(MStudents.renderDetail(CID, 'stu1')).not.toContain('Open Concern');
   });
 });
 
@@ -719,53 +695,28 @@ describe('evidenceChange (the phone’s Improving / Dropped line)', () => {
   });
 });
 
-/* ── Card stack term (questionnaire answers) ────────────────── */
-describe('MStudents.initCardStack term', () => {
-  const terms = [
-    { ordinal: 1, label: 'Term 1', starts_on: '2026-09-02', ends_on: '2026-11-27' },
-    { ordinal: 2, label: 'Term 2', starts_on: '2026-11-28', ends_on: '2027-01-29' },
-    { ordinal: 3, label: 'Term 3', starts_on: '2027-02-08', ends_on: '2027-04-16' },
-  ];
-
-  // The term the first card asks getStudentTermRating for.
-  function cardTerm(today, reportingTerms) {
-    const asked = [];
+/* ── The card stack ────────────────────────────────────────── */
+describe('MStudents.initCardStack', () => {
+  it('draws each card with MStudentCard, in the sorted order', () => {
+    const drawn = [];
     const realStack = globalThis.MCardStack;
+    const realCard = globalThis.MStudentCard;
     globalThis.MCardStack = {
       create: (el, students, opts) => {
-        opts.renderCard(students[0]);
+        students.forEach(st => drawn.push(opts.renderCard(st)));
         return { destroy() {}, getCurrentIndex: () => 0, goTo() {} };
       },
     };
-    mockDataLayer({
-      courseToday: () => today,
-      getReportingTerms: () => reportingTerms,
-      getStudentTermRating: (cid, sid, termId) => {
-        asked.push(termId);
-        return null;
-      },
-    });
+    globalThis.MStudentCard = { render: st => '<card>' + st.id + '</card>' };
+    mockDataLayer({});
     try {
       MStudents.initCardStack(CID);
     } finally {
       MStudents.destroyCardStack();
       globalThis.MCardStack = realStack;
+      globalThis.MStudentCard = realCard;
     }
-    return asked[0];
-  }
-
-  it('shows the term that holds today', () => {
-    expect(cardTerm('2026-12-10', terms)).toBe('term-2');
-    expect(cardTerm('2026-10-01', terms)).toBe('term-1');
-  });
-
-  it('between terms, shows the last one begun; before the first, the first', () => {
-    expect(cardTerm('2027-02-02', terms)).toBe('term-2');
-    expect(cardTerm('2026-08-20', terms)).toBe('term-1');
-  });
-
-  it('shows Report 1 in a class with no terms', () => {
-    expect(cardTerm('2026-12-10', [])).toBe('term-1');
+    expect(drawn).toEqual(['<card>stu1</card>', '<card>stu2</card>', '<card>stu3</card>']);
   });
 });
 

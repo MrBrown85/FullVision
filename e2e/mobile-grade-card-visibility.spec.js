@@ -37,7 +37,7 @@ async function openGrader(page) {
   });
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
 }
 

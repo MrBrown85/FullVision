@@ -212,15 +212,16 @@ describe('the phone grader’s pictures', () => {
     expect(card(0).querySelector('.m-work-page img').getAttribute('src')).toBe('blob:page:f0p1');
   });
 
-  it('full screen shows the pages the strip already has, with no new request', async () => {
+  it('Full Screen shows the pages the card already has, with no new request', async () => {
     openGrader();
     await settle();
     const before = asked.length;
     MGradePhotos.openFull(CID, card(0).querySelector('.m-work-full'));
     await settle();
     expect(asked.length).toBe(before);
-    const sheet = [...document.querySelectorAll('#m-sheet-container .m-work-sheet-page')];
-    expect(sheet.map(img => img.getAttribute('src'))).toEqual(['blob:page:f0p1', 'blob:page:f0p2']);
+    const pages = [...document.querySelectorAll('#m-reader .m-reader-page')];
+    expect(pages.map(img => img.getAttribute('src'))).toEqual(['blob:page:f0p1', 'blob:page:f0p2']);
+    MGradeReader.close();
   });
 
   it('a page with no thumbnail shows the page in the strip', async () => {

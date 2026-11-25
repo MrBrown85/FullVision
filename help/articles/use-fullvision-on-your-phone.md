@@ -13,8 +13,7 @@ labels:
   - Students
   - All Students
   - Observe
-  - View Profile
-  - Customize Card
+  - Profile
   - Sweep
   - Recent
   - All
@@ -47,7 +46,7 @@ shots:
 
 ## Students
 
-Each student has a card with the overall level and a level for each competency. Swipe left or right to move between cards, or choose **All Students** to find a student by name. On a card, **Observe** records an observation about that student and **View Profile** opens the student's full record. **Customize Card** in **Settings** sets what each card shows.
+Each student has a card with the overall level and the five newest pieces of work with their results. Swipe left or right to move between cards, or choose **All Students** to find a student by name. On a card, **Observe** records an observation about that student and **Profile** opens the student's record, starting with what the student has said about themselves.
 
 ## Observe
 

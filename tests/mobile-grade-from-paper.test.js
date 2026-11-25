@@ -116,11 +116,14 @@ describe('with the student page and Send Work on', () => {
     expect(card('st1').querySelector('[data-action="m-work-setto-menu"]')).toBeNull();
   });
 
-  it('the not-in card has its status under Add Work and each criterion "Not scored" until one is tapped', () => {
+  it('the not-in card says Nothing Handed In, has Missing and Excused under Add Work and each criterion "Not scored" until one is tapped', () => {
     open();
     const crits = getRubricById(CID, lab().rubricId).criteria;
-    expect(card(sid).querySelector('.m-grade-student-header .m-status-row')).toBeNull();
-    expect(card(sid).querySelectorAll('.m-work-notin-status .m-status-pill').length).toBe(3);
+    expect(card(sid).querySelector('.m-work-notin-title').textContent).toBe('Nothing Handed In');
+    // Late waits for ⋯: there is no work for it to be late on.
+    expect(
+      [...card(sid).querySelectorAll('.m-work-notin-status .m-status-pill')].map(p => p.getAttribute('data-val')),
+    ).toEqual(['NS', 'EXC']);
     const rows = [...card(sid).querySelectorAll('[data-action="m-paper-crit"]')];
     expect(rows.map(r => r.querySelector('.m-paper-crit-name').textContent)).toEqual(crits.map(c => c.name));
     expect(rows.map(r => r.querySelector('.m-paper-crit-now').textContent)).toEqual(crits.map(() => 'Not scored'));
@@ -178,7 +181,7 @@ describe('with the student page and Send Work on', () => {
     await vi.runAllTimersAsync();
     expect(getStudentSubmission(CID, sid, LAB)).toMatchObject({ on_paper: true, sent_by: 'teacher' });
     // The card now says it was handed in on paper, and has no Add Work.
-    expect(card(sid).querySelector('.m-work-sent').textContent).toBe('Handed in on paper');
+    expect(card(sid).querySelector('.m-work-onpaper').textContent).toBe('Handed in on paper');
     expect(card(sid).querySelector('[data-action="m-add-work"]')).toBeNull();
     undo.onclick();
     expect(keysOn(sid, LAB)).toHaveLength(0);

@@ -298,6 +298,20 @@ window.MObserve = (function () {
     return st.lastName ? first + ' ' + st.lastName.charAt(0) + '.' : first;
   }
 
+  // The student's own words a note starts from, quoted above it (the board "Surprise Words").
+  var _words = null;
+  // html-safe: the label, the day and the words go through MC.esc
+  function _wordsHtml() {
+    if (!_words) return '';
+    return (
+      '<figure class="m-sp-words"><figcaption>' +
+      MC.esc(_words.label + (_words.day ? ' \u00b7 ' + _words.day : '')) +
+      '</figcaption><blockquote>' +
+      MC.esc(_words.text) +
+      '</blockquote></figure>'
+    );
+  }
+
   function _quotedNoticeHtml(label) {
     if (!label) return '';
     var lead = label === 'Quoted' ? 'Quoted in a report.' : label + '.';
@@ -464,7 +478,7 @@ window.MObserve = (function () {
         },
       }) +
       '<div class="m-edit-body">' +
-      (isNew ? _studentRowHtml() : _quotedNoticeHtml(quoted)) +
+      (isNew ? _wordsHtml() + _studentRowHtml() : _quotedNoticeHtml(quoted)) +
       '<textarea class="obs-note-box m-edit-text" id="m-obs-text" aria-label="Observation" placeholder="What did you notice?" rows="3">' +
       MC.esc(isNew ? _newDraft : ob.text || '') +
       '</textarea>' +
@@ -675,10 +689,12 @@ window.MObserve = (function () {
      The + button opens it empty; "Write Your Own…" opens it for one
      student. Unsent text waits for next time. */
   var _newDraft = '';
-  function presentNewObsSheet(cid, presetSid) {
+  // `words`: the student's own words to quote at the top ({ label, day, text }), from the profile's + Observe.
+  function presentNewObsSheet(cid, presetSid, words) {
     resetSheetState();
     // presetSid: one student's id, or a list of them (the students who have not seen a bulletin).
     _selectedStudents = Array.isArray(presetSid) ? presetSid.slice() : presetSid ? [presetSid] : [];
+    _words = words || null;
     MC.presentSheet(_editSheetHtml(cid, null, null, null), {
       onClose: function () {
         var ta = document.getElementById('m-obs-text');
@@ -737,6 +753,7 @@ window.MObserve = (function () {
   var _editingSid = null;
 
   function resetSheetState() {
+    _words = null;
     _selectedStudents = [];
     _selectedSentiment = null;
     _selectedContext = null;

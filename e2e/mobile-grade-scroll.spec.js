@@ -66,7 +66,7 @@ test.describe('Phone grading card', () => {
     const group = () => card(page).locator('.m-crit-group').last();
 
     await group().locator('.m-score-btn[data-score="3"]').click();
-    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('3');
+    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('PRF');
     expect(await cardTop(page)).toBe(top);
 
     await group().locator('.m-mod-btn').last().click();
@@ -90,7 +90,7 @@ test.describe('Phone grading card', () => {
     const top = await scrollCardToBottom(page);
     const group = () => card(page).locator('.m-score-group').last();
     await group().locator('.m-score-btn[data-score="2"]').click();
-    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('DEV');
     expect(await cardTop(page)).toBe(top);
   });
 
@@ -100,9 +100,7 @@ test.describe('Phone grading card', () => {
     await card(page).locator('.m-crit-group').last().locator('.m-score-btn[data-score="4"]').click();
     // What a server echo or an id re-key does once the save lands.
     await page.evaluate(() => _invalidateAndRerender());
-    await expect(
-      card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active .m-level-fig'),
-    ).toHaveText('4');
+    await expect(card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active')).toHaveText('EXT');
     expect(await cardTop(page)).toBe(top);
   });
 
