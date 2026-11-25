@@ -136,7 +136,6 @@ body.fv-switching-course::after {
 }
 
 .m-seg-btn:active:not(.m-seg-active),
-.m-filter-pill:active:not(.m-filter-active),
 .m-sweep-type:active:not(.m-selected) {
   background: var(--overlay-pressed);
 }
@@ -1060,50 +1059,6 @@ body.fv-switching-course::after {
   text-align: right;
 }
 
-/* ── Filter Pills ──────────────────────────────────────────── */
-.m-filter-strip {
-  display: flex;
-  gap: 8px;
-  padding: 0 16px 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-.m-filter-strip::-webkit-scrollbar {
-  display: none;
-}
-
-.m-filter-pill {
-  flex: 0 0 auto;
-  padding: 10px 16px;
-  min-height: 44px;
-  border-radius: 22px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-2);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  white-space: nowrap;
-  transition:
-    background-color 0.15s,
-    border-color 0.15s,
-    color 0.15s;
-}
-.m-filter-pill.m-filter-active {
-  background: var(--active-fill);
-  color: #fff;
-  border-color: var(--active-fill);
-}
-/* Wrapping variant used inside the Grade-picker filter sheet — categories
- * and modules can exceed one line. */
-.m-filter-strip-wrap {
-  flex-wrap: wrap;
-  overflow-x: visible;
-  padding-bottom: 0;
-}
-
 /* ── Grade Filter Bar ──────────────────────────────────────── */
 .m-grade-filter-bar {
   display: flex;
@@ -1165,22 +1120,6 @@ body.fv-switching-course::after {
   color: var(--text-2);
   margin-bottom: 8px;
 }
-.m-filter-sheet-section .m-filter-strip,
-.m-filter-sheet-section .m-segmented {
-  margin: 0;
-  padding: 0;
-  /* The date range row holds the fixed ranges plus one option per
-     reporting term, so it wraps three to a row. */
-  flex-wrap: wrap;
-  gap: 2px;
-}
-.m-filter-sheet-section .m-seg-btn {
-  flex: 1 1 calc(33.333% - 2px);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* ── Bottom Sheet ──────────────────────────────────────────── */
 .m-sheet-backdrop {
   position: fixed;
@@ -2840,12 +2779,17 @@ body.fv-switching-course::after {
 }
 
 /* The board "Grade Tab, Filter That Applies As You Tap": Filter on the
-   left, Clear All and Done on the right; "Showing 6 of 18" in green; a
-   chosen chip blue-tinted with a tick. */
+   left, Clear All and Done on the right; "Showing 6 of 18" under them;
+   each section a short grey list, a check on what is picked. */
 .m-live-filter-head {
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Done stays in reach however far the lists scroll. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
 }
 .m-live-filter-head .m-filter-sheet-heading {
   flex: 1;
@@ -2866,23 +2810,71 @@ body.fv-switching-course::after {
   font-weight: 700;
 }
 .m-live-filter-count {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--score-3-text);
-}
-.m-live-filter .m-filter-sheet-title {
+  margin: 0 0 16px;
   font-size: 15px;
+  font-weight: 500;
   color: var(--text);
 }
-.m-live-filter .m-filter-pill.m-filter-active {
-  background: var(--active-light);
-  border-color: var(--active);
-  color: var(--link);
+.m-live-filter .m-filter-sheet-section {
+  margin-bottom: 20px;
+}
+.m-live-filter .m-filter-sheet-title {
+  margin: 0 0 6px 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+/* A section's choices: rows in one grey group, a hairline between them. */
+.m-filter-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.m-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 14px 0 16px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-filter-row + .m-filter-row {
+  box-shadow: inset 0 1px 0 var(--divider-medium);
+}
+.m-filter-row:active {
+  background: var(--divider-subtle);
+}
+.m-filter-row-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.m-filter-row.m-filter-active {
   font-weight: 600;
 }
-.m-live-filter .m-filter-pill.m-filter-active::before {
-  content: '\2713\00a0';
+/* The check on a row picked, drawn as two strokes. */
+.m-filter-row.m-filter-active::after {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 12px;
+  margin: 0 6px 4px 0;
+  border: solid var(--link);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+.m-filter-row:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+  border-radius: 12px;
 }
 
 /* The grading card's work: when it came, the pages, the note. */
