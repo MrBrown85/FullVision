@@ -227,6 +227,11 @@ describe('student-submit: the hashed address', () => {
     expect(calls).toHaveLength(12);
     expect(new Set(calls.map(c => c.hash)).size).toBe(1);
     expect(calls[0].hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(JSON.stringify(calls)).not.toContain('2001');
+    // No part of the address reaches the database. Checked on the address's own shape (its colons): the
+    // hash is 64 random hex digits, so a bare '2001' turned up in it now and then and failed main (Nov 24).
+    const sent = JSON.stringify(calls);
+    for (const part of ['2001:db8', 'db8:1:2', '1:2::1', 'aaaa:bbbb', 'cccc:dddd', '2001:0db8']) {
+      expect(sent).not.toContain(part);
+    }
   });
 });
