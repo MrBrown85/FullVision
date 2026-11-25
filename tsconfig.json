@@ -33,6 +33,7 @@
     "shared/data-term-ratings.js",
     "shared/data-student-records.js",
     "shared/data-student-cards.js",
+    "teacher/card-show.js",
     "shared/data-student-work.js",
     "shared/data-handout-files.js",
     "shared/data-feedback-live.js",

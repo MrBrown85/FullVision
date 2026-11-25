@@ -507,7 +507,7 @@ var StudentPageStudents = (function () {
         '" title="' +
         hint +
         '"' +
-        (value === 'print' ? dis : '') +
+        (value === 'print' || value === 'showcards' ? dis : '') +
         '>' +
         label +
         '</button>'
@@ -553,11 +553,17 @@ var StudentPageStudents = (function () {
       group(
         'Card',
         btn(
-          'print',
-          one ? 'Replace Card' : 'Replace Cards',
-          one ? 'Replace Card' : 'Replace Cards',
-          'Makes a new card for each. Their old card stops working at once.',
-        ),
+          'showcards',
+          'Replace and Show',
+          one ? 'Replace Card and Show on Screen' : 'Replace Cards and Show on Screen',
+          'Makes a new card for each and shows it here, one at a time, to scan or type. Their old card stops working at once.',
+        ) +
+          btn(
+            'print',
+            'Replace and Print',
+            one ? 'Replace Card and Print' : 'Replace Cards and Print',
+            'Makes a new card for each and prints it. Their old card stops working at once.',
+          ),
       ) +
       '<button type="button" class="cm-action-btn sps-bar-btn sps-bar-clear" data-action="spStudentClear">Clear Selection</button>' +
       '</div>'
@@ -754,15 +760,30 @@ var StudentPageStudents = (function () {
           dis +
           '>Unlock</button>'
         : '') +
-      (c
-        ? '<button type="button" class="cm-action-btn" data-action="spCardsNewCard" data-student="' +
-          esc(s.id) +
-          '" aria-label="' +
-          esc('Replace ' + full + '\u2019s Card') +
-          '"' +
-          dis +
-          '>Replace Card</button>'
-        : '');
+      // Show on Screen for a student beside the teacher; Print for paper. Only once they have a card.
+      (c ? ['1', ''] : [])
+        .map(function (show) {
+          var verb = (c ? 'Replace and ' : 'Make and ') + (show ? 'Show' : 'Print');
+          return (
+            '<button type="button" class="cm-action-btn" data-action="spCardsNewCard" data-student="' +
+            esc(s.id) +
+            '"' +
+            (show ? ' data-show="1"' : '') +
+            ' aria-label="' +
+            esc(c ? verb.replace(' and ', ' ' + full + '\u2019s Card and ') : verb + ' a Card for ' + full) +
+            '" title="' +
+            (show
+              ? 'Makes a new card and shows it here to scan or type. Nothing is printed.'
+              : 'Makes a new card and prints it.') +
+            (c ? ' The old card stops working at once.' : '') +
+            '"' +
+            dis +
+            '>' +
+            verb +
+            '</button>'
+          );
+        })
+        .join('');
     var fresh = st.fresh;
     st.fresh = false;
     return (
@@ -1004,12 +1025,17 @@ var StudentPageStudents = (function () {
       case 'spStudentBulk': {
         var ids = picked(cid);
         if (!ids.length) return true;
-        if (data.value === 'print') {
-          // Once the cards are asked for, the ticks go: a second press would print them again.
+        if (data.value === 'print' || data.value === 'showcards') {
+          // Once the cards are asked for, the ticks go: a second press would make them again.
           if (typeof StudentCards !== 'undefined' && StudentCards.printNewCards) {
-            StudentCards.printNewCards(cid, ids, function () {
-              clearPicked(cid);
-            });
+            StudentCards.printNewCards(
+              cid,
+              ids,
+              function () {
+                clearPicked(cid);
+              },
+              data.value === 'showcards',
+            );
           }
           return true;
         }

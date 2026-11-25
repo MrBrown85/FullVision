@@ -500,7 +500,8 @@ describe('the Students list', () => {
         'Use Class Setting',
         'Pause',
         'Resume',
-        'Replace Cards',
+        'Replace and Show',
+        'Replace and Print',
         'Clear Selection',
       ]);
       // Each says in full what it acts on, and what it does on hover.
@@ -510,7 +511,7 @@ describe('the Students list', () => {
         'Card',
       ]);
       expect(bar.querySelector('[data-value="print"]').getAttribute('title')).toBe(
-        'Makes a new card for each. Their old card stops working at once.',
+        'Makes a new card for each and prints it. Their old card stops working at once.',
       );
       StudentPageStudents.handleAction('spStudentBulk', {
         dataset: { value: 'hide' },
@@ -631,7 +632,8 @@ describe('the Students list', () => {
       expect([...bar.querySelectorAll('button')].map(text)).toEqual([
         'Pause',
         'Resume',
-        'Replace Card',
+        'Replace and Show',
+        'Replace and Print',
         'Clear Selection',
       ]);
       StudentPageStudents.handleAction('spStudentBulk', {

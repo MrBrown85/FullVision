@@ -413,6 +413,15 @@ var StudentCards = (function () {
     );
   }
 
+  // Show on Screen: the cards just made, up on this screen (teacher/card-show.js).
+  function _showOnScreen(cid, items) {
+    if (typeof CardShow === 'undefined') return;
+    var className = _className(cid);
+    CardShow.open(items, function (item) {
+      return cardHtml(item, className, QrSlips.qrSvg(item.url));
+    });
+  }
+
   /* ── Making cards: one path for every button ───────────────── */
 
   /* The list, as it is after a press: each made card in place of the
@@ -484,9 +493,10 @@ var StudentCards = (function () {
   /* One press: make a card for each of `asked` ([{ enrollment_id,
      replaces }]), then print the ones whose code came back. `replacing` is
      true for Print New Card and New Codes for This Class: a student left
-     with the card they had is named afterwards. Answers how many cards
-     were printed. */
-  function _makeAndPrint(cid, asked, replacing) {
+     with the card they had is named afterwards. `show`: the cards go up on
+     this screen (Show on Screen) instead of to the printer. Answers how
+     many cards were printed or shown. */
+  function _makeAndPrint(cid, asked, replacing, show) {
     var st = _st(cid);
     if (st.making) return st.making;
     if (!asked.length) return Promise.resolve(0);
@@ -566,6 +576,7 @@ var StudentCards = (function () {
         cid: cid,
         items: items,
         count: items.length,
+        shown: !!show,
         until: Date.now() + HOLD_MS,
         // The timer, when it does fire on time, ends them then.
         timer: setTimeout(function () {
@@ -573,7 +584,9 @@ var StudentCards = (function () {
           _check();
         }, HOLD_MS),
       };
-      _print(cid, items);
+      if (show) _showOnScreen(cid, items);
+      else _print(cid, items);
+      // A card shown on screen is handed out as a printed one is: it leaves Not Printed.
       var ids = items.map(function (item) {
         return item.id;
       });
@@ -637,12 +650,12 @@ var StudentCards = (function () {
   }
 
   // The question Replace Card asks (design section 4; renamed Nov 24 2026: "Print New Card" hid that the old card stops).
-  function newCardQuestion(first) {
+  function newCardQuestion(first, show) {
     return {
       title: 'Replace ' + first + '\u2019s Card?',
       message:
         first + '\u2019s card stops working as soon as the new one is made. Everything ' + first + ' has sent stays.',
-      ok: 'Replace and Print',
+      ok: show ? 'Replace and Show' : 'Replace and Print',
     };
   }
 
@@ -666,7 +679,7 @@ var StudentCards = (function () {
 
   /* Print New Card for one student. Answers a promise of how many were
      printed, or null when a question went up instead (its Yes makes it). */
-  function printNewCard(cid, enrollmentId) {
+  function printNewCard(cid, enrollmentId, show) {
     var st = _st(cid);
     if (st.making || st.loading || st.cards === null) return Promise.resolve(0);
     var student = _roster(cid).filter(function (s) {
@@ -675,9 +688,9 @@ var StudentCards = (function () {
     if (!student) return Promise.resolve(0);
     var card = _byStudent(st.cards)[enrollmentId] || null;
     var asked = [{ enrollment_id: enrollmentId, replaces: card ? card.id : null }];
-    if (!_handedOut(card)) return _makeAndPrint(cid, asked, true);
-    _ask(cid, newCardQuestion(_first(student) || _name(student)), function () {
-      _makeAndPrint(cid, asked, true);
+    if (!_handedOut(card)) return _makeAndPrint(cid, asked, true, show);
+    _ask(cid, newCardQuestion(_first(student) || _name(student), show), function () {
+      _makeAndPrint(cid, asked, true, show);
     });
     return Promise.resolve(null);
   }
@@ -703,7 +716,7 @@ var StudentCards = (function () {
   }
 
   // The question Print New Cards asks for ticked students: `stop` cards stop, `first` students get their first.
-  function newCardsQuestion(stop, first) {
+  function newCardsQuestion(stop, first, show) {
     var all = stop + first;
     return {
       title: stop
@@ -721,14 +734,14 @@ var StudentCards = (function () {
             : first + ' students get their first card. '
           : '') +
         'Everything they have sent stays.',
-      ok: stop ? 'Replace and Print' : 'Make and Print',
+      ok: (stop ? 'Replace and ' : 'Make and ') + (show ? 'Show' : 'Print'),
     };
   }
 
   /* Print New Cards for the students ticked on the list (the Students
      list's bar): asks first, then one press for just those students, each
      card in place of the one the list shows for them. */
-  function printNewCards(cid, ids, onYes) {
+  function printNewCards(cid, ids, onYes, show) {
     var st = _st(cid);
     if (st.making || st.loading || st.cards === null) return;
     var byStudent = _byStudent(st.cards);
@@ -748,9 +761,9 @@ var StudentCards = (function () {
     var stop = asked.filter(function (it) {
       return !!it.replaces;
     }).length;
-    _ask(cid, newCardsQuestion(stop, asked.length - stop), function () {
+    _ask(cid, newCardsQuestion(stop, asked.length - stop, show), function () {
       if (onYes) onYes();
-      _makeAndPrint(cid, asked, true);
+      _makeAndPrint(cid, asked, true, show);
     });
   }
 
@@ -769,6 +782,7 @@ var StudentCards = (function () {
     var held = _heldFor(cid);
     if (!held) return 0;
     _print(cid, held.items);
+    held.shown = false; // printed now: the note says so
     return held.count;
   }
 
@@ -1153,10 +1167,11 @@ var StudentCards = (function () {
     return true;
   }
 
-  function _heldLine(n) {
+  function _heldLine(n, shown) {
     return (
-      (n === 1 ? '1 card went' : n + ' cards went') +
-      ' to the printer. Print Again works until you leave this screen. After that, printing makes new codes.'
+      (n === 1 ? '1 card ' : n + ' cards ') +
+      (shown ? (n === 1 ? 'was' : 'were') + ' shown on screen.' : 'went to the printer.') +
+      ' Print Again works until you leave this screen. After that, printing makes new codes.'
     );
   }
 
@@ -1271,7 +1286,7 @@ var StudentCards = (function () {
     var notes = [];
     if (st.msg) notes.push(st.msg);
     else if (_waitingHere(st, cid)) notes.push(MAKING);
-    else if (held) notes.push(_heldLine(held.count));
+    else if (held) notes.push(_heldLine(held.count, held.shown));
     if (replaced) notes = notes.concat(replaced);
     else if (known && !st.making && !failed) notes.push('Checking which cards were made…');
     if (!notes.length) {
@@ -1455,7 +1470,7 @@ var StudentCards = (function () {
       return true;
     }
     if (action === 'spCardsNewCard') {
-      if (cid && data.student) printNewCard(cid, data.student);
+      if (cid && data.student) printNewCard(cid, data.student, data.show === '1');
       return true;
     }
     if (action === 'spCardsNewCodes') {

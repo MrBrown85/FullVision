@@ -323,6 +323,7 @@ load('teacher/quiz-card-draw.js');
 load('teacher/quiz-builder.js');
 load('teacher/quiz-results.js');
 load('teacher/cm-questionnaires.js');
+load('teacher/card-show.js');
 load('teacher/student-cards.js');
 load('teacher/student-page-students.js');
 load('teacher/preview-student.js');
