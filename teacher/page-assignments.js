@@ -310,7 +310,14 @@ window.PageAssignments = (function () {
      assessments. A focused rubric row moves to the new student's first row. */
   function stepFocusStudent(dir) {
     if (!focusStudentId) return;
+    // The All Caught Up panel (I3): Previous takes it away; nothing else steps.
+    if (_grader && _grader.caughtUp) {
+      if (dir < 0) _graderHideCaughtUp();
+      return;
+    }
     var memo = _graderFocusMemo();
+    // With a queue (I3), a step past either end of this piece carries into the next or previous piece.
+    if (_grader && _graderQueueStep(dir)) return;
     // Show is on To Return or Returned: the next student it lists (S1-F2).
     if (_grader && _graderStepShown(dir)) {
       _graderToTop();
@@ -13001,6 +13008,11 @@ window.PageAssignments = (function () {
       // The gradebook's rows, in their order: group work steps through these.
       rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
       onClose: opts.onClose || null,
+      // The pieces that follow (I3): the Inbox's order. Ignored when the piece opened is not among them.
+      queue: _graderQueueOf(opts.queue, aid),
+      qi: 0,
+      queueShow: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
+      caughtUp: false,
       pageListeners: opts.overPage ? pageListeners : null,
       page: page,
       // Show: To Grade, To Return, Returned, Not In or All (S1-F2, S6-F3).
@@ -13014,6 +13026,10 @@ window.PageAssignments = (function () {
       reflectBusy: null,
       reflectMsg: null,
     };
+    if (_grader.queue)
+      _grader.qi = _grader.queue.findIndex(function (q) {
+        return q.aid === aid;
+      });
     overlay.addEventListener('mousedown', function (e) {
       if (e.target === overlay) closeGrader();
     });
@@ -13033,6 +13049,8 @@ window.PageAssignments = (function () {
       else if (what === 'return-next') _graderReturnNext();
       else if (what === 'show') _graderSetShow(btn.dataset.show);
       else if (what === 'returnAll') _graderReturnAll(btn);
+      else if (what === 'caught-return') _graderCaughtReturn(btn);
+      else if (what === 'caught-close') closeGrader();
       else if (what.indexOf('work-') === 0) _graderWorkAction(what, btn);
       else if (what.indexOf('reflect-') === 0) _graderReflectAction(what, btn);
       else if (what.indexOf('revision-') === 0) _graderRevisionAction(what, btn);
@@ -13103,7 +13121,7 @@ window.PageAssignments = (function () {
     // ⌘/Ctrl+Enter: Return & Next, from anywhere in the dialog, a comment box too.
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       var rn = _grader.overlay.querySelector('[data-grader="return-next"]:not(:disabled)');
-      if (rn && !CritComment.isOpen() && !_commentPopoverState) {
+      if (rn && !_grader.caughtUp && !CritComment.isOpen() && !_commentPopoverState) {
         e.preventDefault();
         _graderReturnNext();
         return;
@@ -13670,6 +13688,329 @@ window.PageAssignments = (function () {
       });
   }
 
+  /* ── The grader's queue (I3, docs/plans/inbox-redesign-plan.md) ──
+     The Inbox opens the grader with `queue`, [{ aid, studentIds }] in the
+     order its stacks are shown. On the last step of a piece Next names the
+     next piece and carries on into it, in the same dialog; Previous on the
+     first step goes back to the last step of the one before. After the
+     last piece Next reads Finish and the dialog shows All Caught Up. With
+     no queue none of this draws and nothing here runs. */
+  function _graderQueueOf(queue, aid) {
+    if (!queue || !queue.length) return null;
+    var out = queue
+      .filter(function (q) {
+        return q && q.aid;
+      })
+      .map(function (q) {
+        return { aid: q.aid, studentIds: (q.studentIds || []).slice() };
+      });
+    return out.some(function (q) {
+      return q.aid === aid;
+    })
+      ? out
+      : null;
+  }
+
+  // A piece the queue can carry into: it is in the class and has someone in its list.
+  function _graderQueueTarget(dir) {
+    var cid = activeCourse;
+    var roster = getStudents(cid).map(function (s) {
+      return s.id;
+    });
+    for (var i = _grader.qi + dir; i >= 0 && i < _grader.queue.length; i += dir) {
+      var q = _grader.queue[i];
+      if (!_assessmentById(cid, q.aid)) continue;
+      var anyone = q.studentIds.some(function (id) {
+        return roster.indexOf(id) >= 0;
+      });
+      if (anyone) return i;
+    }
+    return -1;
+  }
+
+  /* True when a step in `dir` has nowhere to go in this piece: the last (or
+     first) student, group or one Show lists. */
+  function _graderEdge(dir) {
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    if (!a) return false;
+    if (_graderShowOn() && _graderShowWanted(cid, a)) return !_nextShownStop(cid, a, dir);
+    var steps = _graderSteps(cid, a);
+    if (steps) {
+      var u = _graderUnitIndex(steps, focusStudentId);
+      return u >= 0 && (dir > 0 ? u >= steps.length - 1 : u <= 0);
+    }
+    var i = _grader.studentIds.indexOf(focusStudentId);
+    return i >= 0 && (dir > 0 ? i >= _grader.studentIds.length - 1 : i <= 0);
+  }
+
+  // ← → at an edge of a piece in a queue. True when it was used.
+  function _graderQueueStep(dir) {
+    if (!_grader.queue || !_graderEdge(dir)) return false;
+    var to = _graderQueueTarget(dir);
+    if (to >= 0) _graderSwitchPiece(to, dir > 0 ? 'first' : 'last');
+    else if (dir > 0) _graderShowCaughtUp();
+    else return false;
+    return true;
+  }
+
+  /* The dialog on another piece of the queue, as if it had been opened on
+     it: its students, its work pane and Show as they began. The dialog, its
+     listeners and onClose stay. `which` is the student it lands on: the
+     first one Show lists, or the last. */
+  function _graderSwitchPiece(qi, which) {
+    var cid = activeCourse;
+    var q = _grader.queue[qi];
+    // A field being typed in saves on blur, so finish it first.
+    var active = document.activeElement;
+    if (active && _grader.overlay.contains(active) && active.blur) active.blur();
+    if (window.MarkUp && MarkUp.isOpen()) MarkUp.close();
+    var roster = getStudents(cid).map(function (s) {
+      return s.id;
+    });
+    var ids = q.studentIds.filter(function (id) {
+      return roster.indexOf(id) >= 0;
+    });
+    _graderForgetDrawn();
+    _grader.aid = q.aid;
+    _grader.qi = qi;
+    _grader.studentIds = ids;
+    if (_grader.rowOrder) _grader.rowOrder = ids.slice();
+    _grader.menuSid = null;
+    _grader.show = _grader.queueShow;
+    _grader.work = { page: 0, fit: _workFitSaved(), turns: {}, focus: false, pics: {} };
+    _grader.reflectDrafts = {};
+    _grader.reflectBusy = null;
+    _grader.reflectMsg = null;
+    _grader.revisionMsg = null;
+    _grader.source = null;
+    // Drawn from the start, as a piece opened new is.
+    _grader.workShell = undefined;
+    openAssessIds = new Set([q.aid]);
+    _commentPopoverState = null;
+    CritComment.drop();
+    _kbFocusEl = null;
+    _statusDebounce = {};
+    var a = _assessmentById(cid, q.aid);
+    var stops = _graderStops(cid, a);
+    var listed =
+      _graderShowOn() && _graderShowWanted(cid, a)
+        ? stops.filter(function (s) {
+            return _stopShown(cid, q.aid, s, _grader.show);
+          })
+        : [];
+    var pool = listed.length ? listed : stops;
+    var stop = which === 'last' ? pool[pool.length - 1] : pool[0];
+    focusStudentId = stop.focus;
+    _graderToTop();
+    render();
+    if (!_grader) return;
+    var again = _grader.overlay.querySelector('[data-grader="next"]:not(:disabled)');
+    if (again) again.focus({ preventScroll: true });
+    else _grader.overlay.querySelector('.grader-dialog').focus({ preventScroll: true });
+    if (which === 'first') _focusGraderPoints(q.aid);
+  }
+
+  /* Next and Previous in a queue: on the last step of a piece Next names the
+     next piece (or reads Finish after the last); on the first step Previous
+     is on when a piece comes before. Called after the dialog's chrome is
+     drawn, so it has the last word on both buttons. */
+  function _graderApplyQueue(dialog, cid, a, view) {
+    if (!_grader.queue) return;
+    if (_grader.caughtUp && !dialog.querySelector('.grader-caught-up')) _grader.caughtUp = false;
+    var next = dialog.querySelector('[data-grader="next"]');
+    var prev = dialog.querySelector('[data-grader="prev"]');
+    if (!next || !prev) return;
+    if (_graderEdge(1)) {
+      var to = _graderQueueTarget(1);
+      var following = to >= 0 ? _assessmentById(cid, _grader.queue[to].aid) : null;
+      var title = following ? following.title || 'Assessment' : '';
+      var label = following ? 'Next: ' + title + ' →' : 'Finish';
+      next.disabled = false;
+      if (next.dataset.queueLabel !== label) {
+        next.dataset.queueLabel = label;
+        next.classList.add('is-queue');
+        // html-safe: the title goes through esc
+        next.innerHTML = following
+          ? '<span class="grader-next-pre">Next: </span><span class="grader-next-title">' +
+            esc(title) +
+            '</span><span class="grader-next-arrow"> →</span>'
+          : '<span class="grader-next-pre">Finish</span>';
+      }
+      next.setAttribute('aria-label', label);
+      next.title = label;
+    } else if (next.classList.contains('is-queue')) {
+      next.classList.remove('is-queue');
+      delete next.dataset.queueLabel;
+      next.removeAttribute('title');
+      // html-safe: a fixed icon
+      next.innerHTML = _GRADER_CHEVRON_RIGHT;
+      next.setAttribute('aria-label', view ? 'Next' : 'Next student');
+    }
+    var back = _graderEdge(-1) ? _graderQueueTarget(-1) : -1;
+    if (back >= 0) {
+      var before = _assessmentById(cid, _grader.queue[back].aid);
+      prev.disabled = false;
+      prev.title = 'Previous: ' + (before.title || 'Assessment');
+      prev.dataset.queueBack = '1';
+    } else if (prev.dataset.queueBack) {
+      delete prev.dataset.queueBack;
+      prev.removeAttribute('title');
+    }
+  }
+
+  // The queue's pieces with grades waiting, in order: [{ aid, title, sids }], whole class.
+  function _graderQueueWaiting(cid) {
+    if (!_holdsGrades(cid)) return [];
+    var roster = getStudents(cid).map(function (s) {
+      return s.id;
+    });
+    var seen = {};
+    var out = [];
+    _grader.queue.forEach(function (q) {
+      var a = _assessmentById(cid, q.aid);
+      if (!a || seen[q.aid]) return;
+      seen[q.aid] = true;
+      var sids = GraderWork.draftsReturned(cid, q.aid, roster);
+      if (sids.length) out.push({ aid: q.aid, title: a.title || 'Assessment', sids: sids });
+    });
+    return out;
+  }
+
+  /* All Caught Up, over the dialog after the last step of the last piece:
+     what is waiting to be returned, piece by piece, then Return N Graded
+     and Not Yet; in a class that holds no grades, or with nothing waiting,
+     Done. */
+  // html-safe: counts and fixed words; titles go through esc
+  function _graderCaughtUpHtml(items) {
+    var n = items.reduce(function (sum, i) {
+      return sum + i.sids.length;
+    }, 0);
+    return (
+      '<h2 class="grader-caught-up-title" id="grader-caught-up-title">All Caught Up</h2>' +
+      (items.length
+        ? '<ul class="grader-caught-up-list">' +
+          items
+            .map(function (i) {
+              return (
+                '<li><span class="grader-caught-up-name">' +
+                esc(i.title) +
+                '</span><span class="grader-caught-up-n">' +
+                i.sids.length +
+                ' graded</span></li>'
+              );
+            })
+            .join('') +
+          '</ul>' +
+          '<div class="grader-caught-up-actions">' +
+          '<button type="button" class="btn btn-primary" data-grader="caught-return">' +
+          esc(GradeState.returnNGraded(n)) +
+          '</button>' +
+          '<button type="button" class="btn btn-ghost" data-grader="caught-close">Not Yet</button></div>'
+        : '<div class="grader-caught-up-actions">' +
+          '<button type="button" class="btn btn-primary" data-grader="caught-close">Done</button></div>')
+    );
+  }
+
+  function _graderShowCaughtUp() {
+    var cid = activeCourse;
+    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    if (!dialog) return;
+    var active = document.activeElement;
+    if (active && _grader.overlay.contains(active) && active.blur) active.blur();
+    _graderHideCaughtUp();
+    var panel = document.createElement('section');
+    panel.className = 'grader-caught-up';
+    panel.setAttribute('aria-labelledby', 'grader-caught-up-title');
+    // html-safe: built by _graderCaughtUpHtml
+    panel.innerHTML = _graderCaughtUpHtml(_graderQueueWaiting(cid));
+    Array.prototype.forEach.call(dialog.children, function (el) {
+      el.setAttribute('inert', '');
+    });
+    dialog.appendChild(panel);
+    _grader.caughtUp = true;
+    var first = panel.querySelector('button');
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  function _graderHideCaughtUp() {
+    if (!_grader) return;
+    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    if (!dialog) return;
+    var panel = dialog.querySelector('.grader-caught-up');
+    if (panel) panel.remove();
+    Array.prototype.forEach.call(dialog.children, function (el) {
+      el.removeAttribute('inert');
+    });
+    var wasUp = _grader.caughtUp;
+    _grader.caughtUp = false;
+    if (wasUp) {
+      var back = dialog.querySelector('[data-grader="next"]') || dialog;
+      back.focus({ preventScroll: true });
+    }
+  }
+
+  // Return N Graded on the panel: asks first, naming everyone, then returns each piece's drafts and closes.
+  function _graderCaughtReturn(button) {
+    if (!_grader) return;
+    var cid = activeCourse;
+    var overlay = _grader.overlay;
+    var items = _graderQueueWaiting(cid);
+    if (!items.length) return closeGrader();
+    _askReturnPieces(cid, items, button, function () {
+      if (!_grader || _grader.overlay !== overlay) return;
+      items.forEach(function (i) {
+        _returnDrafts(cid, i.aid, i.sids);
+      });
+      closeGrader();
+    });
+  }
+
+  /* One question for the drafts waiting on several pieces: "Return 4 Grades
+     Now?" and the names, once each, of everyone with a grade waiting. */
+  function _askReturnPieces(cid, items, button, then) {
+    var all = [];
+    items.forEach(function (i) {
+      all = all.concat(i.sids);
+    });
+    var who = all.filter(function (sid, k) {
+      return all.indexOf(sid) === k;
+    });
+    var message = GradeState.draftsSentence(cid, who);
+    if (who.length !== all.length)
+      message = message.replace(/^\d+ drafts?/, all.length + ' drafts').replace(' it yet.', ' them yet.');
+    if (button && button.focus) button.focus({ preventScroll: true });
+    showConfirm(GradeState.returnQuestion(all.length), message, GradeState.returnNGraded(all.length), 'primary', then);
+  }
+
+  /* The Dashboard's Return N Graded (I3): one question naming everyone with
+     a grade waiting on these pieces, then each piece's drafts are returned
+     and `then` is called. It reads nothing from the page shown: every call
+     takes the class. Nothing happens, and `then` is not called, in a class
+     that holds no grades or with nothing waiting. */
+  function askReturn(cid, aids, button, then) {
+    if (!_holdsGrades(cid)) return;
+    var roster = getStudents(cid).map(function (s) {
+      return s.id;
+    });
+    var items = [];
+    (aids || []).forEach(function (aid) {
+      var have = items.some(function (i) {
+        return i.aid === aid;
+      });
+      if (have) return;
+      var sids = GraderWork.draftsReturned(cid, aid, roster);
+      if (sids.length) items.push({ aid: aid, sids: sids });
+    });
+    if (!items.length) return;
+    _askReturnPieces(cid, items, button, function () {
+      items.forEach(function (i) {
+        _returnDrafts(cid, i.aid, i.sids);
+      });
+      if (typeof then === 'function') then();
+    });
+  }
+
   // ← → on group work. False on other work, which steps student by student.
   function _graderStepGroup(dir) {
     var cid = activeCourse;
@@ -14021,6 +14362,7 @@ window.PageAssignments = (function () {
     // To Return, Returned and All, and Return N Graded (S1-F2). It draws
     // the dialog again itself when what Show lists has run out.
     if (_refreshGraderShow(dialog, cid, a)) return;
+    _graderApplyQueue(dialog, cid, a, view);
     var grade = _graderGrade(cid, a, sid);
     // The foot's: a member graded separately has a grade of her own in the
     // members card, above it.
@@ -17459,6 +17801,7 @@ window.PageAssignments = (function () {
     render: render,
     openGrader: openGrader,
     closeGrader: closeGrader,
+    askReturn: askReturn,
     graderOpen: function () {
       return !!_grader;
     },
