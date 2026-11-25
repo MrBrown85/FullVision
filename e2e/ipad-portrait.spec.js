@@ -275,7 +275,7 @@ for (const [width, height, ipad] of [
               ),
             ]
               .filter(e => {
-                // A student's tick is 13 px wide, 12 tall: one of a row of them (28 across the tile).
+                // A student's tick is 12 px tall, one of a row of them sharing the row's width.
                 // Its row's name and the tile's other controls are the finger's size.
                 if (e.matches('.dash-comp-tick')) return false;
                 const r = e.getBoundingClientRect();
