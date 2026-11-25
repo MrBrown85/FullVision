@@ -574,8 +574,7 @@ window.MStudentDetail = (function () {
       id: 'student-detail',
       title: displayName(st),
       backLabel: 'Students',
-      rightHTML:
-        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>',
+      rightHTML: MC.syncDot(),
     });
     // Each designation by its code and name ("P Gifted"), as the desktop
     // header shows them, then the IEP / MOD / ELL badges.

@@ -382,8 +382,39 @@ body.fv-switching-course::after {
 /* Sync light, as on the desktop top bar. The dot's colours come from
    teacher/styles.css; data.js sets its state. */
 .m-sync {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sync .tb-sync-dot {
+  display: block;
+}
+/* A tap shows the dot's words under it (MComponents.showSyncTip). */
+.m-sync-tip {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: -36px;
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
 
 /* Large title area */

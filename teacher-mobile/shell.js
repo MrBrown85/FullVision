@@ -1008,6 +1008,7 @@
         return;
       }
 
+      if (action === 'm-sync-dot') return MC.showSyncTip(target); // the dot's words; red tries again
       // ⋯: the Settings sheet (Help, sign out, switch to desktop)
       if (action === 'm-settings') {
         // getLastSyncedAt() is an ISO string (data.js). Calling .toISOString()
