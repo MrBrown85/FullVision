@@ -15,7 +15,7 @@ const PRECACHE_URLS = [
   '/favicon.svg',
   '/assets/icons/apple-touch-icon.png',
   // Demo Mode's sample class: the Inbox's thumbnails and the sample bulletins' pages, so an offline Demo draws them.
-  // (The full-size sample pages open from the network; they are about 2.5 MB together.)
+  // (The other full-size sample pages open from the network; they are about 2 MB together.)
   '/assets/sample-work/cell-lab-cece-1-thumb.jpg',
   '/assets/sample-work/cell-lab-fatima-1-thumb.jpg',
   '/assets/sample-work/cell-lab-fatima-2-thumb.jpg',
@@ -34,6 +34,15 @@ const PRECACHE_URLS = [
   '/assets/sample-work/light-lab-maya-1-thumb.jpg',
   '/assets/sample-work/light-lab-sofia-1-thumb.jpg',
   '/assets/sample-work/light-lab-sofia-2-thumb.jpg',
+  // The To Grade stack's top sheet is the page itself (the thumbnail first), so Light Refraction Lab's pages are
+  // kept whole too (about 440 KB).
+  '/assets/sample-work/light-lab-aiden-1.jpg',
+  '/assets/sample-work/light-lab-ines-1.jpg',
+  '/assets/sample-work/light-lab-liv-1.jpg',
+  '/assets/sample-work/light-lab-marcus-1.jpg',
+  '/assets/sample-work/light-lab-maya-1.jpg',
+  '/assets/sample-work/light-lab-sofia-1.jpg',
+  '/assets/sample-work/light-lab-sofia-2.jpg',
   '/assets/sample-bulletins/cell-board-1.svg',
   '/assets/sample-bulletins/cell-theory-1.svg',
   '/assets/sample-bulletins/cell-theory-2.svg',
@@ -135,10 +144,6 @@ const PRECACHE_URLS = [
   '/teacher/dashboard.css',
   '/teacher/dash-competencies.css',
   '/teacher/dash-inbox.css',
-  '/teacher/dash-inbox-pick.css',
-  '/teacher/dash-inbox-side.css',
-  '/teacher/dash-inbox-flip.css',
-  '/teacher/dash-inbox-roll.css',
   '/teacher/dash-inbox-stacks.css',
   '/teacher/dash-inbox-rollcall.css',
   '/teacher/dash-inbox-targets.css',
@@ -237,10 +242,6 @@ const PRECACHE_URLS = [
   '/teacher/dash-inbox-model.js',
   '/teacher/dash-inbox.js',
   '/teacher/dash-inbox-drop.js',
-  '/teacher/dash-inbox-pick.js',
-  '/teacher/dash-inbox-side.js',
-  '/teacher/dash-inbox-flip.js',
-  '/teacher/dash-inbox-roll.js',
   '/teacher/dash-inbox-queue.js',
   '/teacher/dash-inbox-stacks.js',
   '/teacher/dash-inbox-targets.js',

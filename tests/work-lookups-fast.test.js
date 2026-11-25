@@ -14,6 +14,8 @@
  * does not depend on the machine).
  */
 import './setup.js';
+import { readFileSync } from 'fs';
+import { runInThisContext } from 'vm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { U, seedClass, clearClass, openAssignments, closePages } from './helpers/pin-save-paths.js';
@@ -168,11 +170,8 @@ describe("one student's work on one piece", { timeout: 120000 }, () => {
 
 // The panel drawn and then mounted, as the Dashboard does it: the tile's view
 // runs its mount in afterRender, and the counting guards must see that too.
-let mounts = 0;
 function drawAndMount(draw) {
   const was = globalThis.document;
-  const pm = DashInboxPick.mount;
-  DashInboxPick.mount = (...a) => (mounts++, pm.apply(DashInboxPick, a));
   const html = draw();
   const dom = parseHTML('<!DOCTYPE html><html><body><main id="main">' + html + '</main></body></html>');
   const proto = Object.getPrototypeOf(Object.getPrototypeOf(dom.document.createElement('div')));
@@ -184,10 +183,28 @@ function drawAndMount(draw) {
     DashInbox.beforeRender();
   } finally {
     globalThis.document = was;
-    DashInboxPick.mount = pm;
   }
   return html;
 }
+
+const panel = ids => ({
+  cid: CID,
+  sections: [],
+  allStudents: getStudents(CID),
+  assessments: [],
+  classAvg: 0,
+  classR: 0,
+  ccCounts: {},
+  ccAssessments: {},
+  ccObs: {},
+  coreSelf: coreSelfRatings(CID, ids),
+  coreView: 'self',
+  compView: 'mix',
+  obs: {},
+  classChange: null,
+  helpRule: null,
+  naComp: null,
+});
 
 describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }, () => {
   it('counting the class’s work, the rows’ buttons, and Same Photo As', () => {
@@ -201,7 +218,7 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     expect(wholeClassCopies).toBe(0);
   });
 
-  it('the Dashboard draw counts the class once and asks workCounts only for the rows drawn', () => {
+  it("the Dashboard draw counts the class once and asks no piece's counts again", () => {
     seed();
     const ids = getStudents(CID).map(s => s.id);
     const calls = { workCounts: 0, classWorkCounts: 0 };
@@ -210,216 +227,31 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     GraderWork.workCounts = (...a) => (calls.workCounts++, wc.apply(GraderWork, a));
     GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
     try {
-      // The model alone: one count of the class, and one workCounts for each row drawn.
       wholeClassCopies = 0;
-      const m = DashInboxModel.build(CID, { seen: null });
-      expect(wholeClassCopies).toBe(1);
-      expect(m.pieces.length).toBeGreaterThan(20);
-      expect(m.rows).toHaveLength(4);
-      expect(calls.classWorkCounts).toBe(1);
-      expect(calls.workCounts).toBeLessThanOrEqual(m.rows.length + 2);
-      expect(m.pieces.reduce((n, p) => n + p.tograde, 0)).toBe(cwc(CID, ids).tograde);
-
-      // The whole panel: the top bar and the Inbox share the one count.
-      calls.workCounts = calls.classWorkCounts = 0;
-      const html = DashOverview.renderOverviewPanel({
-        cid: CID,
-        sections: [],
-        allStudents: getStudents(CID),
-        assessments: [],
-        classAvg: 0,
-        classR: 0,
-        ccCounts: {},
-        ccAssessments: {},
-        ccObs: {},
-        coreSelf: coreSelfRatings(CID, ids),
-        coreView: 'self',
-        compView: 'mix',
-        obs: {},
-        classChange: null,
-        helpRule: null,
-        naComp: null,
-      });
+      const html = drawAndMount(() => DashOverview.renderOverviewPanel(panel(ids)));
       expect(html).toContain('id="dash-inbox"');
       expect(html).toContain('dash-glance-tograde');
-      expect(calls.classWorkCounts).toBe(1);
-      expect(calls.workCounts).toBeLessThanOrEqual(4 + 2);
-    } finally {
-      GraderWork.workCounts = wc;
-      GraderWork.classWorkCounts = cwc;
-    }
-  });
-
-  it('the Dashboard draw with Side by Side counts the class once and no piece again', () => {
-    seed();
-    const ids = getStudents(CID).map(s => s.id);
-    const calls = { workCounts: 0, classWorkCounts: 0, workInIds: 0 };
-    const wc = GraderWork.workCounts;
-    const cwc = GraderWork.classWorkCounts;
-    const wi = GraderWork.workInIds;
-    GraderWork.workCounts = (...a) => (calls.workCounts++, wc.apply(GraderWork, a));
-    GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
-    GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
-    try {
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'side');
-      const draw = () =>
-        DashOverview.renderOverviewPanel({
-          cid: CID,
-          sections: [],
-          allStudents: getStudents(CID),
-          assessments: [],
-          classAvg: 0,
-          classR: 0,
-          ccCounts: {},
-          ccAssessments: {},
-          ccObs: {},
-          coreSelf: coreSelfRatings(CID, ids),
-          coreView: 'self',
-          compView: 'mix',
-          obs: {},
-          classChange: null,
-          helpRule: null,
-          naComp: null,
-        });
-      // The tile's own By Assessment model is built in every view: that is the baseline.
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'assessment');
-      drawAndMount(draw);
-      const base = { ...calls };
-      expect(base.classWorkCounts).toBe(1);
-      calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'side');
-      const html = drawAndMount(draw);
-      expect(mounts).toBeGreaterThan(0);
-      expect(html).toContain('dash-inbox-side-row');
-      expect(html).toContain('dash-inbox-pick-btn');
-      // One count of the class, shared with the top bar; the switch counts no piece again.
-      expect(calls.classWorkCounts).toBe(1);
-      // Over the baseline only the chosen piece's own row asks: its counts, and who is in.
-      expect(calls.workCounts).toBeLessThanOrEqual(base.workCounts + 1);
-      expect(calls.workInIds).toBeLessThanOrEqual(base.workInIds + 1);
-      // The next draw counts afresh (a new send shows), and no more than the first.
-      const first = { ...calls };
-      calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
-      drawAndMount(draw);
-      expect(calls).toEqual(first);
-    } finally {
-      GraderWork.workCounts = wc;
-      GraderWork.classWorkCounts = cwc;
-      GraderWork.workInIds = wi;
-      localStorage.removeItem('fv-dash-inbox-view:' + CID);
-    }
-  });
-
-  it("the Dashboard draw with the redrawn Inbox counts the class once and asks no piece's counts again", () => {
-    seed();
-    const ids = getStudents(CID).map(s => s.id);
-    const calls = { workCounts: 0, classWorkCounts: 0 };
-    const wc = GraderWork.workCounts;
-    const cwc = GraderWork.classWorkCounts;
-    GraderWork.workCounts = (...a) => (calls.workCounts++, wc.apply(GraderWork, a));
-    GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
-    try {
-      const draw = () =>
-        DashOverview.renderOverviewPanel({
-          cid: CID,
-          sections: [],
-          allStudents: getStudents(CID),
-          assessments: [],
-          classAvg: 0,
-          classR: 0,
-          ccCounts: {},
-          ccAssessments: {},
-          ccObs: {},
-          coreSelf: coreSelfRatings(CID, ids),
-          coreView: 'self',
-          compView: 'mix',
-          obs: {},
-          classChange: null,
-          helpRule: null,
-          naComp: null,
-        });
-      localStorage.setItem('fv-build-inboxStacks', '1');
-      wholeClassCopies = 0;
-      const html = drawAndMount(draw);
       expect(html).toContain('dash-inbox-stacks-row');
       const waiting = cwc(CID, ids).pieces.filter(p => p.tograde > 0).length;
       expect(waiting).toBeGreaterThan(20);
       expect(html.match(/class="dash-inbox-stack"/g)).toHaveLength(waiting);
-      // One count of the class, shared with the top bar and the tile's model.
+      // One count of the class, shared with the top bar and the tile.
       expect(calls.classWorkCounts).toBe(1);
-      // The stacks ask no piece's counts: only the model's rows (four) do.
-      expect(calls.workCounts).toBeLessThanOrEqual(4 + 2);
-      // The class's work is read once for the model and once for the queue, never per piece.
+      // The stacks ask no piece's counts.
+      expect(calls.workCounts).toBe(0);
+      // The class's work is read once for the queue, never per piece.
       expect(wholeClassCopies).toBeLessThanOrEqual(2);
     } finally {
       GraderWork.workCounts = wc;
       GraderWork.classWorkCounts = cwc;
-      localStorage.removeItem('fv-build-inboxStacks');
-    }
-  });
-
-  it('the Dashboard draw with Flip Through counts the class once and no piece again', () => {
-    seed();
-    const ids = getStudents(CID).map(s => s.id);
-    const calls = { workCounts: 0, classWorkCounts: 0, workInIds: 0 };
-    const wc = GraderWork.workCounts;
-    const cwc = GraderWork.classWorkCounts;
-    const wi = GraderWork.workInIds;
-    GraderWork.workCounts = (...a) => (calls.workCounts++, wc.apply(GraderWork, a));
-    GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
-    GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
-    try {
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'flip');
-      const draw = () =>
-        DashOverview.renderOverviewPanel({
-          cid: CID,
-          sections: [],
-          allStudents: getStudents(CID),
-          assessments: [],
-          classAvg: 0,
-          classR: 0,
-          ccCounts: {},
-          ccAssessments: {},
-          ccObs: {},
-          coreSelf: coreSelfRatings(CID, ids),
-          coreView: 'self',
-          compView: 'mix',
-          obs: {},
-          classChange: null,
-          helpRule: null,
-          naComp: null,
-        });
-      // The tile's own By Assessment model is built in every view: that is the baseline.
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'assessment');
-      drawAndMount(draw);
-      const base = { ...calls };
-      expect(base.classWorkCounts).toBe(1);
-      calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'flip');
-      const html = drawAndMount(draw);
-      expect(mounts).toBeGreaterThan(0);
-      expect(html).toContain('dash-inbox-flip-stage');
-      expect(html).toContain('dash-inbox-pick-btn');
-      // One count of the class, shared with the top bar; the switch counts no piece again.
-      expect(calls.classWorkCounts).toBe(1);
-      // Over the baseline only the chosen piece's own row asks: its counts, and who is in.
-      expect(calls.workCounts).toBeLessThanOrEqual(base.workCounts + 1);
-      expect(calls.workInIds).toBeLessThanOrEqual(base.workInIds + 1);
-      // The next draw counts afresh (a new send shows), and no more than the first.
-      const first = { ...calls };
-      calls.workCounts = calls.classWorkCounts = calls.workInIds = 0;
-      drawAndMount(draw);
-      expect(calls).toEqual(first);
-    } finally {
-      GraderWork.workCounts = wc;
-      GraderWork.classWorkCounts = cwc;
-      GraderWork.workInIds = wi;
-      localStorage.removeItem('fv-dash-inbox-view:' + CID);
     }
   });
 
   it('the Dashboard draw with Roll Call counts the class once and reads only the chosen piece', () => {
     seed();
+    runInThisContext(readFileSync('teacher/dash-inbox-rollcall.js', 'utf-8'), {
+      filename: 'teacher/dash-inbox-rollcall.js',
+    });
     const ids = getStudents(CID).map(s => s.id);
     const calls = { workCounts: 0, classWorkCounts: 0, workInIds: 0, workStateOf: 0 };
     const ws = GraderWork.workStateOf;
@@ -431,39 +263,19 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
     GraderWork.workInIds = (...a) => (calls.workInIds++, wi.apply(GraderWork, a));
     try {
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'roll');
-      const draw = () =>
-        DashOverview.renderOverviewPanel({
-          cid: CID,
-          sections: [],
-          allStudents: getStudents(CID),
-          assessments: [],
-          classAvg: 0,
-          classR: 0,
-          ccCounts: {},
-          ccAssessments: {},
-          ccObs: {},
-          coreSelf: coreSelfRatings(CID, ids),
-          coreView: 'self',
-          compView: 'mix',
-          obs: {},
-          classChange: null,
-          helpRule: null,
-          naComp: null,
-        });
-      // The tile's own By Assessment model is built in every view: that is the baseline.
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'assessment');
+      const draw = () => DashOverview.renderOverviewPanel(panel(ids));
+      // The To Grade view is the baseline.
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'stacks');
       draw();
       const base = { ...calls };
       expect(base.classWorkCounts).toBe(1);
       calls.workCounts = calls.classWorkCounts = calls.workInIds = calls.workStateOf = 0;
-      localStorage.setItem('fv-dash-inbox-view:' + CID, 'roll');
+      localStorage.setItem('fv-dash-inbox-view:' + CID, 'rollcall');
       const html = draw();
-      expect(html).toContain('dash-inbox-roll-grid');
-      expect(html).toContain('dash-inbox-pick-btn');
+      expect(html).toContain('dash-inbox-rollcall');
       // One count of the class, shared with the top bar; the switch counts no piece again.
       expect(calls.classWorkCounts).toBe(1);
-      // Over the baseline only the chosen piece's own row asks: its counts, and who is in.
+      // Over the baseline only the chosen piece's own count asks: its counts, and who is in.
       expect(calls.workCounts).toBeLessThanOrEqual(base.workCounts + 1);
       expect(calls.workInIds).toBeLessThanOrEqual(base.workInIds + 1);
       // Each student of the one piece is asked once for a state, and no other piece's students are.

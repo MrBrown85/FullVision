@@ -1,8 +1,7 @@
 /**
  * The redrawn Inbox's To Grade view (teacher/dash-inbox-stacks.js, and the
  * tile's header in teacher/dash-inbox.js; slice I1 of
- * docs/plans/inbox-redesign-plan.md). Behind the build switch inboxStacks:
- * with it off the tile is the one that was released.
+ * docs/plans/inbox-redesign-plan.md).
  */
 import './setup.js';
 import { readFileSync } from 'fs';
@@ -46,8 +45,6 @@ afterEach(() => {
   delete window.WorkWall;
 });
 
-const flagOn = () => localStorage.setItem('fv-build-inboxStacks', '1');
-
 // The tile as a page: DashInbox's click looks for it in the document.
 function mountTile() {
   const html = DashInbox.html(CID);
@@ -76,23 +73,7 @@ function clickOn(doc, selector) {
   return { handled, redraws: () => redraws };
 }
 
-describe('with the switch off', () => {
-  it('is the tile that was released: a view pill, By Assessment, no stacks', () => {
-    const doc = parseHTML('<body>' + DashInbox.html(CID) + '</body>').document;
-    expect(doc.querySelector('.dash-view-btn').textContent.trim()).toBe('By Assessment');
-    expect(doc.querySelector('.dash-inbox-row')).toBeTruthy();
-    expect(doc.querySelector('.is-stacks, .dash-inbox-switch, .dash-inbox-stack')).toBeNull();
-  });
-
-  it('keeps the view the teacher chose, and ignores the stacks key', () => {
-    DashInbox.setView(CID, 'stacks');
-    expect(DashInbox.viewOf(CID).key).toBe('assessment');
-  });
-});
-
-describe('with the switch on', () => {
-  beforeEach(flagOn);
-
+describe('the To Grade view', () => {
   it('has the title, a two-button switch, Assignments →, one button, and no view menu or assignment row', () => {
     const doc = parseHTML('<body>' + DashInbox.html(CID) + '</body>').document;
     const head = doc.querySelector('.dash-inbox-head');
@@ -283,7 +264,6 @@ describe('the states', () => {
     const q = queue({ returns: [ret('a', 28), ret('b', 3), ret('c', 1), ret('d', 18)], toReturn: 50 });
     const head = parseHTML('<body>' + DashInboxStacks.headerHtml(CID, null, q) + '</body>').document;
     expect(head.querySelector('button').textContent).toBe('Return All 50');
-    flagOn();
     const doc = parseHTML('<body>' + DashInboxStacks.html(CID, null, q) + '</body>').document;
     expect(doc.querySelector('.dash-inbox-stack')).toBeNull();
     expect(doc.querySelector('.dash-inbox-returns').classList.contains('is-solo')).toBe(true);
@@ -313,14 +293,12 @@ describe('the states', () => {
   });
 
   it("with nothing to grade or return, draws the tile's existing empty state", () => {
-    flagOn();
     const html = DashInboxStacks.html(CID, { caughtUp: true }, queue());
     expect(html).toContain('id="dash-inbox-caught"');
     expect(DashInboxStacks.headerHtml(CID, null, queue())).toBe('');
   });
 
   it('writes a title only through esc', () => {
-    flagOn();
     const q = queue({
       toGrade: 2,
       caughtUp: false,

@@ -1,10 +1,12 @@
 # The Inbox, redrawn (2026-11-24)
 
+**Status.** I1 to I5 are built and on for everyone since I5 (2026-11-24); the old views and their tests are deleted. On `main`, not released.
+
 **Why.** The Inbox showed all student work, so the few pieces waiting on the teacher were lost among returned ones. Colin, Nov 24: show only what is waiting; no row of assignments along the top; no grey explainer lines; no grading inside the tile; keep Roll Call.
 
 **Board.** "Inbox Redesign Board" (https://claude.ai/artifact/CNpZMPoLwkpM522dLJxNbo), the Revision row, R1 to R6. Each builder's brief is written from the board's own files.
 
-**Switch.** `inboxStacks` in `shared/build-flags.js`, off. Off, the Inbox is exactly as released. On, the tile draws what this plan describes. The last slice turns it on and deletes the old views.
+**Switch.** `inboxStacks` in `shared/build-flags.js` was off until the last slice (I5), which turned it on and deleted the old views; the name stays only so a device that kept the key changes nothing.
 
 ## What the tile is (switch on)
 

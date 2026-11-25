@@ -1,6 +1,5 @@
 /**
- * The redrawn Inbox's To Grade view (slice I1 of docs/plans/inbox-redesign-plan.md),
- * behind the build switch inboxStacks. Demo Mode, Science 8, the student page and
+ * The redrawn Inbox's To Grade view (slice I1 of docs/plans/inbox-redesign-plan.md). Demo Mode, Science 8, the student page and
  * Send Work on. Set FV_SHOTS to a folder to keep pictures.
  */
 import { test, expect } from '@playwright/test';
@@ -20,7 +19,6 @@ const shot = async (page, name) => {
 
 // With `more`, three more assessments have work waiting (11, 3 and 1 late), as the board draws.
 async function open(page, { tile = true, more = false } = {}) {
-  await page.addInitScript(() => localStorage.setItem('fv-build-inboxStacks', '1'));
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();
@@ -259,20 +257,3 @@ for (const tile of [true, false]) {
     },
   );
 }
-
-test('with the switch off the tile is the released one', async ({ page }) => {
-  await page.goto('/login.html?demo=1');
-  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-  await page.locator('.dash-glance').waitFor();
-  await page.evaluate(() => {
-    const cid = getActiveCourse();
-    setStudentPageSwitch(cid, true, 'on_return');
-    const work = getCourseSubmissions(cid);
-    work.course.send_work = true;
-    saveDemoStudentWork(cid, work);
-    PageDashboard.render();
-  });
-  await page.locator('#dash-inbox').waitFor();
-  await expect(page.locator('#dash-view-btn-inbox')).toContainText('By Assessment');
-  await expect(page.locator('.dash-inbox-stack, .dash-inbox-switch')).toHaveCount(0);
-});

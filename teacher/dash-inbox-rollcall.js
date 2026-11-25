@@ -1,8 +1,7 @@
 // @ts-check
 /* dash-inbox-rollcall.js — the Inbox's Roll Call (slice I2 of
    docs/plans/inbox-redesign-plan.md; board Rev-RollCall). The whole class for
-   one assessment, read down four columns in class-list order. Drawn only when
-   BuildFlags.on('inboxStacks'); the tile's header is another slice's.
+   one assessment, read down four columns in class-list order. The tile's header is DashInbox's.
 
    Row 1: arrows around a menu button that is the assessment's title (a
    listbox of every piece whose work the teacher's screens show, newest dated
@@ -842,11 +841,8 @@ window.DashInboxRollCall = (function () {
     _redraw();
   }
 
-  var bf = /** @type {any} */ (window).BuildFlags;
   var inbox = /** @type {any} */ (window).DashInbox;
-  if (inbox && bf && bf.on('inboxStacks')) {
-    inbox.addView({ key: 'rollcall', label: 'Roll Call', html: html, mount: mount, unmount: unmount });
-  }
+  if (inbox) inbox.addView({ key: 'rollcall', label: 'Roll Call', html: html, mount: mount, unmount: unmount });
 
   return {
     model: model,

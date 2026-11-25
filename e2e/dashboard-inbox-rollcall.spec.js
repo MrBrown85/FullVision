@@ -1,6 +1,6 @@
 /**
  * The Inbox's redrawn Roll Call (teacher/dash-inbox-rollcall.js; slice I2 of
- * docs/plans/inbox-redesign-plan.md), behind the inboxStacks switch. Demo
+ * docs/plans/inbox-redesign-plan.md). Demo
  * Mode, Science 8, the student page and Send Work on. Set FV_SHOTS to a
  * folder to keep pictures.
  */
@@ -15,9 +15,6 @@ const shot = async (page, name) => {
 };
 
 async function open(page, { tile = true } = {}) {
-  await page.addInitScript(() => {
-    localStorage.setItem('fv-build-inboxStacks', '1');
-  });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-glance').waitFor();

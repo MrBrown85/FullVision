@@ -119,7 +119,7 @@ export async function makeRealClass(page) {
 }
 
 /** Demo Mode, the Inbox on `view` (and the Curricular view on `comp`), then the real class. */
-export async function openRealClass(page, { view = 'assessment', comp = null } = {}) {
+export async function openRealClass(page, { view = 'stacks', comp = null } = {}) {
   await page.addInitScript(
     ([v, c]) => {
       try {

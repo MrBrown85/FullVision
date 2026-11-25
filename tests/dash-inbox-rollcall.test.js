@@ -3,7 +3,7 @@
  * docs/plans/inbox-redesign-plan.md): the three counts are GraderWork's, the
  * class is in class-list order, the piece list holds a piece with nothing in,
  * a filter picks the right students, Handed In on Paper writes through
- * markStudentWorkOnPaper, and the view exists only with inboxStacks on.
+ * markStudentWorkOnPaper, and the view is registered with the tile.
  * (Clicks, menus and layout are e2e/dashboard-inbox-rollcall.spec.js.)
  */
 import './setup.js';
@@ -163,13 +163,8 @@ describe('Handed In on Paper', () => {
 });
 
 describe('the switch', () => {
-  it('registers the view only with inboxStacks on', () => {
-    DashInbox.setView(CID, 'rollcall');
-    expect(DashInbox.viewOf(CID).key).not.toBe('rollcall');
-    localStorage.setItem('fv-build-inboxStacks', '1');
-    loadView();
+  it('registers the view, so the tile can show it', () => {
     DashInbox.setView(CID, 'rollcall');
     expect(DashInbox.viewOf(CID).key).toBe('rollcall');
-    localStorage.removeItem('fv-build-inboxStacks');
   });
 });

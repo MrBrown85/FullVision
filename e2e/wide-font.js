@@ -7,7 +7,7 @@
  *   for (const font of FONTS) { ... await useFont(page, font); ... }
  *
  * HARSH is wider still, with the text at 13.3 px and taller lines, as
- * e2e/dashboard-inbox-flip.spec.js measures Flip Through.
+ * e2e/dashboard-inbox-stacks.spec.js measures the stacks.
  */
 export const WIDE_CSS =
   'body, body * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }';

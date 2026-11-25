@@ -1,9 +1,9 @@
 /**
  * The Inbox tile (teacher/dash-inbox.js; D4 of
- * docs/plans/dashboard-inbox-plan.md): no count in its header, the counts
- * line's forms, Grade Submissions carrying its piece, the title opening the
- * Work Wall, All Caught Up, and the top bar's To Grade cell going to the tile
- * when the tile is on the page and to Assignments when it is not.
+ * docs/plans/dashboard-inbox-plan.md, redrawn by
+ * docs/plans/inbox-redesign-plan.md): its header, only in a class with the
+ * student page and Send Work on, its stacks adding up to the top bar's To
+ * Grade, the chosen view and an open stack kept through a redraw.
  */
 import './setup.js';
 import { readFileSync } from 'fs';
@@ -28,7 +28,9 @@ const ids = () => getStudents(CID).map(s => s.id);
 // The tile as a page: DashInbox's click looks for it in the document.
 function mountTile() {
   const html = DashInbox.html(CID);
-  const dom = parseHTML('<!DOCTYPE html><html><body><main id="main">' + html + '</main></body></html>');
+  const dom = parseHTML(
+    '<!DOCTYPE html><html><body><main id="main"><div class="dash-glance"></div>' + html + '</main></body></html>',
+  );
   const proto = Object.getPrototypeOf(Object.getPrototypeOf(dom.document.createElement('div')));
   proto.scrollIntoView = function () {};
   proto.focus = function () {};
@@ -67,60 +69,60 @@ afterEach(() => {
 });
 
 describe('the tile', () => {
-  it('has the title, one view pill, one Assignments link, and no count in its header', () => {
+  it('has the title, a two-way switch, one Assignments link, one button, and no count in its header', () => {
     const doc = mountTile();
     const head = doc.querySelector('.dash-inbox-head');
     expect(head.querySelector('.dash-inbox-title').textContent).toBe('Inbox');
-    expect(head.querySelector('.dash-view-btn').textContent.trim()).toBe('By Assessment');
-    // The pill's menu lists the views registered, By Assessment first (D6 adds Side by Side).
-    expect(head.querySelectorAll('.dash-view-item').length).toBeGreaterThanOrEqual(1);
-    expect(head.querySelector('.dash-view-item .dash-view-name').textContent).toBe('By Assessment');
+    expect(head.querySelector('.dash-view-btn')).toBeNull();
     expect(head.querySelectorAll('a')).toHaveLength(1);
     expect(head.querySelector('a').textContent).toBe('Assignments →');
+    expect(head.querySelectorAll('.dash-inbox-action')).toHaveLength(1);
+    expect(head.querySelector('.dash-inbox-action').textContent).toBe('Start Grading');
     expect(head.textContent).not.toMatch(/\d/);
-    // Closed at rest.
-    expect(head.querySelector('.dash-view-menu').hasAttribute('hidden')).toBe(true);
   });
 
   it('is nothing with Send Work off', () => {
     const work = getCourseSubmissions(CID);
     work.course.send_work = false;
     saveDemoStudentWork(CID, work);
+    expect(DashInbox.shows(CID)).toBe(false);
     expect(DashInbox.html(CID)).toBe('');
   });
 
-  it('says each row\'s counts as "N in · N to grade · N not in"', () => {
-    const doc = mountTile();
-    const row = doc.querySelector('.dash-inbox-row[data-aid="' + LIGHT + '"]');
-    const c = GraderWork.workCounts(CID, LIGHT, ids());
-    const inN = GraderWork.workInIds(CID, LIGHT, ids()).length;
-    expect(row.querySelector('.dash-inbox-main').textContent).toBe(
-      inN + ' in · ' + c.tograde + ' to grade · ' + c.notin + ' not in',
-    );
-    expect(row.querySelector('.dash-inbox-name').textContent).toBe('Light Refraction Lab');
-    // Late is a word, in its own span.
-    expect(row.querySelector('.dash-inbox-late').textContent).toBe('· Late 1');
-    expect(row.querySelector('.dash-inbox-newest').textContent).toMatch(/^Newest: Marcus Lee, /);
-    expect(DashInbox.countsText({ in: 6, tograde: 4, notin: 20, toreturn: 2 })).toBe(
-      '6 in · 4 to grade · 20 not in · 2 to return',
-    );
-    expect(DashInbox.countsText({ in: 6, tograde: 4, notin: 20, toreturn: 0 })).toBe('6 in · 4 to grade · 20 not in');
+  it('is nothing with the student page off', () => {
+    setStudentPageSwitch(CID, false, 'on_return');
+    expect(DashInbox.shows(CID)).toBe(false);
+    expect(DashInbox.html(CID)).toBe('');
   });
 
-  it('puts Late straight after the counts, before the quiet words, so it is never cut', () => {
-    const html = DashInbox.countsHtml({
-      in: 9,
-      tograde: 4,
-      notin: 1,
-      toreturn: 2,
-      late: 3,
-      addedByTeacher: 1,
-      onPaper: 1,
-    });
-    expect(html.indexOf('dash-inbox-main')).toBeLessThan(html.indexOf('dash-inbox-late'));
-    expect(html.indexOf('dash-inbox-late')).toBeLessThan(html.indexOf('dash-inbox-quiet'));
-    expect(html).toContain('· Late 3');
-    expect(html).toContain('You Added 1 · 1 on paper');
+  it("has stacks whose to grade add up to the top bar's To Grade", () => {
+    const doc = mountTile();
+    const sum = [...doc.querySelectorAll('.dash-inbox-stack-count')].reduce((n, el) => n + Number(el.textContent), 0);
+    const bar = parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
+    expect(sum).toBeGreaterThan(0);
+    expect(bar.textContent).toContain(String(sum));
+    expect(DashInbox.model().toGrade).toBe(sum);
+  });
+
+  it('keeps the chosen view and an open stack when the Dashboard draws again', () => {
+    DashInbox.addView({ key: 'rollcall', label: 'Roll Call', html: () => '<p id="rc">roll</p>' });
+    try {
+      let doc = mountTile();
+      clickOn(doc, '.dash-inbox-stack');
+      doc = mountTile();
+      expect(doc.querySelector('.dash-inbox-spread')).toBeTruthy();
+      expect(doc.querySelector('[data-mode="stacks"]').getAttribute('aria-pressed')).toBe('true');
+      DashInbox.setView(CID, 'rollcall');
+      doc = mountTile();
+      expect(doc.querySelector('#rc')).toBeTruthy();
+      expect(doc.querySelector('[data-mode="rollcall"]').getAttribute('aria-pressed')).toBe('true');
+      // Back to To Grade: the stack is still open.
+      DashInbox.setView(CID, 'stacks');
+      expect(mountTile().querySelector('.dash-inbox-spread')).toBeTruthy();
+    } finally {
+      DashInbox.setView(CID, 'stacks');
+      DashInboxStacks.reset();
+    }
   });
 
   it('reads the time as "Thu 1:05 pm", with no comma, and a date past a week', () => {
@@ -135,145 +137,27 @@ describe('the tile', () => {
     const key = 'fv-dash-inbox-seen:' + CID;
     localStorage.removeItem(key);
     const doc = parseHTML('<body>' + DashInbox.html(CID) + '</body>').document;
-    expect(doc.querySelector('.dash-inbox-new')).toBeNull();
+    expect(doc.querySelector('.dash-inbox-stack-dot')).toBeNull();
     expect(Date.parse(localStorage.getItem(key))).toBeGreaterThan(0);
   });
 
-  it('draws a paper hand-in as a sheet named for the student, with the full name for a screen reader', () => {
-    const work = getCourseSubmissions(CID);
-    work.submissions.push({
-      id: 'paper-1',
-      assessment_id: LIGHT,
-      enrollment_id: 'st1',
-      version: 1,
-      state: 'sent',
-      sent_by: 'teacher',
-      on_paper: true,
-      is_late: false,
-      note: null,
-      sent_at: '2999-01-01T00:00:00Z',
-      created_at: '2999-01-01T00:00:00Z',
-      files: [],
-    });
-    saveDemoStudentWork(CID, work);
-    const doc = parseHTML('<body>' + DashInbox.html(CID) + '</body>').document;
-    const sheet = doc.querySelector('.dash-inbox-sheet');
-    expect(sheet.textContent).toContain('Handed In on Paper');
-    expect(sheet.getAttribute('aria-label')).toMatch(/^.+: Handed In on Paper$/);
-    expect(sheet.querySelector('.dash-inbox-sheet-name').textContent).toBe(
-      sheet.getAttribute('aria-label').replace(': Handed In on Paper', ''),
-    );
-  });
-
-  it('Grade Submissions opens the grader on the first student in the order the work came in', () => {
-    const doc = mountTile();
-    const button = doc.querySelector('.dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-grade');
-    expect(button.textContent).toBe('Grade Submissions');
-    expect(button.getAttribute('data-aid')).toBe(LIGHT);
-    const calls = [];
-    const was = window.PageAssignments;
-    window.PageAssignments = { openGrader: (...a) => calls.push(a) };
-    try {
-      const { handled } = clickOn(doc, '.dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-grade');
-      expect(handled).toBe(true);
-    } finally {
-      window.PageAssignments = was;
-    }
-    const order = DashInboxModel.gradeOrder(CID, LIGHT);
-    expect(calls).toHaveLength(1);
-    expect(calls[0][0]).toBe(CID);
-    expect(calls[0][1]).toBe(LIGHT);
-    expect(calls[0][2]).toBe(order[0]);
-    expect(calls[0][3].studentIds).toEqual(order);
-    expect(calls[0][3].show).toBe('tograde');
-    expect(typeof calls[0][3].onClose).toBe('function');
-  });
-
-  it('the title opens the Work Wall', () => {
+  it("a stack's title opens the Work Wall", () => {
     const doc = mountTile();
     const calls = [];
     window.WorkWall = { open: (...a) => calls.push(a) };
-    expect(clickOn(doc, '.dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-name').handled).toBe(true);
+    expect(clickOn(doc, '.dash-inbox-stack-title').handled).toBe(true);
     expect(calls[0].slice(0, 2)).toEqual([CID, LIGHT]);
     expect(typeof calls[0][2].onClose).toBe('function');
   });
 
-  it('escapes a title and a name', () => {
-    getAssessments(CID).find(a => a.id === LIGHT).title = '<i>Hi</i> & "you"';
-    const html = DashInbox.html(CID);
-    expect(html).not.toContain('<i>Hi');
-    expect(html).toContain('&lt;i&gt;Hi&lt;/i&gt;');
-  });
-
-  it('is All Caught Up when nothing waits, and D5 can replace the line', () => {
-    getStudents(CID);
+  it('is All Caught Up when nothing waits', () => {
     GraderWork.workCounts(CID, LIGHT, ids()).ids.tograde.forEach(sid =>
       Grader.setOverallComment(CID, sid, LIGHT, 'Seen.'),
     );
-    // D5 draws this space; with graded work not yet returned it does not say All Caught Up (the top bar's rule).
-    expect(DashInbox.html(CID)).toContain('id="dash-inbox-caught"');
-    expect(DashInbox.html(CID)).not.toContain('Grade Submissions');
-    const was = DashInbox.emptyHtml;
-    DashInbox.emptyHtml = () => '<li id="d5-drop"></li>';
-    try {
-      expect(DashInbox.html(CID)).toContain('id="d5-drop"');
-      expect(DashInbox.html(CID)).not.toContain('All Caught Up');
-    } finally {
-      DashInbox.emptyHtml = was;
-    }
+    expect(DashInbox.html(CID)).not.toContain('Start Grading');
+    expect(DashInbox.html(CID)).not.toContain('dash-inbox-stack"');
   });
 });
 
 // The top bar as the page draws it; the To Grade cell is inside.
 const glance = () => DashOverview.glanceHtml({ cid: CID, allStudents: getStudents(CID), classAvg: 0, missing: [] });
-
-describe("the top bar's To Grade cell", () => {
-  const cell = () => parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
-
-  it('goes to the Inbox with the tile built', () => {
-    const a = cell();
-    expect(a.hasAttribute('data-dash-inbox-jump')).toBe(true);
-    expect(a.getAttribute('aria-label')).toMatch(/: go to the Inbox$/);
-    // The look and the text are as before.
-    expect(a.querySelector('.dash-glance-label').textContent).toBe('To Grade');
-    expect(a.getAttribute('data-href')).toBe('/assignments?course=' + CID + '&show=tograde');
-  });
-
-  it('opens Assignments with no tile built', () => {
-    const was = window.DashInbox;
-    delete window.DashInbox;
-    try {
-      const a = cell();
-      expect(a.hasAttribute('data-dash-inbox-jump')).toBe(false);
-      expect(a.getAttribute('aria-label')).toMatch(/: open Assignments$/);
-    } finally {
-      window.DashInbox = was;
-    }
-  });
-
-  it('goes to the Inbox whatever an old fv-build-dashRow on the device says (D9: the row is on)', () => {
-    for (const v of ['0', '1', 'no']) {
-      localStorage.setItem('fv-build-dashRow', v);
-      expect(cell().hasAttribute('data-dash-inbox-jump')).toBe(true);
-      expect(DashInbox.shows(CID)).toBe(true);
-    }
-    localStorage.removeItem('fv-build-dashRow');
-  });
-
-  it('a click scrolls to the Inbox and rings it; with none on the page the link is left alone', () => {
-    const doc = mountTile();
-    const cellEl = parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
-    doc.body.appendChild(doc.importNode ? doc.importNode(cellEl, true) : cellEl);
-    const r = clickOn(doc, '.dash-glance-tograde');
-    expect(r.handled).toBe(true);
-    expect(r.prevented).toBe(true);
-    expect(doc.getElementById('dash-inbox').classList.contains('is-ring')).toBe(true);
-    // A click to open a new tab is the link's.
-    expect(clickOn(doc, '.dash-glance-tograde', { metaKey: true }).handled).toBe(false);
-    // No Inbox in the page: the click is not taken.
-    doc.getElementById('dash-inbox').remove();
-    const none = clickOn(doc, '.dash-glance-tograde');
-    expect(none.handled).toBe(false);
-    expect(none.prevented).toBe(false);
-  });
-});

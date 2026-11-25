@@ -42,9 +42,10 @@ async function expectReadable(page) {
 }
 
 /* The Inbox with Send Work on, so the sample work shows (Light Refraction Lab
-   has work waiting), and a kept time long ago so the sends show as +N.
-   `caughtUp` assesses everything waiting; `view` picks a view from the pill. */
-async function openInbox(page, { view = null, caughtUp = false } = {}) {
+   has work waiting), and a kept time long ago so the new work shows its dot.
+   `caughtUp` assesses everything waiting; `view` picks a view from the
+   switch; `stack` opens a stack. */
+async function openInbox(page, { view = null, caughtUp = false, stack = false } = {}) {
   await page.evaluate(caughtUp => {
     const cid = getActiveCourse();
     setStudentPageSwitch(cid, true, 'on_return');
@@ -54,26 +55,24 @@ async function openInbox(page, { view = null, caughtUp = false } = {}) {
     localStorage.setItem('fv-dash-inbox-seen:' + cid, '2000-01-01T00:00:00.000Z');
     if (caughtUp) {
       const ids = getStudents(cid).map(s => s.id);
-      getAssessments(cid).forEach(a =>
+      getAssessments(cid).forEach(a => {
         GraderWork.workCounts(cid, a.id, ids).ids.tograde.forEach(sid =>
           Grader.setOverallComment(cid, sid, a.id, 'Seen.'),
-        ),
-      );
+        );
+        const back = GraderWork.workCounts(cid, a.id, ids).ids.toreturn;
+        if (back.length) Grader.returnGrades(cid, a.id, back);
+      });
     }
     PageDashboard.render();
   }, caughtUp);
-  await page.locator('#dash-inbox, #dash-inbox-caught').first().waitFor();
-  if (view && view !== 'menu') {
-    await page.locator('#dash-view-btn-inbox').click();
-    await page.locator('#dash-view-menu-inbox [data-view="' + view + '"]').click();
-  } else if (view === 'menu') {
-    await page.locator('#dash-view-btn-inbox').click();
-    await expect(page.locator('#dash-view-menu-inbox')).toBeVisible();
-  } else if (!caughtUp) {
-    await expect(page.locator('.dash-inbox-grade').first()).toBeVisible();
-    await expect(page.locator('.dash-inbox-new').first()).toBeVisible();
+  await page.locator('#dash-inbox').waitFor();
+  if (view) await page.locator('[data-dash-inbox="mode"][data-mode="' + view + '"]').click();
+  else if (!caughtUp) {
+    await expect(page.locator('.dash-inbox-action').first()).toBeVisible();
+    await expect(page.locator('.dash-inbox-stack-dot').first()).toBeVisible();
   }
-  if (caughtUp) await expect(page.locator('.dash-inbox-drop-area').first()).toBeVisible();
+  if (stack) await page.locator('.dash-inbox-stack').first().click();
+  if (caughtUp) await expect(page.locator('.dash-inbox-caught-up').first()).toBeVisible();
   // Let a view's own pictures and fades settle.
   await page.waitForTimeout(400);
 }
@@ -93,23 +92,19 @@ async function sendWorkOn(page, hash) {
 
 const DESKTOP = [
   { name: 'dashboard', hash: '/dashboard', ready: '.dash-card' },
-  // The Inbox is behind a build switch. Its +N badge, Grade button, ticks and
-  // buttons are white words on the blue fill; each view and the piece switch
-  // are held to 4.5:1 too.
+  // The Inbox: its dot, buttons and stacks are held to 4.5:1 in each view and state.
   ...[
-    ['By Assessment', null],
-    ['By Assessment, view menu open', 'menu'],
-    ['Side by Side', 'side'],
-    ['Flip Through', 'flip'],
-    ['Roll Call', 'roll'],
-  ].map(([label, view]) => ({
-    name: 'dashboard with the Inbox on, ' + label,
+    ['To Grade', null, false],
+    ['To Grade, a stack open', null, true],
+    ['Roll Call', 'rollcall', false],
+  ].map(([label, view, stack]) => ({
+    name: 'dashboard, the Inbox, ' + label,
     hash: '/dashboard',
     ready: '.dash-glance',
-    open: page => openInbox(page, { view }),
+    open: page => openInbox(page, { view, stack }),
   })),
   {
-    name: 'dashboard with the Inbox on, All Caught Up and the drop area',
+    name: 'dashboard, the Inbox with nothing waiting',
     hash: '/dashboard',
     ready: '.dash-glance',
     open: page => openInbox(page, { caughtUp: true }),

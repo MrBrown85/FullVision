@@ -1,8 +1,7 @@
 /**
  * The redrawn Inbox with nothing waiting (R5) and a scan held over it (R6):
  * teacher/dash-inbox-targets.js and the one-line tile in teacher/dash-inbox.js
- * (slice I4 of docs/plans/inbox-redesign-plan.md). Behind the build switch
- * inboxStacks: off, the tile is D5's, as released.
+ * (slice I4 of docs/plans/inbox-redesign-plan.md).
  */
 import './setup.js';
 import { readFileSync } from 'fs';
@@ -46,7 +45,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const flagOn = () => localStorage.setItem('fv-build-inboxStacks', '1');
 const ids = () => getStudents(CID).map(s => s.id);
 // Everything assessed and returned: nothing to grade and nothing to return.
 function allDone() {
@@ -94,19 +92,7 @@ function dragEvent(doc, type, target, dt) {
 }
 const files = () => ({ types: ['Files'], files: [{ name: 'x.pdf' }], items: [], dropEffect: 'none' });
 
-describe('the switch off', () => {
-  it('is D5 as released: the drop area for a class with nothing to grade', () => {
-    allDone();
-    const doc = parseHTML('<body>' + DashInbox.html(CID, { bulletins: true }) + '</body>').document;
-    expect(doc.querySelector('#dash-inbox-caught')).toBeTruthy();
-    expect(doc.querySelector('.is-quiet, .dash-inbox-target, .dash-inbox-caught-up')).toBeNull();
-    expect(DashInbox.quiet()).toBe(false);
-  });
-});
-
 describe('which state draws', () => {
-  beforeEach(flagOn);
-
   it('work waiting: the usual tile, not the line', () => {
     parseHTML('<body>' + DashInbox.html(CID, { bulletins: true }) + '</body>');
     expect(DashInbox.quiet()).toBe(false);
@@ -178,7 +164,6 @@ describe('which state draws', () => {
 
 describe('the targets', () => {
   beforeEach(() => {
-    flagOn();
     allDone();
   });
 
