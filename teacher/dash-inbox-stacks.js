@@ -508,6 +508,17 @@ window.DashInboxStacks = (function () {
     PA.openGrader(cid, aid, sid, { studentIds: ids, show: 'tograde', onClose: redraw, queue: queue });
   }
 
+  /** Start Grading, and the top bar's To Grade: the grader on the first work
+   * waiting, with the whole Inbox behind it. False when nothing waits.
+   * @param {string} cid @param {() => void} redraw
+   * @returns {boolean} */
+  function start(cid, redraw) {
+    var first = DashInboxQueue.order(cid)[0];
+    if (!first || !first.studentIds.length) return false;
+    _grade(cid, first.aid, first.studentIds[0], redraw);
+    return true;
+  }
+
   /** A click on one of the view's controls. el carries data-dash-inbox;
    * ctx is { cid, redraw }. True when it was this view's.
    * @param {Element} el @param {{ cid: string, redraw: () => void }} ctx
@@ -535,8 +546,7 @@ window.DashInboxStacks = (function () {
       return true;
     }
     if (kind === 'start') {
-      var first = DashInboxQueue.order(cid)[0];
-      if (first && first.studentIds.length) _grade(cid, first.aid, first.studentIds[0], ctx.redraw);
+      start(cid, ctx.redraw);
       return true;
     }
     if (kind === 'stack-return' || kind === 'returnall') {
@@ -564,6 +574,7 @@ window.DashInboxStacks = (function () {
     html: html,
     headerHtml: headerHtml,
     mount: mount,
+    start: start,
     unmount: unmount,
     click: click,
     state: function () {

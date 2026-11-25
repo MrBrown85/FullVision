@@ -147,44 +147,6 @@ test('Grade Submissions opens the grader on the first student in the order the w
   await expect(page.locator('#dash-inbox')).toBeVisible();
 });
 
-test('To Grade in the top bar scrolls to the Inbox and rings it; the ring is gone at rest', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await open(page);
-  const tile = page.locator('#dash-inbox');
-  await expect(tile).not.toHaveClass(/is-ring/);
-  // Scroll the page down so the Inbox is out of view and the top bar's cell is too.
-  await page.evaluate(() => {
-    const main = document.getElementById('main');
-    main.scrollTop = main.scrollHeight;
-    window.scrollTo(0, document.body.scrollHeight);
-  });
-  const before = await box(page, '#dash-inbox');
-  expect(before.bottom <= 0 || before.top >= 800 || before.top < 0).toBe(true);
-  // The ring's own life: when the class goes on and when it comes off.
-  await page.evaluate(() => {
-    window.__ring = {};
-    new MutationObserver(() => {
-      const on = document.getElementById('dash-inbox').classList.contains('is-ring');
-      if (on && !window.__ring.on) window.__ring.on = performance.now();
-      if (!on && window.__ring.on && !window.__ring.off) window.__ring.off = performance.now();
-    }).observe(document.getElementById('dash-inbox'), { attributes: true, attributeFilter: ['class'] });
-  });
-  // Enter on the focused cell, as a keyboard teacher would.
-  await page.locator('.dash-glance-tograde').evaluate(el => el.focus({ preventScroll: true }));
-  await page.keyboard.press('Enter');
-  await expect(tile).toHaveClass(/is-ring/);
-  await expect.poll(async () => (await box(page, '#dash-inbox')).bottom).toBeGreaterThan(100);
-  const after = await box(page, '#dash-inbox');
-  expect(after.top).toBeLessThan(800);
-  // Still on the Dashboard: the link was not followed.
-  expect(new URL(page.url()).pathname).toBe('/dashboard');
-  await expect(tile).not.toHaveClass(/is-ring/, { timeout: 2000 });
-  // The ring lasts 200 to 250 ms (a 1,000 ms ring would fail this).
-  const ring = await page.evaluate(() => window.__ring);
-  expect(ring.off - ring.on).toBeGreaterThanOrEqual(180);
-  expect(ring.off - ring.on).toBeLessThanOrEqual(400);
-});
-
 test('a counts line too long for its box loses its quiet words, never Late, in the page font or a wide one', async ({
   page,
 }) => {

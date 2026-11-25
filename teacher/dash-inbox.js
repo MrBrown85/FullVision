@@ -899,6 +899,14 @@ window.DashInbox = (function () {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return false;
       if (!document.getElementById('dash-inbox')) return false;
       e.preventDefault();
+      // To Grade starts the grading: the grader on the first work waiting,
+      // carrying on through every assessment (Colin, Nov 25). With nothing
+      // to grade it shows the Inbox, where what is left to return sits.
+      var S = /** @type {any} */ (window).DashInboxStacks;
+      var after = function () {
+        if (document.querySelector('#main .dash-glance')) ctx.redraw();
+      };
+      if (S && S.start && S.start(ctx.cid, after)) return true;
       return jump();
     }
     var el = t.closest('[data-dash-inbox]');
