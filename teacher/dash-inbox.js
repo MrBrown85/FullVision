@@ -442,15 +442,15 @@ window.DashInbox = (function () {
   /** @type {boolean} */
   var _quiet = false;
 
+  /** The targets file, when it is loaded.
+   * @returns {any} */
+  function _T() {
+    return /** @type {any} */ (window).DashInboxTargets;
+  }
+
   /** @param {any} view @param {any} queue */
   function _quietNow(view, queue) {
-    return !!(
-      view.key === 'stacks' &&
-      queue.on &&
-      queue.caughtUp &&
-      !(queue.returns && queue.returns.length) &&
-      window.DashInboxTargets
-    );
+    return !!(view.key === 'stacks' && queue.on && queue.caughtUp && !(queue.returns && queue.returns.length) && _T());
   }
 
   /** The one-line tile.
@@ -491,7 +491,7 @@ window.DashInbox = (function () {
       esc('/assignments?course=' + encodeURIComponent(cid)) +
       '">Assignments →</a></div>' +
       '<div class="dash-inbox-body">' +
-      (rest ? DashInboxTargets.html(cid) : '') +
+      (rest ? _T().html(cid) : '') +
       '</div></section>'
     );
   }
@@ -737,7 +737,7 @@ window.DashInbox = (function () {
     }
     _mounted = null;
     if (window.DashInboxDrop) DashInboxDrop.unmount();
-    if (window.DashInboxTargets) DashInboxTargets.unmount();
+    if (_T()) _T().unmount();
     var col = document.querySelector('.dash-row-left');
     _colWas = _stacksOn() && col && document.getElementById('dash-inbox') ? { cid: _drawn, rows: _rowsOf(col) } : null;
     var list = document.getElementById('dash-inbox-list');
@@ -822,10 +822,10 @@ window.DashInbox = (function () {
     if (_pics) _pics.sweep();
     // A drop of files anywhere on the tile, in every view (D5).
     // With the redrawn To Grade view the targets take the tile's drag and clicks; D5's page-wide refusal stays.
-    var targets = !!(_stacksOn() && view.key === 'stacks' && window.DashInboxTargets);
+    var targets = !!(_stacksOn() && view.key === 'stacks' && _T());
     if (window.DashInboxDrop) DashInboxDrop.mount(tile, cid, _model, { own: targets });
     if (targets)
-      DashInboxTargets.mount(tile, cid, {
+      _T().mount(tile, cid, {
         quiet: _quiet && !tile.classList.contains('is-rest'),
         rest: _quiet && tile.classList.contains('is-rest'),
       });
@@ -857,7 +857,7 @@ window.DashInbox = (function () {
     }
     _mounted = null;
     if (window.DashInboxDrop) DashInboxDrop.leave(cid);
-    if (window.DashInboxTargets) DashInboxTargets.leave();
+    if (_T()) _T().leave();
     _colWas = null;
     if (_pics) _pics.releaseAll();
     _snap = null;

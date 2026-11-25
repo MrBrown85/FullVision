@@ -124,7 +124,7 @@ window.DashInboxDrop = (function () {
       if (p !== q) return p < q ? 1 : -1;
       return y.i - x.i;
     });
-    return list.slice(0, limit > 0 ? limit : MAX_CHOICES).map(function (/** @type {any} */ x) {
+    return list.slice(0, limit && limit > 0 ? limit : MAX_CHOICES).map(function (/** @type {any} */ x) {
       var w = _window(cid, x.a) || {};
       return {
         aid: x.a.id,

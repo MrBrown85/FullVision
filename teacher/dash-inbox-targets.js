@@ -21,7 +21,7 @@
    unmount before the next, leave when the Dashboard is left, and click for
    the buttons here (data-dash-inbox="targets-open", "targets-close",
    "target", "target-other"). */
-window.DashInboxTargets = (function () {
+/** @type {any} */ (window).DashInboxTargets = (function () {
   'use strict';
 
   var MAX_PIECES = 7;
@@ -142,6 +142,7 @@ window.DashInboxTargets = (function () {
     _open = why;
     if (_rest) return;
     if (_panel) {
+      // html-safe: panelHtml escapes every title and note
       _panel.innerHTML = panelHtml(_cid, { close: why === 'add' });
       _panel.hidden = false;
     }
@@ -262,10 +263,11 @@ window.DashInboxTargets = (function () {
       _show('add', true);
       return;
     }
+    var again = cid;
     var opened = AW.open(cid, aid, {
       drop: e.dataTransfer,
       onClose: function () {
-        _redraw(cid);
+        _redraw(again);
       },
     });
     if (opened && !_rest) _hide();
@@ -319,6 +321,7 @@ window.DashInboxTargets = (function () {
           'so those files were not added. Drop them again.',
           'so nothing was opened. Choose again.',
         );
+        // html-safe: panelHtml escapes every title and note
         if (_panel && !_rest) _panel.innerHTML = panelHtml(ctx.cid, { close: true });
         else ctx.redraw();
         return true;
