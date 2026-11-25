@@ -3751,9 +3751,12 @@ a.dash-ins-name:hover {
 .cm-tabbed-wide .cm-tab-panel {
   max-width: none;
 }
+/* Search and the roster's notes take the room left beside the buttons, but
+   never less than Search's own least width: where that does not fit (an iPad
+   mini upright, a wider font) the buttons wrap to a line of their own rather
+   than the field running under Import Roster. */
 .cm-rs-tools {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
