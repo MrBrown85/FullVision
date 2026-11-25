@@ -529,7 +529,10 @@
         }
         mineList.items = itemsFrom(res);
         // An answer after the first draw: the cards are drawn again where the student is.
-        if (mineList.items && S && S.screen === 'assignments' && S.page && S.page.student.id === student) paint();
+        if (mineList.items)
+          SP.whenFree(function () {
+            if (S && S.screen === 'assignments' && S.page && S.page.student.id === student) paint();
+          });
       },
       function () {
         /* no answer: no quiz buttons */
@@ -606,7 +609,9 @@
       if (!got) return;
       back[p.id] = got;
       // The cards are drawn again where the student is, now with See Your Quiz.
-      if (S && S.screen === 'assignments' && (S.demo || (S.page && S.page.student.id === student))) paint();
+      SP.whenFree(function () {
+        if (S && S.screen === 'assignments' && (S.demo || (S.page && S.page.student.id === student))) paint();
+      });
     });
   }
 

@@ -1465,7 +1465,11 @@
      device's other tabs see it. A touch after the limit does not bring the
      session back: it is checked first. */
   function active(now) {
-    if (!session || S.demo || !showing()) return;
+    // Writing on the student's own form is activity too, though the form is not watched (showing): a
+    // reflection opened from the page (S.back), Send My Work, Reflect on Feedback. It was not counted, so
+    // a student who wrote for more than fifteen minutes was signed out, the answers deleted, on going back.
+    var own = S.screen === 'send' || S.screen === 'reflect' || !!S.back;
+    if (!session || S.demo || !(showing() || own)) return;
     var at = clock(now);
     if (at - (session.active || 0) < 1000) return;
     if (over(session, at)) {
@@ -1851,6 +1855,7 @@
     var view = StudentPage.viewOf ? StudentPage.viewOf(S) : null;
     var out = StudentPageView.press(uiOf(), view, act, el);
     if (!out) return;
+    var was = StudentPage.listScroll.before(S);
     UI_KEYS.forEach(function (k) {
       S[k] = out.ui[k];
     });
@@ -1860,8 +1865,8 @@
     paint(out.focus);
     // Settings slides in on the drawing that opens it (page-view.js).
     if (out.slide && typeof document !== 'undefined') StudentPageView.slideIn(document);
-    var scroll = !out.piece && !out.stay;
-    if (scroll && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    // To the top for a move; something closed goes back to where its list was (s/student.js).
+    StudentPage.listScroll.after(was, S, !out.piece && !out.stay);
     watchRows();
     // Reflect opened: its list asked again (at most every 20 s), so one turned on mid-class shows.
     if (act === 'tab' && S.tab === 'questionnaires' && Date.now() - formsAt >= 20000) loadForms();
@@ -1928,7 +1933,7 @@
 
   // The page drawn again where the student is, the focus kept on what had it.
   function repaintPage() {
-    if (!S || S.screen !== 'assignments' || S.sendAsk) return;
+    if (!S || S.screen !== 'assignments' || S.sendAsk || StudentPage.later(repaintPage)) return;
     var el = typeof document !== 'undefined' ? document.activeElement : null;
     var sel = '';
     if (el && el.getAttribute && el.getAttribute('data-act')) {
