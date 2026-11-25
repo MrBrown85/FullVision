@@ -74,6 +74,31 @@ async function layout(page) {
 }
 const perRow = l => l.sides.filter(s => s.top === l.sides[0].top).length;
 
+/* The menu opened at the foot of the pages, far from its button, and
+   moving the focus into it scrolled the reports up out of sight: the rule
+   that anchored it went with the Dashboard's view menus (#1740). Colin,
+   2026-11-25: "clicking these does it". */
+test('the Zoom menu opens under its button and moves nothing', async ({ page }) => {
+  const errors = await open(page);
+  const btn = page.locator('#studio-zoom-btn');
+  const before = await page.locator('#rb-preview').boundingBox();
+  await btn.click();
+  const menu = page.getByRole('menu', { name: 'Zoom' });
+  await expect(menu).toBeVisible();
+  const b = await btn.boundingBox();
+  const m = await menu.boundingBox();
+  // Just under the button, its left edge with the button's.
+  expect(m.y).toBeGreaterThanOrEqual(b.y + b.height);
+  expect(m.y).toBeLessThan(b.y + b.height + 16);
+  expect(Math.abs(m.x - b.x)).toBeLessThan(2);
+  // The pages stayed where they were.
+  expect(await page.locator('#rb-preview').boundingBox()).toEqual(before);
+  await expect(page.getByRole('menuitemradio', { name: 'Automatic', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test('Automatic puts a sheet’s two sides in one row; the choice survives a reload', async ({ page }) => {
   const errors = await open(page);
   await expect(page.locator('#studio-zoom-btn')).toHaveText('Automatic');
