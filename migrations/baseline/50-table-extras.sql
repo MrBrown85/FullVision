@@ -119,16 +119,6 @@ create policy observation_tag_via_obs on public.observation_tag as permissive fo
 create policy observation_template_own on public.observation_template as permissive for all to public
   using ((teacher_id = ( SELECT auth.uid() AS uid)))
   with check ((teacher_id = ( SELECT auth.uid() AS uid)));
-create policy phone_report_via_course on public.phone_report as permissive for all to public
-  using (public.fv_owns_course(course_id))
-  with check (public.fv_owns_course(course_id));
-create policy phone_report_student_via_report on public.phone_report_student as permissive for all to public
-  using ((EXISTS ( SELECT 1
-   FROM public.phone_report r
-  WHERE ((r.id = phone_report_student.report_id) AND public.fv_owns_course(r.course_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM public.phone_report r
-  WHERE ((r.id = phone_report_student.report_id) AND public.fv_owns_course(r.course_id)))));
 create policy question_via_questionnaire on public.question as permissive for all to public
   using ((EXISTS ( SELECT 1
    FROM public.questionnaire q
@@ -200,9 +190,6 @@ create policy section_override_via_enrollment on public.section_override as perm
 create policy student_owner on public.student as permissive for all to public
   using ((teacher_id = ( SELECT auth.uid() AS uid)))
   with check ((teacher_id = ( SELECT auth.uid() AS uid)));
-create policy student_access_code_via_enrollment on public.student_access_code as permissive for all to public
-  using (public.fv_owns_enrollment(enrollment_id))
-  with check (public.fv_owns_enrollment(enrollment_id));
 create policy subject_via_course on public.subject as permissive for all to public
   using (public.fv_owns_course(course_id))
   with check (public.fv_owns_course(course_id));
