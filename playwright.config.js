@@ -61,7 +61,7 @@ export default defineConfig({
           {
             name: 'webkit-phone',
             testMatch:
-              /(mobile-bulletins|phone-grader|mobile-students-card|mobile-student-profile|mobile-tabs-fit)\.spec\.js$/,
+              /(mobile-bulletins|phone-grader|mobile-students-card|mobile-student-profile|mobile-tabs-fit|mobile-sync-dot)\.spec\.js$/,
             use: { browserName: 'webkit' },
           },
         ]

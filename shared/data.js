@@ -427,6 +427,22 @@ function _updateSyncIndicator() {
   });
 }
 
+/* A tap or click on a red sync dot tries again at once: Add Work's held
+   photos go again, paused cloud sync probes the server, a class that
+   couldn't load loads again. Otherwise it does nothing; the outbox already
+   retries on its own. The desktop top bar and the phone's bars share it. */
+function retryFromSyncDot() {
+  if (getSyncDotState().status !== 'error') return;
+  if (typeof retryHeldStudentWork === 'function') retryHeldStudentWork();
+  if (_supabaseDegraded) {
+    retrySupabaseRecovery();
+    return;
+  }
+  var cid = getActiveCourse();
+  if (cid && courseLoadFailed(cid)) retryActiveCourseLoad();
+}
+window.retryFromSyncDot = retryFromSyncDot;
+
 function isSupabaseDegraded() {
   return _supabaseDegraded;
 }

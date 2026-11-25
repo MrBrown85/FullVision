@@ -1335,9 +1335,7 @@ window.MGrade = (function () {
         backIconOnly: true,
         // The sync dot is the only place sync problems show, so the grading
         // screen carries it too.
-        rightHTML:
-          '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
-          bar.more,
+        rightHTML: MC.syncDot() + bar.more,
       });
 
       // The progress line: a segment for each card, dark once graded, blue for
