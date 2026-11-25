@@ -74,9 +74,18 @@ var CmQuestionnaires = (function () {
     });
   }
 
-  /* How many reflections students can see now, for the tab's count (null until read). */
+  /* How many reflections students can see now, for the tab's count (null until
+     read). Asks for the class's reflections when they have not been read:
+     the Dashboard's old Core card used to read them first (removed in #1740). */
   function countOn(cid) {
-    if (!Questionnaires.loaded(cid)) return null;
+    if (!cid) return null;
+    if (!Questionnaires.loaded(cid)) {
+      Questionnaires.load(cid, function (loadedCid) {
+        if (loadedCid === cid) _rerender();
+      });
+      // Demo Mode reads them at once.
+      if (!Questionnaires.loaded(cid)) return null;
+    }
     var today = _today();
     return Questionnaires.list(cid).filter(function (q) {
       return !q.parent_id && Questionnaires.visible(q, today);
