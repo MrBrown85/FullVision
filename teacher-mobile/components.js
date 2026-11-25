@@ -48,6 +48,15 @@ window.MComponents = (function () {
     var subtitle = opts.subtitle
       ? '<div style="font-size:12px;color:var(--text-3);font-weight:400">' + _esc(opts.subtitle) + '</div>'
       : '';
+    var title = _esc(opts.title);
+    // `titleAction`: the title is a button (the grader's name opens the class list).
+    if (opts.titleAction)
+      title =
+        '<button type="button" class="m-nav-title-btn" data-action="' +
+        opts.titleAction +
+        '"><span class="m-nav-title-text">' +
+        title +
+        '</span><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></button>';
     // `compact`: the title shows in the bar at rest (no large title below).
     return (
       '<div class="m-nav-bar' +
@@ -58,7 +67,7 @@ window.MComponents = (function () {
       '<div class="m-nav-bar-inner">' +
       back +
       '<h1 class="m-nav-bar-title-inline">' +
-      _esc(opts.title) +
+      title +
       subtitle +
       '</h1>' +
       actions +
@@ -412,8 +421,14 @@ window.MComponents = (function () {
      (competencies that disagree: the lowest, outlined, no + or −), action,
      attrs (the data attributes every button carries; ids are ours). */
   // html-safe: levels are numbers, words constants, attrs ours
+  // "PRF", and "PRF +" on the chosen level: what the new look's track reads (look.css).
+  function _levelCode(lv, mod) {
+    return levelCode(lv) + (mod ? ' ' + scoreModSuffix(mod) : '');
+  }
+
   function levelButtonsHTML(opts) {
     var mod = opts.mixed ? 0 : opts.mod;
+    var look = !!window.MGradeLook && window.MGradeLook.on();
     return opts.order
       .map(function (lv) {
         var on = opts.level === lv;
@@ -427,6 +442,7 @@ window.MComponents = (function () {
           '" data-score="' +
           lv +
           '"' +
+          (look ? ' data-code="' + _levelCode(lv, on ? mod : 0) + '"' : '') +
           opts.attrs +
           ' aria-label="' +
           fig +
@@ -512,6 +528,7 @@ window.MComponents = (function () {
       var fig = on ? formatScoreLevel(lv, mod) : String(lv);
       btn.classList.toggle('m-score-active', on);
       btn.classList.toggle('m-score-mixed', on && !!mixed);
+      if (btn.hasAttribute('data-code')) btn.setAttribute('data-code', _levelCode(lv, on ? mod : 0));
       btn.setAttribute('aria-label', fig + ', ' + scoreLevelText(lv));
       var f = btn.querySelector('.m-level-fig');
       if (f) f.textContent = fig;
