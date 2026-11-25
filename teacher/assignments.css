@@ -7620,7 +7620,8 @@ button.grader-member-name {
 .assess-toolbar .tb-action-btn {
   flex-shrink: 0;
 }
-.assess-toolbar .tb-action-btn {
+.assess-toolbar .tb-action-btn,
+.report-toolbar .tb-action-btn {
   padding: 0 12px;
   font-size: var(--text-sm);
 }

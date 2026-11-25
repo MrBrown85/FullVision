@@ -55,6 +55,7 @@ window.Router = (function () {
         '/teacher/report-one-zoom.js',
         '/teacher/report-one-head.js',
         '/teacher/report-print-paper.js',
+        '/teacher/report-toolbar.js',
         '/teacher/page-reports.js',
       ],
     },

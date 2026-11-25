@@ -131,7 +131,8 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     );
     RQ.syncApprove();
     expect(btn.disabled).toBe(true);
-    expect(ready.textContent).toBe('Approve and Next is off until you pick Use the New Sentence or Keep as Written.');
+    // The reason is the button's title; the Ready count keeps its words (below).
+    expect(btn.title).toContain('Approve and Next is off until you pick Use the New Sentence or Keep as Written.');
     const html = open();
     expect(html).toContain(`<span class="qn-stale-label">Written</span><span class="qn-stale-was">${NH_BEFORE}</span>`);
     expect(html).toContain(`<span class="qn-stale-label">Now true</span><span class="qn-stale-now">${NH_AFTER}</span>`);
@@ -229,7 +230,8 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
     expect(RQ.approveBlockers(st)).toContain('claims');
     RQ.syncApprove();
-    expect(ready.textContent).toBe('Approve and Next is off until you pick Keep as Approved or Use the New Sentence.');
+    expect(btn.title).toContain('Approve and Next is off until you pick Keep as Approved or Use the New Sentence.');
+    expect(ready.textContent).toBe('1 of 2 Ready');
   });
 });
 

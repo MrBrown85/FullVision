@@ -44,6 +44,7 @@
     "teacher/student-page-students.js",
     "teacher/report-one-head.js",
     "teacher/report-print-paper.js",
+    "teacher/report-toolbar.js",
     "shared/data-withdrawn.js",
     "shared/data-overrides.js",
     "shared/data-utilities.js",
