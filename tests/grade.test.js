@@ -174,9 +174,8 @@ describe('grade-format-guard', () => {
   const DIRS = ['shared', 'teacher', 'teacher-mobile', 's'];
   // Where grades are meant to be formatted, plus data files of sentences.
   const EXEMPT = new Set(['shared/calc.js', 'shared/constants.js', 'shared/comment-bank.js', 'shared/seed-data.js']);
-  // s/ loads phone-report-view.js without constants.js, so it keeps its own
-  // copy of the words; s/student.js holds a preview's sample report.
-  const OWN_WORDS = new Set(['shared/phone-report-view.js', 's/student.js']);
+  // s/ loads without constants.js, so s/student.js keeps its own copy of the words.
+  const OWN_WORDS = new Set(['s/student.js']);
 
   const TO_FIXED_1 = {
     // A points score's % in a cell's title, through calc.js oneDecimal.
@@ -282,8 +281,6 @@ describe('grade-format-guard', () => {
     'teacher/rubric-print.js round out.scale * 100': 'a print scale',
     'shared/data.js floor Number(v)': 'a whole-number setting',
     'shared/data-term-ratings.js floor v': 'a whole-number check (a habit rating, a count)',
-    'shared/phone-report-view.js round Number(level) || 0':
-      'the phone report’s level is already whole: phone-reports.js sends roundLevel’s',
     'shared/student-view.js floor v': 'a count or an index',
     'teacher/class-results.js round pct': 'a bar’s width',
     'teacher/class-results.js round (38 - ((p.pct - lo) / (hi - lo)) * 32) * 10': 'a chart point’s y',

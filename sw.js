@@ -167,7 +167,6 @@ const PRECACHE_URLS = [
   '/teacher/quiz.css',
   '/teacher/quiz-results.css',
   '/teacher/preview-student.css',
-  '/shared/phone-report.css',
   '/shared/handout-viewer.css',
   '/shared/handout-out.css',
   '/teacher/grades-print.css',
@@ -216,6 +215,7 @@ const PRECACHE_URLS = [
   '/shared/data-quiz-tries.js',
   '/teacher/quiz-results.js',
   '/teacher/cm-questionnaires.js',
+  '/teacher/card-show.js',
   '/teacher/student-cards.js',
   '/teacher/student-page-students.js',
   // Sticker sheets (B4): the reader, its jsQR (fetched only when a scan is read), and the screen.
@@ -226,7 +226,6 @@ const PRECACHE_URLS = [
   '/teacher/cm-student-page.js',
   '/shared/student-voice.js',
   '/teacher/learner-profile.js',
-  '/shared/phone-report-view.js',
   '/shared/backup-restore.js',
   '/teacher/cm-roster-file.js',
   '/teacher/cm-block-picker.js',

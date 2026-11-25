@@ -37,14 +37,10 @@ create function rls_test.of_score(p uuid) returns uuid language sql stable
 as $$ select rls_test.of_enrollment(enrollment_id) from public.score where id = p $$;
 create function rls_test.of_submission(p uuid) returns uuid language sql stable
 as $$ select rls_test.of_course(course_id) from public.submission where id = p $$;
-create function rls_test.of_phone_report(p uuid) returns uuid language sql stable
-as $$ select rls_test.of_course(course_id) from public.phone_report where id = p $$;
 create function rls_test.of_report_issue(p uuid) returns uuid language sql stable
 as $$ select rls_test.of_course(course_id) from public.report_issue where id = p $$;
 create function rls_test.of_card(p uuid) returns uuid language sql stable
 as $$ select rls_test.of_enrollment(enrollment_id) from public.student_card where id = p $$;
-create function rls_test.of_access_code(p uuid) returns uuid language sql stable
-as $$ select rls_test.of_enrollment(enrollment_id) from public.student_access_code where id = p $$;
 create function rls_test.of_device_session(p uuid) returns uuid language sql stable
 as $$ select min(rls_test.of_enrollment(enrollment_id)::text)::uuid
         from student_submit.device_session_enrollment where session_id = p $$;

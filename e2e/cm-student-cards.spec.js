@@ -286,17 +286,13 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   // Print New Card for the first student, from the panel their name opens: the question, in the design's words.
   const first = at.firsts[0];
   await card.getByRole('button', { name: at.names[0], exact: true }).click();
-  await card.getByRole('button', { name: 'Print a New Card for ' + at.names[0] }).click();
-  let ask = page.getByRole('dialog', { name: 'Print a New Card for ' + first + '?' });
+  await card.getByRole('button', { name: 'Replace ' + at.names[0] + '’s Card and Print' }).click();
+  let ask = page.getByRole('dialog', { name: 'Replace ' + first + '’s Card?' });
   await expect(ask).toBeVisible();
   await expect(ask.locator('.confirm-message')).toHaveText(
-    'The card ' +
-      first +
-      ' has now stops working as soon as the new one is made. Everything ' +
-      first +
-      ' has sent stays.',
+    first + '’s card stops working as soon as the new one is made. Everything ' + first + ' has sent stays.',
   );
-  await expect(ask.getByRole('button')).toHaveText(['Cancel', 'Print New Card']);
+  await expect(ask.getByRole('button')).toHaveText(['Cancel', 'Replace and Print']);
   if (F2_SHOTS) {
     // Once the question has faded in.
     await page.waitForTimeout(600);
@@ -310,10 +306,10 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   expect(await savedCards(page, at.cid)).toEqual(before);
   expect((await sheets(page)).length).toBe(1);
   // Print New Card: one sheet, Card 2, and only that student's card changed.
-  await card.getByRole('button', { name: 'Print a New Card for ' + at.names[0] }).click();
+  await card.getByRole('button', { name: 'Replace ' + at.names[0] + '’s Card and Print' }).click();
   await page
-    .getByRole('dialog', { name: 'Print a New Card for ' + first + '?' })
-    .getByRole('button', { name: 'Print New Card' })
+    .getByRole('dialog', { name: 'Replace ' + first + '’s Card?' })
+    .getByRole('button', { name: 'Replace and Print' })
     .click();
   await expect.poll(async () => (await sheets(page)).length).toBe(2);
   const one = (await sheets(page))[1];
@@ -423,8 +419,8 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   // Back from the Back cache after pagehide: the list is drawn again, with no dead Print Again.
   await catchPrints(page);
   await card.getByRole('button', { name: at.names[1], exact: true }).click();
-  await card.getByRole('button', { name: 'Print a New Card for ' + at.names[1] }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Print New Card' }).click();
+  await card.getByRole('button', { name: 'Replace ' + at.names[1] + '’s Card and Print' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Replace and Print' }).click();
   await expect.poll(async () => (await sheets(page)).length).toBe(1);
   all.push((await sheets(page))[0]);
   await expect(actions).toHaveText(['Print Again', 'New Codes for This Class']);
@@ -458,7 +454,7 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   // The Students list's own filters come after All (e2e/student-page-options.spec.js has them).
   await expect(filters.getByRole('radio')).toHaveText([
     'All ' + at.count,
-    'Exceptions 0',
+    'Grade Exceptions 0',
     'Not Printed ' + at.count,
     'Locked 0',
     'Never Opened 0',
@@ -481,7 +477,7 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   await page.goto('/dashboard?manage=student-page');
   await expect(filters.getByRole('radio')).toHaveText([
     'All ' + at.count,
-    'Exceptions 0',
+    'Grade Exceptions 0',
     'Not Printed 0',
     'Locked 1',
     'Never Opened ' + (at.count - 1),

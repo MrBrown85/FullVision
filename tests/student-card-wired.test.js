@@ -266,88 +266,6 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
   });
 });
 
-describe('a slip still opens: the card is asked first, then open', () => {
-  const SLIP = {
-    ok: true,
-    token: 'a'.repeat(64),
-    student: { first_name: 'Cece' },
-    course: { name: 'Science 8', block: 'B' },
-    preview: [{ title: 'November Reflection', count: 1 }],
-    check: 'identity',
-  };
-
-  it('a slip’s code is put to card, which says it is no card, and then to open', async () => {
-    const dev = school({ slips: { K7M4QX: SLIP } });
-    const page = await dev.open('#K7M-4QX');
-    expect(page.calls.map(c => c.body)).toEqual([
-      { route: 'card', code: 'K7M4QX' },
-      { route: 'open', code: 'K7M4QX' },
-    ]);
-    expect(page.root().querySelector('.sp-big').textContent).toBe('Hi Cece!');
-    expect(page.root().querySelector('.sp-head-sub').textContent).toBe('Student Questions');
-    // A slip's code stays in the address, as it always has; nothing is kept for it.
-    expect(page.addresses).toEqual([]);
-    expect(dev.store).toEqual({});
-  });
-
-  /* The page can be released before the function is deployed with the
-     card's routes. The function deployed today answers a route it does not
-     know with HTTP 400 and { ok: false, error: 'bad_request' }. */
-  it.each([
-    ['the function deployed today, which has no card route', () => ({ ok: false, error: 'bad_request' })],
-    ['the function with the card’s routes, which says it is no card', () => ({ ok: false, error: 'not_found' })],
-  ])('a slip opens against %s', async (name, cardSays) => {
-    const dev = school({ slips: { K7M4QX: SLIP } });
-    const page = await dev.open('#K7M-4QX', {
-      server: body => (body.route === 'card' ? cardSays() : dev.fn.handle(body)),
-    });
-    expect(routes(page)).toEqual(['card', 'open']);
-    expect(page.root().querySelector('.sp-big').textContent).toBe('Hi Cece!');
-    page.type('#sp-ident', '0123456');
-    await page.click('[data-act="start"]');
-    // The slip's code goes with its verify, so a password can be checked by its tag (plan S3-S1).
-    // The token is the one the function made for open (2026112403), not one the database chose.
-    expect(page.calls[2].body).toEqual({
-      route: 'verify',
-      token: expect.stringMatching(/^[0-9a-f]{64}$/),
-      code: 'K7M4QX',
-      birthday: null,
-      student_number: '0123456',
-      password: null,
-    });
-    // The handler sent it to the slip's verify, not the card's.
-    expect(dev.fn.sql.map(q => q.fn)).toContain('verify');
-    expect(dev.fn.sql.map(q => q.fn)).not.toContain('verify_card');
-  });
-
-  it('a code nobody holds, typed on the slip screen, gets the slip’s words', async () => {
-    const dev = school();
-    const page = await dev.open('');
-    page.type('#sp-code', 'ABC-234');
-    await page.submit('form[data-form="code"]');
-    expect(routes(page)).toEqual(['card', 'open']);
-    expect(alertText(page)).toBe(
-      "That code didn't work. Check the letters and numbers on your slip. If you have a newer slip, use that one. If not, ask your teacher for a new slip.",
-    );
-  });
-
-  /* The page does not know yet whether the code is a card's or a slip's, so
-     it speaks as neither and does not go on to the slip route (review of PR
-     998; tests/student-card-session.test.js has the rest). */
-  it('with no internet a scanned code says so once, in words that fit a card and a slip alike', async () => {
-    const dev = school();
-    const page = await dev.open('#P3R8-WDK4', {
-      server: () => {
-        throw new Error('offline');
-      },
-    });
-    expect(routes(page)).toEqual(['card', 'open']);
-    expect(alertText(page)).toBe("Couldn't reach FullVision. Check your internet and try again.");
-    expect(text(page)).not.toMatch(/slip|answers|Student Questions/i);
-    expect(page.root().querySelector('[data-act="code-retry"]').textContent).toBe('Try Again');
-  });
-});
-
 describe('a card that won’t open says why', () => {
   const WHY = [
     ['card_stopped', { stopped: true }, 'This card has been replaced. Ask your teacher for your new card.'],
@@ -402,18 +320,6 @@ describe('a card that won’t open says why', () => {
     expect(alertText(page)).toBe('This card has been replaced. Ask your teacher for your new card.');
     expect(alertText(page)).not.toContain("That code didn't work.");
     expect(page.root().querySelector('#sp-ident')).toBeNull();
-  });
-
-  it('too many wrong codes from this address: card says locked, the slip is still tried, then Too many tries', async () => {
-    const dev = school({ slips: { K7M4QX: { ok: true, token: 'a'.repeat(64), student: {}, course: {}, parts: [] } } });
-    dev.fn.state.addressLocked = true;
-    const page = await dev.open('#P3R8-WDK4');
-    expect(routes(page)).toEqual(['card', 'open']);
-    expect(alertText(page)).toBe('Too many tries. Wait 15 minutes and try again.');
-    // A real slip is not shut out by the card route's lock.
-    const slip = await dev.open('#K7M-4QX');
-    expect(routes(slip)).toEqual(['card', 'open']);
-    expect(slip.root().querySelector('[data-act="start"]')).toBeTruthy();
   });
 
   it('verify answers locked (the address limit was reached meanwhile): Too many tries, and the check ends', async () => {
@@ -492,7 +398,7 @@ describe('a card that won’t open says why', () => {
     page.calls.length = 0;
     page.type('#sp-code', 'ABC-234');
     await page.submit('form[data-form="card"]');
-    expect(routes(page)).toEqual(['card', 'open']);
+    expect(routes(page)).toEqual(['card']);
     expect(alertText(page)).toBe("That code didn't work. Check the letters and numbers on your card.");
     expect(page.root().querySelector('#sp-code').getAttribute('value')).toBe('ABC-234');
     // Not six letters and numbers: said at once, and nothing is asked.
@@ -509,31 +415,6 @@ describe('a card that won’t open says why', () => {
     await page.submit('form[data-form="card"]');
     expect(alertText(page)).toBe("Couldn't reach FullVision. Check your internet and try again.");
     expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();
-  });
-
-  it('a slip typed on the card’s screen opens as a slip', async () => {
-    const dev = school({
-      slips: {
-        K7M4QX: {
-          ok: true,
-          token: 'a'.repeat(64),
-          student: { first_name: 'Cece' },
-          course: { name: 'Science 8' },
-          parts: [],
-        },
-      },
-    });
-    const page = await signIn(dev);
-    await page.click('[data-act="settings-open"]');
-    await page.click('.sp-set [data-act="logout-ask"]');
-    // Log Out? takes presses once it has been up a moment (a double tap is not a yes).
-    page.advance(500);
-    await page.click('[data-act="card-done"]');
-    await page.click('[data-act="card-restart"]');
-    page.type('#sp-code', 'K7M-4QX');
-    await page.submit('form[data-form="card"]');
-    expect(page.root().querySelector('[data-act="start"]')).toBeTruthy();
-    expect(page.root().querySelector('.sp-head-sub').textContent).toBe('Student Questions');
   });
 });
 

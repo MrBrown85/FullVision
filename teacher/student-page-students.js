@@ -10,8 +10,8 @@
      Overall Grade (Shown · Class, Hidden · Class, Hidden, Shown, Page
      Paused), and the filters Feedback Not Opened, Questions and Exceptions.
    - A box to tick on each row, and the bar the ticked rows get: Hide
-     Overall Grade, Show Overall Grade, Same as Class, Pause Pages, Open
-     Pages, Print New Cards (asks first) and Clear.
+     Overall Grade (Show, Hide, Use Class Setting), Student Page (Pause,
+     Resume), Replace Card (asks first) and Clear Selection.
    - The side panel a student's name opens: when they last opened their
      page, Preview as <first name>, What <first name> Sees (Overall Grade,
      Student Page), What <first name> Has Done, and the Card.
@@ -389,7 +389,7 @@ var StudentPageStudents = (function () {
     if (offered(cid)) {
       out.push({
         value: 'exceptions',
-        label: 'Exceptions',
+        label: 'Grade Exceptions',
         tone: 'warn',
         empty: 'Every student follows the class.',
         shows: function (card, s) {
@@ -485,36 +485,87 @@ var StudentPageStudents = (function () {
       });
   }
 
-  /* The bar for the ticked rows. Print New Cards and Clear always; the
-     option buttons where the options are offered. `off` while a press is
-     out or the list is being read. */
+  /* The bar for the ticked rows (Colin, Nov 24 2026: the old black bar and its
+     names, "Print New Cards", "Same as Class", "Pause Pages", left him unsure
+     what they did). In FullVision's selection colours (the Assignments list's
+     bar), its buttons in named groups: Overall Grade (Show, Hide, Use Class
+     Setting), Student Page (Pause, Resume), and Replace Card, which says the old
+     card stops (it asks first). Each button's hover says what it does. Replace
+     Card and Clear Selection always; the options where they are offered. `off`
+     while a press is out or the list is being read. */
   // html-safe: the count is a number; the rest fixed words
   function barHtml(cid, off) {
     var ids = picked(cid);
     if (!ids.length) return '';
     var dis = off ? ' disabled' : '';
-    var btn = function (value, label) {
+    var btn = function (value, label, full, hint) {
       return (
         '<button type="button" class="cm-action-btn sps-bar-btn" data-action="spStudentBulk" data-value="' +
         value +
+        '" aria-label="' +
+        full +
+        '" title="' +
+        hint +
         '"' +
-        (value === 'print' ? dis : '') +
+        (value === 'print' || value === 'showcards' ? dis : '') +
         '>' +
         label +
         '</button>'
       );
     };
+    var group = function (name, buttons) {
+      return (
+        '<div class="sps-bar-group" role="group" aria-label="' +
+        name +
+        '"><span class="sps-bar-label" aria-hidden="true">' +
+        name +
+        '</span>' +
+        buttons +
+        '</div>'
+      );
+    };
+    var one = ids.length === 1;
     return (
       '<div class="sps-bar" role="toolbar" aria-label="Selected students">' +
       '<span class="sps-bar-count" role="status">' +
       ids.length +
       ' Selected</span>' +
       (gradeOffered(cid)
-        ? btn('hide', 'Hide Overall Grade') + btn('show', 'Show Overall Grade') + btn('class', 'Same as Class')
+        ? group(
+            'Overall Grade',
+            btn('show', 'Show', 'Show Overall Grade', 'They see their overall grade on their page.') +
+              btn('hide', 'Hide', 'Hide Overall Grade', 'They don\u2019t see their overall grade.') +
+              btn(
+                'class',
+                'Use Class Setting',
+                'Overall Grade: Use Class Setting',
+                'They follow the class\u2019s Show Overall Grade setting.',
+              ),
+          )
         : '') +
-      (offered(cid) ? btn('pause', 'Pause Pages') + btn('open', 'Open Pages') : '') +
-      btn('print', 'Print New Cards') +
-      '<button type="button" class="cm-action-btn sps-bar-btn sps-bar-clear" data-action="spStudentClear">Clear</button>' +
+      (offered(cid)
+        ? group(
+            'Student Page',
+            btn('pause', 'Pause', 'Pause Student Page', 'Their page is turned off until you resume it.') +
+              btn('open', 'Resume', 'Resume Student Page', 'Their page is turned back on.'),
+          )
+        : '') +
+      group(
+        'Card',
+        btn(
+          'showcards',
+          'Replace and Show',
+          one ? 'Replace Card and Show on Screen' : 'Replace Cards and Show on Screen',
+          'Makes a new card for each and shows it here, one at a time, to scan or type. Their old card stops working at once.',
+        ) +
+          btn(
+            'print',
+            'Replace and Print',
+            one ? 'Replace Card and Print' : 'Replace Cards and Print',
+            'Makes a new card for each and prints it. Their old card stops working at once.',
+          ),
+      ) +
+      '<button type="button" class="cm-action-btn sps-bar-btn sps-bar-clear" data-action="spStudentClear">Clear Selection</button>' +
       '</div>'
     );
   }
@@ -583,7 +634,7 @@ var StudentPageStudents = (function () {
         [
           {
             value: 'class',
-            label: 'Same as Class (' + (_classShows(cid) ? 'Shown' : 'Hidden') + ')',
+            label: 'Use Class Setting (' + (_classShows(cid) ? 'Shown' : 'Hidden') + ')',
             action: 'spStudentGrade',
           },
           { value: 'show', label: 'Show', action: 'spStudentGrade' },
@@ -709,15 +760,30 @@ var StudentPageStudents = (function () {
           dis +
           '>Unlock</button>'
         : '') +
-      (c
-        ? '<button type="button" class="cm-action-btn" data-action="spCardsNewCard" data-student="' +
-          esc(s.id) +
-          '" aria-label="' +
-          esc('Print a New Card for ' + full) +
-          '"' +
-          dis +
-          '>Print New Card</button>'
-        : '');
+      // Show on Screen for a student beside the teacher; Print for paper. Only once they have a card.
+      (c ? ['1', ''] : [])
+        .map(function (show) {
+          var verb = (c ? 'Replace and ' : 'Make and ') + (show ? 'Show' : 'Print');
+          return (
+            '<button type="button" class="cm-action-btn" data-action="spCardsNewCard" data-student="' +
+            esc(s.id) +
+            '"' +
+            (show ? ' data-show="1"' : '') +
+            ' aria-label="' +
+            esc(c ? verb.replace(' and ', ' ' + full + '\u2019s Card and ') : verb + ' a Card for ' + full) +
+            '" title="' +
+            (show
+              ? 'Makes a new card and shows it here to scan or type. Nothing is printed.'
+              : 'Makes a new card and prints it.') +
+            (c ? ' The old card stops working at once.' : '') +
+            '"' +
+            dis +
+            '>' +
+            verb +
+            '</button>'
+          );
+        })
+        .join('');
     var fresh = st.fresh;
     st.fresh = false;
     return (
@@ -827,7 +893,7 @@ var StudentPageStudents = (function () {
   var GRADE_WORDS = {
     hide: ['’s overall grade is hidden.', 'Overall grade hidden for '],
     show: ['’s overall grade is shown.', 'Overall grade shown for '],
-    class: [' follows the class for Show Overall Grade.', 'Same as Class for '],
+    class: [' follows the class for Show Overall Grade.', 'Class setting for '],
   };
 
   function _toastText(cid, ids, change) {
@@ -959,12 +1025,17 @@ var StudentPageStudents = (function () {
       case 'spStudentBulk': {
         var ids = picked(cid);
         if (!ids.length) return true;
-        if (data.value === 'print') {
-          // Once the cards are asked for, the ticks go: a second press would print them again.
+        if (data.value === 'print' || data.value === 'showcards') {
+          // Once the cards are asked for, the ticks go: a second press would make them again.
           if (typeof StudentCards !== 'undefined' && StudentCards.printNewCards) {
-            StudentCards.printNewCards(cid, ids, function () {
-              clearPicked(cid);
-            });
+            StudentCards.printNewCards(
+              cid,
+              ids,
+              function () {
+                clearPicked(cid);
+              },
+              data.value === 'showcards',
+            );
           }
           return true;
         }

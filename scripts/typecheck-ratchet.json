@@ -1,5 +1,6 @@
 {
   "checked": [
+    "teacher/card-show.js",
     "teacher/report-one-words.js",
     "teacher/report-one-copy.js",
     "teacher/report-one-undo.js",
@@ -128,7 +129,6 @@
     "s/page-view.js",
     "s/questionnaire.js",
     "s/reflect.js",
-    "s/report.js",
     "s/send.js",
     "s/student-data.js",
     "s/student.js",
@@ -144,7 +144,6 @@
     "shared/loading-screen.js",
     "shared/markup-draw.js",
     "shared/offline-queue.js",
-    "shared/phone-report-view.js",
     "shared/photo-queue.js",
     "shared/photo-readers.js",
     "shared/photo-shrink.js",

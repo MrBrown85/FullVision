@@ -16,9 +16,7 @@
  * tests/student-submit-card-key.test.js. Here the stand-in database knows
  * the card by its tag, worked out a second way (tests/helpers/card-key-fake.js).
  *
- * The four slip routes are in tests/student-submit-handler.test.js.
  */
-import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler as makeRealHandler } from '../supabase/functions/student-submit/handler.ts';
@@ -186,7 +184,6 @@ const clone = v => JSON.parse(JSON.stringify(v));
 function setup(answers, overrides) {
   const calls = [];
   const logs = [];
-  const slip = [];
   const sessions = { [SESSION]: [CECE], [OTHER_DEVICE]: [OMAR] };
   const inSession = (token, enrollment) =>
     !sessions[token] ? 'signed_out' : sessions[token].includes(enrollment) ? null : 'not_found';
@@ -227,10 +224,6 @@ function setup(answers, overrides) {
     },
     answers,
   );
-  const untouched = name => async () => {
-    slip.push(name);
-    return { ok: true, parts: [] };
-  };
   const handle = makeHandler(
     Object.assign(
       {
@@ -240,14 +233,7 @@ function setup(answers, overrides) {
         sessionToken: () => NEW_SESSION,
         log: entry => logs.push(entry),
         db: {
-          open: untouched('open'),
-          verify: untouched('verify'),
-          check: untouched('check'),
-          submit: untouched('submit'),
           async call(text, params) {
-            // A slip's open and verify, with tags since plan S3-S1: a slip's, not a card's.
-            if (text === SLIP_SQL.open) return untouched('open')();
-            if (text === SLIP_SQL.verify) return untouched('verify')();
             calls.push({ sql: text, params });
             const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
             const add = /, p_add => (true|false)[,)]/.exec(text);
@@ -258,7 +244,7 @@ function setup(answers, overrides) {
       overrides,
     ),
   );
-  return { handle, calls, logs, slip };
+  return { handle, calls, logs };
 }
 
 function post(body, headers) {
@@ -331,7 +317,7 @@ describe('student-submit: the card route', () => {
   });
 
   it("answers a slip's code as not_found, like any guess, and says nothing about slips", async () => {
-    const { handle, calls, logs, slip } = setup();
+    const { handle, calls, logs } = setup();
     const guess = await (await handle(post({ route: 'card', code: GUESS }))).json();
     const res = await handle(post({ route: 'card', code: SLIP }));
     expect(res.status).toBe(200);
@@ -343,7 +329,6 @@ describe('student-submit: the card route', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].params[0]).toBe(codeTag(GUESS));
     // The function does not try open itself: open is the page's next request.
-    expect(slip).toEqual([]);
 
     // Whatever else the database put beside the refusal stays behind.
     const dirty = setup({ card: () => ({ ok: false, error: 'not_found', kind: 'slip', questionnaire_id: QUIZ }) });
@@ -404,7 +389,7 @@ describe('student-submit: the card route', () => {
 
 describe('student-submit: verify for a card', () => {
   it('checks the birthday, student number or card password and starts the device session', async () => {
-    const { handle, calls, slip } = setup();
+    const { handle, calls } = setup();
     const hash = expect.stringMatching(/^[0-9a-f]{64}$/);
     const ok = { ok: true, session_token: NEW_SESSION, expires_at: EXPIRES, enrollment_id: CECE, classes: CLASSES };
 
@@ -427,7 +412,6 @@ describe('student-submit: verify for a card', () => {
     ]);
     for (const c of calls) expect(c.params).not.toContain(NEW_SESSION);
     // The slip's verify is a different function and is not called.
-    expect(slip).toEqual([]);
   });
 
   it('from the start screen always starts a new session, and ends the one the device sent', async () => {
@@ -569,16 +553,8 @@ describe('student-submit: verify for a card', () => {
     expect(calls).toEqual([]);
   });
 
-  it("still passes busy on from a slip's open", async () => {
-    // Since plan S3-S1 a slip's open is a tagged statement (slip-routes.ts).
-    const { handle } = setup(null, { db: { call: async () => ({ ok: false, error: 'busy' }) } });
-    const res = await handle(post({ route: 'open', code: SLIP }));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: false, error: 'busy' });
-  });
-
   it('refuses a verify with nothing to check, or a field of the wrong shape', async () => {
-    const { handle, calls, slip } = setup();
+    const { handle, calls } = setup();
     for (const body of [
       { route: 'verify', code: CODE },
       { route: 'verify', code: CODE, birthday: '', student_number: '', password: '' },
@@ -594,26 +570,6 @@ describe('student-submit: verify for a card', () => {
       expect((await handle(post(body))).status, JSON.stringify(body)).toBe(400);
     }
     expect(calls).toEqual([]);
-    expect(slip).toEqual([]);
-  });
-
-  it("leaves a slip's verify as it was: a token goes to student_submit.verify, whatever else is sent", async () => {
-    const { handle, calls, slip } = setup();
-    const token = 'e'.repeat(64);
-    let res = await handle(post({ route: 'verify', token, student_number: '0123456' }));
-    expect(await res.json()).toEqual({ ok: true, parts: [] });
-    res = await handle(post({ route: 'verify', token, code: CODE, birthday: '2012-05-15', session: SESSION }));
-    expect(await res.json()).toEqual({ ok: true, parts: [] });
-    // A token of the wrong shape is a bad slip request, not a card's.
-    res = await handle(post({ route: 'verify', token: 12, code: CODE, birthday: '2012-05-15' }));
-    expect(res.status).toBe(400);
-    expect(slip).toEqual(['verify', 'verify']);
-    expect(calls).toEqual([]);
-    // No token at all, with a code, is a card's.
-    res = await handle(post({ route: 'verify', token: null, code: CODE, birthday: '2012-05-15' }));
-    expect((await res.json()).session_token).toBe(NEW_SESSION);
-    expect(slip).toEqual(['verify', 'verify']);
-    expect(calls).toHaveLength(1);
   });
 });
 
@@ -960,7 +916,7 @@ describe('student-submit: every card route', () => {
   });
 
   it.each(routes)('%s calls its one student_submit function and nothing else', async route => {
-    const { handle, calls, slip } = setup();
+    const { handle, calls } = setup();
     const res = await handle(post(GOOD[route]));
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
@@ -986,7 +942,6 @@ describe('student-submit: every card route', () => {
     expect(calls[0].params).toHaveLength(text.match(/\$\d/g).length);
     expect(calls[0].params.at(-1)).toMatch(/^[0-9a-f]{64}$/);
     expect(JSON.stringify(calls)).not.toContain('203.0.113.7');
-    expect(slip).toEqual([]);
   });
 
   it.each(routes)('%s refuses to run outside ca-central-1, before touching the database', async route => {

@@ -1,8 +1,7 @@
 /**
  * The Reflect tab in Class Settings (docs/STUDENT-VOICE-PLAN.md, PR 5;
  * docs/plans/reflect-plan.md): shared/questionnaires.js,
- * teacher/cm-questionnaires.js and teacher/qr-slips.js (which student
- * cards print with).
+ * and teacher/cm-questionnaires.js.
  *
  * In Demo Mode a reflection turns on from its template and saves on this
  * device; the switch is the gate (no closing date set by itself; one past
@@ -132,66 +131,6 @@ describe('Questionnaires module', () => {
 function dom() {
   return parseHTML('<!doctype html><html><head></head><body></body></html>').document;
 }
-
-describe('QR slips', () => {
-  it('makes one slip per code, sorted by last name, with the code after #', () => {
-    var slips = QrSlips.buildSlips(
-      students(),
-      [
-        { enrollment_id: 'e1', code: 'K7M-4QX' },
-        { enrollment_id: 'e2', code: 'ABC-234' },
-        { enrollment_id: 'gone', code: 'ZZZ-999' },
-      ],
-      'https://fullvision.ca',
-    );
-    expect(slips.map(s => s.name)).toEqual(['Jay Lee', 'Maya Ross']);
-    expect(slips[1].url).toBe('https://fullvision.ca/s/#K7M-4QX');
-  });
-
-  it('puts eight slips on a page and draws a real QR for each', () => {
-    var codes = [];
-    var roster = [];
-    for (var i = 0; i < 9; i++) {
-      roster.push({ id: 'e' + i, firstName: 'Student', lastName: String.fromCharCode(65 + i) });
-      codes.push({ enrollment_id: 'e' + i, code: 'AAA-22' + i });
-    }
-    var slips = QrSlips.buildSlips(roster, codes, 'https://fullvision.ca');
-    var html = QrSlips.buildPages(slips, { title: 'About Me', closes_on: '2026-11-14' }, 'Science 8 · Block A');
-    var box = dom().createElement('div');
-    box.innerHTML = html;
-    var pages = box.querySelectorAll('.qs-page');
-    expect(pages).toHaveLength(2);
-    expect(pages[0].querySelectorAll('.qs-slip')).toHaveLength(8);
-    expect(pages[1].querySelectorAll('.qs-slip')).toHaveLength(1);
-    expect(box.querySelectorAll('.qs-qr svg')).toHaveLength(9);
-    expect(box.querySelector('.qs-type strong').textContent).toBe('AAA-220');
-    expect(box.querySelector('.qs-dates').textContent).toBe('Open until Nov 14');
-    expect(box.querySelector('.qs-type span').textContent).toBe('No camera? Go to fullvision.ca/s and type');
-  });
-});
-
-describe('QR slips: the slip password', () => {
-  it('prints the password under the code only when there is one', () => {
-    var slips = QrSlips.buildSlips(
-      students(),
-      [
-        { enrollment_id: 'e1', code: 'K7M-4QX', password: '4821' },
-        { enrollment_id: 'e2', code: 'ABC-234', password: null },
-      ],
-      'https://fullvision.ca',
-    );
-    var box = dom().createElement('div');
-    box.innerHTML = QrSlips.buildPages(slips, { title: 'About Me' }, 'Science 8', () => '');
-    var bySlip = Array.from(box.querySelectorAll('.qs-slip')).map(el => ({
-      name: el.querySelector('.qs-name').textContent,
-      pass: el.querySelector('.qs-pass strong') ? el.querySelector('.qs-pass strong').textContent : null,
-    }));
-    expect(bySlip).toEqual([
-      { name: 'Jay Lee', pass: null },
-      { name: 'Maya Ross', pass: '4821' },
-    ]);
-  });
-});
 
 describe('Questionnaires tab', () => {
   var originals;

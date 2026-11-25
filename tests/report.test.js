@@ -520,7 +520,6 @@ describe('report-calc-callers', () => {
   const FILES = readdirSync(resolve(ROOT, 'teacher'))
     .filter(name => REPORT_FILE.test(name) && name !== 'report-scores.js')
     .map(name => 'teacher/' + name)
-    .concat(['shared/phone-report-view.js'])
     .sort();
 
   // calc.js functions that read no score (as tests/report-score-seam.test.js lists them).

@@ -27,8 +27,7 @@
 import { randomUUID } from 'node:crypto';
 import { readCardKey } from '../../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../../supabase/functions/student-submit/handler.ts';
-import { SLIP_SQL } from '../../supabase/functions/student-submit/slip-routes.ts';
-import { FAKE_KEY, codeTag, passwordTag, slipCodeTag } from './card-key-fake.js';
+import { FAKE_KEY, codeTag, passwordTag } from './card-key-fake.js';
 import { C1, fakeWorld } from './fake-send-world.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
@@ -223,7 +222,6 @@ export function sampleCard(today, more) {
 /**
  * The function and its stand-in database.
  *   cards     the live cards, each as sampleCard() gives one
- *   slips     { code: what student_submit.open answers }
  *   now       () => milliseconds; the database's clock
  *   lasts     how long a new session lasts, in milliseconds (default 6 hours)
  *   cardKey   what STUDENT_CARD_KEY is set to. Left out, a made-up key.
@@ -255,29 +253,11 @@ export function fakeStudentSubmit(opts = {}) {
   }
   const state = {
     cards: {},
-    slips: Object.assign({}, opts.slips),
     sessions: {}, // token → { expires, cards: { enrollment: code } }
     seen: {}, // 'enrollment:assessment' → when
     addressLocked: false,
     down: false,
     dirty: null, // a function that changes page()'s reply before it is sent
-    // What a slip's verify, check and submit answer.
-    slipAnswers: {
-      verify: {
-        ok: true,
-        parts: [
-          {
-            id: 'p1',
-            kind: 'core_reflection',
-            title: 'November Reflection',
-            questions: [{ id: 'q1', kind: 'text', prompt: 'How did it go?', options: {}, core_ids: [] }],
-          },
-        ],
-        context: {},
-      },
-      check: { ok: true, report: {} },
-      submit: { ok: true, submitted_at: '2026-11-04T10:00:00Z' },
-    },
   };
   (opts.cards || []).forEach(k => (state.cards[norm(k.code)] = k));
   const sql = []; // every statement the function ran: { fn, params }
@@ -617,20 +597,7 @@ export function fakeStudentSubmit(opts = {}) {
     },
   };
 
-  /* A slip's four functions. open answers as state.slips says, but as the database does since 2026112403: it
-     names no token, only new_token, and the function hands the phone a token it made itself. */
-  const slip = name => async code => {
-    if (state.down) throw new Error('down');
-    sql.push({ fn: name, params: [code] });
-    if (name !== 'open') return clone(state.slipAnswers[name]);
-    const said = state.slips[norm(code)] ? clone(state.slips[norm(code)]) : no('not_found');
-    if (typeof said.token === 'string') {
-      delete said.token;
-      said.new_token = true;
-    }
-    return said;
-  };
-  /* The tokens the function makes for a new card session or slip: 64 hex characters, all of them a to f, one
+  /* The tokens the function makes for a new card session: 64 hex characters, all of them a to f, one
      after another. A random one could hold a test's birthday or student number by chance (2012, 0123456), and
      the tests look for those in what the page keeps. */
   let tokens = 0;
@@ -649,16 +616,8 @@ export function fakeStudentSubmit(opts = {}) {
     sessionToken: letterToken,
     log: entry => logs.push(entry),
     db: {
-      check: slip('check'),
-      submit: slip('submit'),
       async call(text, params) {
         if (state.down) throw new Error('down');
-        // A slip's open and verify with tags (slip-routes.ts, plan S3-S1): the slip whose code has this tag.
-        if (text === SLIP_SQL.open) {
-          const code = Object.keys(state.slips).find(c => slipCodeTag(norm(c)) === params[0]);
-          return code ? slip('open')(code) : (sql.push({ fn: 'open', params: [null] }), no('not_found'));
-        }
-        if (text === SLIP_SQL.verify) return slip('verify')(params[0]);
         const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
         const add = /, p_add => (true|false)[,)]/.exec(text);
         if (world && WORKER_FNS.includes(fn)) return world.db.call(text, params);
@@ -672,12 +631,10 @@ export function fakeStudentSubmit(opts = {}) {
           return found.error ? no(found.error) : clone(state.groupWork || { ok: true, assessments: [] });
         }
         if (world && REVISION_FNS[fn]) return clone(REVISION_FNS[fn](params));
-        // Batch E's `forms` (E2): what state.forms holds, else no questionnaire and no report for the card.
+        // Batch E's `forms` (E2): what state.forms holds, else no questionnaire for the card.
         if (fn === 'forms') {
           const found = inSession(params[0], params[1]);
-          return found.error
-            ? no(found.error)
-            : clone(state.forms || { ok: true, v: 1, questionnaires: [], reports: [] });
+          return found.error ? no(found.error) : clone(state.forms || { ok: true, v: 1, questionnaires: [] });
         }
         // Bulletins (B1b, deployed): what state.bulletins holds, else a class with nothing posted.
         if (fn === 'bulletins') {

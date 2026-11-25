@@ -7368,30 +7368,38 @@ label.cm-cr-row {
   font-size: var(--text-sm);
   text-align: left;
 }
-/* The bar the ticked rows get. */
+/* The bar the ticked rows get: FullVision's selection colours (the Assignments
+   list's bar), white buttons in named groups. */
 .sps-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--divider-medium);
   border-radius: var(--radius);
-  background: var(--text);
-  color: var(--surface);
+  background: var(--active-light);
+  color: var(--text);
   font-family: var(--font-base);
   font-size: var(--text-sm);
 }
 .sps-bar-count {
+  font-weight: 700;
+  color: var(--active);
+}
+.sps-bar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sps-bar-label {
   font-weight: 600;
-  margin-right: 4px;
+  color: var(--text-2);
+  margin-right: 2px;
 }
 .sps-bar .sps-bar-btn {
-  background: transparent;
-  color: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--surface) 40%, transparent);
-}
-.sps-bar .sps-bar-btn:hover {
-  background: color-mix(in srgb, var(--surface) 14%, transparent);
+  background: var(--surface);
 }
 .sps-bar .sps-bar-btn:disabled {
   opacity: 0.5;
@@ -7399,7 +7407,156 @@ label.cm-cr-row {
 }
 .sps-bar .sps-bar-clear {
   margin-left: auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--link);
 }
+/* Show on Screen: the card just made, large, over everything, for a student
+   beside the teacher to scan or type (teacher/student-cards.js). The card is
+   the printed one (teacher/qr-slips.css), drawn at screen size. */
+.sc-show-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.sc-show {
+  width: min(620px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-base);
+}
+.sc-show-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sc-show-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.sc-show-count {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+/* teacher/qr-slips.css is the printed sheet's (media print), so the card on
+   screen carries its own layout, the printed card's at screen size. */
+.sc-show-card.qs-slip {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: #000;
+  line-height: 1.25;
+}
+.sc-show-card .qs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #000;
+}
+.sc-show-card .qs-who {
+  min-width: 0;
+}
+.sc-show-card .qs-name {
+  font-weight: 700;
+}
+.sc-show-card .qs-class,
+.sc-show-card .qs-dates {
+  color: #333;
+}
+.sc-show-card .qs-what {
+  flex-shrink: 0;
+  text-align: right;
+}
+.sc-show-card .qs-title {
+  font-weight: 700;
+}
+.sc-show-card .qs-body {
+  display: flex;
+  align-items: center;
+}
+.sc-show-card .qs-qr {
+  flex-shrink: 0;
+}
+.sc-show-card .qs-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.sc-show-card .qs-how {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sc-show-card .qs-type span {
+  display: block;
+  font-weight: 700;
+  color: #555;
+}
+.sc-show-card .qs-type strong {
+  display: block;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.sc-show-card .qs-name {
+  font-size: 1.5rem;
+}
+.sc-show-card .qs-class,
+.sc-show-card .qs-dates,
+.sc-show-card .qs-title {
+  font-size: 0.95rem;
+}
+.sc-show-card .qs-body {
+  gap: 24px;
+}
+.sc-show-card .qs-qr {
+  width: min(260px, 45vw);
+  height: min(260px, 45vw);
+}
+.sc-show-card .qs-scan {
+  font-size: 1rem;
+}
+.sc-show-card .qs-type span {
+  font-size: 0.8rem;
+}
+.sc-show-card .qs-type strong {
+  font-size: 2rem;
+  letter-spacing: 3px;
+}
+.sc-show-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sc-show-spacer {
+  flex: 1;
+}
+@media (max-width: 560px) {
+  .sc-show-card .qs-body {
+    flex-direction: column;
+  }
+}
+
 /* The side panel: from the right, over Class Settings, under any question. */
 .sps-panel {
   position: fixed;

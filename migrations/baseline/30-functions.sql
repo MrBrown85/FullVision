@@ -711,8 +711,6 @@ begin
         select c.teacher_id into _t from observation x join course c on c.id = x.course_id where x.id = p_id;
     when 'questionnaire' then
         select c.teacher_id into _t from questionnaire x join course c on c.id = x.course_id where x.id = p_id;
-    when 'phone_report' then
-        select c.teacher_id into _t from phone_report x join course c on c.id = x.course_id where x.id = p_id;
     when 'report_issue' then
         select c.teacher_id into _t from report_issue x join course c on c.id = x.course_id where x.id = p_id;
     when 'submission' then
@@ -750,9 +748,6 @@ begin
     when 'student_card' then
         select c.teacher_id into _t
           from student_card x join enrollment e on e.id = x.enrollment_id join course c on c.id = e.course_id where x.id = p_id;
-    when 'access_code' then
-        select c.teacher_id into _t
-          from student_access_code x join enrollment e on e.id = x.enrollment_id join course c on c.id = e.course_id where x.id = p_id;
     else
         raise exception 'fv_private.teacher_of: no kind %', p_kind using errcode = '22023';
     end case;
@@ -1879,51 +1874,6 @@ begin
     -- The revision's grade returned: the request is done, for good.
     perform _revision_settle(new.enrollment_id, new.assessment_id, false);
     return null;
-end;
-$function$;
-
-CREATE OR REPLACE FUNCTION public._phone_report_json(p_id uuid)
- RETURNS jsonb
- LANGUAGE sql
- STABLE
- SET search_path TO 'public'
-AS $function$
-  select to_jsonb(r) || jsonb_build_object(
-           'students', coalesce((
-             select jsonb_agg(jsonb_build_object(
-                      'enrollment_id', s.enrollment_id,
-                      'data', s.data,
-                      'updated_at', s.updated_at,
-                      'opened_at', (select min(c.opened_at) from student_access_code c
-                                     where c.phone_report_id = r.id and c.enrollment_id = s.enrollment_id))
-                    order by s.enrollment_id)
-               from phone_report_student s where s.report_id = r.id), '[]'::jsonb))
-    from phone_report r
-   where r.id = p_id;
-$function$;
-
-CREATE OR REPLACE FUNCTION public._phone_report_put(p_report_id uuid, p_course_id uuid, p_students jsonb)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-declare
-    _item jsonb;
-    _eid  uuid;
-begin
-    if jsonb_typeof(p_students) is distinct from 'array' then
-        raise exception 'students must be an array' using errcode = '22023';
-    end if;
-    for _item in select * from jsonb_array_elements(p_students) loop
-        _eid := (_item->>'enrollment_id')::uuid;
-        if not exists (select 1 from enrollment e where e.id = _eid and e.course_id = p_course_id
-                         and fv_owns_enrollment(e.id)) then
-            raise exception 'enrollment not in this class' using errcode = 'P0002';
-        end if;
-        insert into phone_report_student (report_id, enrollment_id, data, updated_at)
-        values (p_report_id, _eid, _item->'data', now())
-        on conflict (report_id, enrollment_id) do update set data = excluded.data, updated_at = now();
-    end loop;
 end;
 $function$;
 
@@ -3307,34 +3257,6 @@ begin
     delete from section_override where enrollment_id = p_enrollment_id and section_id = p_section_id;
 end; $function$;
 
-CREATE OR REPLACE FUNCTION public.close_phone_report(p_id uuid, p_idempotency_key uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-declare
-    _cached jsonb;
-    _r      phone_report%rowtype;
-begin
-    if (select auth.uid()) is null then
-        raise exception 'not authenticated' using errcode = 'PT401';
-    end if;
-    _cached := fv_idem_check(p_idempotency_key, 'close_phone_report');
-    if _cached is not null then
-        return _cached;
-    end if;
-    select * into _r from phone_report where id = p_id and fv_owns_course(course_id) for update;
-    if not found then
-        raise exception 'report not found' using errcode = 'P0002';
-    end if;
-    update phone_report set closed_at = coalesce(closed_at, now()), updated_at = now() where id = _r.id;
-    update student_access_code set revoked_at = now() where phone_report_id = _r.id and revoked_at is null;
-    _cached := _phone_report_json(_r.id);
-    perform fv_idem_store(p_idempotency_key, 'close_phone_report', _cached);
-    return _cached;
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION public.confirm_quiz(p_assessment_id uuid, p_marks jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -3646,39 +3568,6 @@ begin
     perform fv_idem_store(p_idempotency_key, 'create_observation_follow_up', jsonb_build_object('id', _id));
     return _id;
 end; $function$;
-
-CREATE OR REPLACE FUNCTION public.create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date, p_students jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-declare
-    _cached jsonb;
-    _id     uuid;
-    _label  text := nullif(btrim(coalesce(p_term_label, '')), '');
-begin
-    if (select auth.uid()) is null then
-        raise exception 'not authenticated' using errcode = 'PT401';
-    end if;
-    _cached := fv_idem_check(p_idempotency_key, 'create_phone_report');
-    if _cached is not null then
-        return _cached;
-    end if;
-    if not fv_owns_course(p_course_id) then
-        raise exception 'course not found' using errcode = 'P0002';
-    end if;
-    if p_expires_on is null or p_expires_on < (now() at time zone public._fv_timezone((select c.timezone from public.course c where c.id = p_course_id)))::date then
-        raise exception 'the last day must be today or later' using errcode = '22023';
-    end if;
-    insert into phone_report (course_id, term, term_label, expires_on, created_by)
-    values (p_course_id, p_term, _label, p_expires_on, (select auth.uid()))
-    returning id into _id;
-    perform _phone_report_put(_id, p_course_id, p_students);
-    _cached := _phone_report_json(_id);
-    perform fv_idem_store(p_idempotency_key, 'create_phone_report', _cached);
-    return _cached;
-end;
-$function$;
 
 CREATE OR REPLACE FUNCTION public.create_report_issue(p_course_id uuid, p_term integer, p_term_label text, p_paper text, p_form jsonb, p_students jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -8289,17 +8178,6 @@ AS $function$
     ) x;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.list_phone_reports(p_course_id uuid)
- RETURNS jsonb
- LANGUAGE sql
- STABLE
- SET search_path TO 'public'
-AS $function$
-  select coalesce(jsonb_agg(_phone_report_json(r.id) order by r.issued_at desc), '[]'::jsonb)
-    from phone_report r
-   where r.course_id = p_course_id and fv_owns_course(r.course_id);
-$function$;
-
 CREATE OR REPLACE FUNCTION public.list_questionnaire_templates()
  RETURNS jsonb
  LANGUAGE sql
@@ -11705,42 +11583,6 @@ begin
     perform fv_idem_store(p_idempotency_key, 'update_observation_follow_up', jsonb_build_object('id', p_id));
 end; $function$;
 
-CREATE OR REPLACE FUNCTION public.update_phone_report(p_id uuid, p_students jsonb DEFAULT '[]'::jsonb, p_expires_on date DEFAULT NULL::date, p_idempotency_key uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-declare
-    _cached jsonb;
-    _r      phone_report%rowtype;
-begin
-    if (select auth.uid()) is null then
-        raise exception 'not authenticated' using errcode = 'PT401';
-    end if;
-    _cached := fv_idem_check(p_idempotency_key, 'update_phone_report');
-    if _cached is not null then
-        return _cached;
-    end if;
-    select * into _r from phone_report where id = p_id and fv_owns_course(course_id) for update;
-    if not found then
-        raise exception 'report not found' using errcode = 'P0002';
-    end if;
-    perform _phone_report_put(_r.id, _r.course_id, coalesce(p_students, '[]'::jsonb));
-    if p_expires_on is not null then
-        if p_expires_on < (now() at time zone public._fv_timezone((select c.timezone from public.course c where c.id = _r.course_id)))::date then
-            raise exception 'the last day must be today or later' using errcode = '22023';
-        end if;
-        update phone_report set expires_on = p_expires_on where id = _r.id;
-        update student_access_code set expires_at = ((p_expires_on + 1)::timestamp at time zone public._fv_timezone((select c.timezone from public.course c where c.id = _r.course_id)))
-         where phone_report_id = _r.id and revoked_at is null;
-    end if;
-    update phone_report set updated_at = now() where id = _r.id;
-    _cached := _phone_report_json(_r.id);
-    perform fv_idem_store(p_idempotency_key, 'update_phone_report', _cached);
-    return _cached;
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION public.update_student(p_id uuid, p_patch jsonb)
  RETURNS void
  LANGUAGE plpgsql
@@ -13088,74 +12930,6 @@ AS $function$
    where q.id = p_id;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit._payload(p_code_id uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _c      student_access_code%rowtype;
-    _q      questionnaire%rowtype;
-    _child  questionnaire%rowtype;
-    _course course%rowtype;
-    _parts  jsonb;
-    _ctx    jsonb := '{}'::jsonb;
-begin
-    select * into _c from student_access_code where id = p_code_id;
-    select * into _q from questionnaire where id = _c.questionnaire_id;
-    select * into _course from course where id = _q.course_id;
-
-    _parts := jsonb_build_array(_part(_q.id));
-    -- A Goal Check-In rides on its reflection's slip.
-    for _child in
-        select * from questionnaire
-         where parent_id = _q.id and kind = 'goal_checkin' and is_on
-         order by created_at
-    loop
-        if _closed_reason(_child, _course.timezone) is null then
-            _parts := _parts || jsonb_build_array(_part(_child.id));
-        end if;
-    end loop;
-
-    -- The Goal Check-In shows the course goal the student last wrote in About
-    -- Me (their own words, back to the holder of their own slip).
-    if exists (select 1 from jsonb_array_elements(_parts) p where p->>'kind' = 'goal_checkin') then
-        select jsonb_build_object('course_goal', jsonb_build_object('text', a.value_text, 'at', r.submitted_at))
-          into _ctx
-          from answer a
-          join question x on x.id = a.question_id
-          join response r on r.id = a.response_id
-          join questionnaire q2 on q2.id = r.questionnaire_id
-         where r.enrollment_id = _c.enrollment_id and q2.course_id = _q.course_id
-           and x.repeated_key = 'better_at' and nullif(btrim(a.value_text), '') is not null
-         order by r.submitted_at desc
-         limit 1;
-    end if;
-
-    return jsonb_build_object('parts', _parts, 'context', coalesce(_ctx, '{}'::jsonb));
-end;
-$function$;
-
-CREATE OR REPLACE FUNCTION student_submit._preview(p_code_id uuid)
- RETURNS jsonb
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-    select coalesce(jsonb_agg(jsonb_build_object('title', q.title, 'count',
-               (select count(*) from question x where x.questionnaire_id = q.id and not x.archived
-                  and not coalesce(x.teacher_only, false)))
-             order by q.parent_id nulls first, q.created_at), '[]'::jsonb)
-      from student_access_code c
-      join questionnaire p on p.id = c.questionnaire_id
-      join course co on co.id = p.course_id
-      join questionnaire q on q.id = p.id
-         or (q.parent_id = p.id and q.kind = 'goal_checkin' and q.is_on
-             and student_submit._closed_reason(q, co.timezone) is null)
-     where c.id = p_code_id
-$function$;
-
 CREATE OR REPLACE FUNCTION student_submit._quiz_new_order(p_assessment_id uuid)
  RETURNS jsonb
  LANGUAGE sql
@@ -13659,9 +13433,6 @@ begin
         end loop;
     end loop;
 
-    -- A slip of this student's for it, not yet used, can no longer send it.
-    update student_access_code set used_at = _now
-     where questionnaire_id = _q.id and enrollment_id = p_enrollment_id and used_at is null and revoked_at is null;
     return jsonb_build_object('ok', true, 'submitted_at', _now);
 end;
 $function$;
@@ -13910,77 +13681,6 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit."check"(p_token text, p_birthday text, p_ip_hash text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _s      session%rowtype;
-    _c      student_access_code%rowtype;
-    _r      phone_report%rowtype;
-    _course course%rowtype;
-    _dob    date;
-    _given  date;
-    _data   jsonb;
-begin
-    if coalesce(p_token, '') !~ '^[0-9a-f]{64}$' then
-        perform _log('open', 'bad_token', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-    select * into _s from session
-     where token_hash = p_token
-       for update;
-    if not found or _s.expires_at < now() then
-        perform _log('open', 'bad_token', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-    select * into _c from student_access_code where id = _s.code_id;
-    if _c.phone_report_id is null or _c.revoked_at is not null then
-        perform _log('open', 'not_found', p_ip_hash, _c.id);
-        return jsonb_build_object('ok', false, 'error', 'not_found');
-    end if;
-    select * into _r from phone_report where id = _c.phone_report_id;
-    select * into _course from course where id = _r.course_id;
-    if _r.closed_at is not null
-       or (now() at time zone public._fv_timezone(_course.timezone))::date > _r.expires_on then
-        perform _log('open', 'closed', p_ip_hash, _c.id, _r.course_id);
-        return jsonb_build_object('ok', false, 'error', 'report_closed');
-    end if;
-    if _s.check_fails >= 5
-       or (select count(*) from attempt
-            where code_id = _c.id and outcome = 'wrong_birthday' and at > now() - interval '15 minutes') >= 10 then
-        perform _log('open', 'locked', p_ip_hash, _c.id, _r.course_id);
-        return jsonb_build_object('ok', false, 'error', 'locked');
-    end if;
-    select s.date_of_birth into _dob
-      from enrollment e join student s on s.id = e.student_id
-     where e.id = _c.enrollment_id;
-    if _dob is null then
-        perform _log('open', 'no_birthday', p_ip_hash, _c.id, _r.course_id);
-        return jsonb_build_object('ok', false, 'error', 'no_birthday');
-    end if;
-    begin
-        _given := p_birthday::date;
-    exception when others then
-        _given := null;
-    end;
-    if _given is distinct from _dob then
-        update session set check_fails = check_fails + 1 where id = _s.id;
-        perform _log('open', 'wrong_birthday', p_ip_hash, _c.id, _r.course_id);
-        return jsonb_build_object('ok', false, 'error', 'wrong_birthday', 'tries_left', greatest(0, 4 - _s.check_fails));
-    end if;
-
-    update session set checked_at = coalesce(checked_at, now()) where id = _s.id;
-    update student_access_code set opened_at = coalesce(opened_at, now()) where id = _c.id;
-    select data into _data from phone_report_student
-     where report_id = _r.id and enrollment_id = _c.enrollment_id;
-    perform _log('open', 'ok', p_ip_hash, _c.id, _r.course_id);
-    return jsonb_build_object('ok', true, 'report', coalesce(_data, '{}'::jsonb));
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION student_submit.done(p_session_token text, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -14198,13 +13898,11 @@ AS $function$
 declare
     _in     jsonb := _session_class(p_session_token, p_enrollment_id);
     _course course%rowtype;
-    _today  date;
 begin
     if _in ? 'error' then
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     select * into _course from course where id = (_in->>'course_id')::uuid;
-    _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
     return jsonb_build_object(
         'ok', true, 'v', 1,
         'questionnaires', coalesce((
@@ -14221,18 +13919,7 @@ begin
                                            where x.questionnaire_id = q.id and x.enrollment_id = p_enrollment_id) r
                      where q.course_id = _course.id and q.parent_id is null and q.kind <> 'goal_checkin'
                        and _card_listed(q.id, p_enrollment_id)) x
-             where x.state is not null), '[]'::jsonb),
-        'reports', coalesce((
-            select jsonb_agg(jsonb_build_object(
-                       'id', r.id, 'title', coalesce(r.term_label, 'Report ' || r.term),
-                       'issued_at', r.issued_at, 'expires_on', r.expires_on,
-                       'opened_at', (select min(c.opened_at) from student_access_code c
-                                      where c.phone_report_id = r.id and c.enrollment_id = p_enrollment_id),
-                       'overall', s.data->'overall', 'comment', s.data->'comment')
-                     order by r.issued_at desc, r.id)
-              from phone_report r
-              join phone_report_student s on s.report_id = r.id and s.enrollment_id = p_enrollment_id
-             where r.course_id = _course.id and r.closed_at is null and _today <= r.expires_on), '[]'::jsonb));
+             where x.state is not null), '[]'::jsonb));
 end;
 $function$;
 
@@ -14571,166 +14258,6 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _uuid    constant text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
-    _hex64   constant text := '^[0-9a-f]{64}$';
-    _was_sub text := current_setting('request.jwt.claim.sub', true);
-    _was_all text := current_setting('request.jwt.claims', true);
-    _cached  jsonb;
-    _item    record;
-    _cand    jsonb;
-    _q       questionnaire%rowtype;
-    _r       phone_report%rowtype;
-    _course  uuid;
-    _expires timestamptz;
-    _has_pw  boolean;
-    _made    uuid;
-    _pick    int;
-    _con     text;
-    _one     jsonb;
-    _results jsonb := '[]'::jsonb;
-begin
-    -- The request's shape, before anything is read or changed. A tag is 64
-    -- lower-case hex characters and nothing else: a code can never arrive
-    -- where a tag goes.
-    if coalesce(p_key_id, '') !~ '^[0-9a-f]{8}$' then
-        raise exception 'malformed key id' using errcode = '22023';
-    end if;
-    if p_kind is null or p_kind not in ('questionnaire', 'report') then
-        raise exception 'kind must be questionnaire or report' using errcode = '22023';
-    end if;
-    if p_items is null or jsonb_typeof(p_items) <> 'array' then
-        raise exception 'items must be a list' using errcode = '22023';
-    end if;
-    if jsonb_array_length(p_items) > 250 then
-        raise exception 'at most 250 students in one request' using errcode = '22023';
-    end if;
-    for _item in select t.i, t.ord from jsonb_array_elements(p_items) with ordinality as t(i, ord) loop
-        if jsonb_typeof(_item.i) <> 'object'
-           or jsonb_typeof(_item.i->'enrollment_id') is distinct from 'string' or _item.i->>'enrollment_id' !~ _uuid
-           or jsonb_typeof(_item.i->'candidates') is distinct from 'array' then
-            raise exception 'item % is malformed', _item.ord using errcode = '22023';
-        end if;
-        if jsonb_array_length(_item.i->'candidates') <> 2 then
-            raise exception 'item % must have exactly two candidates', _item.ord using errcode = '22023';
-        end if;
-        for _cand in select c from jsonb_array_elements(_item.i->'candidates') c loop
-            if jsonb_typeof(_cand) <> 'object'
-               or jsonb_typeof(_cand->'code_hmac') is distinct from 'string' or _cand->>'code_hmac' !~ _hex64
-               or jsonb_typeof(_cand->'pw_hmac') is distinct from 'string' or _cand->>'pw_hmac' !~ _hex64 then
-                raise exception 'item % has a candidate that is not two tags', _item.ord using errcode = '22023';
-            end if;
-        end loop;
-    end loop;
-    if (select count(distinct lower(i->>'enrollment_id')) from jsonb_array_elements(p_items) i) <> jsonb_array_length(p_items) then
-        raise exception 'a student is named twice' using errcode = '22023';
-    end if;
-    if (select count(distinct c->>'code_hmac') from jsonb_array_elements(p_items) i, jsonb_array_elements(i->'candidates') c)
-       <> 2 * jsonb_array_length(p_items) then
-        raise exception 'a code tag is given twice' using errcode = '22023';
-    end if;
-
-    perform _as_teacher(p_teacher_id);
-    if p_kind = 'questionnaire' then
-        select * into _q from questionnaire where id = p_target_id and fv_owns_course(course_id);
-        if _q.id is null then
-            raise exception 'questionnaire not found' using errcode = 'P0002';
-        end if;
-        _course := _q.course_id;
-        _expires := coalesce((_q.closes_on + 1)::timestamptz, now() + interval '30 days');
-    else
-        select * into _r from phone_report where id = p_target_id and fv_owns_course(course_id);
-        if _r.id is null then
-            raise exception 'report not found' using errcode = 'P0002';
-        end if;
-        if _r.closed_at is not null then
-            raise exception 'this report is closed' using errcode = 'FVS01';
-        end if;
-        _course := _r.course_id;
-        _expires := ((_r.expires_on + 1)::timestamp at time zone public._fv_timezone((select c.timezone from public.course c where c.id = _r.course_id)));
-    end if;
-    _cached := fv_idem_check(p_idempotency_key, 'issue_slips');
-    if _cached is not null then
-        perform set_config('request.jwt.claim.sub', coalesce(_was_sub, ''), true);
-        perform set_config('request.jwt.claims', coalesce(_was_all, ''), true);
-        return jsonb_build_object('replayed', true, 'results', _cached->'results');
-    end if;
-
-    for _item in
-        select (t.i->>'enrollment_id')::uuid as enrollment_id, t.i->'candidates' as candidates
-          from jsonb_array_elements(p_items) with ordinality as t(i, ord)
-         order by t.ord
-    loop
-        _one := jsonb_build_object('enrollment_id', _item.enrollment_id);
-        if not exists (select 1 from enrollment e
-                        where e.id = _item.enrollment_id and e.course_id = _course and e.withdrawn_at is null
-                          and fv_owns_enrollment(e.id))
-           or (p_kind = 'report' and not exists (select 1 from phone_report_student s
-                                                  where s.report_id = _r.id and s.enrollment_id = _item.enrollment_id)) then
-            -- not in this class (or not sent this report), or withdrawn
-            _results := _results || jsonb_build_array(_one || jsonb_build_object('result', 'not_found'));
-            continue;
-        end if;
-        -- All or nothing for the student: if no new slip can be stored, the
-        -- old one is not taken back either.
-        begin
-            if p_kind = 'questionnaire' then
-                update student_access_code set revoked_at = now()
-                 where enrollment_id = _item.enrollment_id and questionnaire_id = _q.id
-                   and used_at is null and revoked_at is null;
-                _has_pw := exists (select 1 from enrollment e join student s on s.id = e.student_id
-                                    where e.id = _item.enrollment_id and s.date_of_birth is null
-                                      and nullif(btrim(s.student_number), '') is null);
-            else
-                update student_access_code set revoked_at = now()
-                 where enrollment_id = _item.enrollment_id and phone_report_id = _r.id and revoked_at is null;
-                _has_pw := false;
-            end if;
-            _made := null;
-            for _try in 0..1 loop
-                begin
-                    insert into student_access_code (enrollment_id, questionnaire_id, phone_report_id,
-                                                     code_hmac, pw_hmac, key_id, expires_at)
-                    values (_item.enrollment_id, _q.id, _r.id, _item.candidates->_try->>'code_hmac',
-                            case when _has_pw then _item.candidates->_try->>'pw_hmac' end, p_key_id, _expires)
-                    returning id into _made;
-                    _pick := _try;   -- which candidate was stored: the edge returns its code
-                    exit;
-                exception when unique_violation then
-                    get stacked diagnostics _con = constraint_name;
-                    if _con is distinct from 'student_access_code_code_hmac' then
-                        raise;
-                    end if;
-                    -- That tag is a slip's already: try the other candidate.
-                end;
-            end loop;
-            if _made is null then
-                raise exception 'both candidates are taken' using errcode = 'FVS02';
-            end if;
-            _one := _one || jsonb_build_object('result', 'made', 'slip_id', _made, 'candidate', _pick,
-                                               'has_password', _has_pw);
-        exception when sqlstate 'FVS02' then
-            _one := jsonb_build_object('enrollment_id', _item.enrollment_id, 'result', 'failed');
-        end;
-        _results := _results || jsonb_build_array(_one);
-    end loop;
-
-    -- What a replay returns: the same, without which candidate was used.
-    perform fv_idem_store(p_idempotency_key, 'issue_slips',
-                          jsonb_build_object('results', (select coalesce(jsonb_agg(r - 'candidate' order by n), '[]'::jsonb)
-                                                           from jsonb_array_elements(_results) with ordinality as x(r, n))));
-    perform set_config('request.jwt.claim.sub', coalesce(_was_sub, ''), true);
-    perform set_config('request.jwt.claims', coalesce(_was_all, ''), true);
-    return jsonb_build_object('replayed', false, 'results', _results);
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -14771,168 +14298,6 @@ begin
            and (m.enrollment_id = p_enrollment_id
                 or not exists (select 1 from score s where s.enrollment_id = m.enrollment_id and s.assessment_id = _a.id
                                                        and s.status in ('NS', 'EXC')))), '[]'::jsonb));
-end;
-$function$;
-
-CREATE OR REPLACE FUNCTION student_submit.open(p_code_hmac text, p_key_id text, p_ip_hash text, p_new_token_hash text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _c      student_access_code%rowtype;
-    _q      questionnaire%rowtype;
-    _course course%rowtype;
-    _name   text;
-    _why    text;
-    _exp    timestamptz := now() + interval '80 minutes';
-    _r      phone_report%rowtype;
-    _dob    date;
-    _by     text;
-    _pw     boolean;
-begin
-    -- A tag is 64 lower-case hex characters, and a key id 8. Anything else is
-    -- a bug in the caller, not a student's guess: fail, and log nothing.
-    if p_code_hmac is not null and p_code_hmac !~ '^[0-9a-f]{64}$' then
-        raise exception 'malformed code tag' using errcode = '22023';
-    end if;
-    if coalesce(p_key_id, '') !~ '^[0-9a-f]{8}$' then
-        raise exception 'malformed key id' using errcode = '22023';
-    end if;
-    -- The hash of a token the function made: the database never sees the token.
-    if coalesce(p_new_token_hash, '') !~ '^[0-9a-f]{64}$' then
-        raise exception 'malformed token hash' using errcode = '22023';
-    end if;
-
-    if random() < 0.02 then
-        delete from attempt where at < now() - interval '30 days';
-        delete from session where expires_at < now() - interval '1 day';
-    end if;
-
-    -- A school's students share one address, so the limit is generous and
-    -- counts only codes that weren't found (a guess), not closed forms,
-    -- used slips or wrong birthdays.
-    if (select count(*) from attempt
-         where ip_hash = p_ip_hash and route = 'open' and outcome in ('not_found', 'bad_format', 'ambiguous')
-           and at > now() - interval '15 minutes') >= 300 then
-        perform _log('open', 'locked', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'locked');
-    end if;
-    if (select count(*) from attempt
-         where route = 'open' and outcome in ('not_found', 'bad_format')
-           and at > now() - interval '10 minutes') >= 500 then
-        perform _log('open', 'busy', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'busy');
-    end if;
-
-    -- Not six characters of the slip alphabet: the edge sends no tag.
-    if p_code_hmac is null then
-        perform _log('open', 'bad_format', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'not_found');
-    end if;
-
-    -- By its tag: live (or used) slips only, through the unique index on tags.
-    select * into _c from student_access_code
-     where code_hmac = p_code_hmac and revoked_at is null and expires_at > now()
-       for update;
-    if _c.id is null then
-        perform _log('open', 'not_found', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'not_found');
-    end if;
-
-    -- A phone report's code opens to the birthday check, not the report:
-    -- check() hands the report over once the birthday matches. It works
-    -- until the report's last day or until the teacher closes it, as often
-    -- as the student likes.
-    if _c.phone_report_id is not null then
-        select * into _r from phone_report where id = _c.phone_report_id;
-        select * into _course from course where id = _r.course_id;
-        if _course.deleted_at is not null
-           or exists (select 1 from enrollment e where e.id = _c.enrollment_id and e.withdrawn_at is not null) then
-            perform _log('open', 'not_found', p_ip_hash, _c.id, _r.course_id);
-            return jsonb_build_object('ok', false, 'error', 'not_found');
-        end if;
-        if _r.closed_at is not null
-           or (now() at time zone public._fv_timezone(_course.timezone))::date > _r.expires_on then
-            perform _log('open', 'closed', p_ip_hash, _c.id, _r.course_id);
-            return jsonb_build_object('ok', false, 'error', 'report_closed');
-        end if;
-        if (select count(*) from session where code_id = _c.id) >= 200 then
-            perform _log('open', 'too_many_opens', p_ip_hash, _c.id, _r.course_id);
-            return jsonb_build_object('ok', false, 'error', 'locked');
-        end if;
-        -- The token is the function's; the database keeps only its hash.
-        insert into session (token_hash, code_id, expires_at)
-        values (p_new_token_hash, _c.id, _exp);
-        select coalesce(nullif(btrim(s.preferred_name), ''), s.first_name), s.date_of_birth into _name, _dob
-          from enrollment e join student s on s.id = e.student_id
-         where e.id = _c.enrollment_id;
-        perform _log('open', 'ok', p_ip_hash, _c.id, _r.course_id);
-        return jsonb_build_object(
-            'ok', true, 'kind', 'report', 'new_token', true, 'expires_at', _exp,
-            'student', jsonb_build_object('first_name', _name),
-            'course', jsonb_build_object('name', _course.name, 'block', _course.block),
-            'report', jsonb_build_object('title', coalesce(_r.term_label, 'Report ' || _r.term), 'expires_on', _r.expires_on),
-            'has_birthday', _dob is not null);
-    end if;
-    if _c.questionnaire_id is null then
-        perform _log('open', 'not_found', p_ip_hash, _c.id);
-        return jsonb_build_object('ok', false, 'error', 'not_found');
-    end if;
-    select * into _q from questionnaire where id = _c.questionnaire_id;
-    select * into _course from course where id = _q.course_id;
-    if _c.used_at is not null then
-        perform _log('open', 'used', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'used');
-    end if;
-    if _course.deleted_at is not null
-       or exists (select 1 from enrollment e where e.id = _c.enrollment_id and e.withdrawn_at is not null) then
-        perform _log('open', 'not_found', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'not_found');
-    end if;
-    _why := _closed_reason(_q, _course.timezone);
-    if _why is not null then
-        perform _log('open', _why, p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', _why, 'opens_on', _q.opens_on);
-    end if;
-    if (select count(*) from session where code_id = _c.id) >= 20 then
-        perform _log('open', 'too_many_opens', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'locked');
-    end if;
-
-    -- Who the student must prove they are: their birthday or student number
-    -- when the teacher entered one, else the password printed on the slip
-    -- (its tag). A slip with neither has nothing to check against: they need
-    -- a new slip.
-    select coalesce(nullif(btrim(s.preferred_name), ''), s.first_name),
-           case when s.date_of_birth is not null or nullif(btrim(s.student_number), '') is not null then 'identity'
-                when _c.pw_hmac is not null then 'password' end,
-           _c.pw_hmac is not null
-      into _name, _by, _pw
-      from enrollment e join student s on s.id = e.student_id
-     where e.id = _c.enrollment_id;
-    if _by is null then
-        perform _log('open', 'no_identity', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'reprint');
-    end if;
-
-    -- The token is the function's; the database keeps only its hash.
-    insert into session (token_hash, code_id, expires_at)
-    values (p_new_token_hash, _c.id, _exp);
-
-    -- The questions wait for verify(); the slip alone shows only the first
-    -- name and what the questions are called.
-    perform _log('open', 'ok', p_ip_hash, _c.id, _q.course_id);
-    return jsonb_build_object(
-        'ok', true, 'kind', 'questionnaire', 'new_token', true, 'expires_at', _exp,
-        'student', jsonb_build_object('first_name', _name),
-        'course', jsonb_build_object('name', _course.name, 'block', _course.block),
-        'check', _by,
-        -- A password printed before the teacher added a birthday or number
-        -- still works, so the phone offers it beside them.
-        'also_password', _by = 'identity' and _pw,
-        'preview', student_submit._preview(_c.id));
 end;
 $function$;
 
@@ -15701,40 +15066,6 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.report(p_session_token text, p_enrollment_id uuid, p_report_id uuid, p_ip_hash text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _in     jsonb := _session_class(p_session_token, p_enrollment_id);
-    _r      phone_report%rowtype;
-    _course course%rowtype;
-    _data   jsonb;
-begin
-    if p_report_id is null then
-        raise exception 'a report is needed' using errcode = '22023';
-    end if;
-    if _in ? 'error' then
-        return jsonb_build_object('ok', false, 'error', _in->>'error');
-    end if;
-    select * into _r from phone_report where id = p_report_id and course_id = (_in->>'course_id')::uuid;
-    select data into _data from phone_report_student where report_id = _r.id and enrollment_id = p_enrollment_id;
-    if _r.id is null or _data is null then
-        return jsonb_build_object('ok', false, 'error', 'not_found');
-    end if;
-    select * into _course from course where id = _r.course_id;
-    if _r.closed_at is not null
-       or (now() at time zone public._fv_timezone(_course.timezone))::date > _r.expires_on then
-        return jsonb_build_object('ok', false, 'error', 'report_closed');
-    end if;
-    update student_access_code set opened_at = coalesce(opened_at, now())
-     where phone_report_id = _r.id and enrollment_id = p_enrollment_id;
-    return jsonb_build_object('ok', true, 'report', _data);
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION student_submit.revision_finish(p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_files jsonb, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -16342,205 +15673,6 @@ AS $function$
                                       p_note, p_followed_plan, p_request_id);
 $function$;
 
-CREATE OR REPLACE FUNCTION student_submit.slip_roster(p_teacher_id uuid, p_kind text, p_target_id uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _was_sub text := current_setting('request.jwt.claim.sub', true);
-    _was_all text := current_setting('request.jwt.claims', true);
-    _course  uuid;
-    _closed  timestamptz;
-    _ids     jsonb;
-begin
-    if p_kind is null or p_kind not in ('questionnaire', 'report') then
-        raise exception 'kind must be questionnaire or report' using errcode = '22023';
-    end if;
-    perform _as_teacher(p_teacher_id);
-    if p_kind = 'questionnaire' then
-        select q.course_id into _course from questionnaire q where q.id = p_target_id and fv_owns_course(q.course_id);
-    else
-        select r.course_id, r.closed_at into _course, _closed from phone_report r where r.id = p_target_id and fv_owns_course(r.course_id);
-    end if;
-    if _course is null then
-        raise exception 'not found' using errcode = 'P0002';
-    end if;
-    if _closed is not null then
-        raise exception 'this report is closed' using errcode = 'FVS01';
-    end if;
-    select coalesce(jsonb_agg(e.id order by e.roster_position nulls last, e.id), '[]'::jsonb) into _ids
-      from enrollment e
-     where e.course_id = _course and e.withdrawn_at is null and fv_owns_enrollment(e.id)
-       and (p_kind = 'questionnaire'
-            or exists (select 1 from phone_report_student s where s.report_id = p_target_id and s.enrollment_id = e.id));
-    perform set_config('request.jwt.claim.sub', coalesce(_was_sub, ''), true);
-    perform set_config('request.jwt.claims', coalesce(_was_all, ''), true);
-    return _ids;
-end;
-$function$;
-
-CREATE OR REPLACE FUNCTION student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _s       session%rowtype;
-    _c       student_access_code%rowtype;
-    _q       questionnaire%rowtype;
-    _course  course%rowtype;
-    _why     text;
-    _parts   uuid[];
-    _qid     text;
-    _val     jsonb;
-    _x       question%rowtype;
-    _clean   jsonb;
-    _clean_by_part jsonb := '{}'::jsonb;
-    _part    uuid;
-    _rid     uuid;
-    _term    text;
-    _core    text;
-    _lvl     jsonb;
-    _now     timestamptz := now();
-    _result  jsonb;
-begin
-    if coalesce(p_token, '') !~ '^[0-9a-f]{64}$' then
-        perform _log('submit', 'bad_token', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-    select * into _s from session
-     where token_hash = p_token
-       for update;
-    if not found then
-        perform _log('submit', 'bad_token', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-    -- A second tap: the first answer, nothing saved twice.
-    if _s.submitted_at is not null then
-        return _s.result;
-    end if;
-    if _s.expires_at < _now then
-        perform _log('submit', 'expired', p_ip_hash, _s.code_id);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-
-    select * into _c from student_access_code where id = _s.code_id for update;
-    -- A report code opens a report to read; there's nothing on it to send.
-    if _c.phone_report_id is not null then
-        perform _log('submit', 'closed', p_ip_hash, _c.id);
-        return jsonb_build_object('ok', false, 'error', 'closed');
-    end if;
-    select * into _q from questionnaire where id = _c.questionnaire_id;
-    -- The slip alone isn't enough: verify() has to have matched.
-    if _s.checked_at is null then
-        perform _log('submit', 'not_checked', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-    select * into _course from course where id = _q.course_id;
-    if _c.revoked_at is not null or _c.used_at is not null then
-        perform _log('submit', case when _c.used_at is not null then 'used' else 'revoked' end,
-                     p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', case when _c.used_at is not null then 'used' else 'not_found' end);
-    end if;
-    _why := _closed_reason(_q, _course.timezone);
-    if _why is not null or _course.deleted_at is not null
-       or exists (select 1 from enrollment e where e.id = _c.enrollment_id and e.withdrawn_at is not null) then
-        perform _log('submit', coalesce(_why, 'closed'), p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', coalesce(_why, 'closed'));
-    end if;
-    if (select count(*) from attempt
-         where course_id = _q.course_id and route = 'submit' and outcome = 'ok'
-           and at > _now - interval '1 minute') >= 120 then
-        perform _log('submit', 'busy', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'busy');
-    end if;
-
-    if jsonb_typeof(p_answers) is distinct from 'object'
-       or (select count(*) from jsonb_object_keys(p_answers)) > 80
-       or octet_length(p_answers::text) > 100000 then
-        perform _log('submit', 'invalid', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'invalid');
-    end if;
-
-    -- The parts the slip opened: the questionnaire and its open Goal Check-In.
-    select array_agg(id) into _parts from (
-        select _q.id as id
-        union all
-        select g.id from questionnaire g
-         where g.parent_id = _q.id and g.kind = 'goal_checkin' and g.is_on
-           and _closed_reason(g, _course.timezone) is null
-    ) p;
-
-    for _qid, _val in select * from jsonb_each(p_answers) loop
-        if _qid !~ '^[0-9a-fA-F-]{36}$' then
-            perform _log('submit', 'invalid', p_ip_hash, _c.id, _q.course_id);
-            return jsonb_build_object('ok', false, 'error', 'invalid');
-        end if;
-        select * into _x from question
-         where id = _qid::uuid and not archived and questionnaire_id = any(_parts);
-        if not found then
-            perform _log('submit', 'invalid', p_ip_hash, _c.id, _q.course_id);
-            return jsonb_build_object('ok', false, 'error', 'invalid', 'question_id', _qid);
-        end if;
-        begin
-            _clean := _clean_answer(_x.kind, _x.options, _x.core_ids, _val);
-        exception when others then
-            perform _log('submit', 'invalid', p_ip_hash, _c.id, _q.course_id);
-            return jsonb_build_object('ok', false, 'error', 'invalid', 'question_id', _qid);
-        end;
-        if _clean is not null then
-            _clean_by_part := jsonb_set(_clean_by_part, array[_x.questionnaire_id::text],
-                coalesce(_clean_by_part->(_x.questionnaire_id::text), '{}'::jsonb)
-                  || jsonb_build_object(_x.id::text, _clean || jsonb_build_object('kind', _x.kind)));
-        end if;
-    end loop;
-    if _clean_by_part = '{}'::jsonb then
-        perform _log('submit', 'empty', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'empty');
-    end if;
-
-    -- The class's reporting term for self-assessments: 'T' + the period, or
-    -- '' for a class without terms (as the client keys them).
-    _term := case when _q.report_period is not null
-                   and jsonb_typeof(_course.reporting_terms) = 'array'
-                   and jsonb_array_length(_course.reporting_terms) > 0
-                  then 'T' || _q.report_period else '' end;
-
-    foreach _part in array _parts loop
-        if not (_clean_by_part ? _part::text) then continue; end if;
-        insert into response (questionnaire_id, enrollment_id, via, submitted_at)
-        values (_part, _c.enrollment_id, 'link', _now)
-        returning id into _rid;
-        for _qid, _val in select * from jsonb_each(_clean_by_part->(_part::text)) loop
-            insert into answer (response_id, question_id, value_num, value_text, value_json)
-            values (_rid, _qid::uuid, (_val->>'num')::numeric, _val->>'text', _val->'json');
-            if _val->>'kind' = 'scale4' and _val->'json' ? 'levels' then
-                for _core, _lvl in select * from jsonb_each(_val->'json'->'levels') loop
-                    insert into core_self_assessment (enrollment_id, core_id, term_key, level, body)
-                    values (_c.enrollment_id, _core, _term, (_lvl #>> '{}')::int,
-                            case when jsonb_typeof(_val->'json'->'why') = 'object'
-                                 then _val->'json'->'why'->>_core
-                                 else _val->'json'->>'why' end)
-                    on conflict (enrollment_id, core_id, term_key)
-                    do update set level = excluded.level,
-                                  body = coalesce(excluded.body, core_self_assessment.body),
-                                  updated_at = now();
-                end loop;
-            end if;
-        end loop;
-    end loop;
-
-    update student_access_code set used_at = _now where id = _c.id;
-    _result := jsonb_build_object('ok', true, 'submitted_at', _now);
-    update session set submitted_at = _now, result = _result where id = _s.id;
-    perform _log('submit', 'ok', p_ip_hash, _c.id, _q.course_id);
-    return _result;
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -16637,99 +15769,6 @@ begin
     end if;
     perform set_config('fv.work_removal_reason', '', true);
     return jsonb_build_object('ok', true, 'unsent', true, 'cancelled', _cancelled > 0, 'pages', _pages, 'kept', _kept);
-end;
-$function$;
-
-CREATE OR REPLACE FUNCTION student_submit.verify(p_token text, p_birthday text, p_student_number text, p_pw_hmac text, p_ip_hash text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'student_submit', 'pg_temp'
-AS $function$
-declare
-    _s      session%rowtype;
-    _c      student_access_code%rowtype;
-    _q      questionnaire%rowtype;
-    _course course%rowtype;
-    _why    text;
-    _dob    date;
-    _num    text;
-    _given  date;
-    _match  boolean := false;
-    _misses int;
-begin
-    if p_pw_hmac is not null and p_pw_hmac !~ '^[0-9a-f]{64}$' then
-        raise exception 'malformed tag' using errcode = '22023';
-    end if;
-    if coalesce(p_token, '') !~ '^[0-9a-f]{64}$' then
-        perform _log('open', 'bad_token', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-    select * into _s from session
-     where token_hash = p_token
-       for update;
-    if not found or _s.expires_at < now() then
-        perform _log('open', 'bad_token', p_ip_hash);
-        return jsonb_build_object('ok', false, 'error', 'expired');
-    end if;
-    select * into _c from student_access_code where id = _s.code_id for update;
-    if _c.questionnaire_id is null or _c.revoked_at is not null then
-        perform _log('open', 'not_found', p_ip_hash, _c.id);
-        return jsonb_build_object('ok', false, 'error', 'not_found');
-    end if;
-    select * into _q from questionnaire where id = _c.questionnaire_id;
-    select * into _course from course where id = _q.course_id;
-    if _c.used_at is not null then
-        perform _log('open', 'used', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'used');
-    end if;
-    _why := _closed_reason(_q, _course.timezone);
-    if _why is not null or _course.deleted_at is not null
-       or exists (select 1 from enrollment e where e.id = _c.enrollment_id and e.withdrawn_at is not null) then
-        perform _log('open', coalesce(_why, 'closed'), p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', coalesce(_why, 'closed'), 'opens_on', _q.opens_on);
-    end if;
-
-    -- Matched already (a second tap, or the page reloaded): the questions again.
-    if _s.checked_at is not null then
-        return jsonb_build_object('ok', true) || _payload(_c.id);
-    end if;
-
-    -- Five wrong tries on a slip, across every time it was scanned, and the
-    -- slip stops working: one count, so "tries left" is always true.
-    select count(*) into _misses from attempt where code_id = _c.id and outcome = 'wrong_identity';
-    if _misses >= 5 then
-        perform _log('open', 'locked', p_ip_hash, _c.id, _q.course_id);
-        return jsonb_build_object('ok', false, 'error', 'slip_locked');
-    end if;
-
-    select s.date_of_birth, nullif(_norm(s.student_number), '')
-      into _dob, _num
-      from enrollment e join student s on s.id = e.student_id
-     where e.id = _c.enrollment_id;
-
-    begin
-        _given := nullif(btrim(coalesce(p_birthday, '')), '')::date;
-    exception when others then
-        _given := null;
-    end;
-    _match := (_dob is not null and _given is not null and _given = _dob)
-           or (_num is not null and _norm(p_student_number) = _num)
-           or (_c.pw_hmac is not null and p_pw_hmac is not null and p_pw_hmac = _c.pw_hmac);
-
-    if not _match then
-        update session set check_fails = check_fails + 1 where id = _s.id;
-        perform _log('open', 'wrong_identity', p_ip_hash, _c.id, _q.course_id);
-        if _misses + 1 >= 5 then
-            return jsonb_build_object('ok', false, 'error', 'slip_locked');
-        end if;
-        return jsonb_build_object('ok', false, 'error', 'wrong_identity', 'tries_left', 4 - _misses);
-    end if;
-
-    update session set checked_at = now() where id = _s.id;
-    update student_access_code set opened_at = coalesce(opened_at, now()) where id = _c.id;
-    perform _log('open', 'verified', p_ip_hash, _c.id, _q.course_id);
-    return jsonb_build_object('ok', true) || _payload(_c.id);
 end;
 $function$;
 

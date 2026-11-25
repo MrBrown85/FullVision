@@ -736,8 +736,15 @@ describe('the list in Class Settings › Student Page', () => {
       expect(buttons(box)).toEqual(['New Codes for This Class', 'Make and Print 2 Cards']);
       // Dee's is locked: Unlock on her row. Every card can be replaced, from the student's panel.
       expect(rowButtons(box)).toEqual([[], [], [], ['Unlock Dee Dunn’s Card'], [], []]);
-      expect(cardButtons(LIVE, U(14))).toEqual(['Unlock Dee Dunn’s Card', 'Print a New Card for Dee Dunn']);
-      expect(cardButtons(LIVE, U(11))).toEqual(['Print a New Card for Jordan Abel']);
+      expect(cardButtons(LIVE, U(14))).toEqual([
+        'Unlock Dee Dunn’s Card',
+        'Replace Dee Dunn’s Card and Show',
+        'Replace Dee Dunn’s Card and Print',
+      ]);
+      expect(cardButtons(LIVE, U(11))).toEqual([
+        'Replace Jordan Abel’s Card and Show',
+        'Replace Jordan Abel’s Card and Print',
+      ]);
       expect(cardButtons(LIVE, U(16))).toEqual([]);
     } finally {
       vi.useRealTimers();
@@ -1510,13 +1517,45 @@ describe('Print New Card', () => {
   });
   afterEach(() => releaseQuestions());
 
+  it('Replace and Show puts the new card up on screen, one student at a time, and prints nothing', async () => {
+    seedDemo();
+    await shown(CID);
+    await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }]);
+    StudentCards._reset();
+    await shown(CID);
+    press('spCardsNewCard', CID, { student: 's1', show: '1' });
+    await afterDraw();
+    expect(asked).toEqual([]);
+    expect(sheets.length).toBe(0);
+    const shownCard = document.getElementById('sc-show');
+    expect(shownCard).not.toBe(null);
+    expect(shownCard.getAttribute('role')).toBe('dialog');
+    expect(shownCard.querySelector('.sc-show-title').textContent).toBe('Jordan Abel’s Card');
+    expect(shownCard.querySelector('.qs-qr svg')).not.toBe(null);
+    const code = shownCard.querySelector('.qs-type strong').textContent;
+    expect(code).toMatch(/^[A-Z0-9]{4}-?[A-Z0-9]{4}$/);
+    // One student: Done only. Done closes it, and the code is kept nowhere.
+    expect([...shownCard.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Done']);
+    shownCard.querySelector('[data-sc-show="done"]').click();
+    expect(document.getElementById('sc-show')).toBe(null);
+    expect(everythingKept()).not.toContain(code);
+    const box = parse(StudentCards.render(CID));
+    expect(noteOf(box)).toBe(
+      '1 card was shown on screen. Print Again works until you leave this screen. After that, printing makes new codes.',
+    );
+    expect(box.textContent).not.toContain(code);
+  });
+
   it('a card never printed and never opened is replaced without asking', async () => {
     seedDemo();
     await shown(CID);
     const first = (await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }])).data.results[0];
     StudentCards._reset();
     await shown(CID);
-    expect(cardButtons(CID, 's1')).toEqual(['Print a New Card for Jordan Abel']);
+    expect(cardButtons(CID, 's1')).toEqual([
+      'Replace Jordan Abel’s Card and Show',
+      'Replace Jordan Abel’s Card and Print',
+    ]);
     press('spCardsNewCard', CID, { student: 's1' });
     await afterDraw();
     expect(asked).toEqual([]);
@@ -1553,14 +1592,17 @@ describe('Print New Card', () => {
       });
       t.fn.markPrinted([U(901)]);
       await shown(LIVE);
-      expect(cardButtons(LIVE, U(11))).toEqual(['Print a New Card for Cece Abel']);
+      expect(cardButtons(LIVE, U(11))).toEqual([
+        'Replace Cece Abel’s Card and Show',
+        'Replace Cece Abel’s Card and Print',
+      ]);
       press('spCardsNewCard', LIVE, { student: U(11) });
       expect(asked.length).toBe(1);
-      expect(asked[0].title).toBe('Print a New Card for Cece?');
+      expect(asked[0].title).toBe('Replace Cece’s Card?');
       expect(asked[0].message).toBe(
-        'The card Cece has now stops working as soon as the new one is made. Everything Cece has sent stays.',
+        'Cece’s card stops working as soon as the new one is made. Everything Cece has sent stays.',
       );
-      expect(asked[0].ok).toBe('Print New Card');
+      expect(asked[0].ok).toBe('Replace and Print');
       // Cancel: the dialog closes and nothing was asked of anyone.
       await afterDraw();
       expect(t.fn.posts).toEqual([]);
@@ -1587,7 +1629,7 @@ describe('Print New Card', () => {
       t.fn.markPrinted([U(901)]);
       await shown(LIVE);
       press('spCardsNewCard', LIVE, { student: U(12) });
-      expect(asked[0].title).toBe('Print a New Card for Avery?');
+      expect(asked[0].title).toBe('Replace Avery’s Card?');
       asked[0].onOk();
       await StudentCards._making(LIVE);
       await afterDraw();
@@ -1625,7 +1667,7 @@ describe('Print New Card', () => {
     StudentCards._reset();
     await shown(CID);
     press('spCardsNewCard', CID, { student: 's1' });
-    expect(asked.map(q => q.title)).toEqual(['Print a New Card for Jordan?']);
+    expect(asked.map(q => q.title)).toEqual(['Replace Jordan’s Card?']);
     expect(storedCards()[0].id).toBe(made.card_id);
     // A student with no card has no Print New Card; asked for anyway, it is a first card, with no question.
     expect(cardButtons(CID, 's2')).toEqual([]);
@@ -1742,7 +1784,7 @@ describe('Print New Card', () => {
       expect(reads()).toBe(before + 1);
       expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
         'Could not make the card. Check the connection and try again.',
-        '1 student still has their old card: Cam Cole. Choose their name, then Print New Card, to try again.',
+        '1 student still has their old card: Cam Cole. Choose their name, then Replace Card, to try again.',
       ]);
     } finally {
       t.session.signOut();
@@ -1963,7 +2005,7 @@ describe('New Codes for This Class', () => {
       const box = parse(StudentCards.render(LIVE));
       expect(notesOf(box)).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-        '2 students still have their old card: Avery Byrne, Cam Cole. Choose each name, then Print New Card, to try again.',
+        '2 students still have their old card: Avery Byrne, Cam Cole. Choose each name, then Replace Card, to try again.',
       ]);
       // Print New Card on one of them: the line names the other only.
       StudentCards._setBatch(250);
@@ -1975,7 +2017,7 @@ describe('New Codes for This Class', () => {
       await afterDraw();
       expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-        '1 student still has their old card: Cam Cole. Choose their name, then Print New Card, to try again.',
+        '1 student still has their old card: Cam Cole. Choose their name, then Replace Card, to try again.',
       ]);
     } finally {
       t.session.signOut();
@@ -2118,7 +2160,11 @@ describe('Unlock and Unlock All', () => {
     let box = parse(StudentCards.render(CID));
     expect(buttons(box)).toEqual(['New Codes for This Class']);
     expect(rowButtons(box)[0]).toEqual(['Unlock Jordan Abel’s Card']);
-    expect(cardButtons(CID, 's1')).toEqual(['Unlock Jordan Abel’s Card', 'Print a New Card for Jordan Abel']);
+    expect(cardButtons(CID, 's1')).toEqual([
+      'Unlock Jordan Abel’s Card',
+      'Replace Jordan Abel’s Card and Show',
+      'Replace Jordan Abel’s Card and Print',
+    ]);
     press('spCardsUnlock', CID, { card: made[0].card_id });
     await quiet(CID);
     expect(storedCards()[0].locked_at).toBe(null);
@@ -2126,7 +2172,10 @@ describe('Unlock and Unlock All', () => {
     box = parse(StudentCards.render(CID));
     expect(rowsOf(box)[0][2]).toMatch(/^Printed /);
     expect(rowButtons(box)[0]).toEqual([]);
-    expect(cardButtons(CID, 's1')).toEqual(['Print a New Card for Jordan Abel']);
+    expect(cardButtons(CID, 's1')).toEqual([
+      'Replace Jordan Abel’s Card and Show',
+      'Replace Jordan Abel’s Card and Print',
+    ]);
 
     // Two locked: Unlock All, and it clears both.
     const again = storedCards();
@@ -2392,7 +2441,7 @@ describe('the three faults the review of S3-W1 left', () => {
       await quiet(LIVE);
       expect(marks().length).toBe(sentBefore + 1);
       press('spCardsNewCard', LIVE, { student: U(11) });
-      expect(asked.map(q => q.title)).toEqual(['Print a New Card for Jordan?']);
+      expect(asked.map(q => q.title)).toEqual(['Replace Jordan’s Card?']);
       expect(t.fn.posts.length).toBe(1);
     } finally {
       t.session.signOut();
@@ -2502,7 +2551,7 @@ describe('an old card stopped and the new one not printed', () => {
       const box = parse(StudentCards.render(LIVE));
       expect(notesOf(box)).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
-        '1 student still has their old card: Cam Cole. Choose their name, then Print New Card, to try again.',
+        '1 student still has their old card: Cam Cole. Choose their name, then Replace Card, to try again.',
         "1 student's old card has stopped and the new one didn't print: Avery Byrne. Press Make and Print 1 Card to print it.",
       ]);
     } finally {

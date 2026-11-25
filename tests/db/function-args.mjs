@@ -57,7 +57,6 @@ export const KIND_BY_ARG = {
   p_card_id: 'student_card',
   p_card_ids: 'student_card',
   p_issue_id: 'report_issue',
-  p_report_id: 'phone_report',
   p_key: 'idempotency_key',
   p_bulletin_id: 'bulletin',
   p_bulletin_file_id: 'bulletin_file',
@@ -66,9 +65,7 @@ export const KIND_BY_ARG = {
 
 /* p_id, p_ids and p_src_id name a different kind in each function. */
 export const KIND_BY_FUNCTION = {
-  _phone_report_json: 'phone_report',
   _questionnaire_json: 'questionnaire',
-  close_phone_report: 'phone_report',
   delete_assessment: 'assessment',
   delete_category: 'category',
   delete_comment_template: 'comment_template',
@@ -98,7 +95,6 @@ export const KIND_BY_FUNCTION = {
   update_enrollment: 'enrollment',
   update_observation: 'observation',
   update_observation_follow_up: 'observation_follow_up',
-  update_phone_report: 'phone_report',
   update_student: 'student',
   upsert_category: 'category',
   upsert_competency_group: 'competency_group',
@@ -181,9 +177,6 @@ export const VALUES = {
   save_term_attendance: { p_term: '1' },
   get_report: { p_term: '1' },
   get_term_rating: { p_term: '1' },
-  create_phone_report: { p_term: '1', p_students: [{ enrollment_id: '${enrollment}', data: {} }] },
-  update_phone_report: { p_students: [{ enrollment_id: '${enrollment}', data: {} }] },
-  _phone_report_put: { p_students: [{ enrollment_id: '${enrollment}', data: {} }] },
   create_report_issue: {
     p_term: '1',
     p_paper: "'letter'",

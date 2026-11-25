@@ -12,7 +12,6 @@ import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { addressKey, ipHash, makeHandler } from '../supabase/functions/student-submit/handler.ts';
 import { FAKE_KEY } from './helpers/card-key-fake.js';
-import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 
 const from = headers => new Request('https://x.supabase.co/functions/v1/student-submit', { method: 'POST', headers });
 const hashOf = address => ipHash(from({ 'cf-connecting-ip': address }), 'k1');
@@ -182,34 +181,27 @@ describe('student-submit: the hashed address', () => {
 
   it('reaches every route as one key for one /64, with no part of the address', async () => {
     const calls = [];
-    const record =
-      route =>
-      async (...args) => {
-        calls.push({ route, hash: args.at(-1), args });
-        return { ok: true };
-      };
     const handle = makeHandler({
       region: 'ca-central-1',
       ipKey: 'test-key',
       cardKey: await readCardKey(FAKE_KEY),
       log: () => {},
       db: {
-        check: record('check'),
-        submit: record('submit'),
         async call(text, params) {
-          // A slip's open ends with the new token's hash (2026112403); the address is third.
-          calls.push({ route: 'card', hash: text === SLIP_SQL.open ? params[2] : params.at(-1), args: params });
+          // A card's verify ends with the new session's hash; the address is the one before.
+          calls.push({
+            route: 'card',
+            hash: text.includes('verify_card') ? params.at(-2) : params.at(-1),
+            args: params,
+          });
           return { ok: true };
         },
       },
     });
     const token = 'a'.repeat(64);
     const bodies = [
-      { route: 'open', code: 'K7M-4QX' },
-      { route: 'verify', token, student_number: '0123456' },
-      { route: 'check', token, birthday: '2012-05-15' },
-      { route: 'submit', token, answers: {} },
       { route: 'card', code: 'P3R8-WD4K' },
+      { route: 'verify', code: 'P3R8-WD4K', student_number: '0123456' },
       { route: 'done', session: token },
     ];
     for (const address of ['2001:db8:1:2::1', '2001:db8:1:2:aaaa:bbbb:cccc:dddd']) {
@@ -224,7 +216,7 @@ describe('student-submit: the hashed address', () => {
         expect(res.status).toBe(200);
       }
     }
-    expect(calls).toHaveLength(12);
+    expect(calls).toHaveLength(6);
     expect(new Set(calls.map(c => c.hash)).size).toBe(1);
     expect(calls[0].hash).toMatch(/^[0-9a-f]{64}$/);
     // No part of the address reaches the database. Checked on the address's own shape (its colons): the

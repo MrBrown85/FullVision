@@ -138,7 +138,7 @@ describe('an eight-character card opens the student’s page', () => {
 
 describe('a replaced card says so', () => {
   it('the line exists once in the student page, and app.js reuses it', () => {
-    const files = ['student.js', 'app.js', 'questionnaire.js', 'report.js', 'assignments.js', 'student-data.js'];
+    const files = ['student.js', 'app.js', 'questionnaire.js', 'assignments.js', 'student-data.js'];
     const found = files.filter(f => readFileSync(resolve(__dirname, '..', 's', f), 'utf8').includes(REPLACED));
     expect(found).toEqual(['student.js']);
   });
@@ -193,26 +193,5 @@ describe('a replaced card says so', () => {
     expect(alertText(page)).toBe(REPLACED);
     expect(page.root().querySelector('#sp-ident')).toBeNull();
     expect(dev.store).toEqual({});
-  });
-});
-
-describe('a six-character slip still opens as before', () => {
-  it('scanned: card says it is no card, then open, and the box shows K7M-4QX', async () => {
-    const dev = school();
-    dev.fn.state.slips.K7M4QX = {
-      ok: true,
-      token: 'a'.repeat(64),
-      student: { first_name: 'Cece' },
-      course: { name: 'Science 8', block: 'B' },
-      preview: [{ title: 'November Reflection', count: 1 }],
-      check: 'identity',
-    };
-    const page = await dev.open('#k7m-4qx');
-    expect(page.calls.map(c => c.body)).toEqual([
-      { route: 'card', code: 'K7M4QX' },
-      { route: 'open', code: 'K7M4QX' },
-    ]);
-    expect(page.root().querySelector('[data-act="start"]')).toBeTruthy();
-    expect(page.T.state().typed).toBe('K7M-4QX');
   });
 });

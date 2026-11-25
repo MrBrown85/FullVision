@@ -17,8 +17,6 @@
   var slipParts = StudentPage.slipParts;
   var identityFields = StudentPage.identityFields;
   var verifyIdentity = StudentPage.verifyIdentity;
-  var call = StudentPage.call;
-  var messageFor = StudentPage.messageFor;
   var saveDraft = StudentPage.saveDraft;
   var clearDraft = StudentPage.clearDraft;
   var paint = StudentPage.paint;
@@ -903,48 +901,7 @@
       return Promise.resolve();
     }
     if (S.cardForm) return sendFromCard(answers);
-    S.sending = true;
-    S.message = '';
-    paint();
-    function attempt(retried) {
-      return call({ route: 'submit', token: S.data.token, answers: answers }).then(function (res) {
-        if (res && res.ok) return res;
-        // The 80-minute token (a class block) ran out while they wrote: open again for a
-        // fresh one (the code is still unused) and send once more.
-        if (res && res.error === 'expired' && !retried) {
-          return call({ route: 'open', code: S.code }).then(function (again) {
-            if (!again || !again.ok) return again;
-            S.data.token = again.token;
-            // A slip that asks who you are asks again on the new session.
-            if (again.check && S.ident) {
-              return call(Object.assign({ route: 'verify', token: again.token, code: S.code }, S.ident)).then(
-                function (ok) {
-                  return ok && ok.ok ? attempt(true) : ok;
-                },
-              );
-            }
-            return attempt(true);
-          });
-        }
-        return res;
-      });
-    }
-    return attempt(false).then(function (res) {
-      S.sending = false;
-      if (res && res.ok) {
-        clearDraft();
-        S.screen = 'sent';
-        S.message = '';
-        try {
-          history.replaceState(null, '', location.pathname);
-        } catch (e) {
-          /* the code stays in the address; it no longer works */
-        }
-      } else {
-        S.message = messageFor(res);
-      }
-      paint();
-    });
+    return Promise.resolve();
   }
 
   /* Opened from a real card's page (S4-F4): `answer` through the card's

@@ -49,7 +49,6 @@ const DESKTOP_APP = [
   'teacher/qr-slips.css',
   'teacher/preview-student.css',
   's/page-view.css',
-  'shared/phone-report.css',
   'teacher/grades-print.css',
 ];
 const PHONE_APP = [
@@ -62,7 +61,6 @@ const PHONE_APP = [
 ];
 const STUDENT_PAGE = [
   // s/index.html's <head>.
-  'shared/phone-report.css',
   'shared/loading-screen.css',
   's/student.css',
   's/page-view.css',
