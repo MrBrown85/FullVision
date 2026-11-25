@@ -54,8 +54,6 @@ export const OWNERS = {
   'public.observation_student': 'rls_test.of_observation(t.observation_id)',
   'public.observation_tag': 'rls_test.of_observation(t.observation_id)',
   'public.observation_template': 'coalesce(t.teacher_id, rls_test.of_course(t.course_id))',
-  'public.phone_report': 'rls_test.of_course(t.course_id)',
-  'public.phone_report_student': 'rls_test.of_phone_report(t.report_id)',
   'public.photo_check_log': 'rls_test.of_course(t.course_id)',
   'public.photo_keep_check': 'rls_test.of_course(t.course_id)',
   'public.question': 'rls_test.of_questionnaire(t.questionnaire_id)',
@@ -84,7 +82,6 @@ export const OWNERS = {
   'public.section': 'rls_test.of_course(t.course_id)',
   'public.section_override': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.student': 't.teacher_id',
-  'public.student_access_code': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.student_card': 'rls_test.of_enrollment(t.enrollment_id)',
   'public.subject': 'rls_test.of_course(t.course_id)',
   'public.submission': 'rls_test.of_course(t.course_id)',
@@ -106,7 +103,6 @@ export const OWNERS = {
   'student_submit.device_session': 'rls_test.of_device_session(t.id)',
   'student_submit.device_session_enrollment': 'rls_test.of_enrollment(t.enrollment_id)',
   'student_submit.send_log': 'rls_test.of_card(t.card_id)',
-  'student_submit.session': 'rls_test.of_access_code(t.code_id)',
   'student_submit.write_log': 'rls_test.of_card(t.card_id)',
 };
 
