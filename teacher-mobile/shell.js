@@ -96,7 +96,7 @@
     _bindEdgeSwipe();
 
     _hideLoader();
-    _initPullToRefresh();
+    MPullRefresh.init(_doRefresh);
     // The teacher's other classes load in the background, so switching to one doesn't start from nothing.
     if (typeof preloadClasses === 'function') {
       var preload = function () {
@@ -128,123 +128,8 @@
     history.pushState({ m: 0, guard: true }, '');
   }
 
-  /* ── Pull to refresh ───────────────────────────────────────────
-     On a list at its top, a pull brings the content down with the finger
-     (with resistance) and grows the spinner; past the threshold a release
-     reloads the class while the content waits, then it springs back. Not on
-     the card stack, which has its own gestures. */
-  var PULL_THRESHOLD = 70;
-  var PULL_HOLD = 48;
-  var _pull = null; // { content, startX, startY, decided, on, dy }
-  var _pullIndicator = null;
-  var _refreshing = false;
-  var _pullToRefreshInitialized = false;
-  function _initPullToRefresh() {
-    if (_pullToRefreshInitialized) return;
-    _pullToRefreshInitialized = true;
-    document.addEventListener(
-      'touchstart',
-      function (e) {
-        _pull = null;
-        _pullOff();
-        if (_refreshing) return;
-        var content = e.target.closest('.m-screen-content');
-        if (!content || content.scrollTop > 0) return;
-        if (e.target.closest('.m-card-stack')) return;
-        if (!document.getElementById('m-sheet-backdrop').classList.contains('u-hidden')) return;
-        _pull = {
-          content: content,
-          startX: e.touches[0].clientX,
-          startY: e.touches[0].clientY,
-          decided: false,
-          on: false,
-          dy: 0,
-        };
-        // Only an armed pull listens to the moves (and can stop the scroll), so no other touch waits for this script.
-        document.addEventListener('touchmove', _pullMove, { passive: false });
-      },
-      { passive: true },
-    );
-    document.addEventListener('touchend', _pullEnd, { passive: true });
-    document.addEventListener('touchcancel', _pullOff, { passive: true });
-  }
-
-  function _pullOff() {
-    document.removeEventListener('touchmove', _pullMove);
-  }
-
-  function _pullMove(e) {
-    if (!_pull) return;
-    var dx = e.touches[0].clientX - _pull.startX;
-    var dy = e.touches[0].clientY - _pull.startY;
-    if (!_pull.decided) {
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      _pull.decided = true;
-      if (dy <= 0 || Math.abs(dx) > dy || _pull.content.scrollTop > 0) {
-        _pull = null;
-        return _pullOff();
-      }
-      _pull.on = true;
-      _pull.content.classList.add('m-pulling');
-      _showPullIndicator();
-    }
-    if (!_pull.on) return;
-    e.preventDefault();
-    // Resistance: the content moves less and less as the pull grows.
-    var pull = Math.min(120, Math.max(0, dy) * 0.5);
-    _pull.dy = pull;
-    _pull.content.style.transform = 'translateY(' + pull + 'px)';
-    _pullIndicator.style.height = pull + 'px';
-    _pullIndicator.classList.toggle('m-pull-ready', pull >= PULL_THRESHOLD);
-    _pullIndicator.style.setProperty('--m-pull', String(Math.min(1, pull / PULL_THRESHOLD)));
-  }
-
-  function _pullEnd() {
-    _pullOff();
-    if (!_pull || !_pull.on) {
-      _pull = null;
-      return;
-    }
-    var p = _pull;
-    _pull = null;
-    p.content.classList.remove('m-pulling');
-    if (p.dy >= PULL_THRESHOLD) {
-      _settlePull(p.content, PULL_HOLD);
-      _doRefresh().then(function () {
-        _settlePull(p.content, 0);
-      });
-    } else {
-      _settlePull(p.content, 0);
-    }
-  }
-
-  function _showPullIndicator() {
-    if (!_pullIndicator) {
-      _pullIndicator = document.createElement('div');
-      _pullIndicator.className = 'm-pull-indicator';
-      _pullIndicator.innerHTML = '<span class="m-pull-spinner"></span>';
-      document.getElementById('m-app').prepend(_pullIndicator);
-    }
-    _pullIndicator.classList.remove('m-pull-settle');
-  }
-
-  // The content and the spinner ease to `px` down (0 = back in place).
-  function _settlePull(content, px) {
-    content.classList.add('m-pull-settle');
-    content.style.transform = px ? 'translateY(' + px + 'px)' : '';
-    if (_pullIndicator) {
-      _pullIndicator.classList.add('m-pull-settle');
-      _pullIndicator.style.height = px + 'px';
-      _pullIndicator.classList.toggle('m-pull-ready', px > 0);
-      _pullIndicator.style.setProperty('--m-pull', px ? '1' : '0');
-    }
-    setTimeout(function () {
-      content.classList.remove('m-pull-settle');
-    }, 300);
-  }
-
+  // Pull to refresh's reload (teacher-mobile/pull-refresh.js).
   async function _doRefresh() {
-    _refreshing = true;
     try {
       // refreshFromSupabase was removed, so this used to reload nothing and
       // still say "Synced". It now reloads the class and reports the result.
@@ -260,7 +145,6 @@
       var msg = e.message === 'timeout' ? 'Sync timed out' : 'Refresh failed — ' + (e.message || 'unknown error');
       MC.showToast(msg);
     }
-    _refreshing = false;
   }
 
   /* ── Auth screen ──────────────────────────────────────────── */
@@ -550,6 +434,7 @@
   /* ── Tab switching ──────────────────────────────────────────── */
   function _switchTab(tab) {
     if (tab === _activeTab) return;
+    MGradeLook.flush(); // a return held for Undo goes now
     _tabState[_activeTab] = _captureTabState();
     _activeTab = tab;
     _gradeReturnSid = null;
@@ -766,6 +651,7 @@
   // The Settings sheet's Active Class, or Open Class on a photo warning.
   function _switchClass(newCid) {
     if (!newCid || newCid === _cid) return;
+    MGradeLook.flush(); // a return held for Undo goes now
     _cid = newCid;
     // Screens left open on each tab belong to the old class.
     _tabState = { students: null, observe: null, grade: null };
@@ -837,6 +723,7 @@
 
     var top = screens[screens.length - 1];
     var below = screens[screens.length - 2];
+    if (top.id === 'm-screen-grade-swiper') MGradeLook.flush(); // a return held for Undo goes now
     if (_gradeReturnSid && top.id === 'm-screen-grade-swiper') {
       _returnToStudent(_gradeReturnSid, top);
       return;

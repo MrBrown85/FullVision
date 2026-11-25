@@ -138,6 +138,7 @@ load('teacher-mobile/markup.js');
 load('teacher-mobile/crit-own.js');
 load('teacher-mobile/grade-look.js');
 load('teacher-mobile/tab-grade.js');
+load('teacher-mobile/level-sheet.js');
 // Bulletins (B1f): the fourth tab, shown only with the build flag on.
 load('teacher-mobile/bulletins-model.js');
 load('teacher-mobile/tab-bulletins.js');

@@ -14,8 +14,6 @@
 
   /** @type {any} */
   var W = window;
-  var MORE =
-    '<svg width="18" height="4" viewBox="0 0 18 4" aria-hidden="true"><circle cx="2" cy="2" r="2" fill="currentColor"/><circle cx="9" cy="2" r="2" fill="currentColor"/><circle cx="16" cy="2" r="2" fill="currentColor"/></svg>';
 
   // The grading screen's class and cards, as renderSwiper last drew them.
   /** @type {string | null} */
@@ -66,13 +64,19 @@
     var look = _mark();
     _cid = cid;
     _units = look ? units : [];
-    if (!look) return { title: '', titleAction: '', more: '' };
+    if (!look) return { title: '', titleAction: '', more: '', strip: '' };
     var named = !oneStudent && units.length > 0;
     return {
       title: named ? unitName(cid, units[0]) : '',
       titleAction: named ? 'm-grade-roster' : '',
       more:
-        '<button type="button" class="m-grade-more" data-action="m-grade-more" aria-label="More">' + MORE + '</button>',
+        '<button type="button" class="m-grade-more" data-action="m-grade-more" aria-label="More">' +
+        W.MComponents.ICONS.more +
+        '</button>',
+      // The strip is drawn as a progress line: nothing in it is a control, so
+      // it is out of the tab order and the screen reader's way. The class list
+      // does its job.
+      strip: ' inert',
     };
   }
 
@@ -81,6 +85,13 @@
   function show(idx) {
     var el = document.querySelector('#m-nav-bar-grade-swiper .m-nav-title-text');
     if (el && _cid && _units[idx]) el.textContent = unitName(_cid, _units[idx]);
+  }
+
+  // Text the new look does not show but a screen reader still reads (look.css .m-look-sr).
+  // html-safe: wraps markup the caller built
+  /** @param {string} html */
+  function quiet(html) {
+    return on() ? '<span class="m-look-sr">' + html + '</span>' : html;
   }
 
   // "Comment for Maya": the Overall Comment, named for who it is to. '' with the switch off.
@@ -117,7 +128,9 @@
           '><span>' +
           _esc(unitName(cid, unit)) +
           '</span>' +
-          (graded ? '<span class="m-roster-graded">Graded</span>' : '') +
+          (graded
+            ? '<span class="m-roster-graded"><span aria-hidden="true">\u2713</span>' + quiet('Graded') + '</span>'
+            : '') +
           '</button>'
         );
       })
@@ -221,18 +234,9 @@
     if (idx >= 0) grade.jumpToStudent(idx);
   }
 
-  // Leaving the grading screen, or the app, sends a held return first.
-  document.addEventListener(
-    'click',
-    function (e) {
-      if (_held && e.target instanceof Element && e.target.closest('[data-action="m-back"], .m-tab-item')) flush();
-    },
-    true,
-  );
-  if (W.addEventListener) {
-    W.addEventListener('popstate', flush);
-    W.addEventListener('pagehide', flush);
-  }
+  // Leaving the app sends a held return first ("Yes, send it", Colin,
+  // Nov 24). Leaving the grading screen does too: shell.js calls flush.
+  if (W.addEventListener) W.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) flush();
   });
@@ -259,6 +263,7 @@
     commentLabel: commentLabel,
     marks: marks,
     unitName: unitName,
+    quiet: quiet,
     hold: hold,
     held: held,
     flush: flush,
