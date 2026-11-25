@@ -1,7 +1,8 @@
 // @ts-check
 /* grade-look.js — the phone grader's frame: who is on screen in the top bar,
    the class list behind that name (hold a name to peek at the paper), the ⋯
-   sheet, the return held seven seconds for Undo, All Caught Up, and the
+   sheet, a status's chip and its Undo, the return held seven seconds for
+   Undo, All Caught Up, and the
    comment a teacher last wrote on a criterion waiting as a suggestion
    (docs/plans/phone-look-plan.md).
 
@@ -196,7 +197,9 @@
     var may = canSetAssignmentStatus(cid, sid, a.id, 'NS');
     var ids = ' data-sid="' + sid + '" data-aid="' + a.id + '"';
     var pill = function (/** @type {string} */ val, /** @type {string} */ label) {
-      var locked = val !== 'LATE' && !may;
+      // The status that is on can always come off (canSetAssignmentStatus):
+      // a comment or rubric row left on Excused work locked it on.
+      var locked = val !== 'LATE' && val !== status && !may;
       return (
         '<button type="button" class="m-status-pill' +
         (status === val ? ' m-status-active' : '') +
@@ -219,8 +222,50 @@
       pill('EXC', 'Excused') +
       '</div>' +
       // Why Missing and Excused can't be picked, where they can't.
-      (single && !may ? '<div class="m-more-hint">Clear the score and comment to mark Missing or Excused.</div>' : '')
+      (single && !may && status !== 'NS' && status !== 'EXC'
+        ? '<div class="m-more-hint">Clear the score and comment to mark Missing or Excused.</div>'
+        : '')
     );
+  }
+
+  /** @type {Record<string, string>} */
+  var STATUS_WORDS = { NS: 'Missing', EXC: 'Excused', LATE: 'Late' };
+
+  /* A status on a card, as a chip that takes it off when tapped: the ⋯
+     sheet's own action, so the tap does what the sheet's button does. */
+  // html-safe: the label goes through esc; ids are ours; the status is a fixed code
+  /** @param {string} sid @param {string} aid @param {string} status @param {string} label */
+  function statusChip(sid, aid, status, label) {
+    return (
+      '<button type="button" class="m-grade-chip m-grade-chip-' +
+      status.toLowerCase() +
+      '" data-action="m-grade-status" data-val="' +
+      status +
+      '" data-sid="' +
+      sid +
+      '" data-aid="' +
+      aid +
+      '" aria-label="' +
+      _esc('Take Off ' + label) +
+      '">' +
+      _esc(label) +
+      '</button>'
+    );
+  }
+
+  /* After a status is set or taken off: a toast over the tab bar names it,
+     and its Undo calls `put`, which puts the old one back (an accidental
+     Excused could not be undone: Colin, 2026-11-25). */
+  /** @param {string} cid @param {string} sid @param {string} aid @param {string | null} was @param {string | null} now @param {() => void} put */
+  function statusUndo(cid, sid, aid, was, now, put) {
+    var said = now ? 'Marked ' + STATUS_WORDS[now] : 'Took off ' + STATUS_WORDS[was || ''];
+    W.MComponents.showToast(said, {
+      low: true,
+      onUndo: function () {
+        // Only while the status is still the one the toast names.
+        if (getAssignmentStatus(cid, sid, aid) === now) put();
+      },
+    });
   }
 
   function openMore() {
@@ -425,5 +470,7 @@
     flush: flush,
     suggestion: suggestion,
     rememberComment: rememberComment,
+    statusChip: statusChip,
+    statusUndo: statusUndo,
   };
 })();
