@@ -212,19 +212,10 @@ function openGrading(aid) {
   stack().innerHTML = MGrade.renderSwiper(CID, aid);
   MGrade.setupSwiper(CID, aid);
 }
-// What the Students tab hands each card (teacher-mobile/tab-students.js).
-const cardData = () => ({
-  sections: getSections(CID),
-  statuses: getAssignmentStatuses(CID),
-  assessments: getAssessments(CID),
-  termId: 'term-1',
-  widgetConfig: getCardWidgetConfig(),
-});
 const cardHtml = sid =>
-  MCardWidgets.assembleCard(
+  MStudentCard.render(
     getStudents(CID).find(s => s.id === sid),
     CID,
-    cardData(),
   );
 
 /* The walk the snapshot records. Returns { name: html }. */
@@ -266,9 +257,6 @@ function walk(config) {
       openList();
       out[name('Grade list, after grading')] = stack().innerHTML;
     }
-    EVERYONE.forEach(sid => {
-      out[name('Card ' + sid.slice(-2))] = cardHtml(sid);
-    });
     clearClass(CID);
   }
   return out;
@@ -328,10 +316,10 @@ describe('with the build switch off the phone is what it was', () => {
       beforeSignedIn[name] = SIGNED_IN + name in snapshot ? snapshot[SIGNED_IN + name] : snapshot[name];
     });
 
-  it('the snapshot covers the list, the grading screens and the cards', () => {
-    // 15 a class (2 lists, 8 grading screens, 5 cards), and the Proficiency
-    // class's 6 pictures of a grading session.
-    expect(Object.keys(before).length).toBe(15 * 3 + 6);
+  it('the snapshot covers the list and the grading screens', () => {
+    // 10 a class (2 lists, 8 grading screens), and the Proficiency class's 6
+    // pictures of a grading session. (The Students card is the new look's own.)
+    expect(Object.keys(before).length).toBe(10 * 3 + 6);
     Object.keys(before).forEach(name => expect(before[name].length, name).toBeGreaterThan(300));
     // Signed in, main differs only on a grading screen after a save, and
     // only in the sync dot.
@@ -468,7 +456,7 @@ const sheetClosed = () => vi.advanceTimersByTime(400);
 
 // A student's card, on a page of its own.
 function card(sid) {
-  // html-safe: MCardWidgets.assembleCard escapes names and text; a test page
+  // html-safe: MStudentCard.render escapes names and text; a test page
   stack().innerHTML = cardHtml(sid);
   return stack().querySelector('.m-scard-return');
 }
@@ -1091,13 +1079,19 @@ describe('with the switch on and When I Return Them', () => {
       };
       held();
       grading();
-      const withDrafts = cardHtml(BEN);
-      const box = card(BEN).outerHTML;
+      // The level and each piece's title and result; not the Not Opened dots, which follow a return.
+      const numbers = html => [
+        html.match(/<div class="m-sc-level.*?<\/div>/s)[0],
+        [...html.matchAll(/m-sc-row-title">([^<]*)<\/span><span class="m-sc-pill[^>]*>([^<]*)</g)].map(
+          m => m[1] + ' ' + m[2],
+        ),
+      ];
+      const withDrafts = numbers(cardHtml(BEN));
       clearClass(CID);
       localStorage.clear();
       seed({ config: { student_page_enabled: true, return_grades: 'on_save' } });
       grading();
-      expect(withDrafts.replace(box, '') === cardHtml(BEN)).toBe(true);
+      expect(withDrafts).toEqual(numbers(cardHtml(BEN)));
     });
   });
 

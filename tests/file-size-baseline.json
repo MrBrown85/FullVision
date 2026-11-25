@@ -7,7 +7,7 @@
   "shared/data.js": 9900,
   "shared/offline-queue.js": 1738,
   "shared/student-view.js": 1795,
-  "teacher-mobile/shell.js": 1738,
+  "teacher-mobile/shell.js": 1707,
   "teacher-mobile/tab-grade.js": 3695,
   "teacher/class-results.js": 1891,
   "teacher/comment-bank.js": 8451,

@@ -686,8 +686,8 @@
     if (restore) newScreen.setAttribute('data-restore', JSON.stringify(restore));
     newScreen.classList.add('m-push-enter');
     stack.appendChild(newScreen);
-    // The student screen's open tab, in view in its strip.
-    if (window.MStudentDetail) MStudentDetail.scrollActiveTab(newScreen);
+    // A student's profile measures its long answers.
+    if (window.MStudentDetail) MStudentDetail.opened(newScreen);
     // A pushed screen with its own sync dot shows the current state.
     if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
 
@@ -784,7 +784,7 @@
       screen.classList.remove('m-screen-hidden');
       screen.setAttribute('data-restore', JSON.stringify({ kind: 'detail', sid: sid }));
       stack.appendChild(screen);
-      if (window.MStudentDetail) MStudentDetail.scrollActiveTab(screen);
+      if (window.MStudentDetail) MStudentDetail.opened(screen);
       if (list) list.style.display = 'none';
       _navStacks[_activeTab].push('detail');
       var navBar = screen.querySelector('.m-nav-bar');
@@ -993,7 +993,7 @@
 
       // Grade on a student page: the newest assessment's grading screen on
       // the Grade tab, at that student's card. Back returns to the page.
-      if (action === 'm-student-grade' || action === 'm-assess-grade') {
+      if (action === 'm-assess-grade') {
         _openGraderAt(
           target.getAttribute('data-sid'),
           target.getAttribute('data-aid'),
@@ -1024,7 +1024,7 @@
         return;
       }
 
-      // Settings sheet (course switcher, Customize Card on Students, sign out, switch to desktop)
+      // Settings sheet (course switcher, sign out, switch to desktop)
       if (action === 'm-settings') {
         var pickerCourses = getPickerCourses(_cid);
         var courseOpts = pickerCourses
@@ -1068,9 +1068,6 @@
                 courseOpts +
                 '</select>' +
                 '</div>'
-              : '') +
-            (_activeTab === 'students'
-              ? '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-open-widget-editor">Customize Card</button>'
               : '') +
             // Help opens the help site in a new tab.
             '<a class="m-btn-primary m-help-link" href="/help" target="_blank" rel="noopener">Help</a>' +
@@ -1172,30 +1169,7 @@
         return;
       }
 
-      // Widget editor actions
-      if (action === 'm-open-widget-editor') {
-        MCardWidgetEditor.show(function onUpdate() {
-          MStudents.initCardStack(_cid);
-        });
-        return;
-      }
-      if (action === 'm-wdg-toggle' || action === 'm-wdg-reset') {
-        MCardWidgetEditor.handleAction(action, target);
-        return;
-      }
-
       // ── Students tab ──
-      // The whole Teacher Comment from a student card.
-      if (action === 'm-comment-full') {
-        var cSid = target.getAttribute('data-sid');
-        var cSt = getStudents(_cid).find(function (s) {
-          return s.id === cSid;
-        });
-        var cTerm = target.getAttribute('data-term');
-        if (cSt) MC.presentSheet(MCardWidgets.commentSheetHtml(cSt, _cid, cTerm === '' ? null : cTerm));
-        return;
-      }
-
       if (action === 'm-all-students') {
         MStudents.showAllStudents();
         return;
@@ -1221,11 +1195,6 @@
         var sid = target.getAttribute('data-sid');
         var html = MStudents.renderDetail(_cid, sid);
         _pushScreen(html, { kind: 'detail', sid: sid });
-        return;
-      }
-
-      if (action === 'm-student-tab') {
-        MStudentDetail.selectTab(target, target.getAttribute('data-tab'));
         return;
       }
 

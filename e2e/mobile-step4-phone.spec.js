@@ -326,7 +326,7 @@ test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
 
   // Dragged from the level, not the name (a button, which a mouse press never drags).
   const box = await page.locator('.m-card-stack-item[data-depth="0"]').boundingBox();
-  const lv = await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-level').boundingBox();
+  const lv = await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-level').boundingBox();
   const y = lv.y + lv.height / 2;
   await page.mouse.move(box.x + box.width - 40, y);
   await page.mouse.down();
@@ -377,7 +377,7 @@ test('phone controls are finger-sized', async ({ page }) => {
   await openPhone(page);
   await expect(page.locator('.m-demo-pill').first()).toBeInViewport();
   expect(await page.evaluate(small)).toEqual([]);
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   await page.waitForTimeout(500);
   expect(await page.evaluate(small)).toEqual([]);
   await page.locator('[data-action="m-back"]').first().click();
@@ -410,7 +410,7 @@ test('Observe starters say Post and can be undone', async ({ page }) => {
 test('student card says when more rows are below', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 560 }); // so the card's list runs past its bottom
   await openPhone(page);
-  const box = page.locator('.m-card-stack-item[data-depth="0"] .m-scard-widgets');
+  const box = page.locator('.m-card-stack-item[data-depth="0"] .m-sc-scroll');
   await expect(box).toHaveClass(/m-more-below/);
   const cue = await box.evaluate(el => getComputedStyle(el, '::after').content);
   expect(cue).toContain('More Below');
@@ -436,7 +436,7 @@ test('phone titles, chips and sparklines are not cut', async ({ page }) => {
     st[1].lastName = st[0].lastName;
   }, long);
 
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   await page.locator('#m-screen-student-detail summary', { hasText: 'All Work' }).click();
   await page.locator('#m-screen-student-detail summary', { hasText: 'Competencies' }).click();
   const cutRows = await page.evaluate(() =>
@@ -474,7 +474,7 @@ test('phone titles, chips and sparklines are not cut', async ({ page }) => {
 // assessment on that student; the Grade button says which piece it opens.
 test('student screen assessment rows open their grading', async ({ page }) => {
   await openPhone(page);
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   // All Work opens in place on the profile.
   await page.locator('#m-screen-student-detail summary', { hasText: 'All Work' }).click();
   const row = page.locator('#m-screen-student-detail .m-assess-compact[data-action="m-assess-grade"]').nth(2);
@@ -486,5 +486,5 @@ test('student screen assessment rows open their grading', async ({ page }) => {
   await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-title-text')).toHaveText(name);
   await expect(page.locator('#m-thumb-strip .m-thumb-current')).toHaveAttribute('data-sid', sid);
   await page.locator('[data-action="m-back"]').first().click();
-  await expect(page.locator('#m-screen-student-detail .m-sl-id-name')).toHaveText(name);
+  await expect(page.locator('#m-screen-student-detail .m-sp-name')).toHaveText(name);
 });

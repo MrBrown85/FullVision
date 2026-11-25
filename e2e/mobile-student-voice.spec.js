@@ -12,18 +12,18 @@ test("Cece's own goals and answers show on her phone profile", async ({ page }) 
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   const screen = page.locator('#m-screen-student-detail');
-  await expect(screen.locator('.m-sl-id-name')).toContainText('Cece');
+  await expect(screen.locator('.m-sp-name')).toContainText('Cece');
 
   // Her goal and check-in, About Me, and her reflections, first on the profile.
-  const goal = screen.locator('.m-sl-block', { has: page.locator('h2', { hasText: 'Cece’s Goal' }) });
+  const goal = screen.locator('.m-sp-card', { has: page.locator('h2', { hasText: 'Cece’s Goal' }) });
   await expect(goal).toContainText('Hand in labs on time');
   await expect(goal).toContainText('Working On It');
   await expect(goal).toContainText('Core Competency: Personal Awareness & Responsibility');
-  const about = screen.locator('.m-sl-block', { has: page.locator('h2', { hasText: 'About Me' }) });
+  const about = screen.locator('.m-sp-card', { has: page.locator('h2', { hasText: 'About Me' }) });
   await expect(about).toContainText('I ask a lot of questions');
-  const refl = screen.locator('.m-sl-block', { has: page.locator('h2', { hasText: 'Reflections' }) });
+  const refl = screen.locator('.m-sp-card', { has: page.locator('h2', { hasText: 'Reflections' }) });
   await refl.locator('summary').first().click();
   await expect(refl.locator('details[open]').first()).toBeVisible();
   await expect(screen).toContainText('Personal Awareness & Responsibility: Growing');

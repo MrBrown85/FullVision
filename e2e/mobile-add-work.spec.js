@@ -127,9 +127,7 @@ test('Add Work from a not-in card: a photo, Save and Next, then the work is on t
   await expect(card.locator('.m-work-page img')).toHaveAttribute('src', /^blob:/);
 });
 
-test('the student card’s To Grade list, View Profile’s, the red count, and Add Work, Then Grade It', async ({
-  page,
-}) => {
+test('the student card’s To Grade list, the red count, and Add Work, Then Grade It', async ({ page }) => {
   await openPhone(page, { clear: ['st2'] });
   const badge = page.locator('.m-tab-item[data-tab="grade"] .m-tab-badge');
   await expect(badge).toHaveText('1');
@@ -149,14 +147,17 @@ test('the student card’s To Grade list, View Profile’s, the red count, and A
   await expect(list).toBeInViewport();
   await shot(page, 'S7-F4-student-card-to-grade');
 
-  await top.locator('.m-sl-profile').click();
-  const detail = page.locator('#m-screen-student-detail');
-  await expect(detail.locator('.m-scard-tograde .m-scard-return-head')).toHaveText('To Grade');
-  await shot(page, 'S7-F4-view-profile-to-grade');
+  // To Grade is the card's: the profile does not carry it.
+  await top.locator('.m-sc-profile').click();
+  await expect(page.locator('#m-screen-student-detail .m-sp-name')).toBeVisible();
+  await expect(page.locator('#m-screen-student-detail .m-scard-tograde')).toHaveCount(0);
+  // The screen under goes once the slide is done; Back before that would leave it hidden.
+  await expect(page.locator('#m-screen-students-list')).toBeHidden();
+  await page.locator('#m-screen-student-detail .m-nav-bar-back').click();
 
   // Grade opens the grader on Noor's work only, a tab for each piece, the lab first.
-  const pieces = await detail.locator('.m-scard-tograde-row').count();
-  await detail.locator('.m-scard-tograde-row[data-action="m-assess-grade"][data-aid="' + LAB + '"]').click();
+  const pieces = await list.locator('.m-scard-tograde-row').count();
+  await list.locator('.m-scard-tograde-row[data-action="m-assess-grade"][data-aid="' + LAB + '"]').click();
   const grader = page.locator('#m-screen-grade-swiper');
   await expect(grader).toBeVisible();
   const noor = await fullName(page, 'st2');

@@ -12,7 +12,7 @@ test('an opened competency shows Now and Next', async ({ page }) => {
   // The demo class seeds after the curriculum bank loads.
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => CompetencyWording.loadBank());
-  await page.evaluate(() => document.querySelector('.m-card-stack-item[data-depth="0"] .m-sl-profile').click());
+  await page.evaluate(() => document.querySelector('.m-card-stack-item[data-depth="0"] .m-sc-profile').click());
   await page.locator('#m-screen-student-detail summary', { hasText: 'Competencies' }).click();
   const card = page.locator('.m-section-card[data-sec="PA4"]');
   await card.waitFor();

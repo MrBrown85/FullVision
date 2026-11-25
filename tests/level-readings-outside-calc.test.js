@@ -226,33 +226,8 @@ describe.each(VALUES)('a level of %s', v => {
     seed();
     const s = said(v);
     expect(MComponents.profBg(v)).toBe(s.colour);
-    const data = { widgetConfig: { order: ['hero'], disabled: [] } };
-    const hero = atLevel(v, () => MCardWidgets.render('hero', student(), CID, data));
-    expect(hero).toContain('<div class="m-scard-prof-label">' + s.word + '</div>');
-    const detail = atLevel(v, () => MStudentDetail.renderDetail({ cid: CID, sid: ME, renderBadges: () => '' }));
-    expect(detail).toContain('<div class="m-hero-prof-label">' + s.word + '</div>');
-  });
-});
-
-describe('the phone’s Focus Areas: competencies below Proficient, by the figure shown', () => {
-  // 2.94 prints 2.9 and is listed; 2.95, even a hair under, prints 3.0 and is not.
-  it.each([
-    [2.4, true],
-    [2.94, true],
-    [hair(2.95), false],
-    [2.95, false],
-    [2.97, false],
-    [3, false],
-  ])('%s listed: %s', (v, listed) => {
-    seed();
-    const real = globalThis.getFocusAreas;
-    globalThis.getFocusAreas = () => [{ prof: v, tag: { label: 'Evidence' }, section: { color: '#336699' } }];
-    try {
-      const detail = MStudentDetail.renderDetail({ cid: CID, sid: ME, renderBadges: () => '' });
-      expect(detail.indexOf('Focus Areas') >= 0).toBe(listed);
-    } finally {
-      globalThis.getFocusAreas = real;
-    }
+    const card = atLevel(v, () => MStudentCard.render(student(), CID));
+    expect(card).toContain('<span class="m-sc-word">' + s.word + '</span>');
   });
 });
 

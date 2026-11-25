@@ -281,7 +281,7 @@ test.describe('the student card’s To Return list', () => {
   test('lists the student’s drafts, and Return returns one in one tap', async ({ page }) => {
     const info = await openPhone(page, { on: true, drafts: true });
     const card = page.locator('.m-card-stack-item[data-depth="0"]');
-    await expect(card.locator('.m-sl-name')).toContainText(info.names[0]);
+    await expect(card.locator('.m-sc-name')).toContainText(info.names[0]);
     await expect(card.locator('.m-scard-return-head')).toHaveText('To Return');
     const rows = card.locator('.m-scard-return-row');
     await expect(rows).toHaveCount(2);
