@@ -237,13 +237,18 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Only the newest commit on a branch is tested: a new push or merge
-    # cancels the run still testing the commit before it. One group per
-    # shard, because a matrix shares a job's concurrency group and the
-    # shards would otherwise cancel each other.
+    # On main a run that has started always finishes (2026-11-24, Colin:
+    # merges a few minutes apart kept cancelling each other's runs, and a
+    # run takes 7 to 15 minutes, so on a busy day none finished). A merge
+    # made while a run is going waits for it; GitHub keeps only the newest
+    # waiting run, so merges that arrive together are tested by one run,
+    # and a waiting run marked cancelled is covered by the newer one. On
+    # any other branch a new run still cancels the one before it. One
+    # group per shard, because a matrix shares a job's concurrency group
+    # and the shards would otherwise cancel each other.
     concurrency:
       group: e2e-${{ github.ref }}-shard-${{ matrix.shard }}
-      cancel-in-progress: true
+      cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
     strategy:
       # A failure in one shard doesn't stop the others, so the report lists
       # every failing spec.
@@ -332,7 +337,7 @@ jobs:
     timeout-minutes: 10
     concurrency:
       group: e2e-report-${{ github.ref }}
-      cancel-in-progress: true
+      cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
     permissions:
       contents: read
       issues: write

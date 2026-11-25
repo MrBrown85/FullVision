@@ -1050,6 +1050,11 @@ window.MGrade = (function () {
     var _currentIdx = 0;
     var _undoStack = [];
     var _scrollRAF = null;
+    // The card a jump is sliding to: the cards it passes on the way never
+    // become the one on screen. A second after the jump the cards rule again,
+    // so a finger that stops the slide is followed.
+    var _jumpTo = null;
+    var _jumpTimer = null;
     // Rubric view per assessment (true unless Tags is chosen) and the
     // Advanced Rubric checklists open, keyed sid:aid:critId.
     var _rubricView = {};
@@ -1066,8 +1071,6 @@ window.MGrade = (function () {
        Graded Separately From and Back to Group Grade (which asks first). */
     var _GROUP_THUMB_COLOR = '#6e7b87';
     var _swiperLabels = null;
-    var _MORE_ICON =
-      '<svg width="16" height="4" viewBox="0 0 16 4" aria-hidden="true"><circle cx="2" cy="2" r="1.8" fill="currentColor"/><circle cx="8" cy="2" r="1.8" fill="currentColor"/><circle cx="14" cy="2" r="1.8" fill="currentColor"/></svg>';
 
     // The swiper's cards in order: on group work a card per group (drawn from
     // the member its grade comes from), each followed by its members graded
@@ -1259,7 +1262,7 @@ window.MGrade = (function () {
               '" aria-label="More for ' +
               name +
               '">' +
-              _MORE_ICON +
+              MC.ICONS.more +
               '</button></div>'
             );
           })
@@ -1449,22 +1452,28 @@ window.MGrade = (function () {
       _currentIdx = 0;
 
       var stuSt = _student ? students[0] : null;
+      // The new look (teacher-mobile/grade-look.js): the bar names the card
+      // on screen, and carries ⋯.
+      var look = MGradeLook.bar(cid, units, !!stuSt);
       var nav = MC.navBar({
         id: 'grade-swiper',
-        title: stuSt ? displayName(stuSt) : assessment.title,
-        subtitle: _subtitleText(0, students.length),
+        title: stuSt ? displayName(stuSt) : look.title || assessment.title,
+        titleAction: look.titleAction,
+        subtitle: look.title ? '' : _subtitleText(0, students.length),
         backLabel: stuSt ? displayNameFirst(stuSt) || displayName(stuSt) : 'Grade',
         // The sync dot is the only place sync problems show, so the grading
         // screen carries it too.
         rightHTML:
-          '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>',
+          '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+          look.more,
       });
 
       // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).
       var chipText = MC.chipTexts(students, units);
       // One student's work has no strip of students (it is kept, hidden, for
       // the card count), and a tab for each piece instead.
-      var thumbs = '<div class="m-thumb-strip' + (stuSt ? ' m-thumb-strip-off' : '') + '" id="m-thumb-strip">';
+      var thumbs =
+        '<div class="m-thumb-strip' + (stuSt ? ' m-thumb-strip-off' : '') + '" id="m-thumb-strip"' + look.strip + '>';
       students.forEach(function (st, idx) {
         var unit = units[idx];
         var color = unit.view ? _GROUP_THUMB_COLOR : MC.avatarColor(st.id);
@@ -1558,6 +1567,9 @@ window.MGrade = (function () {
     function _returnBarOwn(cid, a, unit, last) {
       var none = { state: '', act: '' };
       if (!unit) return none;
+      // A return held for Undo already reads as returned.
+      if (MGradeLook.held(cid, a.id, unit.st.id))
+        return { state: '<span class="m-returned-mark">Returned</span>', act: '' };
       // What the bar says is worked out once for both layouts (S11-T1),
       // revisions with it (S11-F1, the board "Phone: Return for Revision").
       var area = GraderWork.returnArea(cid, a, unit.st.id, _cardReturnIds(unit), { revisions: true });
@@ -1908,8 +1920,12 @@ window.MGrade = (function () {
       _saveTyped(cid, unit.st.id);
       var ids = _cardReturnIds(unit);
       if (!GraderWork.draftsIn(cid, a.id, ids).length) return _syncReturnBar();
-      Grader.returnGrades(cid, a.id, ids);
-      clearProfCache();
+      // Sent now; in the new look, held seven seconds for Undo (grade-look.js).
+      MGradeLook.hold(cid, a.id, unit, function (late) {
+        Grader.returnGrades(cid, a.id, ids);
+        clearProfCache();
+        if (late) _syncReturnBar();
+      });
       MC.haptic();
       // One student's work: on to their next piece.
       if (_student) {
@@ -2041,7 +2057,7 @@ window.MGrade = (function () {
         MC.esc(initials) +
         '</div>' +
         '<div class="m-grade-student-main"><div class="m-grade-student-name">' +
-        MC.esc(name) +
+        MGradeLook.quiet(MC.esc(name)) +
         badges +
         '</div>' +
         sent +
@@ -2230,7 +2246,9 @@ window.MGrade = (function () {
         '<div class="m-overall">' +
         '<label class="m-overall-label" for="' +
         commentId +
-        '">Overall Comment</label>' +
+        '">' +
+        MC.esc(MGradeLook.commentLabel(cid, st, unit) || 'Overall Comment') +
+        '</label>' +
         '<textarea class="m-overall-comment" id="' +
         commentId +
         '" rows="2" placeholder="Add an overall comment for ' +
@@ -2254,8 +2272,7 @@ window.MGrade = (function () {
         header +
         // The student's work, under who it is (teacher-mobile/grade-photos.js).
         MGradePhotos.cardHtml(cid, assessment, st, unit, { status: notInCard ? statusRow : '' }) +
-        tagGroups +
-        commentRow +
+        MGradeLook.marks(tagGroups + commentRow) +
         '</div></div>'
       );
     }
@@ -2544,7 +2561,7 @@ window.MGrade = (function () {
           count.ticked +
           ' ticked"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>' +
           // Only the ticks, as on the board's chip: no box total.
-          count.ticked +
+          MGradeLook.quiet(String(count.ticked)) +
           '</button>';
       }
       // The board's "Suggested: Proficient" over the levels, from the ticks;
@@ -3321,18 +3338,27 @@ window.MGrade = (function () {
           if (_scrollRAF) return;
           _scrollRAF = requestAnimationFrame(function () {
             _scrollRAF = null;
-            var idx = Math.round(swiper.scrollLeft / swiper.clientWidth);
-            var total = document.querySelectorAll('#m-thumb-strip .m-thumb').length;
-            if (idx !== _currentIdx && idx >= 0 && idx < total) {
-              _currentIdx = idx;
-              _updateCurrentThumb(idx);
-              _updateSubtitle(idx, total);
-              _syncReturnBar(true);
-            }
+            _noteScroll(swiper);
           });
         },
         { passive: true },
       );
+    }
+
+    // The card the cards have scrolled to becomes the one on screen.
+    function _noteScroll(swiper) {
+      var idx = Math.round(swiper.scrollLeft / swiper.clientWidth);
+      if (_jumpTo !== null) {
+        if (idx === _jumpTo) _jumpTo = null;
+        return;
+      }
+      var total = document.querySelectorAll('#m-thumb-strip .m-thumb').length;
+      if (idx !== _currentIdx && idx >= 0 && idx < total) {
+        _currentIdx = idx;
+        _updateCurrentThumb(idx);
+        _updateSubtitle(idx, total);
+        _syncReturnBar(true);
+      }
     }
 
     // ← and → move between students on the grading screen, unless the
@@ -3389,6 +3415,13 @@ window.MGrade = (function () {
     function jumpToStudent(idx, instant) {
       var swiper = document.getElementById('m-swiper');
       if (!swiper) return;
+      clearTimeout(_jumpTimer);
+      _jumpTo = instant ? null : idx;
+      if (!instant)
+        _jumpTimer = setTimeout(function () {
+          _jumpTo = null;
+          _noteScroll(swiper);
+        }, 1000);
       swiper.scrollTo({ left: idx * swiper.clientWidth, behavior: instant ? 'auto' : 'smooth' });
       _currentIdx = idx;
       _updateCurrentThumb(idx);
@@ -3409,6 +3442,7 @@ window.MGrade = (function () {
     }
 
     function _updateSubtitle(idx, total) {
+      MGradeLook.show(idx);
       var titleInline = document.querySelector('#m-nav-bar-grade-swiper .m-nav-bar-title-inline');
       if (titleInline) {
         var assessment = titleInline.textContent.split('\n')[0];
@@ -3534,104 +3568,7 @@ window.MGrade = (function () {
       _syncReturnBar();
     }
 
-    /* ── Press and hold a level (Nov 2 mockup, batch 2) ──────────────
-       Holding a competency's 1–4 button for about half a second opens a
-       sheet: the competency, the level, its descriptor, what Proficient
-       means (the I Can statements) and the next step (CompetencyWording).
-       Letting go doesn't score; a quick tap still does, and a finger that
-       moves first cancels the hold. */
-    var HOLD_MS = 450;
-    var _hold = null;
     var _swiperCid = null;
-
-    function _levelSheetHtml(cid, tag, level) {
-      var l = CompetencyWording.lines(tag, level);
-      if (!l) return '';
-      var word = typeof levelWord === 'function' ? levelWord(cid, level) : l.word;
-      return (
-        '<div class="m-level-sheet">' +
-        '<h2 class="m-level-sheet-title">' +
-        MC.esc(tag.label || tag.code || '') +
-        '</h2>' +
-        '<div class="m-level-sheet-level">' +
-        level +
-        (word ? ' \u00b7 ' + MC.esc(word) : '') +
-        '</div>' +
-        (l.descriptor ? '<p>' + MC.esc(l.descriptor) + '</p>' : '') +
-        (l.iCans.length
-          ? '<p><b>Proficient means:</b></p><ul>' +
-            l.iCans
-              .map(function (x) {
-                return '<li>' + MC.esc(x) + '</li>';
-              })
-              .join('') +
-            '</ul>'
-          : '') +
-        (l.next ? '<p><b>Next step:</b> ' + MC.esc(l.next) + '</p>' : '') +
-        '</div>'
-      );
-    }
-
-    function showLevelSheet(btn) {
-      var cid = _swiperCid;
-      var tag = cid && typeof getTagById === 'function' ? getTagById(cid, btn.getAttribute('data-tid')) : null;
-      var level = parseInt(btn.getAttribute('data-score'), 10);
-      if (!tag || !window.CompetencyWording) return;
-      var html = _levelSheetHtml(cid, tag, level);
-      if (!html) return;
-      MC.presentSheet(html, { half: true });
-      var l = CompetencyWording.lines(tag, level);
-      if (l && !l.ready)
-        CompetencyWording.loadBank().then(function (ok) {
-          var box = document.querySelector('#m-sheet-container .m-level-sheet');
-          // html-safe: _levelSheetHtml escapes the label, level word, descriptor, I Can statements and step (MC.esc)
-          if (ok && box) box.outerHTML = _levelSheetHtml(cid, tag, level);
-        });
-    }
-
-    function _holdDown(e) {
-      // A finger or pen: a mouse's slow click still scores.
-      if (e.pointerType === 'mouse') return;
-      var btn = e.target.closest && e.target.closest('.m-score-btn[data-tid]');
-      if (!btn) return;
-      if (_hold) clearTimeout(_hold.timer);
-      _hold = {
-        btn: btn,
-        x: e.clientX,
-        y: e.clientY,
-        shown: false,
-        timer: setTimeout(function () {
-          _hold.shown = true;
-          showLevelSheet(btn);
-        }, HOLD_MS),
-      };
-    }
-    function _holdMove(e) {
-      if (!_hold || _hold.shown) return;
-      if (Math.abs(e.clientX - _hold.x) + Math.abs(e.clientY - _hold.y) > 10) {
-        clearTimeout(_hold.timer);
-        _hold = null;
-      }
-    }
-    function _holdUp() {
-      if (!_hold) return;
-      clearTimeout(_hold.timer);
-      if (!_hold.shown) _hold = null;
-    }
-    // The click that ends a hold is swallowed, so the level isn't scored.
-    function _holdClick(e) {
-      if (!_hold) return;
-      var held = _hold.shown && _hold.btn.contains(e.target);
-      _hold = null;
-      if (!held) return;
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    document.addEventListener('pointerdown', _holdDown);
-    document.addEventListener('pointermove', _holdMove);
-    document.addEventListener('pointerup', _holdUp);
-    document.addEventListener('pointercancel', _holdUp);
-    document.addEventListener('click', _holdClick, true);
 
     return {
       renderSwiper: renderSwiper,

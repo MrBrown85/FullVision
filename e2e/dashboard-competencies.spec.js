@@ -1,22 +1,30 @@
 /**
- * The Competencies tile's two pages at one third of the row (D3 of
- * docs/plans/dashboard-inbox-plan.md): Level Mix and Self-Assessment as one
- * row per competency, the row's list, the other views fitting the tile, and
- * the view menus and hover tips showing whole. Demo Mode, Science 8.
+ * The Competencies tile (what the class's work has covered): one row for each
+ * competency assessed in the period with its count and one tick for each
+ * student, This Term | Year, the quiet Not Assessed line, and Core. Demo
+ * Mode, Science 8. Counts and levels are checked against the data in
+ * tests/dash-competencies-pages.test.js; here it is the drawn tile: nothing
+ * runs past it, the list scrolls inside it, and the controls work.
  */
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { FONTS, useFont } from './wide-font.js';
 import { mkdirSync } from 'node:fs';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 async function openDashboard(page, { w = 1280, h = 800 } = {}) {
-  await page.setViewportSize({ width: Math.max(w, 1024), height: h });
+  await page.setViewportSize({ width: w, height: h });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('.dash-comp-tile').waitFor();
-  // A phone-wide window gets the desktop page by being narrowed after it loads.
-  if (w < 1024) await page.setViewportSize({ width: w, height: h });
+  await page.locator('#dash-comp-page-curricular .dash-comp-it').first().waitFor({ state: 'attached' });
+}
+
+async function goCore(page) {
+  await page.locator('#dash-comp-tab-core').click();
+  await expect(page.locator('#dash-comp-page-core')).toHaveClass(/is-on/);
+  await page.waitForTimeout(300);
 }
 
 const box = loc =>
@@ -25,517 +33,279 @@ const box = loc =>
     return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height };
   });
 
-const heights = (page, sel) => page.locator(sel).evaluateAll(els => els.map(e => e.getBoundingClientRect().height));
-
-async function goCore(page) {
-  await page.locator('#dash-comp-tab-core').click();
-  await expect(page.locator('#dash-comp-page-core')).toHaveClass(/is-on/);
-  await page.waitForTimeout(300);
-}
-async function goCurricular(page) {
-  await page.locator('#dash-comp-tab-curricular').click();
-  await expect(page.locator('#dash-comp-page-curricular')).toHaveClass(/is-on/);
-  await page.waitForTimeout(300);
-}
-
-// How far the shown page scrolls sideways or down, and the page's own width.
-const pageFit = page =>
+/* What runs past the tile, sideways or out of the window, and whether the
+   list or the page scrolls. */
+const fitOf = page =>
   page.evaluate(() => {
-    const el = document.querySelector('.dash-comp-page.is-on');
-    return { sw: el.scrollWidth - el.clientWidth, sh: el.scrollHeight - el.clientHeight };
+    const tile = document.querySelector('.dash-comp-tile').getBoundingClientRect();
+    const on = document.querySelector('.dash-comp-page.is-on');
+    const list = on.querySelector('.dash-comp-list');
+    const past = [...on.querySelectorAll('.dash-comp-sub > *, .dash-comp-it > *, .dash-comp-tick, .dash-comp-fold')]
+      .filter(el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && (r.right > tile.right + 0.5 || r.left < tile.left - 0.5);
+      })
+      .map(el => (el.textContent || el.className).trim().slice(0, 30));
+    return {
+      past,
+      listSideways: list.scrollWidth - list.clientWidth,
+      pageScrolls: on.scrollHeight > on.clientHeight + 1,
+      docSideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      tileBottom: tile.bottom,
+      rowBottom: document.querySelector('.dash-row').getBoundingClientRect().bottom,
+    };
   });
 
-const inWindow = (b, w, h) => b.left >= -0.5 && b.top >= -0.5 && b.right <= w + 0.5 && b.bottom <= h + 0.5;
-
-async function pickView(page, menu, name) {
-  await page.locator('#dash-view-btn-' + menu).click();
-  await page
-    .locator('#dash-view-menu-' + menu + ' .dash-view-item')
-    .filter({ has: page.locator('.dash-view-name', { hasText: new RegExp('^' + name + '$') }) })
-    .click();
-  await page.waitForTimeout(250);
+for (const [w, h] of [
+  [1280, 800],
+  [1440, 900],
+  [1920, 1080],
+]) {
+  test(`nothing runs past the tile at ${w} x ${h}, in the page font and the wide one`, async ({ page }) => {
+    await openDashboard(page, { w, h });
+    for (const font of FONTS) {
+      await useFont(page, font);
+      for (const pg of ['curricular', 'core']) {
+        if (pg === 'core') await goCore(page);
+        const m = await fitOf(page);
+        const at = `${font} font, ${pg}`;
+        expect(m.past, at).toEqual([]);
+        expect(m.listSideways, at).toBeLessThanOrEqual(0);
+        expect(m.pageScrolls, at).toBe(false);
+        expect(m.docSideways, at).toBeLessThanOrEqual(0);
+        expect(m.tileBottom, at).toBeLessThanOrEqual(m.rowBottom + 0.5);
+      }
+      await page.locator('#dash-comp-tab-curricular').click();
+      await page.waitForTimeout(300);
+    }
+  });
 }
 
-test('Level Mix: six rows of one height, a tile 510 px tall that does not scroll', async ({ page }) => {
+test('rows are one tick for each student, the name and count on one line, the strongest first', async ({ page }) => {
   await openDashboard(page);
-  const tile = await box(page.locator('.dash-comp-tile'));
-  expect(Math.round(tile.height)).toBe(510);
-  const rows = page.locator('.dash-comp-ln[data-comp-page="curricular"]');
-  await expect(rows).toHaveCount(6);
-  const hs = await heights(page, '.dash-comp-ln[data-comp-page="curricular"]');
-  expect(Math.max(...hs) - Math.min(...hs)).toBeLessThanOrEqual(0.5);
-  const fit = await pageFit(page);
-  expect(fit.sw).toBe(0);
-  expect(fit.sh).toBeLessThanOrEqual(0);
-  const list = await page
-    .locator('.dash-comp-page.is-on .dash-comp-lines')
-    .evaluate(el => el.scrollHeight - el.clientHeight);
-  expect(list).toBeLessThanOrEqual(0);
-  // Legend and column heading, in words.
-  await expect(page.locator('.dash-comp-page.is-on .dash-comp-legend')).toContainText('Emerging');
-  await expect(page.locator('.dash-comp-page.is-on .dash-comp-legend')).toContainText('Extending');
-  await expect(page.locator('.dash-comp-page.is-on .dash-comp-colhead')).toContainText('Proficient or Above');
-  // Each row names its counts.
-  const label = await rows.first().getAttribute('aria-label');
-  expect(label).toMatch(
-    /: \d+ of \d+ Proficient or above\. Emerging \d+, Developing \d+, Proficient \d+, Extending \d+/,
-  );
-  // Nothing in the tile is wider than the tile.
-  const t = await box(page.locator('.dash-comp-tile'));
-  const over = await page.locator('.dash-comp-page.is-on *').evaluateAll(
-    (els, right) =>
-      els
-        .filter(e => {
-          const r = e.getBoundingClientRect();
-          return r.width > 0 && r.right > right + 0.5;
-        })
-        .map(e => e.className),
-    t.right,
-  );
-  expect(over).toEqual([]);
-});
-
-test('Self-Assessment: seven rows of one height, in the blues', async ({ page }) => {
-  await openDashboard(page);
-  await goCore(page);
-  const hasSelf = await page.locator('#dash-comp-page-core .dash-comp-ln').count();
-  test.skip(!hasSelf, 'the sample class has no self-assessments');
-  const hs = await heights(page, '.dash-comp-ln[data-comp-page="core"]');
-  expect(hs.length).toBeGreaterThan(0);
-  expect(Math.max(...hs) - Math.min(...hs)).toBeLessThanOrEqual(0.5);
-  const fit = await pageFit(page);
-  expect(fit.sw).toBe(0);
-  expect(fit.sh).toBeLessThanOrEqual(0);
-  await expect(page.locator('#dash-comp-page-core .dash-comp-colhead')).toContainText('Self-Assessed');
-  await expect(page.locator('#dash-comp-page-core .dash-comp-legend')).toContainText('Beginning');
-  await expect(page.locator('#dash-comp-page-core .dash-comp-legend')).toContainText('Leading');
-  // Never the level colours.
-  const bg = await page
-    .locator('#dash-comp-page-core .dash-comp-ln-bar i:not(.is-none)')
-    .first()
-    .evaluate(e => getComputedStyle(e).backgroundColor);
-  const self1 = await page.evaluate(() => {
-    const d = document.createElement('i');
-    d.style.background = 'var(--self-1)';
-    document.body.appendChild(d);
-    const a = getComputedStyle(d).backgroundColor;
-    d.style.background = 'var(--self-2)';
-    const b = getComputedStyle(d).backgroundColor;
-    d.style.background = 'var(--self-3)';
-    const c = getComputedStyle(d).backgroundColor;
-    d.style.background = 'var(--self-4)';
-    const e = getComputedStyle(d).backgroundColor;
-    d.remove();
-    return [a, b, c, e];
-  });
-  expect(self1).toContain(bg);
-  const label = await page.locator('.dash-comp-ln[data-comp-page="core"]').first().getAttribute('aria-label');
-  expect(label).toMatch(/self-assessed\. Beginning \d+, Growing \d+, Confident \d+, Leading \d+, Not yet \d+/);
-});
-
-test('the lists and menus are out of sight at rest', async ({ page }) => {
-  await openDashboard(page);
-  for (const sel of [
-    '#dash-comp-pop',
-    '#dash-comp-tipbox',
-    '#dash-view-menu-comp',
-    '#dash-view-menu-core',
-    '.dash-comp-ln-tip',
-  ]) {
-    const n = await page.locator(sel).count();
-    for (let i = 0; i < n; i++) {
-      const s = await page
-        .locator(sel)
-        .nth(i)
-        .evaluate(e => {
-          const c = getComputedStyle(e);
-          return c.display + '/' + c.visibility;
-        });
-      expect(s === 'none/visible' || s.endsWith('/hidden')).toBe(true);
-    }
-  }
-});
-
-test("a row's list opens by click and by Enter, filters the cards and closes with Escape", async ({ page }) => {
-  await openDashboard(page);
-  const rows = page.locator('.dash-comp-ln[data-comp-page="curricular"]');
-  const pop = page.locator('#dash-comp-pop');
-  // Find a row with students below Proficient.
+  const students = await page.evaluate(() => getStudents('sci8').length);
+  const rows = page.locator('#dash-comp-page-curricular .dash-comp-it');
   const n = await rows.count();
-  let at = -1;
-  for (let i = 0; i < n; i++) {
-    await rows.nth(i).click();
-    await expect(pop).toBeVisible();
-    if (await pop.locator('[data-comp-scroll]').count()) {
-      at = i;
-      break;
-    }
-    await page.keyboard.press('Escape');
+  expect(n).toBeGreaterThan(3);
+  for (const i of [0, n - 1]) {
+    await expect(rows.nth(i).locator('.dash-comp-tick')).toHaveCount(students);
+    const m = await rows.nth(i).evaluate(el => {
+      const name = el.querySelector('.dash-comp-it-name').getBoundingClientRect();
+      const num = el.querySelector('.dash-comp-it-n').getBoundingClientRect();
+      const ticks = el.querySelector('.dash-comp-ticks').getBoundingClientRect();
+      const levels = [...el.querySelectorAll('.dash-comp-tick')].map(t => Number(t.dataset.compLevel));
+      return {
+        sameLine: Math.abs(name.top + name.height / 2 - (num.top + num.height / 2)) < 6,
+        under: ticks.top >= name.bottom - 0.5,
+        levels,
+      };
+    });
+    expect(m.sameLine).toBe(true);
+    expect(m.under).toBe(true);
+    // Strongest first; no mark (0) last.
+    const marked = m.levels.filter(l => l > 0);
+    expect(marked).toEqual([...marked].sort((a, b) => b - a));
+    expect(m.levels.slice(marked.length).every(l => l === 0)).toBe(true);
   }
-  expect(at).toBeGreaterThanOrEqual(0);
-  const row = rows.nth(at);
-  await expect(row).toHaveAttribute('aria-expanded', 'true');
-  // The list: the name, "N below Proficient", the students, both links.
-  await expect(pop).toContainText(/\d+ below Proficient: /);
-  expect(await pop.locator('.dash-ins-person').count()).toBeGreaterThan(0);
-  await expect(pop.locator('[data-comp-scroll]')).toContainText(/Show These \d+ in Student Cards ↓/);
-  await expect(pop).toContainText('Open in Gradebook →');
-  const pb = await box(pop);
-  expect(inWindow(pb, 1280, 800)).toBe(true);
-  // The list is not cut off by the tile or the row.
-  const clipped = await pop.evaluate(el => {
-    const r = el.getBoundingClientRect();
-    return [
-      [r.left + 5, r.top + 5],
-      [r.right - 5, r.top + 5],
-      [r.left + 5, r.bottom - 5],
-      [r.right - 5, r.bottom - 5],
-    ].filter(([x, y]) => !el.contains(document.elementFromPoint(x, y))).length;
-  });
-  expect(clipped).toBe(0);
-  // Escape closes it, focus back on the row.
+});
+
+test('the lists and popups are out of sight at rest', async ({ page }) => {
+  await openDashboard(page);
+  await expect(page.locator('#dash-comp-pop')).toBeHidden();
+  expect(await page.locator('#dash-comp-pop').evaluate(el => getComputedStyle(el).display)).toBe('none');
+  for (const pg of ['curricular', 'core']) {
+    const quiet = page.locator(`#dash-comp-na-${pg}`);
+    if (await quiet.count()) {
+      expect(await quiet.evaluate(el => getComputedStyle(el).display)).toBe('none');
+    }
+  }
+});
+
+test('This Term | Year changes what is counted, is kept for the class, and stays on its page', async ({ page }) => {
+  await openDashboard(page);
+  const sw = page.locator('#dash-comp-page-curricular .dash-comp-span');
+  await expect(sw.locator('.seg-btn')).toHaveCount(2);
+  await expect(sw.locator('.seg-btn').nth(1)).toHaveText('Year');
+  const counts = () =>
+    page.locator('#dash-comp-page-curricular .dash-comp-it-n').evaluateAll(els => els.map(e => Number(e.textContent)));
+  const term = await counts();
+  await sw.locator('.seg-btn').nth(1).click();
+  await expect(sw.locator('.seg-btn').nth(1)).toHaveAttribute('aria-pressed', 'true');
+  const year = await counts();
+  expect(year.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(term.reduce((a, b) => a + b, 0));
+  expect(await page.evaluate(() => localStorage.getItem('fv-dash-comp-span:sci8'))).toBe('year');
+  // Focus stays on the control, and the quiet line says Year.
+  await expect(sw.locator('.seg-btn').nth(1)).toBeFocused();
+  // Core, then Year there: the tile is still on Core after the redraw.
+  await goCore(page);
+  await page.locator('#dash-comp-page-core .dash-comp-span .seg-btn').first().click();
+  await expect(page.locator('#dash-comp-tab-core')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#dash-comp-page-core')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('fv-dash-comp-span:sci8'))).toBe('term');
+  // A reload keeps both.
+  await page.reload();
+  await page.locator('.dash-glance').waitFor();
+  await expect(page.locator('#dash-comp-page-core')).toBeVisible();
+});
+
+test('a tick opens the students at that level, Escape closes it and focus returns to the tick', async ({ page }) => {
+  await openDashboard(page);
+  const tick = page.locator('#dash-comp-page-curricular .dash-comp-tick[data-comp-level="3"]').first();
+  const label = await tick.getAttribute('aria-label');
+  expect(label).toMatch(/, Proficient$/);
+  await tick.click();
+  const pop = page.locator('#dash-comp-pop');
+  await expect(pop).toBeVisible();
+  await expect(pop.locator('.dash-mix-pop-head')).toContainText('Proficient');
+  await expect(tick).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
   await expect(pop).toBeHidden();
-  await expect(row).toBeFocused();
-  await expect(row).toHaveAttribute('aria-expanded', 'false');
-  // Enter opens it too.
+  await expect(tick).toBeFocused();
+  // By keyboard too.
+  await tick.focus();
   await page.keyboard.press('Enter');
   await expect(pop).toBeVisible();
-  // Show These N: the cards are filtered and scrolled to; the chip clears it.
-  await pop.locator('[data-comp-scroll]').click();
-  await expect(pop).toBeHidden();
-  await expect(page.locator('.dash-comp-filter')).toBeVisible();
-  await expect
-    .poll(() =>
-      page
-        .locator('.dash-comp-filter')
-        .evaluate(e => e.getBoundingClientRect().top < 400 && e.getBoundingClientRect().top >= -2),
-    )
-    .toBe(true);
-  await page.locator('.dash-comp-chip').click();
-  await expect(page.locator('.dash-comp-filter')).toHaveCount(0);
-});
-
-for (const i of [0, 1]) {
-  test(`a row's tip does not cover its own open list (row ${i})`, async ({ page }) => {
-    await openDashboard(page);
-    const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(i);
-    await row.click();
-    await expect(page.locator('#dash-comp-pop')).toBeVisible();
-    const b = await box(row);
-    await page.mouse.move(b.left + 20, b.top + 10);
-    await page.mouse.move(b.left + 60, b.top + 20);
-    await page.waitForTimeout(250);
-    await expect(page.locator('#dash-comp-tipbox')).toBeHidden();
-    const ok = await page.evaluate(() => {
-      const h = document.querySelector('#dash-comp-pop .dash-mix-pop-head > span');
-      const r = h.getBoundingClientRect();
-      return h.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
-    });
-    expect(ok).toBe(true);
-  });
-}
-
-test('the open row survives a redraw', async ({ page }) => {
-  await openDashboard(page);
-  const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').first();
-  await row.click();
-  await expect(page.locator('#dash-comp-pop')).toBeVisible();
-  await page.evaluate(() => PageDashboard.render());
-  await expect(page.locator('#dash-comp-pop')).toBeVisible();
-  await expect(page.locator('.dash-comp-ln[data-comp-page="curricular"]').first()).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
-});
-
-test('a Core row opens the students at each step', async ({ page }) => {
-  await openDashboard(page);
-  await goCore(page);
-  const rows = page.locator('.dash-comp-ln[data-comp-page="core"]');
-  test.skip(!(await rows.count()), 'the sample class has no self-assessments');
-  await rows.first().click();
-  const pop = page.locator('#dash-comp-pop');
-  await expect(pop).toBeVisible();
-  await expect(pop).toContainText('Beginning');
-  expect(inWindow(await box(pop), 1280, 800)).toBe(true);
   await page.keyboard.press('Escape');
-  await expect(pop).toBeHidden();
-  await expect(rows.first()).toBeFocused();
-});
-
-test('every item of every view menu shows whole, on both pages', async ({ page }) => {
-  await openDashboard(page);
-  for (const [which, menu] of [
-    ['curricular', 'comp'],
-    ['core', 'core'],
-  ]) {
-    if (which === 'core') await goCore(page);
-    const btn = page.locator('#dash-view-btn-' + menu);
-    if (!(await btn.count())) continue;
-    await btn.click();
-    const m = page.locator('#dash-view-menu-' + menu);
-    await expect(m).toBeVisible();
-    const items = m.locator('.dash-view-item');
-    const n = await items.count();
-    expect(n).toBeGreaterThan(1);
-    for (let i = 0; i < n; i++) {
-      const b = await box(items.nth(i));
-      expect(inWindow(b, 1280, 800)).toBe(true);
-      const hit = await items.nth(i).evaluate(el => {
-        const r = el.getBoundingClientRect();
-        return [
-          [r.left + 2, r.top + 2],
-          [r.right - 2, r.top + 2],
-          [r.left + 2, r.bottom - 2],
-          [r.right - 2, r.bottom - 2],
-        ].filter(([x, y]) => !el.closest('.dash-view-menu').contains(document.elementFromPoint(x, y))).length;
-      });
-      expect(hit).toBe(0);
-    }
-    await page.keyboard.press('Escape');
-  }
-});
-
-for (const w of [1440, 1280, 1024, 800, 390]) {
-  test(`each other view fits the tile without scrolling sideways at ${w}`, async ({ page }) => {
-    await openDashboard(page, { w, h: 800 });
-    const views = ['Level Mix', 'Class Average', 'Needs Support', 'Change'];
-    for (const v of views) {
-      await pickView(page, 'comp', v);
-      const fit = await pageFit(page);
-      expect(fit.sw, `Curricular ${v} at ${w}`).toBe(0);
-      const doc = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(doc, `page at ${w}`).toBeLessThanOrEqual(0);
-    }
-    await goCore(page);
-    const menu = await page.locator('#dash-view-btn-core').count();
-    if (menu) {
-      for (const v of ['Evidence', 'Self-Assessment']) {
-        await pickView(page, 'core', v);
-        const fit = await pageFit(page);
-        expect(fit.sw, `Core ${v} at ${w}`).toBe(0);
-      }
-    } else {
-      expect((await pageFit(page)).sw).toBe(0);
-    }
-    // The head: the pill and the link on one line, the link not cut off.
-    const head = await page.locator('.dash-comp-page.is-on .dash-section-title').evaluate(el => {
-      const a = el.querySelector('a');
-      const hr = el.getBoundingClientRect();
-      const ar = a.getBoundingClientRect();
-      return {
-        fits: ar.right <= hr.right + 0.5 && ar.left >= hr.left,
-        cut: a.scrollWidth > a.clientWidth,
-        h: hr.height,
-      };
-    });
-    expect(head.fits, `link at ${w}`).toBe(true);
-    expect(head.cut, `link text cut at ${w}`).toBe(false);
-  });
-}
-
-test('hover tips show whole on the first and last row of each view', async ({ page }) => {
-  await openDashboard(page);
-  const check = async (rows, label) => {
-    const n = await rows.count();
-    for (const i of [0, n - 1]) {
-      await rows.nth(i).hover();
-      const tip = page.locator('#dash-comp-tipbox');
-      await expect(tip, label + ' row ' + i).toBeVisible();
-      const b = await box(tip);
-      expect(inWindow(b, 1280, 800), label + ' row ' + i + ' in window').toBe(true);
-      const bad = await tip.evaluate(el => {
-        const r = el.getBoundingClientRect();
-        return [
-          [r.left + 5, r.top + 5],
-          [r.right - 5, r.top + 5],
-          [r.left + 5, r.bottom - 5],
-          [r.right - 5, r.bottom - 5],
-        ].filter(([x, y]) => !el.contains(document.elementFromPoint(x, y))).length;
-      });
-      expect(bad, label + ' row ' + i + ' not clipped').toBe(0);
-      await page.mouse.move(5, 5);
-      await expect(tip).toBeHidden();
-    }
-  };
-  await pickView(page, 'comp', 'Needs Support');
-  const ns = page.locator('#dash-comp-page-curricular .dash-comp-row');
-  if (await ns.count()) await check(ns, 'Needs Support');
-  await pickView(page, 'comp', 'Change');
-  await check(page.locator('#dash-comp-page-curricular .dash-comp-row'), 'Change');
-  await goCore(page);
-  if (await page.locator('#dash-view-btn-core').count()) await pickView(page, 'core', 'Evidence');
-  await check(page.locator('#dash-comp-page-core .dash-core-row'), 'Evidence');
-});
-
-const LONG = 'Processing and analyzing very long competency names that run past the width of the tile!!';
-const injectLong = page =>
-  page.evaluate(long => {
-    const was = DashInsights.columns;
-    DashInsights.columns = cid => was(cid).map((c, i) => (i === 2 ? { ...c, label: long, title: long } : c));
-    PageDashboard.render();
-  }, LONG);
-
-test('a name wraps to two lines, a 90-character one is cut, and every row keeps one height', async ({ page }) => {
-  await openDashboard(page);
-  await injectLong(page);
-  await page.locator('.dash-comp-ln').first().waitFor();
-  const sel = '.dash-comp-ln[data-comp-page="curricular"]';
-  const hs = await heights(page, sel);
-  expect(Math.max(...hs) - Math.min(...hs)).toBeLessThanOrEqual(0.5);
-  const names = await page
-    .locator(sel + ' .dash-comp-ln-name')
-    .evaluateAll(els =>
-      els.map(e => ({ h: e.clientHeight, cut: e.scrollHeight > e.clientHeight + 1, w: e.scrollWidth > e.clientWidth })),
-    );
-  // Two lines at most; only the 90-character name is cut; none runs sideways.
-  for (const n of names) expect(n.h).toBeLessThanOrEqual(31);
-  expect(names.map(n => n.cut)).toEqual([false, false, true, false, false, false]);
-  expect(names.some(n => n.w)).toBe(false);
-  const label = await page.locator(sel).nth(2).getAttribute('aria-label');
-  expect(label).toContain('very long competency names');
-  expect((await pageFit(page)).sw).toBe(0);
-  // The page still does not scroll with a name of two lines in it.
-  expect((await pageFit(page)).sh).toBeLessThanOrEqual(0);
-});
-
-test('a name that wraps sits above its bar and the Lowest tag beside the number, not under the name', async ({
-  page,
-}) => {
-  await openDashboard(page);
-  const m = await page
-    .locator('.dash-comp-ln:has(.dash-comp-ln-tag)')
-    .first()
-    .evaluate(row => {
-      const n = row.querySelector('.dash-comp-ln-name').getBoundingClientRect();
-      const t = row.querySelector('.dash-comp-ln-tag').getBoundingClientRect();
-      const num = row.querySelector('.dash-comp-ln-num').getBoundingClientRect();
-      const r = row.getBoundingClientRect();
-      return {
-        tagBesideName: t.left >= n.right - 0.5,
-        tagInNumber: t.top >= num.top - 0.5 && t.bottom <= num.bottom + 0.5,
-        inRow: t.right <= r.right + 0.5,
-      };
-    });
-  expect(m.tagBesideName).toBe(true);
-  expect(m.tagInNumber).toBe(true);
-  expect(m.inRow).toBe(true);
-});
-
-test('pointing at a row keeps its name on screen and shows the counts in the tip', async ({ page }) => {
-  await openDashboard(page);
-  const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(1);
-  await row.hover();
-  const tip = page.locator('#dash-comp-tipbox');
-  await expect(tip).toBeVisible();
-  await expect(tip).toContainText('Developing');
-  const vis = await row.locator('.dash-comp-ln-name').evaluate(e => getComputedStyle(e).visibility);
-  expect(vis).toBe('visible');
-  expect(await row.getAttribute('title')).toBeNull();
-  await page.mouse.move(5, 300);
-  await expect(tip).toBeHidden();
-});
-
-test('with 14 competencies the rows keep their height and the list scrolls inside the page', async ({ page }) => {
-  await openDashboard(page);
-  await page.evaluate(() => {
-    const was = DashInsights.columns;
-    DashInsights.columns = cid => {
-      const c = was(cid);
-      const out = [];
-      for (let i = 0; i < 14; i++) out.push({ ...c[i % c.length], key: c[i % c.length].key + ':' + i });
-      return out;
-    };
-    PageDashboard.render();
-  });
-  const sel = '.dash-comp-ln[data-comp-page="curricular"]';
-  await expect(page.locator(sel)).toHaveCount(14);
-  const hs = await heights(page, sel);
-  expect(Math.max(...hs) - Math.min(...hs)).toBeLessThanOrEqual(0.5);
-  const lines = await page
-    .locator('.dash-comp-page.is-on .dash-comp-lines')
-    .evaluate(el => ({ scrolls: el.scrollHeight > el.clientHeight + 1 }));
-  expect(lines.scrolls).toBe(true);
-  const fit = await pageFit(page);
-  expect(fit.sw).toBe(0);
-  expect(fit.sh).toBeLessThanOrEqual(0);
 });
 
 for (const [w, h] of [
   [1280, 800],
   [1280, 720],
-  [800, 1000],
+  [1024, 768],
 ]) {
-  test(`the list clears the top bar and its x can be pressed, at ${w} x ${h}`, async ({ page }) => {
+  test(`a tick's list clears the top bar and its x can be pressed, at ${w} x ${h}`, async ({ page }) => {
     await openDashboard(page, { w, h });
-    for (const which of ['curricular', 'core']) {
-      if (which === 'core') await goCore(page);
-      const rows = page.locator(`.dash-comp-ln[data-comp-page="${which}"]`);
-      const n = await rows.count();
-      expect(n).toBeGreaterThan(0);
-      for (const i of [0, n - 1]) {
-        await rows.nth(i).scrollIntoViewIfNeeded();
-        // On the name: on a tile 440 px wide or more the row is one line and
-        // its bar (one button a level) sits in the row's middle.
-        await rows.nth(i).locator('.dash-comp-ln-name').click();
-        const pop = page.locator('#dash-comp-pop');
-        await expect(pop).toBeVisible();
-        const m = await page.evaluate(() => {
-          const pop = document.getElementById('dash-comp-pop');
-          const r = pop.getBoundingClientRect();
-          const x = pop.querySelector('[data-comp-close]');
-          const xr = x.getBoundingClientRect();
-          const hit = document.elementFromPoint(xr.left + xr.width / 2, xr.top + xr.height / 2);
-          const dock = document.getElementById('dock-mount').getBoundingClientRect();
-          const row = document.querySelector('[aria-expanded="true"][data-comp-open]').getBoundingClientRect();
-          const tile = document.querySelector('.dash-comp-tile').getBoundingClientRect();
-          const roomBeside = tile.left - 16 >= r.width || window.innerWidth - tile.right - 16 >= r.width;
-          const overlap =
-            roomBeside && !(r.right <= row.left || r.left >= row.right || r.bottom <= row.top || r.top >= row.bottom);
-          return {
-            top: r.top,
-            bottom: r.bottom,
-            dockBottom: dock.bottom,
-            xHit: hit === x || x.contains(hit),
-            overlapsRow: overlap,
-            scrolls:
-              pop.querySelector('.dash-comp-pop-people').scrollHeight >
-              pop.querySelector('.dash-comp-pop-people').clientHeight,
-          };
-        });
-        const label = `${which} row ${i} at ${w} x ${h}`;
-        expect(m.top, label + ' is below the top bar').toBeGreaterThanOrEqual(m.dockBottom + 7.5);
-        expect(m.bottom, label + ' is inside the window').toBeLessThanOrEqual(h - 7.5);
-        expect(m.xHit, label + ': the x is the element at its own centre').toBe(true);
-        expect(m.overlapsRow, label + ' does not cover its row when there is room beside it').toBe(false);
-        // The heading and x stay in view: the heading is inside the list's box.
-        await page.keyboard.press('Escape');
-        await expect(pop).toBeHidden();
-      }
+    const ticks = page.locator('#dash-comp-page-curricular .dash-comp-tick:not(.is-none)');
+    const n = await ticks.count();
+    for (const i of [0, n - 1]) {
+      await ticks.nth(i).scrollIntoViewIfNeeded();
+      await ticks.nth(i).click();
+      const pop = page.locator('#dash-comp-pop');
+      await expect(pop).toBeVisible();
+      const m = await page.evaluate(() => {
+        const pop = document.getElementById('dash-comp-pop');
+        const r = pop.getBoundingClientRect();
+        const x = pop.querySelector('[data-comp-close]');
+        const xr = x.getBoundingClientRect();
+        const hit = document.elementFromPoint(xr.left + xr.width / 2, xr.top + xr.height / 2);
+        const dock = document.getElementById('dock-mount').getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, dockBottom: dock.bottom, xHit: hit === x || x.contains(hit) };
+      });
+      const label = `tick ${i} at ${w} x ${h}`;
+      expect(m.top, label + ' is below the top bar').toBeGreaterThanOrEqual(m.dockBottom + 7.5);
+      expect(m.bottom, label + ' is inside the window').toBeLessThanOrEqual(h - 7.5);
+      expect(m.xHit, label + ': the x is the element at its own centre').toBe(true);
+      await page.keyboard.press('Escape');
+      await expect(pop).toBeHidden();
     }
   });
 }
 
-test('Tab past the last control of the list, or Shift+Tab before the first, closes it and returns to the row', async ({
+test('Tab past the last control of the list, or Shift+Tab before the first, closes it and returns to the tick', async ({
   page,
 }) => {
   await openDashboard(page);
-  const row = page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(2);
-  await row.click();
+  const tick = page.locator('#dash-comp-page-curricular .dash-comp-tick:not(.is-none)').nth(2);
+  await tick.click();
   const pop = page.locator('#dash-comp-pop');
   await expect(pop).toBeVisible();
-  for (let i = 0; i < 6 && (await pop.isVisible()); i++) await page.keyboard.press('Tab');
+  for (let i = 0; i < 40 && (await pop.isVisible()); i++) await page.keyboard.press('Tab');
   await expect(pop).toBeHidden();
-  await expect(row).toBeFocused();
-  await row.click();
+  await expect(tick).toBeFocused();
+  await tick.click();
   await expect(pop).toBeVisible();
-  // Focus starts on the first action; Shift+Tab goes to the x, then out.
-  for (let i = 0; i < 20 && (await pop.isVisible()); i++) await page.keyboard.press('Shift+Tab');
+  for (let i = 0; i < 40 && (await pop.isVisible()); i++) await page.keyboard.press('Shift+Tab');
   await expect(pop).toBeHidden();
-  await expect(row).toBeFocused();
+  await expect(tick).toBeFocused();
+});
+
+test('the list scrolls inside the tile with a fade at its foot only while there is more below', async ({ page }) => {
+  await openDashboard(page, { w: 1280, h: 800 });
+  const list = page.locator('#dash-comp-page-curricular .dash-comp-list');
+  const holder = page.locator('#dash-comp-page-curricular .dash-comp-listbox');
+  expect(await list.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await expect(holder).toHaveClass(/has-more/);
+  const fade = page.locator('#dash-comp-page-curricular .dash-comp-fade');
+  expect(Number(await fade.evaluate(el => getComputedStyle(el).opacity))).toBe(1);
+  const before = await page.evaluate(() => window.scrollY);
+  await list.hover();
+  await page.mouse.wheel(0, 9000);
+  await expect.poll(() => list.evaluate(el => el.scrollTop + el.clientHeight >= el.scrollHeight - 2)).toBe(true);
+  await expect(holder).not.toHaveClass(/has-more/);
+  expect(Number(await fade.evaluate(el => getComputedStyle(el).opacity))).toBe(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(before);
+  // The quiet line is the last thing in the list, when there is one.
+  const quiet = page.locator('#dash-comp-page-curricular .dash-comp-quiet');
+  if (await quiet.count()) await expect(quiet).toBeInViewport();
+});
+
+test('Not Assessed opens to the names, and a name opens the New Assessment form with it ticked', async ({ page }) => {
+  await openDashboard(page);
+  // Take one competency out of every assessment, so it has no work in the period.
+  const tagId = await page.evaluate(() => {
+    const sec = getSections('sci8')[0];
+    const tag = sec.tags[0].id;
+    saveAssessments(
+      'sci8',
+      getAssessments('sci8').map(a => Object.assign({}, a, { tagIds: (a.tagIds || []).filter(t => t !== tag) })),
+    );
+    PageDashboard.render();
+    return tag;
+  });
+  const quiet = page.locator('#dash-comp-page-curricular .dash-comp-quiet');
+  await expect(quiet).toContainText(/^\d+ Not Assessed This (Term|Year)$/);
+  await expect(quiet).toHaveAttribute('aria-expanded', 'false');
+  const names = page.locator('#dash-comp-page-curricular .dash-comp-na-name');
+  await expect(names.first()).toBeHidden();
+  await quiet.click();
+  await expect(quiet).toHaveAttribute('aria-expanded', 'true');
+  await expect(names.first()).toBeVisible();
+  // The open line survives a redraw.
+  await page.evaluate(() => PageDashboard.render());
+  await expect(page.locator('#dash-comp-page-curricular .dash-comp-quiet')).toHaveAttribute('aria-expanded', 'true');
+  const mine = page.locator(`#dash-comp-page-curricular .dash-comp-na-name[data-comp-new="${tagId}"]`);
+  await expect(mine).toBeVisible();
+  await mine.click();
+  await expect(page).toHaveURL(/\/assignments\?course=sci8&new=1&tags=/);
+  await expect(page.locator('#new-assess-form')).toBeVisible();
+  await expect(page.locator(`.af-tag-cb[value="${tagId}"]`)).toBeChecked();
+  expect(await page.locator('.af-tag-cb:checked').count()).toBe(1);
+});
+
+test('Core: names, counts and a plain dark bar; the Not Tagged names are not buttons', async ({ page }) => {
+  await openDashboard(page);
+  await goCore(page);
+  const rows = page.locator('#dash-comp-page-core .dash-comp-it');
+  expect(await rows.count()).toBeGreaterThan(0);
+  const first = await rows.first().evaluate(el => ({
+    bar: el.querySelector('.dash-comp-bar i').getBoundingClientRect().width,
+    track: el.querySelector('.dash-comp-bar').getBoundingClientRect().width,
+  }));
+  // The most tagged fills its track.
+  expect(Math.abs(first.bar - first.track)).toBeLessThanOrEqual(1);
+  await expect(page.locator('#dash-comp-page-core .dash-comp-tick')).toHaveCount(0);
+  await expect(page.locator('#dash-comp-page-core .dash-comp-it-n.is-thin')).toHaveCount(0);
+  await expect(page.locator('#dash-comp-page-core .dash-comp-colhead')).toHaveText('Tagged');
+  const quiet = page.locator('#dash-comp-page-core .dash-comp-quiet');
+  if (await quiet.count()) {
+    await expect(quiet).toContainText(/Not Tagged This (Term|Year)$/);
+    await quiet.click();
+    await expect(page.locator('#dash-comp-page-core .dash-comp-na-name').first()).toBeVisible();
+    await expect(page.locator('#dash-comp-page-core button.dash-comp-na-name')).toHaveCount(0);
+  }
+  const m = await box(page.locator('#dash-comp-page-core .dash-comp-sub-link'));
+  expect(m.width).toBeGreaterThan(0);
+  await expect(page.locator('#dash-comp-page-core .dash-comp-sub-link')).toHaveText('Assignments →');
+});
+
+test('the colour of a count of one is amber and of nothing else', async ({ page }) => {
+  await openDashboard(page);
+  await page.locator('#dash-comp-page-curricular .dash-comp-span .seg-btn').nth(1).click();
+  const m = await page
+    .locator('#dash-comp-page-curricular .dash-comp-it-n')
+    .evaluateAll(els => els.map(e => ({ n: Number(e.textContent), thin: e.classList.contains('is-thin') })));
+  expect(m.length).toBeGreaterThan(0);
+  m.forEach(x => expect(x.thin).toBe(x.n === 1));
 });
 
 test('screenshots', async ({ page }, info) => {
@@ -544,66 +314,15 @@ test('screenshots', async ({ page }, info) => {
   mkdirSync(dir, { recursive: true });
   for (const scheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: scheme });
-    await openDashboard(page);
-    await goCurricular(page);
+    await openDashboard(page, { w: 1920, h: 1080 });
+    await page.locator('#dash-comp-tab-curricular').click();
+    await page.waitForTimeout(300);
     const tile = page.locator('.dash-comp-tile');
     await tile.screenshot({ path: `${dir}/curricular-${scheme}.png` });
-    await page.locator('.dash-comp-ln[data-comp-page="curricular"]').nth(2).click();
+    await page.locator('#dash-comp-page-curricular .dash-comp-tick[data-comp-level="3"]').first().click();
     await page.screenshot({ path: `${dir}/curricular-list-${scheme}.png` });
     await page.keyboard.press('Escape');
     await goCore(page);
     await tile.screenshot({ path: `${dir}/core-${scheme}.png` });
-    if (await page.locator('.dash-comp-ln[data-comp-page="core"]').count()) {
-      await page.locator('.dash-comp-ln[data-comp-page="core"]').nth(0).click();
-      await page.screenshot({ path: `${dir}/core-list-${scheme}.png` });
-    }
   }
-});
-
-/* Today's Level Mix opens any level's students, with that level's shared next
-   step, from its count. The tile keeps it: each level's segment of a row's bar
-   is a button. Every level of every row of the sample class, by click and by
-   Enter or Space, gives the list today's Level Mix gives (DashInsights.popHtml,
-   unchanged), one list at a time, its heading naming the level. */
-test("every level's segment opens that level's students, as today's Level Mix does", async ({ page }) => {
-  await openDashboard(page);
-  const segs = page.locator('#dash-comp-page-curricular [data-comp-level]');
-  const n = await segs.count();
-  expect(n).toBeGreaterThan(12);
-  const seen = new Set();
-  for (let i = 0; i < n; i++) {
-    const seg = segs.nth(i);
-    const key = await seg.getAttribute('data-comp-key');
-    const level = Number(await seg.getAttribute('data-comp-level'));
-    seen.add(level);
-    // Click on even rows, the keyboard on odd ones.
-    if (i % 2) {
-      await seg.focus();
-      await page.keyboard.press(i % 4 === 1 ? 'Enter' : 'Space');
-    } else await seg.click();
-    const pop = page.locator('#dash-comp-pop');
-    await expect(pop).toBeVisible();
-    const same = await page.evaluate(
-      ([key, level]) => {
-        const want = document.createElement('div');
-        want.innerHTML = DashInsights.popHtml('sci8', getStudents('sci8'), { key, level });
-        return document.getElementById('dash-comp-pop').innerHTML === want.innerHTML;
-      },
-      [key, level],
-    );
-    expect(same, key + ' level ' + level).toBe(true);
-    const name = await page.evaluate(l => competencyDistribution('', [], {}).bands[l - 1].label, level);
-    await expect(pop.locator('.dash-mix-pop-head')).toContainText(' · ' + name + ' · ');
-    await expect(page.locator('[data-comp-level][aria-expanded="true"]')).toHaveCount(1);
-    await expect(page.locator('[data-comp-open][aria-expanded="true"]')).toHaveCount(0);
-    // Escape closes it, and the focus is back on the level's segment.
-    await page.keyboard.press('Escape');
-    await expect(pop).toBeHidden();
-    await expect(seg).toBeFocused();
-  }
-  // All four levels came up somewhere in the sample class.
-  expect([...seen].sort()).toEqual([1, 2, 3, 4]);
-  // The row's own click still opens the board's list of those below Proficient.
-  await page.locator('#dash-comp-page-curricular [data-comp-open]').first().click();
-  await expect(page.locator('#dash-comp-pop .dash-comp-pop-sum')).toBeVisible();
 });

@@ -19,8 +19,8 @@
      confirmDelete(cid, obId, proceed)  "Delete this observation and its 2
                           follow-ups?" before an observation with follow-ups
                           is deleted; straight through when it has none
-     reveal(obId)         a card opens with its timeline (the dashboard's
-                          open concerns link here with ?ob=)
+     reveal(obId)         a card opens with its timeline (a link to the
+                          Observations page with ?ob=)
 
    Every control carries data-fu-action and is handled here, in the capture
    phase, so a click on the strip never also opens the card beneath it. The
@@ -255,6 +255,8 @@
       _redraw(b, cid);
       _glide(b, from, b.offsetHeight);
     });
+    // The Observations page's Open Concerns count listens.
+    document.dispatchEvent(new CustomEvent('fv:follow-ups-changed', { detail: { cid: cid, obId: obId } }));
   }
 
   function _setOpen(cid, block, open) {

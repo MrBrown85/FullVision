@@ -3526,7 +3526,6 @@ window.DashClassManager = (function () {
     if (!_cmTabShown(cmTab, cmSelectedCourse)) cmTab = 'details';
     _cmSyncUrl();
 
-    // Top bar
     var detailTitle =
       cmMode === 'create'
         ? 'New Class'
@@ -3558,7 +3557,6 @@ window.DashClassManager = (function () {
       sideMount.style.display = courseIds.length === 0 && cmMode !== 'create' ? 'none' : '';
     }
 
-    // Empty state
     if (courseIds.length === 0 && cmMode !== 'create') {
       html += _cmEmptyStateHtml();
       _cmMark(document.getElementById('main'), 'cm-listing', false);
@@ -3592,12 +3590,14 @@ window.DashClassManager = (function () {
     // Preserve scroll position of the detail pane across re-renders
     var detailEl = document.querySelector('.cm-detail');
     var scrollTop = detailEl ? detailEl.scrollTop : 0;
+    var openMenu = CmKeepMenu.mark([cmSelectedCourse, cmTab, cmMode].join('|'));
     document.getElementById('main').innerHTML = html;
     if (scrollTop > 0) {
       var newDetail = document.querySelector('.cm-detail');
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
     _cmRosterScrollCue();
+    CmKeepMenu.reopen(openMenu, [cmSelectedCourse, cmTab, cmMode].join('|'), _cmFloatOverScroll);
     _cmRestoreKeptFocus();
   }
 

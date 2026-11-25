@@ -4,8 +4,7 @@
  * (e2e/dashboard-real-class.js). At four desktop sizes, in the page font and
  * the wide one:
  *  - in both Inbox views no stack, student name or title is cut by the edge
- *    of the box that scrolls it or of the tile: each is wholly in or wholly out;
- *  - Needs Support never says "+N more" while it has room for them.
+ *    of the box that scrolls it or of the tile: each is wholly in or wholly out.
  */
 import { test, expect } from '@playwright/test';
 import { useFont, FONTS } from './wide-font.js';
@@ -75,39 +74,4 @@ for (const [w, h] of SIZES) {
       }
     });
   }
-
-  test(`${w}x${h}: Needs Support never says "+N more" while it has room for them`, async ({ page }) => {
-    await page.setViewportSize({ width: w, height: h });
-    await openRealClass(page, { comp: 'below' });
-    for (const font of FONTS) {
-      await useFont(page, font);
-      await page.waitForTimeout(200);
-      const m = await page.evaluate(() => {
-        const list = document.querySelector('#dash-comp-page-curricular .dash-comp-rows');
-        if (!list) return null;
-        const rows = [...list.querySelectorAll('.dash-comp-row.is-student')].filter(
-          r => getComputedStyle(r).display !== 'none',
-        );
-        const more = list.querySelector('.dash-comp-more');
-        const shownMore = more && getComputedStyle(more).display !== 'none';
-        const n = shownMore ? Number(more.textContent.replace(/\D/g, '')) : 0;
-        const l = list.getBoundingClientRect();
-        const last = rows.length ? rows[rows.length - 1].getBoundingClientRect() : l;
-        const gap = l.bottom - (shownMore ? more.getBoundingClientRect().bottom : last.bottom);
-        return {
-          shown: rows.length,
-          more: n,
-          // Each row's share of the list, against the smallest row the view draws.
-          each: rows.length ? (l.height - (shownMore ? more.offsetHeight : 0)) / rows.length : 0,
-          room: gap,
-          cut: rows.some(r => r.getBoundingClientRect().bottom > l.bottom + 0.5),
-        };
-      });
-      expect(m, font).not.toBeNull();
-      expect(m.cut, font).toBe(false);
-      // With "+N more" on show there was no room for one more student at
-      // the 36 px a Needs Support row takes (DashCompetencies.fit).
-      if (m.more > 0) expect(m.each, font).toBeLessThan(36 * (1 + 1 / m.shown));
-    }
-  });
 }

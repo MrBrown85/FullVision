@@ -677,6 +677,13 @@ window.MCardWidgets = (function () {
   /* ── assembleCard ────────────────────────────────────────────── */
   // html-safe: every widget renderer escapes its text with MC.esc and passes colours through cssColor or constants.
   function assembleCard(st, cid, data) {
+    // The new look (teacher-mobile/student-look.js): the student's My Learning, with To Grade and To Return.
+    if (window.MStudentLook && MStudentLook.on())
+      return MStudentLook.card(
+        st,
+        cid,
+        (window.MGradePhotos ? MGradePhotos.studentListHtml(cid, st) : '') + _toReturnHtml(st, cid),
+      );
     var config = data.widgetConfig;
     var order = config.order;
 

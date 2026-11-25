@@ -421,11 +421,13 @@ describe('the gradebook’s Revising cell and the dashboard’s "1 Revised"', ()
       { course: CID },
     );
     try {
-      expect(jordanCell().querySelector('.gb-revising').textContent).toBe('Revising');
-      expect(jordanCell().textContent).toContain('2.7');
+      // The turning arrow in the cell's corner, outside the grade.
+      expect(jordanCell().querySelector(':scope > .gb-revising svg')).not.toBeNull();
+      expect(jordanCell().querySelector('.gb-scores-val').textContent).toMatch(/^2\.7/);
+      expect(jordanCell().querySelector('.gb-scores-val').textContent).not.toContain('Revising');
       expect(jordanCell().getAttribute('aria-label')).toContain(', returned for revision');
       const keyItem = [...document.querySelectorAll('.gb-key-item')].find(x => x.querySelector('.gb-revising'));
-      expect(keyItem.textContent).toBe('RevisingReturned for revision');
+      expect(keyItem.textContent).toBe('Returned for revision');
       expect(glance()).toMatch(/^All Caught Up/);
       sendRevision();
       expect(glance()).toBe('1 Revised · 0 Not Returned');

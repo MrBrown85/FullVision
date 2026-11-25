@@ -270,6 +270,35 @@ describe('the targets', () => {
     expect(panel.hidden).toBe(true);
   });
 
+  it('every target opens: one past the first three is still a piece it offers (Nov 25: the fourth onward said the list had changed)', () => {
+    const lab = getAssessments(CID).find(a => a.id === LIGHT);
+    const work = getCourseSubmissions(CID);
+    const extra = ['t1', 't2', 't3', 't4'];
+    saveAssessments(
+      CID,
+      getAssessments(CID).concat(extra.map(id => Object.assign({}, lab, { id, title: 'Piece ' + id }))),
+    );
+    extra.forEach(id => work.assessments.push({ id, students_send: 'photos', after_due: 'keep', accept_until: null }));
+    saveDemoStudentWork(CID, work);
+    const doc = mountTile();
+    const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
+    click(doc, doc.querySelector('[data-dash-inbox="targets-open"]'));
+    const all = [...doc.querySelectorAll('.dash-inbox-target[data-aid]')];
+    expect(all.length).toBeGreaterThan(3);
+    const last = all[all.length - 1].getAttribute('data-aid');
+    // Not one of the box's own three.
+    expect(DashInboxDrop.choices(CID).map(c => c.aid)).not.toContain(last);
+    click(doc, all[all.length - 1]);
+    expect(open.mock.calls.map(c => c[1])).toEqual([last]);
+    expect(doc.querySelector('.dash-inbox-targets-note')).toBeNull();
+    // A drop on it reaches Add Work too.
+    open.mockClear();
+    const tile = doc.getElementById('dash-inbox');
+    dragEvent(doc, 'dragenter', tile, files());
+    dragEvent(doc, 'drop', doc.querySelector('.dash-inbox-target[data-aid="' + last + '"]'), files());
+    expect(open.mock.calls.map(c => c[1])).toEqual([last]);
+  });
+
   it('a click on a target opens Add Work for the Class on that piece with no files', () => {
     const doc = mountTile();
     const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);

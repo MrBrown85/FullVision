@@ -11,6 +11,7 @@
     "types": []
   },
   "files": [
+    "teacher/obs-roster.js",
     "teacher/report-one-words.js",
     "teacher/report-one-copy.js",
     "teacher/report-one-undo.js",
@@ -57,6 +58,7 @@
     "teacher/report-qn-browse-cases.js",
     "teacher/report-qn-voice-observations.js",
     "teacher/cm-std-help.js",
+    "teacher/cm-keep-menu.js",
     "teacher/cm-terms.js",
     "teacher/cm-grading-bars.js",
     "teacher/dash-competencies.js",
@@ -87,6 +89,10 @@
     "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js",
     "teacher-mobile/crit-own.js",
+    "teacher-mobile/grade-look.js",
+    "teacher-mobile/student-look.js",
+    "teacher-mobile/level-sheet.js",
+    "teacher-mobile/pull-refresh.js",
     "teacher-mobile/pin-page.js",
     "teacher-mobile/bulletins-model.js",
     "teacher-mobile/tab-bulletins.js",

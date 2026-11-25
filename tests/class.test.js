@@ -89,7 +89,7 @@ describe('class-insights', () => {
   /**
    * The dashboard's class insights (teacher/dash-insights.js) and the calc.js
    * helpers behind them: how many students sit at each proficiency on a
-   * competency, Who Needs Help, Missing and Late, and the class average's
+   * competency, Missing and Late, and the class average's
    * change since the term before.
    */
 
@@ -164,44 +164,6 @@ describe('class-insights', () => {
     });
   });
 
-  describe('Who Needs Help', () => {
-    it('reads a saved rule and falls back to Below Proficient, at least 3 scores', () => {
-      expect(DashInsights.readRule(undefined)).toEqual({ below: 3, min: 3 });
-      expect(DashInsights.readRule({ below: 2, min: 1 })).toEqual({ below: 2, min: 1 });
-      expect(DashInsights.readRule({ below: 7, min: 9 })).toEqual({ below: 3, min: 3 });
-    });
-  });
-
-  describe('the attention model (the competency filter and Needs Support read it)', () => {
-    const OVERALL = { s1: 1.7, s2: 2.1, s3: 3.8, s4: 2.5 };
-    beforeEach(() => {
-      saved.getStudentQuickObs = globalThis.getStudentQuickObs;
-      saved.getOverallProficiency = globalThis.getOverallProficiency;
-      saved.studentGradeSummary = globalThis.studentGradeSummary;
-      globalThis.getStudentQuickObs = () => [];
-      globalThis.getAssessments = () => [];
-      globalThis.getOverallProficiency = (cid, sid) => OVERALL[sid];
-      globalThis.studentGradeSummary = (cid, sid) => ({ text: String(OVERALL[sid]), level: Math.round(OVERALL[sid]) });
-    });
-    afterEach(() => {
-      ['getStudentQuickObs', 'getOverallProficiency', 'studentGradeSummary'].forEach(name => {
-        globalThis[name] = saved[name];
-      });
-    });
-    const model = rule => DashInsights.attentionModel(CID, STUDENTS, { rule, todayStr: '2026-10-22' });
-
-    it('lists each student once, worst first, with the competencies under the rule', () => {
-      const m = model({ below: 3, min: 3 });
-      expect(m.people.map(p => [p.student.id, p.below.length])).toEqual([
-        ['s1', 3],
-        ['s2', 3],
-        ['s4', 1],
-      ]);
-      expect(m.counts).toEqual({ all: 3, below: 3, notobs: 0, nostr: 0, missing: 0 });
-      expect(DashInsights.belowCounts(m)).toEqual({ 's:q': 2, 's:p': 3, 's:c': 2 });
-    });
-  });
-
   describe('the Missing and Late cell', () => {
     it('says so at zero and counts each kind otherwise', () => {
       expect(DashInsights.missingGlanceHtml([], CID)).toContain('Nothing is missing or late.');
@@ -218,10 +180,9 @@ describe('class-insights', () => {
       expect(DashInsights.missingGlanceHtml([], CID)).toMatch(/^<div class="dash-glance-cell dash-glance-missing">/);
     });
 
-    it('the Needs Attention card is gone; its model and rule stay', () => {
-      expect(DashInsights.attentionCardHtml).toBeUndefined();
-      ['attentionModel', 'belowLists', 'readRule', 'isBelowRule'].forEach(name =>
-        expect(typeof DashInsights[name]).toBe('function'),
+    it('the Needs Attention card and the Who Needs Help rule are gone (Nov 25: the competency filter went with the old tile)', () => {
+      ['attentionCardHtml', 'attentionModel', 'belowLists', 'readRule', 'isBelowRule'].forEach(name =>
+        expect(DashInsights[name]).toBeUndefined(),
       );
     });
   });

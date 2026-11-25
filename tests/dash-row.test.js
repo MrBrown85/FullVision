@@ -29,19 +29,9 @@ function opts(extra) {
       assessments: [],
       classAvg: 0,
       classR: 0,
-      ccCounts: {},
-      ccAssessments: {},
-      ccObs: {},
-      coreSelf: coreSelfRatings(
-        CID,
-        STUDENTS.map(s => s.id),
-      ),
-      coreView: 'self',
-      compView: 'mix',
       obs: {},
       classChange: null,
       helpRule: null,
-      naComp: null,
     },
     extra || {},
   );
@@ -122,12 +112,8 @@ describe('the row', () => {
   });
 
   it('a class with no competencies says so, with no column heading over nothing', () => {
-    for (const compView of ['mix', 'avg', 'below', 'trend']) {
-      const html = DashCompetencies.html(opts({ compView }));
-      expect(html).toContain('No competencies in this class yet.');
-      expect(html).not.toContain('dash-comp-labels');
-      expect(html).not.toContain('>Competency<');
-    }
+    const html = DashCompetencies.html(opts());
+    expect(html).toContain('No competencies in this class yet.');
   });
 
   it('draws the tile from the open page, Curricular by default', () => {
@@ -252,9 +238,6 @@ describe('the Competencies tile', () => {
     expect(html).toMatch(/id="dash-comp-tab-curricular" role="tab" aria-selected="false"/);
     expect(html).toContain('>Curricular</button>');
     expect(html).toContain('>Core</button>');
-    // Each page holds today's card, unchanged.
-    expect(html).toContain(DashOverview.competenciesCardHtml(opts({ compPage: 'core' })));
-    expect(html).toContain(DashOverview.coreCardHtml(opts({ compPage: 'core' })));
     expect(html).toMatch(/dash-comp-page is-on" id="dash-comp-page-core"/);
     expect(html).toMatch(/class="dash-comp-page" id="dash-comp-page-curricular"/);
   });

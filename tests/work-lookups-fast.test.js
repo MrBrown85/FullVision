@@ -203,7 +203,6 @@ const panel = ids => ({
   obs: {},
   classChange: null,
   helpRule: null,
-  naComp: null,
 });
 
 describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }, () => {

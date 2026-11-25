@@ -411,8 +411,7 @@ function verifyTyped(body: Json, who: Identity | null, needsSession: boolean): T
 
 export const CARD_ROUTES: Record<string, CardRoute> = {
   /* Code in; first name, class and which identity check out. Nothing opens
-     yet. A slip's code is not_found here, as any unknown code is, so this
-     route says nothing about slips; the page then sends the code to open. */
+     yet. */
   card: {
     // The code's tag, the key id and the hashed address.
     sql: 'select student_submit.card($1::text, $2::text, $3::text) as r',

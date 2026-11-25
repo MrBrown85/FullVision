@@ -1894,6 +1894,23 @@ th.gb-group-alt {
   margin: 0;
   box-shadow: 0 0 0 1.5px var(--surface);
 }
+/* In a Scores cell Late (and Graded Separately's S) sits in the cell's
+   bottom-right corner, so "100%" and its L still fit the 48px column. */
+.gb-scores-val .gb-late {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  min-width: 11px;
+  height: 11px;
+  margin: 0;
+  padding: 0 1px;
+  border-radius: 3px;
+  font-size: 8px;
+  line-height: 11px;
+}
+.gb-scores-val .gb-late + .gb-late {
+  right: 15px;
+}
 
 /* Warning indicator for out-of-range scores */
 .gb-scores-cell.gb-scores-warning {
@@ -2016,7 +2033,7 @@ th.gb-group-alt {
   border-radius: 4px;
 }
 /* The toolbar's one pill: "9 to grade · 4 to return · 1 question", with
-   the camera when work came in. Each part is a count that is also its
+   To Grade's tray when work came in. Each part is a count that is also its
    filter; the one pressed is filled. */
 .gb-work-pill {
   display: inline-flex;
@@ -2116,4 +2133,54 @@ th.gb-group-alt {
 }
 .gb-key-item .gb-question {
   margin: 0 5px 0 0;
+}
+/* A cell's corner marks: the camera top right, the question dot top left,
+   Revising bottom left, Late bottom right (above). Out of the cell's flow, so no mark makes a column
+   wider than its tilted header. On a draft's dashed outline each sits on a
+   patch of the cell's white; they step aside for the editor. */
+.gb-scores-cell > .gb-work-camera,
+.gb-scores-cell > .gb-question,
+.gb-scores-cell > .gb-revising {
+  position: absolute;
+  margin: 0;
+  line-height: 0;
+  pointer-events: none;
+}
+.gb-scores-cell > .gb-work-camera {
+  top: 3px;
+  right: 3px;
+}
+.gb-scores-cell > .gb-work-camera svg {
+  width: 10px;
+  height: 10px;
+}
+.gb-scores-cell.gb-scores-warning > .gb-work-camera {
+  right: 16px;
+}
+.gb-scores-cell > .gb-question {
+  top: 4px;
+  left: 4px;
+}
+.gb-scores-cell > .gb-revising {
+  bottom: 3px;
+  left: 3px;
+}
+.gb-scores-cell.gb-draft > .gb-work-camera,
+.gb-scores-cell.gb-draft > .gb-revising {
+  padding: 1px;
+  border-radius: 3px;
+  background: var(--surface);
+}
+.gb-scores-cell.gb-draft > .gb-work-camera {
+  top: 2px;
+  right: 2px;
+}
+.gb-scores-cell.gb-draft > .gb-revising {
+  bottom: 2px;
+  left: 2px;
+}
+.gb-scores-cell:has(.gb-scores-input) > .gb-work-camera,
+.gb-scores-cell:has(.gb-scores-input) > .gb-question,
+.gb-scores-cell:has(.gb-scores-input) > .gb-revising {
+  display: none;
 }

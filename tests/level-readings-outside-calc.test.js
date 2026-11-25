@@ -222,13 +222,6 @@ describe.each(VALUES)('a level of %s', v => {
     expect(f.standing).toBe(s.word);
   });
 
-  it('the dashboard counts a student below a rule as the word says', () => {
-    seed();
-    const s = said(v);
-    const below = atLevel(v, () => DashInsights.isBelowRule(CID, { sectionIds: [] }, ME, v, { below: 3, min: 0 }));
-    expect(below).toBe(s.level < 3);
-  });
-
   it('the phone app colours and names it as the gradebook does', () => {
     seed();
     const s = said(v);

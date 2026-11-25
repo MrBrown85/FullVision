@@ -861,15 +861,13 @@ window.PageGradebook = (function () {
         : '') +
       (_work
         ? '<span class="gb-key-item"><span class="gb-to-grade">' +
-          WORK_CAMERA +
-          'To Grade</span>Sent, not graded</span>' +
+          WORK_TRAY +
+          '</span>To Grade</span>' +
           '<span class="gb-key-item">' +
           WORK_CAMERA +
           'Has photos</span>'
         : '') +
-      (_revisions
-        ? '<span class="gb-key-item"><span class="gb-revising">Revising</span>Returned for revision</span>'
-        : '') +
+      (_revisions ? '<span class="gb-key-item">' + REVISING_MARK + 'Returned for revision</span>' : '') +
       (_questions ? '<span class="gb-key-item">' + QUESTION_DOT + 'Question waiting</span>' : '') +
       '</div>';
     return html;
@@ -935,6 +933,13 @@ window.PageGradebook = (function () {
      ("Sent Oct 30 · 2 photos. Click to open in the grader."). The numbers
      are GraderWork.workCounts' (shared/grader.js): a pair or group counts
      once, as in the grader. With Send Work off none of it is drawn. */
+  /* Every mark a cell can carry stays out of the cell's width, so a column
+     is as wide as its tilted header whatever is in it: To Grade is a chip
+     the size of Missing's M, with the Inbox's tray in it; the camera, the
+     question dot and Revising sit in the cell's corners (gradebook.css,
+     "A cell's corner marks"). */
+  var WORK_TRAY =
+    '<svg class="gb-tray" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h5l1.5 2.5h5L16 13h5"/><path d="M6 5h12l3 8v6H3v-6z"/></svg>';
   var WORK_CAMERA =
     '<span class="gb-work-camera" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>';
 
@@ -990,6 +995,9 @@ window.PageGradebook = (function () {
      the Learner Profile read, so one answer in the grader clears all three.
      With the switch off none of it is drawn. */
   var QUESTION_DOT = '<span class="gb-question" aria-hidden="true"></span>';
+  // Out for revision (S11): a grey arrow turning back, in the cell's corner.
+  var REVISING_MARK =
+    '<span class="gb-revising" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 3v5h5"/></svg></span>';
 
   function _countQuestions(cid, students, assessments) {
     if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return null;
@@ -1024,15 +1032,15 @@ window.PageGradebook = (function () {
   }
 
   /* The toolbar's one pill (the board "Gradebook With Submissions"):
-     "9 to grade · 4 to return · 1 question", with the camera when work
+     "9 to grade · 4 to return · 1 question", with To Grade's tray when work
      came in. Each part is still its own filter; '' when all are 0. */
-  // html-safe: the parts are numbers and fixed words; the camera is our icon
+  // html-safe: the parts are numbers and fixed words; the tray is our icon
   function _workPill() {
     var parts = [_toGradeButton(), _toReturnButton(), _questionsButton()].filter(Boolean);
     if (!parts.length) return '';
     return (
       '<span class="gb-work-pill">' +
-      (_work && _work.total ? WORK_CAMERA : '') +
+      (_work && _work.total ? '<span class="gb-work-camera">' + WORK_TRAY + '</span>' : '') +
       parts.join('<span class="gb-work-pill-sep" aria-hidden="true">·</span>') +
       '</span>'
     );
@@ -2192,20 +2200,22 @@ window.PageGradebook = (function () {
       cellClass += ' gb-draft';
       cellStyle = cellStyle.replace(/^background:[^;]*;/, '');
     }
-    // Work in (S6-F4): To Grade in place of the dash while it waits,
-    // the camera when photos came in, and a hover line saying what.
+    // Work in (S6-F4): To Grade's chip in place of the dash while it waits,
+    // the camera in the corner when photos came in, and a hover line saying
+    // what. The corner marks take no width (WORK_TRAY says why).
+    var corners = '';
     var work = _workCell(cid, a, s.id);
     if (work && work.tograde) {
       cellStyle = '';
-      // A filled blue chip, with the camera inside when photos came in.
-      display = '<span class="gb-to-grade">' + (work.photos ? WORK_CAMERA : '') + 'To Grade</span>';
-    } else if (work && work.photos) display += WORK_CAMERA;
-    // Out for revision (S11): "Revising" under the grade, nothing in yet.
+      display = '<span class="gb-to-grade">' + WORK_TRAY + '</span>';
+    }
+    if (work && work.photos) corners += WORK_CAMERA;
+    // Out for revision (S11): the turning arrow, nothing in yet.
     var revising = _revisions && GraderWork.revisionStateOf(cid, s.id, a.id) === 'revising';
-    if (revising) display += '<span class="gb-revising">Revising</span>';
+    if (revising) corners += REVISING_MARK;
     // A question waiting (S10-F4): the yellow dot and its hover line.
     var question = _questionCell(a.id, s.id);
-    if (question) display += QUESTION_DOT;
+    if (question) corners += QUESTION_DOT;
     var cellTitle = work ? work.title : '';
     if (question) {
       var asked = _askedOn(question);
@@ -2257,6 +2267,7 @@ window.PageGradebook = (function () {
       '<span class="gb-scores-val">' +
       display +
       '</span>' +
+      corners +
       '</td>';
     return html;
   }
@@ -2283,7 +2294,7 @@ window.PageGradebook = (function () {
       (isCompletionScored(a)
         ? _csvAverageText(cid, a, stats)
         : isPointsScored(a)
-          ? _pointsAverageText(a, stats)
+          ? _fitColumn(_pointsAverageText(a, stats))
           : _levelCellHtml(cid, stats.avg)) +
       '</span></td>'
     );
@@ -2921,6 +2932,20 @@ window.PageGradebook = (function () {
   /* A points Class Average on screen, in both views: "6/10". */
   function _pointsAverageText(a, stats) {
     return formatPoints(oneDecimal(stats.avg)) + '/' + formatPoints(Number(a.maxPoints) || 100);
+  }
+
+  /* A points Class Average in the Scores grid's 48px column: four
+     characters fit on a line ("7/10") even in a Chromebook's or Windows'
+     wider font; a longer one ("44/60", "59.6/80") goes on two,
+     the points over their "/80", as a Both class's level sits over its
+     percent. A wider average would widen the column past its tilted title. */
+  // html-safe: `text` is _pointsAverageText's, numbers and a slash
+  function _fitColumn(text) {
+    var cut = text.indexOf('/');
+    if (text.length <= 4 || cut < 0) return text;
+    return (
+      '<span class="gb-cell-both"><span>' + text.slice(0, cut) + '</span><small>' + text.slice(cut) + '</small></span>'
+    );
   }
 
   /* A Class Average as the CSV prints it, the printed sheet's way. */

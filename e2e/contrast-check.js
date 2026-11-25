@@ -75,8 +75,8 @@ export const LEVEL_TEXT_SELECTORS = [
   // The Dashboard card's trend arrow: a glyph (role="img") in the Proficient
   // or Emerging colour.
   '.dash-card-trend',
-  // The Competencies tile's "Lowest" tag, drawn in the Emerging badge's pair.
-  '.dash-comp-ln-tag',
+  // The Competencies tile's count of one, drawn in the Developing badge's pair.
+  '.dash-comp-it-n.is-thin',
   // Observation types (strength, growth, concern), as in LEVEL_FILL_SELECTORS.
   '.obs-type',
   '.m-obs-type',

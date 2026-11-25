@@ -100,45 +100,6 @@ for (const scheme of ['light', 'dark']) {
       await shot(page.locator('#main, main').first(), `desktop-filter-${scheme}`);
     });
 
-    test('the dashboard draws Notes as yellow marks, lists Note in the key, and never as a strength', async ({
-      page,
-    }) => {
-      await enterDemo(page);
-      await page.goto('/dashboard?course=sci8');
-      const obsCard = page.locator('#dash-obs-card');
-      await expect(obsCard.locator('.dash-ob2-row[data-sid]').first()).toBeVisible();
-      await obsCard.getByRole('tab', { name: 'By Week' }).click();
-      const key = obsCard.locator('.dash-ob2-key');
-      await expect(key).toContainText('Strength');
-      await expect(key.locator('.dash-ob2-swatch[data-type]')).toHaveCount(5);
-      const swatch = key.locator('.dash-ob2-swatch[data-type="note"]');
-      await expect(swatch).toHaveCSS('background-color', YELLOW[scheme]);
-      await expect(key.locator('span:has(> .dash-ob2-swatch[data-type="note"])')).toHaveText('Note');
-      await expect(obsCard.locator('.dash-ob2-cell i[data-type="note"]').first()).toBeVisible();
-
-      // A student whose only observation is a Note has no strength recorded.
-      await page.evaluate(() => {
-        const all = JSON.parse(localStorage.getItem('gb-quick-obs-sci8') || '{}');
-        all.st5 = [
-          {
-            id: 'qo_note_only',
-            text: 'Away on a family trip',
-            dims: [],
-            sentiment: 'note',
-            context: null,
-            date: getTodayStr(),
-            created: new Date().toISOString(),
-          },
-        ];
-        localStorage.setItem('gb-quick-obs-sci8', JSON.stringify(all));
-      });
-      await page.reload();
-      const row = obsCard.locator('.dash-ob2-row[data-sid="st5"]');
-      await expect(row.locator('.dash-ob2-mark')).toBeVisible();
-      await expect(row.locator('.dash-ob2-cell i')).toHaveAttribute('data-type', 'note');
-      await shot(obsCard, `desktop-dashboard-${scheme}`);
-    });
-
     test("the student page's Evidence panel shows the Note block and the timeline key", async ({ page }) => {
       await enterDemo(page);
       await page.goto('/student?id=st1&course=sci8');

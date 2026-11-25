@@ -35,7 +35,6 @@ labels:
   - Class Results
   - View Class Results
   - Class Average
-  - Level Mix
   - Needs Support
   - Change
   - Self-Assessment
@@ -111,7 +110,7 @@ Hover over a Class Average in the Gradebook to see the spread of the class's res
 
 ## Nov 5, 2026: Dashboard Cards
 
-Each student card's strip is now one labelled chip per folder, coloured by the student's level; point at a chip for its full name and level. The trend arrow sits beside the grade, and "N not assessed" appears only when a competency has no scored work yet. The Curricular Competencies card has a view menu beside its title: **Class Average**, **Level Mix**, **Needs Support** and **Change**. Click a competency to sort the class by it, weakest first, with a chip above the cards to clear it, a button to record an observation for the students below, and a link into the gradebook. The Core Competencies card shows students' **Self-Assessment** this term, or the **Evidence** tagged with each. On the student page, click the email address to copy it.
+Each student card's strip is now one labelled chip per folder, coloured by the student's level; point at a chip for its full name and level. The trend arrow sits beside the grade, and "N not assessed" appears only when a competency has no scored work yet. The Curricular Competencies card has a view menu beside its title: **Class Average**, Level Mix, **Needs Support** and **Change**. Click a competency to sort the class by it, weakest first, with a chip above the cards to clear it, a button to record an observation for the students below, and a link into the gradebook. The Core Competencies card shows students' **Self-Assessment** this term, or the **Evidence** tagged with each. On the student page, click the email address to copy it.
 
 ## Nov 5, 2026: Class Settings
 

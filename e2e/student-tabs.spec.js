@@ -152,9 +152,6 @@ test('the dashboard opens the tab that matches where the teacher clicked', async
   await page.goBack();
   await page.locator('.dash-card').first().locator('.dash-card-obs').click();
   await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
-  await page.goBack();
-  await page.locator('.dash-ob2-name').first().click();
-  await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
 });
 
 // The Competencies tab's rows already show each competency; the separate

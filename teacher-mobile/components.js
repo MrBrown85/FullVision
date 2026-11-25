@@ -13,6 +13,7 @@ window.MComponents = (function () {
     settings:
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
     sort: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/></svg>',
+    more: '<svg width="16" height="4" viewBox="0 0 16 4" aria-hidden="true"><circle cx="2" cy="2" r="1.8" fill="currentColor"/><circle cx="8" cy="2" r="1.8" fill="currentColor"/><circle cx="14" cy="2" r="1.8" fill="currentColor"/></svg>',
   };
 
   /* ── Avatar helper ─────────────────────────────────────────── */
@@ -48,6 +49,15 @@ window.MComponents = (function () {
     var subtitle = opts.subtitle
       ? '<div style="font-size:12px;color:var(--text-3);font-weight:400">' + _esc(opts.subtitle) + '</div>'
       : '';
+    var title = _esc(opts.title);
+    // `titleAction`: the title is a button (the grader's name opens the class list).
+    if (opts.titleAction)
+      title =
+        '<button type="button" class="m-nav-title-btn" data-action="' +
+        opts.titleAction +
+        '"><span class="m-nav-title-text">' +
+        title +
+        '</span><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></button>';
     // `compact`: the title shows in the bar at rest (no large title below).
     return (
       '<div class="m-nav-bar' +
@@ -58,7 +68,7 @@ window.MComponents = (function () {
       '<div class="m-nav-bar-inner">' +
       back +
       '<h1 class="m-nav-bar-title-inline">' +
-      _esc(opts.title) +
+      title +
       subtitle +
       '</h1>' +
       actions +
@@ -274,6 +284,8 @@ window.MComponents = (function () {
     clearTimeout(_toastOutTimer);
     el.innerHTML = '<div class="m-toast-item"><span>' + _esc(message) + '</span>' + undoBtn + '</div>';
     _placeToast(el);
+    // `low`: over the tab bar, so it covers nothing on the screen above it (look.css).
+    el.classList.toggle('m-toast-low', !!opts.low);
     if (opts.onUndo) {
       el.querySelector('[data-action="m-toast-undo"]').onclick = function () {
         opts.onUndo();
@@ -412,8 +424,20 @@ window.MComponents = (function () {
      (competencies that disagree: the lowest, outlined, no + or −), action,
      attrs (the data attributes every button carries; ids are ours). */
   // html-safe: levels are numbers, words constants, attrs ours
+  // The phone's new look (docs/plans/phone-look-plan.md), whose styles are look.css.
+  function _look() {
+    var flags = /** @type {any} */ (window).BuildFlags;
+    return !!(flags && flags.on('phoneLook'));
+  }
+
+  // "PRF", and "PRF +" on the chosen level: what the new look's track reads (look.css).
+  function _levelCode(lv, mod) {
+    return levelCode(lv) + (mod ? ' ' + scoreModSuffix(mod) : '');
+  }
+
   function levelButtonsHTML(opts) {
     var mod = opts.mixed ? 0 : opts.mod;
+    var look = _look();
     return opts.order
       .map(function (lv) {
         var on = opts.level === lv;
@@ -427,6 +451,7 @@ window.MComponents = (function () {
           '" data-score="' +
           lv +
           '"' +
+          (look ? ' data-code="' + _levelCode(lv, on ? mod : 0) + '"' : '') +
           opts.attrs +
           ' aria-label="' +
           fig +
@@ -512,6 +537,7 @@ window.MComponents = (function () {
       var fig = on ? formatScoreLevel(lv, mod) : String(lv);
       btn.classList.toggle('m-score-active', on);
       btn.classList.toggle('m-score-mixed', on && !!mixed);
+      if (btn.hasAttribute('data-code')) btn.setAttribute('data-code', _levelCode(lv, on ? mod : 0));
       btn.setAttribute('aria-label', fig + ', ' + scoreLevelText(lv));
       var f = btn.querySelector('.m-level-fig');
       if (f) f.textContent = fig;
@@ -542,7 +568,8 @@ window.MComponents = (function () {
           '><span class="m-mod-sign" aria-hidden="true">' +
           scoreModSuffix(m) +
           '</span>' +
-          (m > 0 ? 'Plus' : 'Minus') +
+          // The new look shows the sign alone; the word is still read out.
+          (_look() ? '<span class="m-mod-word">' + (m > 0 ? 'Plus' : 'Minus') + '</span>' : m > 0 ? 'Plus' : 'Minus') +
           '</button>'
         );
       })

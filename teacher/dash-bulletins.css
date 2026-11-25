@@ -304,6 +304,8 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     grid-column: 1 / -1;
     height: 26px;
     margin-bottom: 8px;
+    /* Read by dash-bulletins.js: the tile is cards here, so it draws them as notes (.is-notes). */
+    --dash-bulletins-cards: 1;
   }
   html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-cls {
     display: inline;
@@ -366,6 +368,7 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     grid-column: 1 / -1;
     height: 26px;
     margin-bottom: 8px;
+    --dash-bulletins-cards: 1;
   }
   html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-cls {
     display: inline;
@@ -501,6 +504,207 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
   }
   .dash-bulletins-tile .dash-bulletins-row .dash-bulletins-seen {
     color: #0058d0;
+  }
+}
+/* The blank note and a photo note's picture are the notes' own: nowhere else. */
+.dash-bulletins-blank,
+.dash-bulletins-pic {
+  display: none;
+}
+
+/* The paper fits the words (Colin, Nov 25: "the text is squished to the top of
+   the cards and leaves a lot of whitespace below"; board B1 to B3). Where the
+   tile is cards, dash-bulletins.js adds .is-notes and each note is as tall as
+   its words need, never a strip as tall as the tile: the words in the middle
+   of the paper in larger type, the day in the foot beside Seen by, no label
+   on a plain announcement (a reminder keeps its own, on yellow), a photo
+   bulletin showing its photo. Write a Bulletin is a blank note in the next
+   free place and Open Bulletins sits beside the title, so there is no foot.
+   The subtitle shows only when it has something to act on. A taller tile
+   holds a second row. */
+.dash-bulletins-tile.is-notes .dash-bulletins-rows {
+  --dbn-font: 14px;
+  --dbn-lines: 3;
+  --dbn-lines-rem: 2;
+  --dbn-min: 96px;
+  --dbn-top: 14px;
+  --dbn-gap: 4px;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-head {
+  grid-column: 1 !important;
+  margin-bottom: 0 !important;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-sub:not(.is-alert),
+.dash-bulletins-tile.is-notes .dash-bulletins-cls,
+.dash-bulletins-tile.is-notes .dash-bulletins-write {
+  display: none !important;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-actions {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: center;
+  padding-top: 0 !important;
+  border-top: 0 !important;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-rows {
+  grid-row: 2 / -1;
+  /* Three notes, and a slim place for the blank one when all three are taken. */
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 0.42fr) !important;
+  grid-auto-rows: auto !important;
+  align-content: start;
+  align-items: start;
+  gap: 24px 20px !important;
+  padding: 14px 8px 6px !important;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-row {
+  align-self: start;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  min-height: var(--dbn-min);
+  padding: var(--dbn-top) 18px 10px !important;
+  row-gap: var(--dbn-gap) !important;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-row .dash-bulletins-kind {
+  grid-column: 1 / -1 !important;
+  grid-row: 1 !important;
+  justify-self: start;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-row .dash-bulletins-plain,
+.dash-bulletins-tile.is-notes .dash-bulletins-row:has(.has-pic) .dash-bulletins-kind {
+  display: none !important;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-row .dash-bulletins-words {
+  grid-row: 2 !important;
+  align-self: center !important;
+  font-size: var(--dbn-font);
+  line-height: 1.4;
+  -webkit-line-clamp: var(--dbn-lines);
+  line-clamp: var(--dbn-lines);
+  text-wrap: pretty;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-row:has(.dash-bulletins-rem) .dash-bulletins-words {
+  -webkit-line-clamp: var(--dbn-lines-rem);
+  line-clamp: var(--dbn-lines-rem);
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-row .dash-bulletins-seen {
+  grid-column: 1 !important;
+  grid-row: 3 !important;
+}
+.dash-bulletins-tile.is-notes .dash-bulletins-row .dash-bulletins-time {
+  grid-column: 2 !important;
+  grid-row: 3 !important;
+  align-self: center;
+  color: #5f5f64;
+}
+/* A photo bulletin: the photo is the note. */
+.dash-bulletins-tile.is-notes .dash-bulletins-words.has-pic {
+  display: block !important;
+  align-self: stretch !important;
+  font-size: 0 !important;
+  padding: 0 !important;
+}
+.dash-bulletins-tile.is-notes .has-pic .dash-bulletins-pic {
+  display: block;
+  width: 100%;
+  height: max(64px, calc(var(--dbn-min) - var(--dbn-top) - 44px));
+  object-fit: cover;
+  border-radius: 2px;
+}
+/* The blank note: Write a Bulletin. */
+.dash-bulletins-tile.is-notes .dash-bulletins-blank {
+  display: block;
+  align-self: stretch;
+  min-width: 0;
+}
+.dash-bulletins-blank-btn {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: max(var(--dbn-min), 72px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  font: inherit;
+  font-size: var(--dbn-font);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--active-fill);
+  background: var(--active-light);
+  border: 2px dashed color-mix(in srgb, var(--active) 45%, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  transform: rotate(0.5deg);
+  transition: transform 0.15s ease;
+}
+.dash-bulletins-blank-btn:hover {
+  transform: rotate(0deg) translateY(-2px);
+}
+.dash-bulletins-blank-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+/* More of the words, in larger type, as the tile grows. */
+@container dash-bulletins (min-height: 200px) {
+  .dash-bulletins-tile.is-notes .dash-bulletins-rows {
+    --dbn-font: 15px;
+    --dbn-lines: 4;
+    --dbn-lines-rem: 3;
+    --dbn-min: 118px;
+    --dbn-top: 16px;
+    --dbn-gap: 6px;
+  }
+}
+@container dash-bulletins (min-height: 240px) {
+  .dash-bulletins-tile.is-notes .dash-bulletins-rows {
+    --dbn-font: 16px;
+    --dbn-lines: 5;
+    --dbn-lines-rem: 4;
+    --dbn-min: 150px;
+    --dbn-top: 22px;
+    --dbn-gap: 10px;
+  }
+}
+@container dash-bulletins (min-height: 300px) {
+  .dash-bulletins-tile.is-notes .dash-bulletins-rows {
+    --dbn-lines: 7;
+    --dbn-lines-rem: 6;
+  }
+}
+/* Room for two rows: the fourth and fifth bulletins show, starting the second row. */
+@container dash-bulletins (min-height: 430px) {
+  .dash-bulletins-tile.is-notes .dash-bulletins-rows {
+    --dbn-lines: 4;
+    --dbn-lines-rem: 3;
+    --dbn-min: 160px;
+  }
+  .dash-bulletins-tile.is-notes .dash-bulletins-row:nth-child(n + 4) {
+    display: grid !important;
+  }
+  .dash-bulletins-tile.is-notes .dash-bulletins-row:nth-child(4) {
+    grid-column: 1 !important;
+  }
+  /* Three or fewer on a tall tile: one row of larger notes. */
+  .dash-bulletins-tile.is-notes .dash-bulletins-rows:not(:has(.dash-bulletins-row:nth-child(4))) {
+    --dbn-font: 18px;
+    --dbn-lines: 10;
+    --dbn-lines-rem: 9;
+    --dbn-min: 210px;
+    --dbn-top: 26px;
+  }
+}
+@container dash-bulletins (min-height: 540px) {
+  .dash-bulletins-tile.is-notes .dash-bulletins-rows {
+    --dbn-lines: 6;
+    --dbn-lines-rem: 5;
+    --dbn-min: 180px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-bulletins-blank-btn {
+    transition: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
