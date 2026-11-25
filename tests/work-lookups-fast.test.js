@@ -310,6 +310,54 @@ describe('a draw makes no copy of the whole class’s work', { timeout: 120000 }
     }
   });
 
+  it("the Dashboard draw with the redrawn Inbox counts the class once and asks no piece's counts again", () => {
+    seed();
+    const ids = getStudents(CID).map(s => s.id);
+    const calls = { workCounts: 0, classWorkCounts: 0 };
+    const wc = GraderWork.workCounts;
+    const cwc = GraderWork.classWorkCounts;
+    GraderWork.workCounts = (...a) => (calls.workCounts++, wc.apply(GraderWork, a));
+    GraderWork.classWorkCounts = (...a) => (calls.classWorkCounts++, cwc.apply(GraderWork, a));
+    try {
+      const draw = () =>
+        DashOverview.renderOverviewPanel({
+          cid: CID,
+          sections: [],
+          allStudents: getStudents(CID),
+          assessments: [],
+          classAvg: 0,
+          classR: 0,
+          ccCounts: {},
+          ccAssessments: {},
+          ccObs: {},
+          coreSelf: coreSelfRatings(CID, ids),
+          coreView: 'self',
+          compView: 'mix',
+          obs: {},
+          classChange: null,
+          helpRule: null,
+          naComp: null,
+        });
+      localStorage.setItem('fv-build-inboxStacks', '1');
+      wholeClassCopies = 0;
+      const html = drawAndMount(draw);
+      expect(html).toContain('dash-inbox-stacks-row');
+      const waiting = cwc(CID, ids).pieces.filter(p => p.tograde > 0).length;
+      expect(waiting).toBeGreaterThan(20);
+      expect(html.match(/class="dash-inbox-stack"/g)).toHaveLength(waiting);
+      // One count of the class, shared with the top bar and the tile's model.
+      expect(calls.classWorkCounts).toBe(1);
+      // The stacks ask no piece's counts: only the model's rows (four) do.
+      expect(calls.workCounts).toBeLessThanOrEqual(4 + 2);
+      // The class's work is read once for the model and once for the queue, never per piece.
+      expect(wholeClassCopies).toBeLessThanOrEqual(2);
+    } finally {
+      GraderWork.workCounts = wc;
+      GraderWork.classWorkCounts = cwc;
+      localStorage.removeItem('fv-build-inboxStacks');
+    }
+  });
+
   it('the Dashboard draw with Flip Through counts the class once and no piece again', () => {
     seed();
     const ids = getStudents(CID).map(s => s.id);
