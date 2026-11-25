@@ -2,8 +2,8 @@
  * The Observations feed's bar and filter panel, in the Assignments toolbar's
  * "Three Things" style (teacher/obs-toolbar.js; Colin, Nov 25: "Build it"):
  * Search with Filter in its end, Show (All, Open Concerns with its count), a
- * chip for each filter that is on; the filter panel (Student, Tag, Type with
- * Date, Context with Assessment and Quoted) floating over the feed; a card's
+ * chip for each filter that is on; the filter panel (Tag, Type, Date over
+ * Context) floating over the feed; a card's
  * type and tags as filters; the point to preview. Demo Mode, Science 8, with
  * the roster open: 25 students, eight open concerns.
  *
@@ -35,6 +35,7 @@ const show = (page, key) => page.locator('.atb-show [data-show="' + key + '"]');
 const filterBtn = page => page.locator('.obs-toolbar .atb-filter-btn');
 const panel = page => page.locator('.obp-panel');
 const row = (page, grp, value) => page.locator('.obp-row[data-grp="' + grp + '"][data-value="' + value + '"]');
+const rosterRow = (page, name) => page.locator('#gb-roster-list .student-row', { hasText: name });
 const cards = page => page.locator('#obs-feed .obs-card');
 const chipLabels = page => page.locator('#obs-chips .atb-chip-label');
 const openConcerns = page => page.evaluate(() => getOpenConcerns('sci8').length);
@@ -141,19 +142,19 @@ test.describe('layout', () => {
       for (const width of [1280, 1440]) {
         await openDemo(page, width);
         await useFont(page, font);
+        // Two students from the roster are one chip.
+        await rosterRow(page, 'Cece Adeyemi').click();
+        await rosterRow(page, 'Noor Al-Rashid').click({ modifiers: ['Shift'] });
         await filterBtn(page).click();
-        for (const v of ['Cece Adeyemi', 'Noor Al-Rashid'])
-          await page.locator('.obp-students .obp-row', { hasText: v }).click();
         await row(page, 'y', 'concern').click();
+        await row(page, 'y', 'growth').click();
         await row(page, 'c', 'independent').click();
+        await row(page, 'c', 'small-group').click();
         await row(page, 'd', 'week').click();
-        await row(page, 'a', 'unlinked').click();
-        await row(page, 'q', 'unquoted').click();
         await page.locator('.obp-tags .obp-row').first().click();
         await page.keyboard.press('Escape');
         const chips = await chipsWhole(page, '.obs-toolbar .atb-chips');
-        // Two students are one chip.
-        expect(chips.length).toBe(7);
+        expect(chips.length).toBe(5);
         for (const c of chips) if (c.on) expect(c, `${width}: ${c.text}`).toMatchObject({ within: true, full: true });
         const f = await fits(page);
         expect(f.rows).toBe(1);
@@ -165,15 +166,13 @@ test.describe('layout', () => {
 
   test('a chip wider than the room is left off, not cut', async ({ page }) => {
     await openDemo(page, 1280);
+    await page.locator('#gb-roster-list .student-row').first().click();
     await page.evaluate(() => {
       const st = getStudents('sci8')[0];
       st.firstName = 'Alexandrina Bartholomew Christopher';
       st.lastName = 'Featherstonehaugh-Wolverhampton-Smythe-Montgomery';
       PageObservations.render();
     });
-    await filterBtn(page).click();
-    await page.locator('.obp-students .obp-row').first().click();
-    await page.keyboard.press('Escape');
     const [chip] = await chipsWhole(page, '.obs-toolbar .atb-chips');
     expect(chip.on ? chip.within && chip.full : true).toBe(true);
   });
@@ -281,7 +280,7 @@ test.describe('Show', () => {
 });
 
 test.describe('the filter panel', () => {
-  test('Filter opens a panel of four columns under Search; Escape closes it and returns to Filter', async ({
+  test('Filter opens a panel of three columns under Search; Escape closes it and returns to Filter', async ({
     page,
   }) => {
     await openDemo(page);
@@ -289,15 +288,10 @@ test.describe('the filter panel', () => {
     await filterBtn(page).click();
     await expect(filterBtn(page)).toHaveAttribute('aria-expanded', 'true');
     await expect(panel(page)).toBeVisible();
-    await expect(panel(page).locator('.assess-filter-head')).toContainText([
-      'Student',
-      'Tag',
-      'Type',
-      'Date',
-      'Context',
-      'Assessment',
-      'Quoted',
-    ]);
+    await expect(panel(page).locator('.assess-filter-head')).toContainText(['Tag', 'Type', 'Date', 'Context']);
+    await expect(panel(page).locator('.obp-col')).toHaveCount(3);
+    // Students are the roster's job; Assessment and Quoted are gone.
+    await expect(panel(page).getByText(/^(Student|Assessment|Quoted)$/)).toHaveCount(0);
     const s = await bar(page).locator('.atb-search').boundingBox();
     const p = await panel(page).boundingBox();
     expect(p.x).toBeCloseTo(s.x, 0);
@@ -343,21 +337,12 @@ test.describe('the filter panel', () => {
     }
   });
 
-  test('Student: a search box over the class, any number ticked, in step with the roster and the feed', async ({
+  test('Students are the roster’s job: a click picks one, shift adds, and the chip and the feed follow', async ({
     page,
   }) => {
     await openDemo(page);
     const all = await cards(page).count();
-    await filterBtn(page).click();
-    const students = panel(page).locator('.obp-students .obp-row');
-    expect(await students.count()).toBeGreaterThan(20);
-    const find = panel(page).locator('.obp-find[data-find="s"]');
-    await find.fill('ethan');
-    await expect(students.filter({ visible: true })).toHaveCount(1);
-    await students.filter({ visible: true }).click();
-    // The panel stays open with its search text; the feed, the chip, the roster follow.
-    await expect(panel(page)).toBeVisible();
-    await expect(find).toHaveValue('ethan');
+    await rosterRow(page, 'Ethan Dubois').click();
     await expect(chipLabels(page)).toHaveText(['Ethan Dubois']);
     await expect(filterBtn(page)).toHaveClass(/has-filters/);
     const feed = await cards(page).count();
@@ -365,30 +350,33 @@ test.describe('the filter panel', () => {
     expect(feed).toBeLessThan(all);
     await expect(cards(page).locator('.obs-card-student')).toHaveText(Array(feed).fill('Ethan Dubois'));
     await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveCount(1);
-    await expect(page.locator('#gb-roster-list .student-row.selected')).toContainText('Ethan Dubois');
-    // A second student.
-    await find.fill('');
-    await panel(page).locator('.obp-students .obp-row', { hasText: 'Sofia Petrov' }).click();
+    await rosterRow(page, 'Sofia Petrov').click({ modifiers: ['Shift'] });
     await expect(chipLabels(page)).toHaveText(['2 students']);
     await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveCount(2);
-    // A click on the roster is in the panel too.
-    await page.locator('#gb-roster-list .student-row', { hasText: 'Jas Gill' }).click();
-    await expect(chipLabels(page)).toHaveText(['Jas Gill']);
+    // The panel has no student column; its filters add to the students'.
     await filterBtn(page).click();
-    await expect(panel(page).locator('.obp-students .obp-row[aria-checked="true"]')).toHaveText(['Jas Gill']);
+    await expect(panel(page).locator('.obp-row[data-grp="s"]')).toHaveCount(0);
+    await row(page, 'y', 'strength').click();
+    await expect(chipLabels(page)).toHaveText(['2 students', 'Strength']);
+    await page.keyboard.press('Escape');
     // The chip's x lets go of the students, and the roster with them.
-    await page.locator('#obs-chips .atb-chip').click();
+    await page.locator('#obs-chips .atb-chip[data-kind="students"]').click();
+    await expect(chipLabels(page)).toHaveText(['Strength']);
+    await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveCount(0);
+    await rosterRow(page, 'Jas Gill').click();
+    await expect(chipLabels(page)).toHaveText(['Jas Gill', 'Strength']);
+    await filterBtn(page).click();
+    await panel(page).getByRole('button', { name: 'Clear Filters' }).click();
     await expect(chipLabels(page)).toHaveCount(0);
     await expect(page.locator('#gb-roster-list .student-row.selected')).toHaveCount(0);
     await expect(cards(page)).toHaveCount(all);
-    await expect(panel(page).locator('.obp-students .obp-row[aria-checked="true"]')).toHaveCount(0);
   });
 
   test('Tag: a search box over the tags with their sections, any number ticked', async ({ page }) => {
     await openDemo(page);
     await filterBtn(page).click();
     const col = panel(page).locator('.obp-tags');
-    await expect(col.locator('[data-section]')).toContainText(['Learning dispositions']);
+    await expect(col.locator('[data-section]')).toContainText(['Learning Dispositions']);
     await col.locator('.obp-find').fill('resilien');
     await expect(col.locator('.obp-row').filter({ visible: true })).toHaveCount(1);
     // A section with nothing left in it is gone with its rows.
@@ -404,37 +392,60 @@ test.describe('the filter panel', () => {
     await expect(panel(page)).toBeVisible();
   });
 
-  test('Type, Date, Context, Assessment, Quoted: one at a time, the chosen one again lets go', async ({ page }) => {
+  test('Type and Context take several, Date one at a time; Title Case throughout', async ({ page }) => {
     await openDemo(page);
-    const all = await cards(page).count();
     await filterBtn(page).click();
     const checked = grp => page.locator('.obp-row[data-grp="' + grp + '"][aria-checked="true"]');
-    for (const [grp, a, b, chipA, chipB] of [
-      ['y', 'growth', 'strength', 'Growth', 'Strength'],
-      ['c', 'independent', 'small-group', 'Independent', 'Small group'],
-      ['d', 'week', 'custom', 'This week', 'Custom dates'],
-      ['a', 'linked', 'unlinked', 'Linked to an assessment', 'Not linked'],
-      ['q', 'quoted', 'unquoted', 'Quoted in a report', 'Not yet quoted'],
-    ]) {
-      await expect(row(page, grp, a)).toHaveAttribute('role', 'radio');
-      await row(page, grp, a).click();
-      await expect(checked(grp)).toHaveCount(1);
-      await expect(chipLabels(page).filter({ hasText: chipA })).toHaveCount(1);
-      await row(page, grp, b).click();
-      await expect(checked(grp)).toHaveCount(1);
-      await expect(row(page, grp, b)).toHaveAttribute('aria-checked', 'true');
-      await expect(chipLabels(page).filter({ hasText: chipB })).toHaveCount(1);
-      await expect(chipLabels(page).filter({ hasText: chipA })).toHaveCount(0);
-      await row(page, grp, b).click();
-      await expect(checked(grp)).toHaveCount(0);
-      await expect(chipLabels(page)).toHaveCount(0);
-    }
-    await expect(cards(page)).toHaveCount(all);
-    // They narrow the feed as they always did.
+    // Type: any of those ticked.
+    await expect(row(page, 'y', 'growth')).toHaveAttribute('role', 'checkbox');
+    await row(page, 'y', 'growth').click();
+    await expect(chipLabels(page)).toHaveText(['Growth']);
     await row(page, 'y', 'strength').click();
-    await expect(cards(page).locator('.obs-type')).toHaveText(Array(await cards(page).count()).fill('Strength'));
-    await row(page, 'q', 'quoted').click();
-    await expect(page.locator('#obs-feed .obs-card-quoted')).toHaveCount(await cards(page).count());
+    await expect(checked('y')).toHaveCount(2);
+    await expect(chipLabels(page)).toHaveText(['2 types']);
+    const shown = new Set(await cards(page).locator('.obs-type').allTextContents());
+    expect([...shown].sort()).toEqual(['Growth', 'Strength']);
+    await row(page, 'y', 'growth').click();
+    await row(page, 'y', 'strength').click();
+    await expect(chipLabels(page)).toHaveCount(0);
+    // Context: the same.
+    await expect(row(page, 'c', 'independent')).toHaveAttribute('role', 'checkbox');
+    await row(page, 'c', 'independent').click();
+    await expect(chipLabels(page)).toHaveText(['Independent']);
+    await row(page, 'c', 'small-group').click();
+    await expect(chipLabels(page)).toHaveText(['2 contexts']);
+    await expect(cards(page).locator('.obs-card-context')).toHaveCount(await cards(page).count());
+    const ctxs = new Set(await cards(page).locator('.obs-card-context').allTextContents());
+    expect([...ctxs].every(c => ['Independent', 'Small group'].includes(c))).toBe(true);
+    await row(page, 'c', 'independent').click();
+    await row(page, 'c', 'small-group').click();
+    // Date: one at a time, the chosen one again lets go.
+    await expect(row(page, 'd', 'week')).toHaveAttribute('role', 'radio');
+    await row(page, 'd', 'week').click();
+    await row(page, 'd', 'custom').click();
+    await expect(checked('d')).toHaveCount(1);
+    await expect(chipLabels(page)).toHaveText(['Custom Dates']);
+    await row(page, 'd', 'custom').click();
+    await expect(checked('d')).toHaveCount(0);
+    await expect(chipLabels(page)).toHaveCount(0);
+    // The words: Title Case, and the panel has nothing about assessments or quotes.
+    await expect(
+      panel(page)
+        .locator('.obp-row .gbf-name')
+        .filter({ hasText: /Whole Class|Small Group/ }),
+    ).toHaveCount(2);
+    await expect(panel(page).locator('.obp-row[data-grp="d"] .gbf-name')).toHaveText([
+      'This Week',
+      'This Term',
+      'Custom Dates',
+    ]);
+    await expect(panel(page).locator('.obp-find')).toHaveAttribute('placeholder', 'Search Tags…');
+    await expect(panel(page).locator('[data-section]')).toContainText([
+      'Learning Dispositions',
+      'Relational and Identity',
+      'Core Competencies',
+    ]);
+    await expect(panel(page).locator('.obp-row[data-grp="a"], .obp-row[data-grp="q"]')).toHaveCount(0);
   });
 
   test('Custom dates shows From and To; the range is a chip and narrows the feed', async ({ page }) => {
@@ -444,7 +455,7 @@ test.describe('the filter panel', () => {
     await row(page, 'd', 'custom').click();
     await expect(panel(page).locator('.obp-dates')).toBeVisible();
     await expect(page.locator('#filter-date-from')).toBeFocused();
-    await expect(chipLabels(page)).toHaveText(['Custom dates']);
+    await expect(chipLabels(page)).toHaveText(['Custom Dates']);
     const days = await page.locator('#obs-feed .obs-feed-date-label span:first-child').allTextContents();
     expect(days.length).toBeGreaterThan(1);
     // From the day before the newest.
@@ -467,7 +478,7 @@ test.describe('the filter panel', () => {
     await row(page, 'd', 'week').click();
     await expect(panel(page).locator('.obp-dates')).toBeHidden();
     await expect(page.locator('#filter-date-from')).toHaveValue('');
-    await expect(chipLabels(page)).toHaveText(['This week']);
+    await expect(chipLabels(page)).toHaveText(['This Week']);
   });
 
   test('ticking keeps the panel open and the keyboard on the same row; the arrow keys move through a column', async ({
@@ -475,8 +486,8 @@ test.describe('the filter panel', () => {
   }) => {
     await openDemo(page);
     await filterBtn(page).click();
-    const students = panel(page).locator('.obp-students .obp-row');
-    await panel(page).locator('.obp-find[data-find="s"]').focus();
+    const students = panel(page).locator('.obp-tags .obp-row');
+    await panel(page).locator('.obp-find[data-find="t"]').focus();
     await page.keyboard.press('ArrowDown');
     await expect(students.nth(0)).toBeFocused();
     await page.keyboard.press('ArrowDown');
@@ -489,7 +500,7 @@ test.describe('the filter panel', () => {
     await page.keyboard.press('ArrowUp');
     // Up from the first row wraps to the last.
     await expect(students.last()).toBeFocused();
-    // A radio row too.
+    // A short column wraps too: Type, then the Date choices run into Context.
     await row(page, 'y', 'concern').focus();
     await page.keyboard.press('Space');
     await expect(row(page, 'y', 'concern')).toBeFocused();
@@ -497,7 +508,14 @@ test.describe('the filter panel', () => {
     await page.keyboard.press('ArrowDown');
     await expect(row(page, 'y', 'note')).toBeFocused();
     await page.keyboard.press('ArrowDown');
-    await expect(row(page, 'd', 'week')).toBeFocused();
+    await expect(row(page, 'y', 'strength')).toBeFocused();
+    await row(page, 'd', 'week').focus();
+    await page.keyboard.press('Space');
+    await expect(row(page, 'd', 'week')).toHaveAttribute('aria-checked', 'true');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(row(page, 'c', 'whole-class')).toBeFocused();
     // A column's list scrolls inside it; the panel keeps its size.
     const before = await panel(page).boundingBox();
     await students.last().scrollIntoViewIfNeeded();
@@ -512,7 +530,7 @@ test.describe('the filter panel', () => {
     const clear = panel(page).getByRole('button', { name: 'Clear Filters' });
     await expect(clear).toBeDisabled();
     await row(page, 'y', 'strength').click();
-    await panel(page).locator('.obp-students .obp-row').first().click();
+    await panel(page).locator('.obp-tags .obp-row').first().click();
     await expect(clear).toBeEnabled();
     await expect(chipLabels(page)).toHaveCount(2);
     await clear.click();
@@ -540,39 +558,37 @@ test.describe('the filter panel', () => {
 test.describe('chips', () => {
   test('a chip for each filter that is on, labelled as the state, and its x removes it', async ({ page }) => {
     await openDemo(page);
+    await rosterRow(page, 'Ethan Dubois').click();
     await filterBtn(page).click();
-    await panel(page).locator('.obp-students .obp-row', { hasText: 'Ethan Dubois' }).click();
     await panel(page).locator('.obp-tags .obp-row', { hasText: 'Self-Regulation' }).click();
     await row(page, 'y', 'concern').click();
+    await row(page, 'y', 'growth').click();
     await row(page, 'c', 'independent').click();
+    await row(page, 'c', 'whole-class').click();
     await row(page, 'd', 'week').click();
-    await row(page, 'a', 'unlinked').click();
-    await row(page, 'q', 'unquoted').click();
     await page.keyboard.press('Escape');
     await expect(chipLabels(page)).toHaveText([
       'Ethan Dubois',
       'Self-Regulation & Reflection',
-      'Concern',
-      'Independent',
-      'This week',
-      'Not linked',
-      'Not yet quoted',
+      '2 types',
+      '2 contexts',
+      'This Week',
     ]);
     await expect(page.locator('#obs-chips .atb-chip').first()).toHaveAttribute(
       'aria-label',
       'Remove Filter: Ethan Dubois',
     );
     // Each x removes its filter; Filter takes the keyboard.
-    await page.locator('#obs-chips .atb-chip[data-kind="type"]').click();
+    await page.locator('#obs-chips .atb-chip[data-kind="types"]').click();
     await expect(filterBtn(page)).toBeFocused();
-    await expect(chipLabels(page)).not.toContainText(['Concern']);
+    await expect(chipLabels(page)).not.toContainText(['2 types']);
     await page.locator('#obs-chips .atb-chip[data-kind="date"]').click();
     await page.locator('#obs-chips .atb-chip[data-kind="students"]').click();
     await page.locator('#obs-chips .atb-chip[data-kind="tags"]').click();
-    await expect(chipLabels(page)).toHaveText(['Independent', 'Not linked', 'Not yet quoted']);
+    await expect(chipLabels(page)).toHaveText(['2 contexts']);
     // Open Concerns is in Show, not a chip.
     await show(page, 'concerns').click();
-    await expect(chipLabels(page)).toHaveCount(3);
+    await expect(chipLabels(page)).toHaveCount(1);
   });
 });
 

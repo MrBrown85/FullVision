@@ -16,13 +16,11 @@ window.PageObservations = (function () {
   var searchQuery = '';
   /* The shared capture strip (shared/obs-capture.js). */
   var _capture = null;
-  var filterSentiment = null;
-  var filterContext = null;
+  var filterSentiment = []; // the types ticked: any of them
+  var filterContext = []; // the contexts ticked: any of them
   var filterDate = null; // 'week' | 'term' | 'custom'
   var filterDateFrom = '';
   var filterDateTo = '';
-  var filterAssessment = null; // 'linked' | 'unlinked'
-  var filterQuoted = null; // 'quoted' | 'unquoted'
   // The Open Concerns button: only Concerns with no Resolved follow-up.
   var filterOpenConcerns = false;
   var _alive = false;
@@ -61,9 +59,7 @@ window.PageObservations = (function () {
   }
 
   var Card = window.ObsCard;
-  var quotedIndex = Card.quotedIndex;
   var sameCaptureIndex = Card.sameCaptureIndex;
-  var isLinked = Card.isLinked;
 
   function refreshStudentCache() {
     _students = sortStudents(getStudents(activeCourse), 'lastName');
@@ -77,11 +73,9 @@ window.PageObservations = (function () {
     return (
       filterStudents.length +
       filterTags.length +
-      (filterSentiment ? 1 : 0) +
-      (filterContext ? 1 : 0) +
+      filterSentiment.length +
+      filterContext.length +
       (filterDate ? 1 : 0) +
-      (filterAssessment ? 1 : 0) +
-      (filterQuoted ? 1 : 0) +
       (filterOpenConcerns ? 1 : 0)
     );
   }
@@ -89,13 +83,11 @@ window.PageObservations = (function () {
   function resetFilters() {
     filterStudents = [];
     filterTags = [];
-    filterSentiment = null;
-    filterContext = null;
+    filterSentiment = [];
+    filterContext = [];
     filterDate = null;
     filterDateFrom = '';
     filterDateTo = '';
-    filterAssessment = null;
-    filterQuoted = null;
     filterOpenConcerns = false;
     searchQuery = '';
     _feedLimit = FEED_STEP;
@@ -260,13 +252,11 @@ window.PageObservations = (function () {
       f: {
         students: filterStudents,
         tags: filterTags,
-        type: filterSentiment,
-        context: filterContext,
+        types: filterSentiment,
+        contexts: filterContext,
         date: filterDate,
         from: filterDateFrom,
         to: filterDateTo,
-        assessment: filterAssessment,
-        quoted: filterQuoted,
         concerns: filterOpenConcerns,
       },
     };
@@ -276,28 +266,13 @@ window.PageObservations = (function () {
     ObsToolbar.sync(barState(false));
   }
 
-  function filterValue(key) {
-    return {
-      type: filterSentiment,
-      context: filterContext,
-      date: filterDate,
-      assessment: filterAssessment,
-      quoted: filterQuoted,
-    }[key];
-  }
-
+  // Date: one choice at a time; the chosen one again lets go (and the range with it).
   function setFilterOption(key, value) {
-    var next = filterValue(key) === value ? null : value;
-    if (key === 'type') filterSentiment = next;
-    else if (key === 'context') filterContext = next;
-    else if (key === 'assessment') filterAssessment = next;
-    else if (key === 'quoted') filterQuoted = next;
-    else if (key === 'date') {
-      filterDate = next;
-      if (next !== 'custom') {
-        filterDateFrom = '';
-        filterDateTo = '';
-      }
+    if (key !== 'date') return;
+    filterDate = filterDate === value ? null : value;
+    if (filterDate !== 'custom') {
+      filterDateFrom = '';
+      filterDateTo = '';
     }
     refreshFilterStrip();
     refilter();
@@ -337,13 +312,13 @@ window.PageObservations = (function () {
           return (o.dims || []).includes(t);
         });
       });
-    if (filterSentiment)
+    if (filterSentiment.length)
       f = f.filter(function (o) {
-        return o.sentiment === filterSentiment;
+        return filterSentiment.includes(o.sentiment);
       });
-    if (filterContext)
+    if (filterContext.length)
       f = f.filter(function (o) {
-        return o.context === filterContext;
+        return filterContext.includes(o.context);
       });
     var b = dateBounds();
     if (b)
@@ -351,17 +326,7 @@ window.PageObservations = (function () {
         var d = obDay(o);
         return (!b.from || d >= b.from) && (!b.to || d <= b.to);
       });
-    if (filterAssessment)
-      f = f.filter(function (o) {
-        return isLinked(o) === (filterAssessment === 'linked');
-      });
     if (filterOpenConcerns) f = f.filter(isOpenConcern);
-    if (filterQuoted) {
-      var qi = quotedIndex(getTermRatings(activeCourse));
-      f = f.filter(function (o) {
-        return !!qi[o.studentId + '|' + o.id] === (filterQuoted === 'quoted');
-      });
-    }
     if (searchQuery) {
       var q = searchQuery.toLowerCase();
       var hay = (_feed && _feed.hay) || {};
@@ -485,50 +450,27 @@ window.PageObservations = (function () {
     return out;
   }
 
-  /* ── The panel's students and tags ──────────────────────── */
-  function toggleFilterStudent(sid) {
-    var idx = filterStudents.indexOf(sid);
-    if (idx >= 0) filterStudents.splice(idx, 1);
-    else filterStudents.push(sid);
-    refreshFilterStrip();
-    refilter();
-    syncRoster();
-  }
-  function toggleFilterTag(key) {
-    var idx = filterTags.indexOf(key);
-    if (idx >= 0) filterTags.splice(idx, 1);
-    else filterTags.push(key);
+  /* ── The panel's tags, types and contexts ──────────────── */
+  function toggleFilter(kind, value) {
+    var list = kind === 'type' ? filterSentiment : kind === 'context' ? filterContext : filterTags;
+    var idx = list.indexOf(value);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push(value);
     refreshFilterStrip();
     refilter();
   }
-  // A chip's ×: that filter goes (a type, a context, the date and its range, the students, the tags).
+  // A chip's ×: that filter goes (the students, the tags, the types, the contexts, the date and its range).
   function dropFilter(kind) {
-    if (kind !== 'students' && kind !== 'tags') return setFilterOption(kind, filterValue(kind));
+    if (kind === 'date') return setFilterOption('date', filterDate);
     if (kind === 'students') filterStudents = [];
-    else filterTags = [];
+    else if (kind === 'tags') filterTags = [];
+    else if (kind === 'types') filterSentiment = [];
+    else filterContext = [];
     refreshFilterStrip();
     refilter();
-    syncRoster();
+    if (kind === 'students') syncRoster();
   }
 
-  /* ── The focus card's tag popover ───────────────────────── */
-  function filterPopoverItems(popoverId, q) {
-    var lower = q.toLowerCase();
-    document.querySelectorAll('#' + popoverId + ' .obs-popover-item').forEach(function (el) {
-      el.style.display = !lower || el.textContent.toLowerCase().includes(lower) ? '' : 'none';
-    });
-    document.querySelectorAll('#' + popoverId + ' .obs-popover-section').forEach(function (sec) {
-      var next = sec.nextElementSibling;
-      var anyVisible = false;
-      while (next && !next.classList.contains('obs-popover-section')) {
-        if (next.classList.contains('obs-popover-item') && next.style.display !== 'none') anyVisible = true;
-        next = next.nextElementSibling;
-      }
-      sec.style.display = !lower || anyVisible ? '' : 'none';
-    });
-  }
-
-  /* ── Other actions ──────────────────────────────────────── */
   // Clear Filters: the panel's filters go; the search and Open Concerns stay.
   function clearAllFilters() {
     var keep = [searchQuery, filterOpenConcerns];
@@ -1113,9 +1055,7 @@ window.PageObservations = (function () {
         searchQuery = text;
         refilter();
       },
-      toggle: function (kind, value) {
-        (kind === 'student' ? toggleFilterStudent : toggleFilterTag)(value);
-      },
+      toggle: toggleFilter,
       pick: setFilterOption,
       range: setCustomDate,
       drop: dropFilter,

@@ -10,15 +10,20 @@
      nothing beside it moves). One at a time: the pressed one clicked again,
      or All, shows everything;
    - a chip for each filter that is on, labelled as the filter chips were
-     (a student's name or "3 students", a tag or "2 tags", the type, the
-     context, the date choice or the custom range, Linked, Quoted), left off
-     whole when they do not fit (styles.css, .atb-chips).
+     (a student's name or "3 students", a tag or "2 tags", a type or "2 types",
+     a context or "2 contexts", the date choice or the custom range), left
+     off whole when they do not fit (styles.css, .atb-chips). The students
+     are the roster's: a click on a name there picks it (shift adds), and the
+     chip shows who.
 
-   The filter panel floats over the feed under Search: Student and Tag (each a
-   search box over a scrolling checklist), Type with Date, Context with
-   Assessment and Quoted (one choice at a time, round marks), and Clear
-   Filters. It is drawn only while open; a tick updates it in place, so it
-   stays open with its search text and the keyboard on the same row.
+   The filter panel floats over the feed under Search, in three columns: Tag
+   (a search box over a scrolling checklist), Type, and Date over Context.
+   Tag, Type and Context take several (square ticks; a card shows when it
+   matches any); Date takes one (round marks) and Custom Dates shows From
+   and To. Clear Filters. It is drawn only while open; a tick updates it in
+   place, so it stays open with its search text and the keyboard on the same
+   row. Every label in it is Title Case (the data's own words are not
+   changed: _title).
 
    The page (page-observations.js) keeps the filters and what each does; this
    file draws how they are chosen. It passes the state it keeps (see State) to
@@ -39,16 +44,15 @@
    *   students: any[],
    *   concerns: number | null,
    *   f: {
-   *     students: string[], tags: string[], type: string | null, context: string | null,
-   *     date: string | null, from: string, to: string, assessment: string | null,
-   *     quoted: string | null, concerns: boolean
+   *     students: string[], tags: string[], types: string[], contexts: string[],
+   *     date: string | null, from: string, to: string, concerns: boolean
    *   }
    * }} State
    *
    * The actions the page gives start():
    * @typedef {{
    *   search: (text: string) => void,
-   *   toggle: (kind: 'student' | 'tag', value: string) => void,
+   *   toggle: (kind: 'tag' | 'type' | 'context', value: string) => void,
    *   pick: (key: string, value: string) => void,
    *   range: (which: 'from' | 'to', value: string) => void,
    *   drop: (kind: string) => void,
@@ -60,17 +64,13 @@
   var X_ICON =
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
-  var ASSESSMENT = [
-    { value: 'linked', label: 'Linked to an assessment' },
-    { value: 'unlinked', label: 'Not linked' },
-  ];
-  var QUOTED = [
-    { value: 'quoted', label: 'Quoted in a report' },
-    { value: 'unquoted', label: 'Not yet quoted' },
-  ];
-  /* The panel's one-at-a-time groups: the mark's letter, the filter's key
-     (the page's setFilterOption), its name, the State field it reads. */
-  var GROUPS = { y: 'type', c: 'context', d: 'date', a: 'assessment', q: 'quoted' };
+  /* The page's setFilterOption takes Date, the one choice. */
+  /** The words of a label with a capital each (and, between words, stays small). @param {string} text */
+  function _title(text) {
+    return text.replace(/\S+/g, function (w, i) {
+      return i && w === 'and' ? w : w.charAt(0).toUpperCase() + w.slice(1);
+    });
+  }
 
   /** @type {Actions | null} */
   var _api = null;
@@ -90,14 +90,14 @@
   }
   function _contexts() {
     return Object.keys(OBS_CONTEXTS).map(function (k) {
-      return { value: k, label: OBS_CONTEXTS[k].label };
+      return { value: k, label: _title(OBS_CONTEXTS[k].label) };
     });
   }
   /** @param {string} cid */
   function _dates(cid) {
-    var opts = [{ value: 'week', label: 'This week' }];
-    if (G.getReportingTerms(cid).length) opts.push({ value: 'term', label: 'This term' });
-    opts.push({ value: 'custom', label: 'Custom dates' });
+    var opts = [{ value: 'week', label: 'This Week' }];
+    if (G.getReportingTerms(cid).length) opts.push({ value: 'term', label: 'This Term' });
+    opts.push({ value: 'custom', label: 'Custom Dates' });
     return opts;
   }
   /** @param {{ value: string, label: string }[]} options @param {string} value */
@@ -112,7 +112,7 @@
   /** @param {State} s */
   function _any(s) {
     var f = s.f;
-    return !!(f.students.length || f.tags.length || f.type || f.context || f.date || f.assessment || f.quoted);
+    return !!(f.students.length || f.tags.length || f.types.length || f.contexts.length || f.date);
   }
 
   /* ── The chips ─────────────────────────────────────────────── */
@@ -132,8 +132,13 @@
     }
     if (f.tags.length)
       out.push(['tags', f.tags.length === 1 ? G.resolveTag(f.tags[0]).label : f.tags.length + ' tags']);
-    if (f.type) out.push(['type', _label(_types(), f.type)]);
-    if (f.context) out.push(['context', _label(_contexts(), f.context)]);
+    if (f.types.length)
+      out.push(['types', f.types.length === 1 ? _label(_types(), f.types[0]) : f.types.length + ' types']);
+    if (f.contexts.length)
+      out.push([
+        'contexts',
+        f.contexts.length === 1 ? _label(_contexts(), f.contexts[0]) : f.contexts.length + ' contexts',
+      ]);
     if (f.date) {
       var d = _label(_dates(s.cid), f.date);
       if (f.date === 'custom')
@@ -144,11 +149,9 @@
               ? 'From ' + _short(f.from)
               : f.to
                 ? 'Until ' + _short(f.to)
-                : 'Custom dates';
+                : 'Custom Dates';
       out.push(['date', d]);
     }
-    if (f.assessment) out.push(['assessment', _label(ASSESSMENT, f.assessment)]);
-    if (f.quoted) out.push(['quoted', _label(QUOTED, f.quoted)]);
     return out;
   }
   // html-safe: the label goes through esc; the kind is one of the fixed names above
@@ -219,7 +222,7 @@
   // html-safe: the label goes through esc; a dot is a palette colour (esc'd) or a type's own; value is esc'd
   /** @param {string} grp @param {string} value @param {boolean} on @param {string} label @param {string} [dot] */
   function _row(grp, value, on, label, dot) {
-    var one = grp !== 's' && grp !== 't';
+    var one = grp === 'd';
     return (
       '<button type="button" class="assess-filter-item obp-row' +
       (one ? ' is-radio' : '') +
@@ -239,31 +242,23 @@
       '</span></button>'
     );
   }
-  // html-safe: built by _row
-  /** @param {State} s */
-  function _studentRows(s) {
-    return s.students
-      .map(function (st) {
-        return _row('s', st.id, s.f.students.indexOf(st.id) >= 0, G.displayName(st));
-      })
-      .join('');
-  }
   // html-safe: section labels go through esc; rows are built by _row
   /** @param {State} s */
   function _tagRows(s) {
     return G.ObsCapture.tagMenuItems(s.cid)
       .map(function (/** @type {any} */ item) {
         return item.type === 'section'
-          ? '<div class="assess-filter-head obp-section" data-section>' + G.esc(item.label) + '</div>'
+          ? '<div class="assess-filter-head obp-section" data-section>' + G.esc(_title(item.label)) + '</div>'
           : _row('t', item.key, s.f.tags.indexOf(item.key) >= 0, item.label, item.color);
       })
       .join('');
   }
-  /** One-at-a-time rows. @param {string} grp @param {{ value: string, label: string }[]} options @param {string | null} cur @param {boolean} [dots] */
+  /** Rows for a few options: a list of those ticked, or the one chosen. @param {string} grp @param {{ value: string, label: string }[]} options @param {string[] | string | null} cur @param {boolean} [dots] */
   function _choice(grp, options, cur, dots) {
     return options
       .map(function (o) {
-        return _row(grp, o.value, cur === o.value, o.label, dots ? OBS_SENTIMENTS[o.value].color : '');
+        var on = Array.isArray(cur) ? cur.indexOf(o.value) >= 0 : cur === o.value;
+        return _row(grp, o.value, on, o.label, dots ? OBS_SENTIMENTS[o.value].color : '');
       })
       .join('');
   }
@@ -294,24 +289,14 @@
     return (
       '<div class="gbf-panel obp-panel" id="obp-panel" role="group" aria-label="Filter"><div class="gbf-cols">' +
       _col(
-        'Student',
-        _head('Student') +
-          find('s', 'Search students…') +
-          '<div class="gbf-list obp-list">' +
-          _studentRows(s) +
-          '</div>',
-        'obp-students',
-      ) +
-      _col(
         'Tag',
-        _head('Tag') + find('t', 'Search tags…') + '<div class="gbf-list obp-list">' + _tagRows(s) + '</div>',
+        _head('Tag') + find('t', 'Search Tags…') + '<div class="gbf-list obp-list">' + _tagRows(s) + '</div>',
         'obp-tags',
       ) +
+      _col('Type', _head('Type') + _choice('y', _types(), f.types, true), 'obp-type') +
       _col(
-        'Type and Date',
-        _head('Type') +
-          _choice('y', _types(), f.type, true) +
-          _head('Date', true) +
+        'Date and Context',
+        _head('Date') +
           _choice('d', _dates(s.cid), f.date) +
           '<div class="obp-dates"' +
           (f.date === 'custom' ? '' : ' hidden') +
@@ -319,17 +304,9 @@
           G.esc(f.from) +
           '"></label><label>To <input type="date" id="filter-date-to" value="' +
           G.esc(f.to) +
-          '"></label></div>',
-        'obp-type',
-      ) +
-      _col(
-        'Context, Assessment and Quoted',
-        _head('Context') +
-          _choice('c', _contexts(), f.context) +
-          _head('Assessment', true) +
-          _choice('a', ASSESSMENT, f.assessment) +
-          _head('Quoted', true) +
-          _choice('q', QUOTED, f.quoted),
+          '"></label></div>' +
+          _head('Context', true) +
+          _choice('c', _contexts(), f.contexts),
         'obp-context',
       ) +
       '</div><div class="gbf-foot"><button type="button" class="assess-filter-item gbf-clear" data-action="obsClear"' +
@@ -436,7 +413,7 @@
     var panel = document.querySelector('.obp-panel');
     if (!panel) return;
     /** @type {Record<string, any>} */
-    var cur = { s: f.students, t: f.tags, y: f.type, c: f.context, d: f.date, a: f.assessment, q: f.quoted };
+    var cur = { t: f.tags, y: f.types, c: f.contexts, d: f.date };
     panel.querySelectorAll('.obp-row').forEach(function (r) {
       var row = /** @type {HTMLElement} */ (r);
       var c = cur[row.dataset.grp || ''];
@@ -522,9 +499,8 @@
       if (el.dataset.show === 'concerns' || _last.f.concerns) _api.concerns();
     } else if (action === 'obsRow') {
       var grp = el.dataset.grp || '';
-      if (grp === 's') _api.toggle('student', value);
-      else if (grp === 't') _api.toggle('tag', value);
-      else _api.pick(GROUPS[/** @type {'y'} */ (grp)], value);
+      if (grp === 'd') _api.pick('date', value);
+      else _api.toggle(grp === 't' ? 'tag' : grp === 'y' ? 'type' : 'context', value);
       if (grp === 'd' && value === 'custom' && _last.f.date === 'custom') {
         var from = document.getElementById('filter-date-from');
         if (from) from.focus();
@@ -536,8 +512,7 @@
     } else if (action === 'obsClear') _api.clear();
     else if (action === 'obsPickType' || action === 'obsPickTag') {
       var back = _fromCard(el);
-      if (action === 'obsPickType') _api.pick('type', value);
-      else _api.toggle('tag', value);
+      _api.toggle(action === 'obsPickType' ? 'type' : 'tag', value);
       back();
     }
   }

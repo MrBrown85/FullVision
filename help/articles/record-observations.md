@@ -39,13 +39,10 @@ labels:
   - Show
   - All
   - Open Concerns
-  - Student
   - Tag
   - Type
   - Date
   - Context
-  - Assessment
-  - Quoted
   - Clear Filters
 next:
   - score-a-student-from-the-gradebook
@@ -76,7 +73,7 @@ The observation appears in the list under its date, and the strip clears for the
 
 ## Find Observations
 
-The search box looks in the note, the student's name, the tags, the context and the linked assessment. The filter button at the end of the search box opens a panel to narrow the list by **Student**, **Tag**, **Type**, **Date**, **Context**, **Assessment** or **Quoted**. Tick as many students and tags as you like; the others take one choice at a time. Each filter that is on shows as a chip beside **Show**, and the × on a chip removes it. **Clear Filters** removes them all.
+The search box looks in the note, the student's name, the tags, the context and the linked assessment. To see one student, choose their name in the list beside the page; shift-click adds more. The filter button at the end of the search box opens a panel to narrow the list by **Tag**, **Type**, **Date** or **Context**. Tick as many tags, types and contexts as you like (an observation shows if it matches any); **Date** takes one choice. Each filter that is on shows as a chip beside **Show**, and the × on a chip removes it. **Clear Filters** removes them all.
 
 On a card, choose its type to show only that type, or one of its tags to show only that tag.
 
