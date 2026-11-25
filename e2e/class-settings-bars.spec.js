@@ -274,6 +274,7 @@ for (const width of [1280, 1440, 1680]) {
 for (const [width, height] of [
   [1024, 768],
   [820, 1180],
+  [744, 1133],
 ]) {
   test(`on an iPad at ${width} × ${height} the controls are 44 tall and the bars wrap cleanly, in both fonts`, async ({
     page,
