@@ -237,6 +237,7 @@ grant execute on routine public._fv_release_orphan_teacher_email() to service_ro
 revoke all on routine public._fv_teacher_sign_in_deleted() from public;
 grant execute on routine public._fv_teacher_sign_in_deleted() to service_role;
 revoke all on routine public._fv_timezone(p_tz text) from public;
+grant execute on routine public._fv_timezone(p_tz text) to authenticated;
 grant execute on routine public._fv_timezone(p_tz text) to service_role;
 revoke all on routine public._grade_copy(p_enrollment_id uuid, p_assessment_id uuid) from public;
 grant execute on routine public._grade_copy(p_enrollment_id uuid, p_assessment_id uuid) to service_role;

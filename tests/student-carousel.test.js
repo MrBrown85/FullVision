@@ -19,7 +19,7 @@ import { openStudentPage } from './helpers/student-page-context.js';
 import { WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 
 const C = globalThis.StudentPageCarousel;
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 
 const handout = (id, title, pages) => ({ id, kind: 'handout', title, pages });
 const link = { id: 'l1', kind: 'link', title: 'Density', url: 'https://example.com/', host: 'example.com' };

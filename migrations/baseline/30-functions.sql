@@ -1056,11 +1056,11 @@ CREATE OR REPLACE FUNCTION public._fv_timezone(p_tz text)
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 begin
-    if nullif(btrim(p_tz), '') is null then return 'America/Vancouver'; end if;
+    if nullif(btrim(p_tz), '') is null or p_tz = 'America/Vancouver' then return 'Etc/GMT+7'; end if;
     perform now() at time zone p_tz;
     return p_tz;
 exception when others then
-    return 'America/Vancouver';
+    return 'Etc/GMT+7';
 end;
 $function$;
 
@@ -3667,7 +3667,7 @@ begin
     if not fv_owns_course(p_course_id) then
         raise exception 'course not found' using errcode = 'P0002';
     end if;
-    if p_expires_on is null or p_expires_on < current_date then
+    if p_expires_on is null or p_expires_on < (now() at time zone public._fv_timezone((select c.timezone from public.course c where c.id = p_course_id)))::date then
         raise exception 'the last day must be today or later' using errcode = '22023';
     end if;
     insert into phone_report (course_id, term, term_label, expires_on, created_by)
@@ -11727,11 +11727,11 @@ begin
     end if;
     perform _phone_report_put(_r.id, _r.course_id, coalesce(p_students, '[]'::jsonb));
     if p_expires_on is not null then
-        if p_expires_on < current_date then
+        if p_expires_on < (now() at time zone public._fv_timezone((select c.timezone from public.course c where c.id = _r.course_id)))::date then
             raise exception 'the last day must be today or later' using errcode = '22023';
         end if;
         update phone_report set expires_on = p_expires_on where id = _r.id;
-        update student_access_code set expires_at = (p_expires_on + 1)::timestamptz
+        update student_access_code set expires_at = ((p_expires_on + 1)::timestamp at time zone public._fv_timezone((select c.timezone from public.course c where c.id = _r.course_id)))
          where phone_report_id = _r.id and revoked_at is null;
     end if;
     update phone_report set updated_at = now() where id = _r.id;
@@ -12967,7 +12967,7 @@ CREATE OR REPLACE FUNCTION student_submit._closed_reason(p_q public.questionnair
  SET search_path TO 'public', 'student_submit', 'pg_temp'
 AS $function$
 declare
-    _today date := (now() at time zone coalesce(nullif(p_tz, ''), 'America/Vancouver'))::date;
+    _today date := (now() at time zone public._fv_timezone(p_tz))::date;
 begin
     if not p_q.is_on then return 'closed'; end if;
     if p_q.opens_on is not null and _today < p_q.opens_on then return 'not_open_yet'; end if;
@@ -13944,7 +13944,7 @@ begin
     select * into _r from phone_report where id = _c.phone_report_id;
     select * into _course from course where id = _r.course_id;
     if _r.closed_at is not null
-       or (now() at time zone coalesce(nullif(_course.timezone, ''), 'America/Vancouver'))::date > _r.expires_on then
+       or (now() at time zone public._fv_timezone(_course.timezone))::date > _r.expires_on then
         perform _log('open', 'closed', p_ip_hash, _c.id, _r.course_id);
         return jsonb_build_object('ok', false, 'error', 'report_closed');
     end if;
@@ -14204,7 +14204,7 @@ begin
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     select * into _course from course where id = (_in->>'course_id')::uuid;
-    _today := (now() at time zone coalesce(nullif(_course.timezone, ''), 'America/Vancouver'))::date;
+    _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
     return jsonb_build_object(
         'ok', true, 'v', 1,
         'questionnaires', coalesce((
@@ -14653,7 +14653,7 @@ begin
             raise exception 'this report is closed' using errcode = 'FVS01';
         end if;
         _course := _r.course_id;
-        _expires := (_r.expires_on + 1)::timestamptz;
+        _expires := ((_r.expires_on + 1)::timestamp at time zone public._fv_timezone((select c.timezone from public.course c where c.id = _r.course_id)));
     end if;
     _cached := fv_idem_check(p_idempotency_key, 'issue_slips');
     if _cached is not null then
@@ -14854,7 +14854,7 @@ begin
             return jsonb_build_object('ok', false, 'error', 'not_found');
         end if;
         if _r.closed_at is not null
-           or (now() at time zone coalesce(nullif(_course.timezone, ''), 'America/Vancouver'))::date > _r.expires_on then
+           or (now() at time zone public._fv_timezone(_course.timezone))::date > _r.expires_on then
             perform _log('open', 'closed', p_ip_hash, _c.id, _r.course_id);
             return jsonb_build_object('ok', false, 'error', 'report_closed');
         end if;
@@ -15726,7 +15726,7 @@ begin
     end if;
     select * into _course from course where id = _r.course_id;
     if _r.closed_at is not null
-       or (now() at time zone coalesce(nullif(_course.timezone, ''), 'America/Vancouver'))::date > _r.expires_on then
+       or (now() at time zone public._fv_timezone(_course.timezone))::date > _r.expires_on then
         return jsonb_build_object('ok', false, 'error', 'report_closed');
     end if;
     update student_access_code set opened_at = coalesce(opened_at, now())

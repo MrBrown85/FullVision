@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 
 const cards = page => [...page.root().querySelectorAll('.sp-deck .sp-piece')];
 const titles = page => cards(page).map(c => c.querySelector('.sp-piece-title').textContent);

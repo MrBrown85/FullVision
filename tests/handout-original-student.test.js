@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const RES = '00000099-0000-4000-8000-000000000000';
 
 async function openHandout(original) {

@@ -9,7 +9,7 @@ import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, WORK, fakeStudentSubmit, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 import { PAGE_JPEG, THUMB_JPEG } from './helpers/fake-send-world.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const KEY = 'fv-s-session';
 const piece = id => '.sp-piece[data-piece="' + id + '"]';
 
