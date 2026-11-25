@@ -1,10 +1,11 @@
 /**
- * The phone's new look, L1: the grader (docs/plans/phone-look-plan.md).
+ * The phone's new look, L1 and L2 (docs/plans/phone-look-plan.md).
  * Demo Mode, Science 8, Light Refraction Lab, with the build switch on:
  * the bar names the card on screen and its name opens the class list; a
  * level on the track, + beside the name; Late from ⋯ shown as one chip on
- * the card. Then the fit of a criterion's line and the bottom bar on a
- * 375 and a 320 px phone, in the page's font and a wide one.
+ * the card; the fit of a criterion's line and the bottom bar on a 375 and
+ * a 320 px phone, in the page's font and a wide one. L2: the Grade list
+ * and Bulletins.
  */
 import { test, expect } from '@playwright/test';
 import { FONTS, useFont } from './wide-font.js';
@@ -106,6 +107,52 @@ test('a level on the track, + beside the name, and Late from ⋯', async ({ page
   await expect(pills.filter({ hasText: 'Missing' })).toBeHidden();
   await expect(pills.filter({ hasText: 'Excused' })).toBeHidden();
   expect(errors).toEqual([]);
+});
+
+test('L2: the Grade list and Bulletins', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fv-build-phoneLook', '1'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/teacher-mobile\//);
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  const aid = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Light Refraction Lab').id);
+
+  // A piece with work waiting: its name, what waits, the bar.
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  const row = page.locator('#m-grade-list .m-cell[data-aid="' + aid + '"]');
+  await expect(row.locator('.m-tg-pill')).toBeVisible();
+  await expect(row.locator('.m-tg-notin')).toBeVisible();
+  await expect(row.locator('.m-cell-subtitle')).toBeHidden();
+  await expect(row.locator('.m-progress-bar')).toBeVisible();
+  // A piece with nothing waiting keeps its line of category and date.
+  await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
+  const done = page.locator('#m-grade-list .m-cell[data-tg="0"]').first();
+  await expect(done.locator('.m-cell-subtitle')).toBeVisible();
+
+  // Bulletins: no large title; "8 Not Seen" is what the Seen line reads.
+  await page.locator('.m-tab-item[data-tab="bulletins"]').click();
+  const feed = page.locator('#m-bulletin-feed');
+  await expect(feed.locator('.m-bulletin-card').first()).toBeVisible();
+  await expect(page.locator('.m-bulletin-content > .m-title-large')).toBeHidden();
+  const seen = feed.locator('.m-bulletin-seen', { has: page.locator('.m-bulletin-not-seen') }).first();
+  await expect(seen.locator('.m-bulletin-not-seen')).toBeVisible();
+  expect(await seen.evaluate(el => getComputedStyle(el).fontSize)).toBe('0px');
+  for (const font of FONTS) {
+    await useFont(page, font);
+    const out = await feed.evaluate(el =>
+      [...el.querySelectorAll('.m-bulletin-card')].flatMap(card => {
+        const box = card.getBoundingClientRect();
+        return [...card.querySelectorAll('.m-bulletin-file-line, .m-bulletin-link, .m-bulletin-not-seen')]
+          .filter(e => {
+            const r = e.getBoundingClientRect();
+            return r.width > 0 && (r.right > box.right + 0.6 || r.left < box.left - 0.6);
+          })
+          .map(e => String(e.className));
+      }),
+    );
+    expect(out, font).toEqual([]);
+  }
 });
 
 for (const width of [375, 320]) {

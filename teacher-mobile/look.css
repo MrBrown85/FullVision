@@ -659,3 +659,80 @@
     padding: 0 14px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   THE GRADE LIST (L2)
+   A piece with work waiting: its name, what waits, the bar. The line of
+   category, date and count stays on a piece with nothing waiting, where it
+   tells one piece from another.
+   ═══════════════════════════════════════════════════════════════ */
+.m-look .m-tg-row:has(.m-tg-counts) .m-cell-subtitle {
+  display: none;
+}
+.m-look .m-tg-row .m-tg-counts {
+  margin: 8px 0 12px;
+}
+.m-look .m-tg-row .m-tg-notin {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BULLETINS (L2)
+   The tab already says Bulletins; the page is a step darker than the cards
+   so each bulletin stands off it.
+   ═══════════════════════════════════════════════════════════════ */
+.m-look .m-bulletin-content > .m-title-large {
+  display: none;
+}
+.m-look .m-bulletin-content {
+  padding-top: 12px;
+  background: var(--surface-2);
+}
+@media (prefers-color-scheme: dark) {
+  .m-look .m-bulletin-content {
+    background: var(--bg);
+  }
+}
+.m-look .m-bulletin-card {
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 2px 10px rgba(0, 0, 0, 0.07);
+}
+.m-look .m-bulletin-btn:not(.m-bulletin-btn-main) {
+  background: var(--active-light);
+  box-shadow: none;
+}
+/* A file reads as a tile, as a link does. */
+.m-look .m-bulletin-file-line {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+/* Who has not seen it is the part to act on: "8 Not Seen" as one button.
+   Seen by everyone, it says so. */
+.m-look .m-bulletin-seen:has(.m-bulletin-not-seen) {
+  font-size: 0;
+}
+.m-look .m-bulletin-seen .m-bulletin-not-seen {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: 16px;
+  background: var(--active-light);
+  color: var(--link);
+  font-size: 15px;
+  font-weight: 600;
+}
+.m-look .m-bulletin-seen:not(:has(.m-bulletin-not-seen)) {
+  color: var(--score-3-text);
+  font-weight: 600;
+}

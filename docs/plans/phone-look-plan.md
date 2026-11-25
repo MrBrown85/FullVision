@@ -1,6 +1,6 @@
 # The phone's new look (2026-11-24)
 
-**Status.** L1 is built on `main` behind the switch. Nothing else is built. Not released.
+**Status.** L1 and L2 are built on `main` behind the switch. Nothing else is built. Not released.
 
 **Why.** Colin, Nov 24: the phone's grading view is cluttered, and a teacher who is not a software user would be overwhelmed by it. The phone is a tool to be used in the moment: grade, observe, post. One strong control for each decision, the rest behind one tap, no grey lines of explanation.
 
@@ -22,8 +22,9 @@ The phone already does almost everything the board shows: the four levels, + and
 
 | Slice | What                                                                                                                                                  | Mostly                                  |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| L1    | The grader: the student's name in the top bar (tap it for the class list), the progress line, the paper first, one four-word track per criterion, ⋯   | `look.css`; ~120 lines in three files   |
-| L2    | Grade list, Bulletins and Observe: the board's tweaks that are styles only                                                                            | `look.css`                              |
+| L1    | The grader: the student's name in the top bar (tap it for the class list), the progress line, the paper first, one four-word track per criterion, ⋯   | `look.css`, `grade-look.js`             |
+| L2    | The Grade list and Bulletins: the board's tweaks that are styles only                                                                                 | `look.css`                              |
+| L2b   | Observe's one filter track and its cards; Bulletins' day headings in place of each card's kind and time; the tabs' own top bar                        | `tab-observe.js`, `tab-bulletins.js`    |
 | L3    | The grader's three small additions: Next Student in an As Soon As I Save class, a Standard rubric's level words behind the chevron, Undo after Return | `tab-grade.js`                          |
 | L4    | Full Screen: score while you read (one criterion over the paper, the dots become the summary)                                                         | `grade-photos.js`, `tab-grade.js`       |
 | L5    | The Students card as the student's My Learning, with Not Opened                                                                                       | `tab-students.js`, `card-widgets.js`    |
@@ -31,7 +32,7 @@ The phone already does almost everything the board shows: the four levels, + and
 | L7    | Pleasant Surprises, one PR each                                                                                                                       | as each needs                           |
 | L8    | Each screen beside its board, the switch on, the old styles deleted, the help pictures retaken                                                        | `build-flags.js`, `styles.css`, `help/` |
 
-L2 to L6 touch different files and can be built at once. L4 and L7 need L1.
+L2b to L6 touch different files and can be built at once. L4 and L7 need L1.
 
 ## What L1 is (switch on)
 
@@ -48,13 +49,18 @@ Unchanged in L1 with the switch on: the points and Complete or Incomplete contro
 
 **Where L1 differs from the board,** for L8 to settle: the comment button keeps the app's own icon; the tab bar stays under the bottom bar; Mark Up is reached from Full Screen, not from the card; a Standard rubric has no chevron yet (L3).
 
+## What L2 is (switch on)
+
+- **Grade list:** a piece with work waiting shows its name, what waits ("3 to grade", and "20 Not In" as a chip) and the bar. The line of category, date and count stays on a piece with nothing waiting.
+- **Bulletins:** no large title; the page is a step darker than the cards and each card has an edge and a shadow; a file is a tile, as a link is; the Seen line reads "8 Not Seen" as one button, or "Seen by All 27". Write a Bulletin is tinted, beside the blue Post a Photo.
+
 ## Colin's answers owed
 
 Each is asked when its slice comes up; none holds up L1 or L2.
 
 1. **Undo after Return and Next (L3).** Recommended: the return is held for seven seconds and sent when the toast goes, so Undo never has to take a grade back from a student.
 2. **For Revision in an As Soon As I Save class (L3).** The student already sees the grade there.
-3. **+ Follow Up on the phone's observation cards (L2).** The board takes it off the card; "Observation follow-ups" 3 puts it on every card. L2 leaves it on until he says.
+3. **+ Follow Up on the phone's observation cards (L2b).** The board takes it off the card; "Observation follow-ups" 3 puts it on every card. It stays on until he says.
 4. **"Profile" or "View Profile" on the Students card (L5).**
 5. **A card made on the spot from the profile (L7).** A card's code cannot be read again once it is made, so this needs a look at who can make one and when.
 
