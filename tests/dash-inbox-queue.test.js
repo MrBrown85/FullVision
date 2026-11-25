@@ -62,7 +62,8 @@ function moreWork() {
           enrollment_id: sid,
           is_late: late,
           sent_by: 'student',
-          sent_at: '2026-11-' + day + 'T1' + (i % 10) + ':00:00.000Z',
+          // After the sample class's own work, whatever day the test runs: a later day newer, students in order.
+          sent_at: new Date(Date.now() + Number(day) * 3600000 + i * 60000).toISOString(),
         }),
       );
     });
