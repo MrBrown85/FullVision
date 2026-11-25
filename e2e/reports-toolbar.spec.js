@@ -75,6 +75,8 @@ async function fits(page) {
       overflow: tb.scrollWidth - tb.clientWidth,
       page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       outside: parts.filter(p => p.r.left < t.left - 0.5 || p.r.right > t.right + 0.5).map(p => p.el.className),
+      // A part whose own words run past its box (the Ready count in a wider font).
+      spill: parts.filter(p => p.el.scrollWidth > p.el.clientWidth + 1).map(p => p.el.id || p.el.className),
       rows: new Set(parts.map(p => Math.round(p.r.top + p.r.height / 2))).size,
       heights: [...new Set(parts.map(p => Math.round(p.r.height)))],
       overlaps: parts
@@ -120,6 +122,7 @@ test.describe('layout', () => {
           expect(f.page).toBeLessThanOrEqual(0);
           expect(f.outside).toEqual([]);
           expect(f.overlaps).toEqual([]);
+          expect(f.spill).toEqual([]);
           expect(f.rows).toBe(1);
           // Every control is 32px (the Ready count's box is the same height).
           expect(f.heights).toEqual([32]);
@@ -137,6 +140,7 @@ test.describe('layout', () => {
           expect(f.overflow).toBeLessThanOrEqual(1);
           expect(f.outside).toEqual([]);
           expect(f.overlaps).toEqual([]);
+          expect(f.spill).toEqual([]);
         });
       }
     }
@@ -219,7 +223,8 @@ test.describe('the Term Questionnaire bar', () => {
     await expect(ready(page)).toHaveText('All 27 Ready');
     await expect(approve(page)).toHaveText('Print Reports ›');
     await expect(approve(page)).toBeEnabled();
-    // The words and the track turn the app's green.
+    // The words and the track turn the app's green (the class lands just after the words).
+    await expect(page.locator('#tq-ready-wrap')).toHaveClass(/is-done/);
     const green = await page.evaluate(() => ({
       text: getComputedStyle(document.getElementById('tq-ready-wrap')).color,
       fill: getComputedStyle(document.querySelector('.rtb-fill')).backgroundColor,

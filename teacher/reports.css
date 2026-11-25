@@ -2468,11 +2468,14 @@
   align-items: center;
   gap: 8px;
 }
+/* The words keep room for the widest count a class has ("26 of 27 Ready" is
+   14 characters), measured in the font on screen: a wider font (Linux,
+   Windows) widens the room with it rather than spilling, and the count
+   changing does not move the buttons beside it. */
 .rtb-ready {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  width: 176px;
   height: var(--control-h);
   padding: 0 4px;
   flex-shrink: 0;
@@ -2497,6 +2500,9 @@
   border-radius: 3px;
   background: var(--active-fill);
   transition: width 0.2s var(--ease-out);
+}
+#tq-ready {
+  min-width: 15ch;
 }
 .rtb-ready.is-done {
   color: var(--score-3-text);
