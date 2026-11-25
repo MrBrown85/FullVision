@@ -350,6 +350,8 @@ load('teacher/dash-inbox-pick.js');
 load('teacher/dash-inbox-side.js');
 load('teacher/dash-inbox-flip.js');
 load('teacher/dash-inbox-roll.js');
+load('teacher/dash-inbox-queue.js');
+load('teacher/dash-inbox-stacks.js');
 load('teacher/dash-observations.js');
 load('teacher/dash-student-cards.js');
 load('teacher/dash-insights.js');

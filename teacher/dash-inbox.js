@@ -9,7 +9,9 @@
    later slice adds a file and never edits this one. This slice registers
    By Assessment only. html(cid, model) gives the view's body; mount(root,
    cid, model) runs once the page is drawn; unmount() before it is drawn
-   again or left.
+   again or left. With the build switch inboxStacks on, the views are
+   stacks (To Grade) and rollcall (Roll Call) only, and a view may add
+   header(cid, model, queue): the one button beside Assignments →.
 
    The Dashboard draws its whole page as one string, so what must outlast a
    draw is kept here, in module state: the view, the list's scroll, where
@@ -23,7 +25,7 @@ window.DashInbox = (function () {
 
   var VIEW_KEY = 'fv-dash-inbox-view:';
   // The view pill's order. A view not listed goes last, in the order it was added.
-  var VIEW_ORDER = ['assessment', 'side', 'flip', 'roll'];
+  var VIEW_ORDER = ['assessment', 'side', 'flip', 'roll', 'stacks', 'rollcall'];
   var MAX_NAMES = 2;
   // How long the ring stays on the tile after To Grade is clicked.
   var RING_MS = 220;
@@ -51,6 +53,9 @@ window.DashInbox = (function () {
   var _views = [];
   /** @type {any} */
   var _model = null;
+  /** The queue the redrawn tile drew (DashInboxQueue), or null. */
+  /** @type {any} */
+  var _queue = null;
   /** @type {string | null} */
   var _cid = null;
   // The picture lookups for the page last drawn: data-dash-pic → file.
@@ -77,7 +82,7 @@ window.DashInbox = (function () {
   }
 
   /* ── Views ─────────────────────────────────────────────── */
-  /** @param {{ key: string, label: string, hint?: string, html: Function, mount?: Function, unmount?: Function }} v */
+  /** @param {{ key: string, label: string, hint?: string, html: Function, header?: Function, mount?: Function, unmount?: Function }} v */
   function addView(v) {
     if (!v || !v.key) return;
     var at = _views.findIndex(function (x) {
@@ -97,19 +102,44 @@ window.DashInbox = (function () {
     return i < 0 ? VIEW_ORDER.length : i;
   }
 
+  /* The redrawn Inbox (docs/plans/inbox-redesign-plan.md) is behind the
+     build switch inboxStacks. On, the tile has two views, To Grade (key
+     stacks) and Roll Call (key rollcall), picked by the switch in its header;
+     off, every view is as it was. */
+  var STACK_KEYS = ['stacks', 'rollcall'];
+
+  function _stacksOn() {
+    return !!(window.BuildFlags && BuildFlags.on('inboxStacks'));
+  }
+
+  /** The views the tile offers now.
+   * @returns {any[]} */
+  function _offered() {
+    // Off, the redrawn views are not offered: the old tile is as released.
+    if (!_stacksOn())
+      return _views.filter(function (v) {
+        return STACK_KEYS.indexOf(v.key) < 0;
+      });
+    var some = _views.filter(function (v) {
+      return STACK_KEYS.indexOf(v.key) >= 0;
+    });
+    return some.length ? some : _views;
+  }
+
   /** @param {string} cid */
   function viewOf(cid) {
     var saved = _cfg.read(VIEW_KEY + cid);
+    var list = _offered();
     return (
-      _views.filter(function (v) {
+      list.filter(function (v) {
         return v.key === saved;
-      })[0] || _views[0]
+      })[0] || list[0]
     );
   }
 
   /** @param {string} cid @param {string} key */
   function setView(cid, key) {
-    var v = _views.filter(function (x) {
+    var v = _offered().filter(function (x) {
       return x.key === key;
     })[0];
     if (v) _cfg.write(VIEW_KEY + cid, v.key);
@@ -381,10 +411,12 @@ window.DashInbox = (function () {
     // A first look on this device starts the kept time: nothing is new until then.
     if (!seen) _cfg.write(DashInboxModel.SEEN_KEY + cid, new Date().toISOString());
     var view = viewOf(cid);
+    if (_stacksOn() && window.DashInboxQueue) return _redrawnHtml(cid, view, seen, ctx);
+    _queue = null;
     var menu = DashOverview.viewMenuHtml({
       id: 'inbox',
       label: 'Inbox view',
-      views: _views.map(function (v) {
+      views: _offered().map(function (v) {
         return { key: v.key, label: v.label, hint: v.hint };
       }),
       current: view.key,
@@ -398,6 +430,46 @@ window.DashInbox = (function () {
       '">Assignments →</a></div>' +
       '<div class="dash-inbox-body">' +
       view.html(cid, _model) +
+      '</div></section>'
+    );
+  }
+
+  /** The redrawn tile (switch on): the title, the two-way switch, the link,
+   * and the view's one header button; no view menu.
+   * @param {string} cid @param {any} view @param {string | null} seen
+   * @param {{ classCounts?: (cid: string, ids: string[]) => any } | undefined} ctx
+   * @returns {string} */
+  function _redrawnHtml(cid, view, seen, ctx) {
+    var queue = (_queue = DashInboxQueue.build(cid, { seen: seen, classCounts: ctx && ctx.classCounts }));
+    var list = _offered();
+    var swtch =
+      '<div class="seg seg-sm dash-inbox-switch" role="group" aria-label="Inbox shows">' +
+      list
+        .map(function (v) {
+          return (
+            '<button type="button" class="seg-btn" data-dash-inbox="mode" data-mode="' +
+            esc(v.key) +
+            '" aria-pressed="' +
+            (v.key === view.key) +
+            '">' +
+            esc(v.label) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>';
+    var action = view.header ? view.header(cid, _model, queue) : '';
+    return (
+      '<section class="dash-inbox is-stacks" id="dash-inbox" tabindex="-1" aria-labelledby="dash-inbox-title">' +
+      '<div class="dash-section-title dash-inbox-head"><h2 class="dash-inbox-title" id="dash-inbox-title">Inbox</h2>' +
+      swtch +
+      '<a role="link" tabindex="0" data-href="' +
+      esc('/assignments?course=' + encodeURIComponent(cid)) +
+      '">Assignments →</a>' +
+      action +
+      '</div>' +
+      '<div class="dash-inbox-body">' +
+      view.html(cid, _model, queue) +
       '</div></section>'
     );
   }
@@ -599,7 +671,7 @@ window.DashInbox = (function () {
     _glide(cid);
     var view = viewOf(cid);
     _mounted = view;
-    if (view.mount) view.mount(tile, cid, _model);
+    if (view.mount) view.mount(tile, cid, _model, _queue);
     // The new page's pictures are in, the view's own included (it fills them
     // from mount, through pics()); let go of any the old page held alone.
     if (_pics) _pics.sweep();
@@ -683,6 +755,16 @@ window.DashInbox = (function () {
     var redraw = function () {
       if (document.querySelector('#main .dash-glance')) ctx.redraw();
     };
+    var kind = el.getAttribute('data-dash-inbox') || '';
+    if (kind === 'mode') {
+      setView(cid, el.getAttribute('data-mode') || '');
+      redraw();
+      return true;
+    }
+    if (kind === 'start' || kind === 'returnall' || kind.indexOf('stack-') === 0) {
+      var S = /** @type {any} */ (window).DashInboxStacks;
+      return !!S && S.click(el, { cid: cid, redraw: redraw });
+    }
     if (el.getAttribute('data-dash-inbox') === 'wall') {
       if (window.WorkWall) WorkWall.open(cid, aid, { onClose: redraw });
       return true;
