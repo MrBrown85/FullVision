@@ -1680,6 +1680,14 @@ body.offline-active #app-dock {
   margin: 4px 6px;
   background: var(--divider-medium);
 }
+/* A one-at-a-time list (the Observations panel's Type, Date, Context): the
+   mark is round, with a dot when chosen. */
+.assess-filter-item.is-radio .assess-filter-box {
+  border-radius: 50%;
+}
+.assess-filter-item.is-radio.is-on .assess-filter-box {
+  background: radial-gradient(circle, #fff 0 3px, transparent 3.5px), var(--active);
+}
 
 /* ── Layout ─────────────────────────────────────────────────── */
 .page-layout {

@@ -115,7 +115,8 @@ describe('the Observations feed', () => {
   });
 
   const cards = () => doc.querySelectorAll('#obs-feed .obs-card').length;
-  const count = () => doc.getElementById('obs-count').textContent;
+  // The bar no longer counts the feed; Show More's line says how many pass the filters.
+  const ofTotal = () => doc.querySelector('.obs-feed-more').textContent;
   function search(text) {
     const el = doc.getElementById('obs-search-input');
     el.value = text;
@@ -128,7 +129,7 @@ describe('the Observations feed', () => {
 
   it('shows the newest 50, then 50 more on Show More', () => {
     expect(cards()).toBe(50);
-    expect(count()).toBe(N * PER + ' observations');
+    expect(ofTotal()).toContain(' of ' + N * PER);
     const more = doc.querySelector('#obs-feed [data-action="obsShowMore"]');
     expect(more.textContent).toBe('Show More');
     expect(doc.querySelector('.obs-feed-more').textContent).toContain('Showing the newest 50 of ' + N * PER);
@@ -159,7 +160,6 @@ describe('the Observations feed', () => {
     search('topic 3');
     expect(reads).toBe(0);
     expect(contexts).toBe(0);
-    expect(count()).toBe(N + ' of ' + N * PER + ' observations');
     expect(cards()).toBe(N);
     expect(pages).toBe(0);
   });
@@ -177,7 +177,9 @@ describe('the Observations feed', () => {
     click(row);
     expect(pages).toBe(0);
     expect(cards()).toBe(PER);
-    expect(doc.getElementById('filter-student-btn').classList.contains('active')).toBe(true);
+    // The bar's chip says who, and the Filter button is blue.
+    expect(doc.querySelector('#obs-chips .atb-chip-label').textContent).toBe('F0 L00');
+    expect(doc.querySelector('.atb-filter-btn').classList.contains('has-filters')).toBe(true);
   });
 
   /* A save lands: the server id is swapped in on the stored observation, and
@@ -258,6 +260,6 @@ describe('the Observations feed', () => {
     addQuickOb(CID, 's0', 'Brand new note', [], 'strength', null);
     page.render();
     expect(doc.querySelector('#obs-feed .obs-card-text').textContent).toBe('Brand new note');
-    expect(count()).toBe(N * PER + 1 + ' observations');
+    expect(ofTotal()).toContain(' of ' + (N * PER + 1));
   });
 });

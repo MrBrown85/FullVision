@@ -322,6 +322,7 @@ const PRECACHE_URLS = [
   '/teacher/gradebook-csv.js',
   '/teacher/page-bulletins.js',
   '/teacher/obs-roster.js',
+  '/teacher/obs-toolbar.js',
   '/teacher/page-observations.js',
   '/teacher/page-starters.js',
   '/teacher/page-reports.js',

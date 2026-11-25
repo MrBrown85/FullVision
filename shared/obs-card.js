@@ -137,9 +137,24 @@ window.ObsCard = (function () {
 
   /* The type as a solid word block in the proficiency colours, a fixed
      74 px column so names line up. An untyped note is an empty outline. */
-  function typeBlockHtml(sentiment) {
+  function typeBlockHtml(sentiment, asFilter) {
     var s = sentiment && OBS_SENTIMENTS[sentiment];
     if (!s) return '<span class="obs-type obs-type-none" aria-hidden="true"></span>';
+    // On the Observations page the block is a button that sets the Type filter (obs-toolbar.js).
+    if (asFilter)
+      return (
+        '<button type="button" class="obs-type" data-sentiment="' +
+        sentiment +
+        '" data-action="obsPickType" data-value="' +
+        sentiment +
+        '" data-stop-prop="true" title="Filter by ' +
+        esc(s.label) +
+        '" aria-label="Filter by ' +
+        esc(s.label) +
+        '">' +
+        esc(s.label) +
+        '</button>'
+      );
     return '<span class="obs-type" data-sentiment="' + sentiment + '">' + esc(s.label) + '</span>';
   }
 
@@ -314,16 +329,18 @@ window.ObsCard = (function () {
   /* The meta line: context (lightest), a linked assessment, a linked
      competency, the tags with their dots, and "Quoted in Report N" as a
      stamp at the right. Empty when there is nothing to show. */
-  function metaHtml(ob, ctx, p) {
+  function metaHtml(ob, ctx, p, asFilter) {
     var tags = (ob.dims || [])
       .map(function (t) {
-        return (
-          '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
-          obsTagColor(t) +
-          '"></span>' +
-          esc(resolveTag(t).label) +
-          '</span>'
-        );
+        var dot = '<span class="dim-dot" style="background:' + obsTagColor(t) + '"></span>' + esc(resolveTag(t).label);
+        // On the Observations page a tag is a button that toggles that tag's filter.
+        return asFilter
+          ? '<button type="button" class="obs-card-dim" data-action="obsPickTag" data-value="' +
+              esc(t) +
+              '" data-stop-prop="true" title="Filter by this tag">' +
+              dot +
+              '</button>'
+          : '<span class="obs-card-dim">' + dot + '</span>';
       })
       .join('');
     var out =
@@ -349,7 +366,9 @@ window.ObsCard = (function () {
                      button (a private note on the student page, where the
                      student may be looking)
        followUps     the follow-ups strip at the foot (the Observations
-                     page's log: shared/obs-follow-ups.js) */
+                     page's log: shared/obs-follow-ups.js)
+       filters       the type block and the tags are buttons that set that
+                     filter (the Observations page's log: obs-toolbar.js) */
   function html(ob, ctx, opts) {
     opts = opts || {};
     var showStudent = opts.showStudent !== false;
@@ -374,7 +393,7 @@ window.ObsCard = (function () {
       '"' +
       (ob.sentiment ? ' data-sentiment="' + ob.sentiment + '"' : '') +
       '>' +
-      typeBlockHtml(ob.sentiment) +
+      typeBlockHtml(ob.sentiment, opts.filters) +
       '<div class="obs-card-main"><div class="obs-card-header">' +
       (showStudent ? '<span class="obs-card-student">' + esc(p.name) + '</span>' : '') +
       (p.withText ? '<span class="obs-card-with">' + esc(p.withText) + '</span>' : '') +
@@ -385,7 +404,7 @@ window.ObsCard = (function () {
           esc(ob.id) +
           '" data-stop-prop="true">Show</button></div>'
         : '<div class="obs-card-text">' + esc(ob.text) + '</div>') +
-      metaHtml(ob, ctx, p) +
+      metaHtml(ob, ctx, p, opts.filters) +
       (opts.followUps && window.ObsFollowUps ? ObsFollowUps.cardHtml(ctx.cid, ob) : '') +
       '</div>' +
       (opts.readOnly

@@ -25,8 +25,6 @@ window.PageObservations = (function () {
   var filterQuoted = null; // 'quoted' | 'unquoted'
   // The Open Concerns button: only Concerns with no Resolved follow-up.
   var filterOpenConcerns = false;
-  var _openPopover = null;
-  var _searchDebounce = null;
   var _alive = false;
 
   /* Deleted observations stay in the data layer until their Undo toast
@@ -53,8 +51,6 @@ window.PageObservations = (function () {
   var _focusFocusables = null;
   var _focusLastActiveEl = null;
 
-  var SEARCH_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
   var tagColor = obsTagColor;
 
   var _ymd = DashObservations.ymd;
@@ -114,15 +110,14 @@ window.PageObservations = (function () {
     syncRoster();
     ObsRoster.focusToggle();
   }
+  // The bar's Show and the badge on Open Concerns (obs-toolbar.js).
   function syncConcernBtn() {
-    ObsRoster.syncConcerns(activeCourse, filterOpenConcerns);
+    ObsToolbar.sync(barState(true));
   }
   function toggleOpenConcerns() {
     filterOpenConcerns = !filterOpenConcerns;
     syncConcernBtn();
-    refreshFilterStrip();
     refilter();
-    ObsRoster.focusConcerns();
   }
 
   /* ── Course switch ──────────────────────────────────────── */
@@ -136,6 +131,7 @@ window.PageObservations = (function () {
     resetFilters();
     makeCapture([]);
     ObsRoster.reset();
+    ObsToolbar.reset();
     render();
     syncRoster();
     overrideSidebarLinks();
@@ -157,7 +153,6 @@ window.PageObservations = (function () {
       if (!_capture) return null;
       _capture.pickStudent(sid, shift);
       filterStudents = _capture.getStudents();
-      syncPopoverChecks('filter-student-dropdown', filterStudents, 'data-sid');
       refreshFilterStrip();
       refilter();
       syncRoster();
@@ -179,64 +174,15 @@ window.PageObservations = (function () {
     var data = feedData();
     var filtered = applyFilters(data.obs);
 
-    // Search, filter chips and count, one row
-    h +=
-      '<div class="obs-toolbar" id="obs-toolbar">' +
-      '<div class="obs-search-wrap"><span class="obs-search-icon">' +
-      SEARCH_SVG +
-      '</span><input class="obs-search-input" type="text" placeholder="Search\u2026" id="obs-search-input" value="' +
-      esc(searchQuery) +
-      '" aria-label="Search observations"></div>' +
-      '<div class="obs-filter-strip" id="obs-filter-strip" role="toolbar" aria-label="Filter observations">' +
-      renderFilterRow() +
-      '</div>' +
-      '<span class="obs-toolbar-count" id="obs-count">' +
-      countText(filtered.length, data.obs.length) +
-      '</span>' +
-      '</div>';
+    // Search, Show and the filter chips, one row (obs-toolbar.js)
+    h += ObsToolbar.html(barState(true));
 
     // Feed
     h += '<div class="obs-feed" id="obs-feed">' + renderFeedHtml(filtered, data) + '</div>';
 
-    // html-safe: the search text is escaped; renderFilterRow's chips and popovers escape every name and label; counts are numbers.
+    // html-safe: ObsToolbar.html escapes the search text and every name; the feed is built by renderFeedHtml.
     document.getElementById('main').innerHTML = h;
     if (_capture) _capture.mount(document.getElementById('obs-capture-host'));
-    wireSearch();
-  }
-
-  /* ── Popover builders ───────────────────────────────────── */
-  function renderStudentPopover(id, selectedArr, toggleFn, filterFn) {
-    var h =
-      '<div class="obs-popover" id="' +
-      id +
-      '" style="width:240px;max-height:340px" data-filter-fn="' +
-      filterFn +
-      '">' +
-      '<input class="obs-popover-search" type="text" placeholder="Search\u2026" data-action-input="popoverSearch" data-popover-id="' +
-      id +
-      '" data-filter-fn="' +
-      filterFn +
-      '" autocomplete="off">' +
-      '<div class="obs-popover-list">';
-    _students.forEach(function (s) {
-      var isSel = selectedArr.includes(s.id);
-      h +=
-        '<div class="obs-popover-item' +
-        (isSel ? ' selected' : '') +
-        '" data-sid="' +
-        s.id +
-        '" data-action="popoverToggle" data-toggle-fn="' +
-        toggleFn +
-        '" data-value="' +
-        s.id +
-        '"><span class="obs-popover-check">' +
-        (isSel ? '✓' : '') +
-        '</span>' +
-        esc(displayName(s)) +
-        '</div>';
-    });
-    h += '</div></div>';
-    return h;
   }
 
   // html-safe: tag keys and labels are escaped; dot colours come from obsTagColor; ids and actions are fixed.
@@ -277,162 +223,6 @@ window.PageObservations = (function () {
     return h;
   }
 
-  /* ── Filter chips ───────────────────────────────────────── */
-  var TYPE_OPTIONS = Object.keys(OBS_SENTIMENTS).map(function (k) {
-    return { value: k, label: OBS_SENTIMENTS[k].label };
-  });
-  var CONTEXT_OPTIONS = Object.keys(OBS_CONTEXTS).map(function (k) {
-    return { value: k, label: OBS_CONTEXTS[k].label };
-  });
-  var ASSESSMENT_OPTIONS = [
-    { value: 'linked', label: 'Linked to an assessment' },
-    { value: 'unlinked', label: 'Not linked' },
-  ];
-  var QUOTED_OPTIONS = [
-    { value: 'quoted', label: 'Quoted in a report' },
-    { value: 'unquoted', label: 'Not yet quoted' },
-  ];
-  function dateOptions() {
-    var opts = [{ value: 'week', label: 'This week' }];
-    if (getReportingTerms(activeCourse).length) opts.push({ value: 'term', label: 'This term' });
-    opts.push({ value: 'custom', label: 'Custom dates' });
-    return opts;
-  }
-
-  function _optionLabel(options, value) {
-    for (var i = 0; i < options.length; i++) if (options[i].value === value) return options[i].label;
-    return value;
-  }
-  // One formatter each, made once (ObsCard.dateFormat).
-  function _shortDate(ymd) {
-    return Card.dateFormat({ month: 'short', day: 'numeric' }).format(new Date(ymd + 'T12:00:00'));
-  }
-
-  var FILTER_CHIPS = {
-    filterStudents: { id: 'filter-student-btn', name: 'Student' },
-    filterTags: { id: 'filter-tag-btn', name: 'Tag' },
-    filterType: { id: 'filter-type-btn', name: 'Type', key: 'type' },
-    filterContext: { id: 'filter-context-btn', name: 'Context', key: 'context' },
-    filterDate: { id: 'filter-date-btn', name: 'Date', key: 'date' },
-    filterAssessment: { id: 'filter-assessment-btn', name: 'Assessment', key: 'assessment' },
-    filterQuoted: { id: 'filter-quoted-btn', name: 'Quoted', key: 'quoted' },
-  };
-
-  function chipState(popoverName) {
-    switch (popoverName) {
-      case 'filterStudents':
-        if (!filterStudents.length) return null;
-        if (filterStudents.length > 1) return filterStudents.length + ' students';
-        return _studentsById[filterStudents[0]] ? displayName(_studentsById[filterStudents[0]]) : '1 student';
-      case 'filterTags':
-        if (!filterTags.length) return null;
-        return filterTags.length === 1 ? resolveTag(filterTags[0]).label : filterTags.length + ' tags';
-      case 'filterType':
-        return filterSentiment ? _optionLabel(TYPE_OPTIONS, filterSentiment) : null;
-      case 'filterContext':
-        return filterContext ? _optionLabel(CONTEXT_OPTIONS, filterContext) : null;
-      case 'filterDate':
-        if (!filterDate) return null;
-        if (filterDate !== 'custom') return _optionLabel(dateOptions(), filterDate);
-        if (filterDateFrom && filterDateTo) return _shortDate(filterDateFrom) + ' – ' + _shortDate(filterDateTo);
-        if (filterDateFrom) return 'From ' + _shortDate(filterDateFrom);
-        if (filterDateTo) return 'Until ' + _shortDate(filterDateTo);
-        return 'Custom dates';
-      case 'filterAssessment':
-        return filterAssessment ? _optionLabel(ASSESSMENT_OPTIONS, filterAssessment) : null;
-      case 'filterQuoted':
-        return filterQuoted ? _optionLabel(QUOTED_OPTIONS, filterQuoted) : null;
-    }
-    return null;
-  }
-
-  function chipInnerHtml(popoverName) {
-    var st = chipState(popoverName);
-    return esc(st || FILTER_CHIPS[popoverName].name) + ' <span class="obs-btn-arrow" aria-hidden="true"></span>';
-  }
-
-  function renderChip(popoverName, popoverHtml) {
-    var chip = FILTER_CHIPS[popoverName];
-    var st = chipState(popoverName);
-    return (
-      '<div class="obs-strip-popover-wrap"><button type="button" class="obs-filter-chip' +
-      (st ? ' active' : '') +
-      '" data-action="openPopover" data-popover="' +
-      popoverName +
-      '" id="' +
-      chip.id +
-      '" aria-haspopup="true" aria-expanded="false" aria-label="' +
-      esc(chip.name + (st ? ': ' + st : '')) +
-      '">' +
-      chipInnerHtml(popoverName) +
-      '</button>' +
-      popoverHtml +
-      '</div>'
-    );
-  }
-
-  function renderOptionPopover(popoverName, options, current, extraHtml) {
-    var key = FILTER_CHIPS[popoverName].key;
-    var h = '<div class="obs-popover obs-option-popover" id="' + POPOVER_IDS[popoverName] + '" role="listbox">';
-    h += '<div class="obs-popover-list">';
-    options.forEach(function (o) {
-      var sel = current === o.value;
-      h +=
-        '<div class="obs-popover-item' +
-        (sel ? ' selected' : '') +
-        '" role="option" aria-selected="' +
-        sel +
-        '" data-action="setFilterOption" data-filter="' +
-        key +
-        '" data-value="' +
-        o.value +
-        '"><span class="obs-popover-check">' +
-        (sel ? '✓' : '') +
-        '</span>' +
-        esc(o.label) +
-        '</div>';
-    });
-    h += '</div>' + (extraHtml || '') + '</div>';
-    return h;
-  }
-
-  function renderDateInputs() {
-    return (
-      '<div class="obs-popover-date-row">' +
-      '<label>From <input type="date" id="filter-date-from" value="' +
-      esc(filterDateFrom) +
-      '"></label>' +
-      '<label>To <input type="date" id="filter-date-to" value="' +
-      esc(filterDateTo) +
-      '"></label>' +
-      '</div>'
-    );
-  }
-
-  function renderFilterRow() {
-    var h =
-      ObsRoster.concernsSlotHtml(activeCourse, filterOpenConcerns) +
-      renderChip(
-        'filterStudents',
-        renderStudentPopover('filter-student-dropdown', filterStudents, 'toggleFilterStudent', 'filterFilterStudents'),
-      ) +
-      renderChip('filterTags', renderTagPopover('filter-tag-dropdown', filterTags, 'toggleFilterTag')) +
-      renderChip('filterType', renderOptionPopover('filterType', TYPE_OPTIONS, filterSentiment)) +
-      renderChip('filterContext', renderOptionPopover('filterContext', CONTEXT_OPTIONS, filterContext)) +
-      renderChip('filterDate', renderOptionPopover('filterDate', dateOptions(), filterDate, renderDateInputs())) +
-      renderChip('filterAssessment', renderOptionPopover('filterAssessment', ASSESSMENT_OPTIONS, filterAssessment)) +
-      renderChip('filterQuoted', renderOptionPopover('filterQuoted', QUOTED_OPTIONS, filterQuoted));
-    if (activeFilterCount() > 0)
-      h += '<button type="button" class="obs-filter-clear" data-action="clearAllFilters">Clear all</button>';
-    return h;
-  }
-
-  /* ── Partial updates ────────────────────────────────────── */
-  function countText(shown, total) {
-    if (shown !== total) return shown + ' of ' + total + ' observation' + (total === 1 ? '' : 's');
-    return total + ' observation' + (total === 1 ? '' : 's');
-  }
-
   // After the observations changed (added, edited, deleted, Undo).
   function refreshFeedAndCount() {
     feedChanged();
@@ -450,8 +240,6 @@ window.PageObservations = (function () {
     var filtered = applyFilters(data.obs);
     var feedEl = document.getElementById('obs-feed');
     if (feedEl) feedEl.innerHTML = renderFeedHtml(filtered, data);
-    var countEl = document.getElementById('obs-count');
-    if (countEl) countEl.textContent = countText(filtered.length, data.obs.length);
   }
   function showMore() {
     var at = _feedLimit;
@@ -461,38 +249,31 @@ window.PageObservations = (function () {
     if (next && typeof next.focus === 'function') next.focus();
   }
 
-  /* Updates chip labels, option checks and the Clear button in place, so an
-     open multi-select popover stays open with its search text. */
+  /* The state the bar and its panel draw (obs-toolbar.js). The open concerns
+     are counted only when asked: a tick in the panel does not read them. */
+  function barState(withConcerns) {
+    return {
+      cid: activeCourse,
+      search: searchQuery,
+      students: _students,
+      concerns: withConcerns && typeof getOpenConcerns === 'function' ? getOpenConcerns(activeCourse).length : null,
+      f: {
+        students: filterStudents,
+        tags: filterTags,
+        type: filterSentiment,
+        context: filterContext,
+        date: filterDate,
+        from: filterDateFrom,
+        to: filterDateTo,
+        assessment: filterAssessment,
+        quoted: filterQuoted,
+        concerns: filterOpenConcerns,
+      },
+    };
+  }
+  // Chips, the Filter button, the panel's marks and Clear Filters follow a change in place.
   function refreshFilterStrip() {
-    Object.keys(FILTER_CHIPS).forEach(function (name) {
-      var chip = FILTER_CHIPS[name];
-      var btn = document.getElementById(chip.id);
-      if (!btn) return;
-      var st = chipState(name);
-      btn.classList.toggle('active', !!st);
-      btn.innerHTML = chipInnerHtml(name);
-      btn.setAttribute('aria-label', chip.name + (st ? ': ' + st : ''));
-      if (!chip.key) return;
-      var current = filterValue(chip.key);
-      document.querySelectorAll('#' + POPOVER_IDS[name] + ' .obs-popover-item').forEach(function (el) {
-        var sel = el.dataset.value === current;
-        el.classList.toggle('selected', sel);
-        el.setAttribute('aria-selected', String(sel));
-        var chk = el.querySelector('.obs-popover-check');
-        if (chk) chk.textContent = sel ? '✓' : '';
-      });
-    });
-    var strip = document.getElementById('obs-filter-strip');
-    if (!strip) return;
-    var clear = strip.querySelector('.obs-filter-clear');
-    if (activeFilterCount() > 0 && !clear) {
-      strip.insertAdjacentHTML(
-        'beforeend',
-        '<button type="button" class="obs-filter-clear" data-action="clearAllFilters">Clear all</button>',
-      );
-    } else if (activeFilterCount() === 0 && clear) {
-      clear.remove();
-    }
+    ObsToolbar.sync(barState(false));
   }
 
   function filterValue(key) {
@@ -516,20 +297,8 @@ window.PageObservations = (function () {
       if (next !== 'custom') {
         filterDateFrom = '';
         filterDateTo = '';
-        var f = document.getElementById('filter-date-from');
-        var t = document.getElementById('filter-date-to');
-        if (f) f.value = '';
-        if (t) t.value = '';
-      }
-      if (next === 'custom') {
-        refreshFilterStrip();
-        refilter();
-        var from = document.getElementById('filter-date-from');
-        if (from) from.focus();
-        return;
       }
     }
-    closeAllPopovers();
     refreshFilterStrip();
     refilter();
   }
@@ -702,7 +471,7 @@ window.PageObservations = (function () {
               : Card.dateFormat({ weekday: 'long', month: 'short', day: 'numeric' }).format(new Date(ds + 'T12:00:00'));
         out += '<div class="obs-feed-date-group">' + Card.dayHeaderHtml(lbl, groups[ds].length);
         shown[ds].forEach(function (ob) {
-          out += Card.html(ob, ctx, { followUps: true });
+          out += Card.html(ob, ctx, { followUps: true, filters: true });
         });
         out += '</div>';
       });
@@ -716,76 +485,33 @@ window.PageObservations = (function () {
     return out;
   }
 
-  /* ── Popover management ─────────────────────────────────── */
-  var POPOVER_IDS = {
-    filterStudents: 'filter-student-dropdown',
-    filterTags: 'filter-tag-dropdown',
-    filterType: 'filter-type-dropdown',
-    filterContext: 'filter-context-dropdown',
-    filterDate: 'filter-date-dropdown',
-    filterAssessment: 'filter-assessment-dropdown',
-    filterQuoted: 'filter-quoted-dropdown',
-  };
-  function openPopover(name) {
-    if (_openPopover === name) {
-      closeAllPopovers();
-      return;
-    }
-    closeAllPopovers();
-    _openPopover = name;
-    var trig = document.querySelector('[data-action="openPopover"][data-popover="' + name + '"]');
-    if (trig) trig.setAttribute('aria-expanded', 'true');
-    var el = document.getElementById(POPOVER_IDS[name]);
-    if (el) {
-      el.classList.add('open');
-      var s = el.querySelector('.obs-popover-search');
-      if (s) {
-        s.value = '';
-        s.focus();
-      }
-    }
-  }
-  function closeAllPopovers() {
-    _openPopover = null;
-    document.querySelectorAll('[data-action="openPopover"][aria-expanded="true"]').forEach(function (b) {
-      b.setAttribute('aria-expanded', 'false');
-    });
-    Object.values(POPOVER_IDS).forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.classList.remove('open');
-    });
-  }
-
-  /* ── Filter strip: students ─────────────────────────────── */
+  /* ── The panel's students and tags ──────────────────────── */
   function toggleFilterStudent(sid) {
     var idx = filterStudents.indexOf(sid);
     if (idx >= 0) filterStudents.splice(idx, 1);
     else filterStudents.push(sid);
-    syncPopoverChecks('filter-student-dropdown', filterStudents, 'data-sid');
     refreshFilterStrip();
     refilter();
+    syncRoster();
   }
-
-  /* ── Filter strip: tags ─────────────────────────────────── */
   function toggleFilterTag(key) {
     var idx = filterTags.indexOf(key);
     if (idx >= 0) filterTags.splice(idx, 1);
     else filterTags.push(key);
-    syncPopoverChecks('filter-tag-dropdown', filterTags, 'data-tag');
     refreshFilterStrip();
     refilter();
   }
-
-  /* ── Shared popover helpers ─────────────────────────────── */
-  function syncPopoverChecks(popoverId, selectedArr, attrName) {
-    document.querySelectorAll('#' + popoverId + ' .obs-popover-item').forEach(function (el) {
-      var val = el.getAttribute(attrName);
-      var isSel = selectedArr.includes(val);
-      el.classList.toggle('selected', isSel);
-      var chk = el.querySelector('.obs-popover-check');
-      if (chk) chk.textContent = isSel ? '✓' : '';
-    });
+  // A chip's ×: that filter goes (a type, a context, the date and its range, the students, the tags).
+  function dropFilter(kind) {
+    if (kind !== 'students' && kind !== 'tags') return setFilterOption(kind, filterValue(kind));
+    if (kind === 'students') filterStudents = [];
+    else filterTags = [];
+    refreshFilterStrip();
+    refilter();
+    syncRoster();
   }
+
+  /* ── The focus card's tag popover ───────────────────────── */
   function filterPopoverItems(popoverId, q) {
     var lower = q.toLowerCase();
     document.querySelectorAll('#' + popoverId + ' .obs-popover-item').forEach(function (el) {
@@ -803,31 +529,15 @@ window.PageObservations = (function () {
   }
 
   /* ── Other actions ──────────────────────────────────────── */
+  // Clear Filters: the panel's filters go; the search and Open Concerns stay.
   function clearAllFilters() {
+    var keep = [searchQuery, filterOpenConcerns];
     resetFilters();
-    var searchEl = document.getElementById('obs-search-input');
-    if (searchEl) searchEl.value = '';
-    document.querySelectorAll('.student-row').forEach(function (r) {
-      r.classList.remove('selected');
-    });
-    closeAllPopovers();
-    var strip = document.getElementById('obs-filter-strip');
-    if (strip) strip.innerHTML = renderFilterRow();
+    searchQuery = keep[0];
+    filterOpenConcerns = keep[1];
+    refreshFilterStrip();
     refilter();
     syncRoster();
-  }
-
-  function wireSearch() {
-    var el = document.getElementById('obs-search-input');
-    if (el)
-      el.addEventListener('input', function (e) {
-        clearTimeout(_searchDebounce);
-        var val = e.target.value;
-        _searchDebounce = setTimeout(function () {
-          searchQuery = val;
-          refilter();
-        }, 120);
-      });
   }
 
   /* One click hides the card and offers Undo for six seconds. The delete
@@ -1264,20 +974,9 @@ window.PageObservations = (function () {
       var pop = document.getElementById('focus-tag-dropdown');
       if (pop) pop.classList.remove('open');
     }
-    if (_openPopover && !e.target.closest('.obs-popover') && !e.target.closest('.obs-filter-chip')) {
-      closeAllPopovers();
-    }
-  }
-
-  function _handleChange(e) {
-    if (e.target.id === 'filter-date-from') setCustomDate('from', e.target.value);
-    else if (e.target.id === 'filter-date-to') setCustomDate('to', e.target.value);
   }
 
   function _handleInput(e) {
-    if (e.target.matches('[data-action-input="popoverSearch"]')) {
-      filterPopoverItems(e.target.dataset.popoverId, e.target.value);
-    }
     if (e.target.matches('[data-action-input="tagPopoverSearch"]')) {
       filterPopoverItems(e.target.dataset.popoverId, e.target.value);
     }
@@ -1296,21 +995,7 @@ window.PageObservations = (function () {
     var action = el.dataset.action;
     if (el.dataset.stopProp === 'true') e.stopPropagation();
 
-    var toggleFns = {
-      toggleFilterStudent: toggleFilterStudent,
-      toggleFilterTag: toggleFilterTag,
-      toggleFocusDim: toggleFocusDim,
-    };
-
     var handlers = {
-      openPopover: function () {
-        openPopover(el.dataset.popover);
-      },
-      setFilterOption: function () {
-        setFilterOption(el.dataset.filter, el.dataset.value);
-      },
-      clearAllFilters: clearAllFilters,
-      toggleOpenConcerns: toggleOpenConcerns,
       toggleNotObserved: toggleNotObserved,
       obsShowMore: showMore,
       deleteOb: function () {
@@ -1319,8 +1004,7 @@ window.PageObservations = (function () {
         });
       },
       popoverToggle: function () {
-        var fn = toggleFns[el.dataset.toggleFn];
-        if (fn) fn(el.dataset.value);
+        toggleFocusDim(el.dataset.value);
       },
       openFocus: function () {
         openFocus(el.dataset.sid, el.dataset.obid);
@@ -1384,10 +1068,6 @@ window.PageObservations = (function () {
       openFocus(e.target.dataset.sid, e.target.dataset.obid);
       return;
     }
-    if (e.key === 'Escape' && _openPopover) {
-      closeAllPopovers();
-      return;
-    }
   }
 
   /* ── init / destroy ─────────────────────────────────────── */
@@ -1395,7 +1075,6 @@ window.PageObservations = (function () {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
     resetFilters();
-    _openPopover = null;
     // The sticky-note view is gone (2026-10-19); drop its saved setting.
     try {
       localStorage.removeItem('fv-obs-view');
@@ -1425,11 +1104,24 @@ window.PageObservations = (function () {
     _addDocListener('click', _handleClick);
     _addDocListener('mousedown', _handleMousedown);
     _addDocListener('input', _handleInput);
-    _addDocListener('change', _handleChange);
     _addDocListener('keydown', _handleKeydown);
     _addDocListener('fv:id-rekeyed', onRekeyed);
     // A Resolved follow-up closes a Concern: the Open Concerns count follows.
     _addDocListener('fv:follow-ups-changed', syncConcernBtn);
+    ObsToolbar.start({
+      search: function (text) {
+        searchQuery = text;
+        refilter();
+      },
+      toggle: function (kind, value) {
+        (kind === 'student' ? toggleFilterStudent : toggleFilterTag)(value);
+      },
+      pick: setFilterOption,
+      range: setCustomDate,
+      drop: dropFilter,
+      clear: clearAllFilters,
+      concerns: toggleOpenConcerns,
+    });
 
     render();
     syncRoster();
@@ -1455,8 +1147,7 @@ window.PageObservations = (function () {
       document.removeEventListener(l.type, l.handler, l.options);
     });
     _listeners = [];
-    if (_searchDebounce) clearTimeout(_searchDebounce);
-    _searchDebounce = null;
+    ObsToolbar.stop();
     if (_focusBackdropEl && _focusBackdropEl.parentNode) {
       _focusBackdropEl.parentNode.removeChild(_focusBackdropEl);
     }
@@ -1475,7 +1166,6 @@ window.PageObservations = (function () {
     _studentsById = {};
     if (_capture) _capture.destroy();
     _capture = null;
-    closeAllPopovers();
     if (typeof clearLongFormAuthContext === 'function') clearLongFormAuthContext('observation-capture');
     delete window._pageSwitchCourse;
   }
