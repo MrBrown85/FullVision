@@ -461,8 +461,8 @@
 
   // Drawn again where the student is, the keyboard kept where it was.
   function redraw() {
-    if (!S || S.screen !== 'assignments' || S.sendAsk || S.settings || S.logout || typeof document === 'undefined')
-      return;
+    var shut = !S || S.screen !== 'assignments' || S.sendAsk || S.settings || S.logout;
+    if (shut || typeof document === 'undefined' || SP.later(redraw)) return;
     /** @type {any} */
     var el = document.activeElement;
     var sel = '';

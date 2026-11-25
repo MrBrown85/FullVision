@@ -646,6 +646,106 @@ var StudentPage = (function () {
     if (f && f.focus) f.focus({ preventScroll: false });
   }
 
+  /* A redraw the student did not ask for (an answer from the server, a
+     bulletin posted) waits while a finger or the mouse is down. Drawn under
+     a press, the button is replaced before the finger lifts and the tap
+     does nothing: these redraws come in a burst as the page opens, just
+     when a student starts tapping (Nov 25 2026). `run` goes now, or once
+     the press is over; a press counts for 700 ms at most, so a lift the
+     page never hears of holds nothing back. Each `run` checks for itself
+     that its screen is still the one showing. */
+  var PRESS_MS = 700;
+  var pressAt = 0;
+  var pressTimer = 0;
+  var waiting = [];
+  // True while a press is under way: `run` is kept and goes when it ends.
+  function later(run) {
+    if (!pressAt || Date.now() - pressAt >= PRESS_MS) return false;
+    if (waiting.indexOf(run) === -1) waiting.push(run);
+    return true;
+  }
+  function whenFree(run) {
+    if (!later(run)) run();
+  }
+
+  /* Something open over the list, in the list's place: Your Feedback, See
+     Your Work, a handout, a sent piece's card, a bulletin's file. Closing
+     one used to leave the page at its top, the row it was opened from out
+     of sight (Nov 25 2026). s/app.js (showPart) calls before() ahead of a
+     press's change and after() once the page is drawn. */
+  function overList(u) {
+    return !!(u.feedback || u.work || u.handout || u.card || u.bulletinFile);
+  }
+  function pageY() {
+    return typeof window !== 'undefined' ? window.scrollY || window.pageYOffset || 0 : 0;
+  }
+  var listAt = null; // { y, tab, segment }: the list's scroll when something opened over it
+  var listScroll = {
+    before: function (u) {
+      return { over: overList(u), y: pageY(), tab: u.tab, segment: u.segment };
+    },
+    /* `top`: the press is a move that starts at the top (a tab, a segment,
+       something opening), unless it is a close. Closed: the list where the
+       student left it; where that is not known, where the focus put it,
+       with the row in view. */
+    after: function (was, u, top) {
+      var same = function (at) {
+        return !!at && at.tab === u.tab && at.segment === u.segment;
+      };
+      var isOver = overList(u);
+      // Opened over the list it was tapped on: that list's scroll is kept for the way back.
+      if (!was.over && isOver) listAt = same(was) ? was : null;
+      var back = was.over && !isOver && same(listAt) ? listAt : null;
+      if (!isOver) listAt = null;
+      if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
+      if (!back) {
+        if (top && !(was.over && !isOver)) window.scrollTo(0, 0);
+        return;
+      }
+      // The list may still be growing (thumbnails): tried again for a few frames while it is too short.
+      var tries = 10;
+      (function set() {
+        window.scrollTo(0, back.y);
+        if (Math.abs(pageY() - back.y) > 1 && tries-- > 0 && typeof requestAnimationFrame === 'function')
+          requestAnimationFrame(set);
+      })();
+    },
+  };
+  function pressEnds(after) {
+    pressAt = 0;
+    if (pressTimer) clearTimeout(pressTimer);
+    // After the click the lift brings, which comes a moment later on a phone.
+    pressTimer = setTimeout(function () {
+      pressTimer = 0;
+      if (pressAt) return; // pressed again already: that press's end runs them
+      waiting.splice(0).forEach(function (run) {
+        run();
+      });
+    }, after);
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener(
+      'pointerdown',
+      function () {
+        pressAt = Date.now();
+        if (pressTimer) clearTimeout(pressTimer);
+        pressTimer = setTimeout(function () {
+          pressEnds(0);
+        }, PRESS_MS);
+      },
+      { capture: true, passive: true },
+    );
+    ['pointerup', 'pointercancel'].forEach(function (name) {
+      window.addEventListener(
+        name,
+        function () {
+          if (pressAt) pressEnds(60);
+        },
+        { capture: true, passive: true },
+      );
+    });
+  }
+
   /* paint(), with the text box being typed in (s/send.js's note) given
      back its focus and caret: a page drawn again under the student's
      typing, as a photo is ready. */
@@ -1120,6 +1220,9 @@ var StudentPage = (function () {
     demoData: demoData,
     loadDemoTemplates: loadDemoTemplates,
     paint: paint,
+    whenFree: whenFree,
+    later: later,
+    listScroll: listScroll,
     paintKeepingCaret: paintKeepingCaret,
     grow: grow,
     _test: {
