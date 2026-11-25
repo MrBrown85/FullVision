@@ -3,9 +3,8 @@
  * 11 more pieces with long names, five with 25 to 28 hand-ins
  * (e2e/dashboard-real-class.js). At four desktop sizes, in the page font and
  * the wide one:
- *  - in every Inbox view no row, name or caption is cut by the edge of the
- *    box that scrolls it or of the tile: each is wholly in or wholly out;
- *  - a mouse wheel turned over the assessment switch reaches its last piece;
+ *  - in both Inbox views no stack, student name or title is cut by the edge
+ *    of the box that scrolls it or of the tile: each is wholly in or wholly out;
  *  - Needs Support never says "+N more" while it has room for them.
  */
 import { test, expect } from '@playwright/test';
@@ -22,8 +21,9 @@ const SIZES = [
 /* The boxes that are cut: for each element matching `sel` that shows, the
    nearest box that clips it (its scroll box, else the Inbox tile). An
    element is fine when it lies wholly inside that box or wholly outside it
-   (scrolled away); `axis` 'y' checks top and bottom only (Side by Side's row
-   is cut on its right edge by design: "the last one is cut by the edge"). */
+   (scrolled away); `axis` 'y' checks top and bottom only (the stacks' row
+   scrolls sideways, so its last stack is cut on the right by design) and 'x'
+   left and right only (Roll Call's grid scrolls down). */
 const cutOnes = (page, sel, clipSel, axis = 'xy') =>
   page.evaluate(
     ([sel, clipSel, axis]) => {
@@ -40,7 +40,7 @@ const cutOnes = (page, sel, clipSel, axis = 'xy') =>
         const yOut = r.bottom <= c.top + 0.5 || r.top >= c.bottom - 0.5;
         const x = r.left >= c.left - 0.5 && r.right <= c.right + 0.5;
         const xOut = r.right <= c.left + 0.5 || r.left >= c.right - 0.5;
-        const okY = y || yOut;
+        const okY = axis === 'x' || y || yOut;
         const okX = axis === 'y' || x || xOut || yOut;
         if (!okY || !okX)
           out.push(
@@ -54,12 +54,10 @@ const cutOnes = (page, sel, clipSel, axis = 'xy') =>
   );
 
 const VIEWS = {
-  assessment: [['#dash-inbox .dash-inbox-row, #dash-inbox .dash-inbox-fold', '#dash-inbox-list, #dash-inbox']],
-  side: [['#dash-inbox .dash-inbox-side-name, #dash-inbox .dash-inbox-side-line', '#dash-inbox', 'y']],
-  flip: [['#dash-inbox .dash-inbox-flip-cap, #dash-inbox .dash-inbox-flip-range', '#dash-inbox']],
-  roll: [
-    ['#dash-inbox .dash-inbox-roll-chip', '#dash-inbox-roll-grid'],
-    ['#dash-inbox .dash-inbox-roll-foot', '#dash-inbox'],
+  stacks: [['#dash-inbox .dash-inbox-stack-title, #dash-inbox .dash-inbox-stack-count', '#dash-inbox', 'y']],
+  rollcall: [
+    ['#dash-inbox .dash-inbox-rc-st', '#dash-inbox-rc-grid', 'x'],
+    ['#dash-inbox .dash-inbox-rc-bar', '#dash-inbox'],
   ],
 };
 
@@ -74,63 +72,9 @@ for (const [w, h] of SIZES) {
         for (const [sel, clip, axis] of VIEWS[view]) {
           expect(await cutOnes(page, sel, clip, axis), `${font}: ${sel}`).toEqual([]);
         }
-        // Roll Call shows every name, or says how many more there are.
-        if (view === 'roll') {
-          const r = await page.evaluate(() => {
-            const grid = document.getElementById('dash-inbox-roll-grid');
-            const g = grid.getBoundingClientRect();
-            const chips = [...grid.querySelectorAll('.dash-inbox-roll-chip')];
-            const shown = chips.filter(c => c.getBoundingClientRect().bottom <= g.bottom + 0.5).length;
-            const more = document.querySelector('[data-dash-roll="more"]');
-            return {
-              all: chips.length,
-              shown,
-              more: more && !more.hidden ? Number(more.textContent.replace(/\D/g, '')) : 0,
-            };
-          });
-          expect(r.shown + r.more, font).toBe(r.all);
-        }
       }
     });
   }
-
-  test(`${w}x${h}: a mouse wheel over the assessment switch reaches its last piece`, async ({ page }) => {
-    await page.setViewportSize({ width: w, height: h });
-    await openRealClass(page, { view: 'side' });
-    for (const font of FONTS) {
-      await useFont(page, font);
-      await page.evaluate(() => {
-        const m = document.getElementById('main');
-        if (m) m.scrollTop = 0;
-        window.scrollTo(0, 0);
-      });
-      const strip = page.locator('#dash-inbox .dash-inbox-pick');
-      const s = await strip.evaluate(el => ({ sw: el.scrollWidth, cw: el.clientWidth }));
-      expect(s.sw, font).toBeGreaterThan(s.cw);
-      const b = await strip.boundingBox();
-      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
-      // Turn the wheel until the switch is at its end (the page scrolls past it).
-      for (let i = 0; i < 60; i++) {
-        const left = await strip.evaluate(el => el.scrollWidth - el.clientWidth - el.scrollLeft);
-        if (left <= 1) break;
-        await page.mouse.wheel(0, 200);
-      }
-      await page.waitForTimeout(150);
-      const end = await strip.evaluate(el => el.scrollWidth - el.clientWidth - el.scrollLeft);
-      expect(end, font).toBeLessThanOrEqual(1);
-      // The last piece is in view, and the page did not scroll instead.
-      const last = await page
-        .locator('#dash-inbox .dash-inbox-pick-btn')
-        .last()
-        .evaluate(el => {
-          const r = el.getBoundingClientRect();
-          const c = el.parentElement.getBoundingClientRect();
-          return r.right <= c.right + 1;
-        });
-      expect(last, font).toBe(true);
-      await strip.evaluate(el => (el.scrollLeft = 0));
-    }
-  });
 
   test(`${w}x${h}: Needs Support never says "+N more" while it has room for them`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });

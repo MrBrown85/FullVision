@@ -151,10 +151,6 @@ teacher/dash-class-manager.js,8406,6,innerHTML,LITERAL,,,palette.innerHTML = ''
 teacher/dash-class-manager.js,8423,4,innerHTML,REVIEWED,marked at the sink,,palette.innerHTML = html
 teacher/dash-competencies.js,850,4,innerHTML,REVIEWED,marked at the sink,,pop.innerHTML = inner
 teacher/dash-competencies.js,1027,4,innerHTML,REVIEWED,marked at the sink,,box.innerHTML = tip.innerHTML
-teacher/dash-inbox-flip.js,319,8,innerHTML,REVIEWED,marked at the sink,,tmp.innerHTML = w[1]
-teacher/dash-inbox-flip.js,547,6,innerHTML,REVIEWED,marked at the sink,,"cp.innerHTML = capHtml(L.cid, list[c], pageShown(st, list[c]))"
-teacher/dash-inbox-roll.js,490,4,innerHTML,ESC_WRAPPED,concat,,"m.innerHTML = '<button type=""button"" role=""menuitem"" class=""dash-inbox-roll-item"" data-dash-roll=""add"" data-sid=""' + esc(menu.sid) + '"">Add Work</button>'"
-teacher/dash-inbox-roll.js,708,4,innerHTML,REVIEWED,marked at the sink,,fresh.innerHTML = html(cid)
 teacher/drafts-before-print.js,149,4,innerHTML,REVIEWED,helper:_html,,"overlay.innerHTML = _html(found, words)"
 teacher/factor-field.js,156,4,innerHTML,REVIEWED,helper:barHtml,,"mount.innerHTML = barHtml(info, selfTitle)"
 teacher/factor-field.js,209,6,insertAdjacentHTML,REVIEWED,marked at the sink,,"bar.insertAdjacentHTML('afterend', factoredHtml(now.mode, now.max, now.weight, false))"

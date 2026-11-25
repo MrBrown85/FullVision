@@ -256,7 +256,7 @@ for (const [width, height, ipad] of [
     const found = {};
     for (const font of FONTS) {
       await useFont(page, font);
-      for (const view of ['assessment', 'side', 'flip', 'roll']) {
+      for (const view of ['stacks', 'rollcall']) {
         for (const pg of ['curricular', 'core']) {
           await page.evaluate(
             ([view, pg]) => {
@@ -275,8 +275,6 @@ for (const [width, height, ipad] of [
               ),
             ]
               .filter(e => {
-                // The list a screen reader reads behind Flip Through's pages is out of sight.
-                if (e.closest('.dash-inbox-flip-vh')) return false;
                 // A Level Mix level's segment is as wide as its count, as today's count
                 // cells were; on a finger the row itself (44 px and more) opens its list.
                 if (e.matches('.dash-comp-ln-seg')) return false;

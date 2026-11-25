@@ -1,7 +1,6 @@
 /**
  * The redrawn Inbox with nothing waiting (board R5) and a scan held over it
- * (board R6), slice I4 of docs/plans/inbox-redesign-plan.md, behind the build
- * switch inboxStacks. Demo Mode, Science 8, the student page and Send Work on,
+ * (board R6), slice I4 of docs/plans/inbox-redesign-plan.md. Demo Mode, Science 8, the student page and Send Work on,
  * every piece assessed and returned. Drops are made in the page with a
  * DataTransfer, as e2e/dashboard-inbox-drop.spec.js does. Set FV_SHOTS to a
  * folder to keep pictures.
@@ -53,7 +52,6 @@ const EXPIRING = () => {
 
 // Everything assessed and returned; with `tile: false` no Bulletins slot is drawn.
 async function open(page, { tile = true } = {}) {
-  await page.addInitScript(() => localStorage.setItem('fv-build-inboxStacks', '1'));
   await page.addInitScript(EXPIRING);
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });

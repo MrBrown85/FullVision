@@ -1,5 +1,5 @@
 /**
- * The Inbox's All Caught Up and a file drop on the tile (D5 of
+ * A file drop on the Inbox tile while Roll Call shows (D5 of
  * docs/plans/dashboard-inbox-plan.md; boards E1 and E1b). Demo Mode, Science
  * 8, the student page and Send Work on.
  *
@@ -36,7 +36,9 @@ const shot = async (page, name) => {
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function open(page, { sendWork = true, tile = true, caughtUp = false } = {}) {
+/* The tile on Roll Call: in To Grade the targets take a held file (their own spec,
+   e2e/dashboard-inbox-empty.spec.js); in Roll Call the cover does. */
+async function open(page, { sendWork = true, tile = true } = {}) {
   await page.addInitScript(EXPIRING);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html?demo=1');
@@ -49,34 +51,17 @@ async function open(page, { sendWork = true, tile = true, caughtUp = false } = {
       DashBulletins.html = () => '';
       PageDashboard.render();
     });
-  await page.evaluate(
-    ([caughtUp, sendWork]) => {
-      if (!sendWork) return;
-      const cid = getActiveCourse();
-      setStudentPageSwitch(cid, true, 'on_return');
-      const work = getCourseSubmissions(cid);
-      work.course.send_work = true;
-      saveDemoStudentWork(cid, work);
-      if (caughtUp) {
-        // Every piece of work waiting is assessed: nothing is left to grade.
-        const ids = getStudents(cid).map(s => s.id);
-        getAssessments(cid).forEach(a =>
-          GraderWork.workCounts(cid, a.id, ids).ids.tograde.forEach(sid =>
-            Grader.setOverallComment(cid, sid, a.id, 'Seen.'),
-          ),
-        );
-        // ...and returned: nothing to return either.
-        if (caughtUp === 'returned')
-          getAssessments(cid).forEach(a => {
-            const back = GraderWork.workCounts(cid, a.id, ids).ids.toreturn;
-            if (back.length) Grader.returnGrades(cid, a.id, back);
-          });
-      }
-      PageDashboard.render();
-    },
-    [caughtUp, sendWork],
-  );
-  if (sendWork) await page.locator('#dash-inbox').waitFor();
+  await page.evaluate(sendWork => {
+    if (!sendWork) return;
+    const cid = getActiveCourse();
+    setStudentPageSwitch(cid, true, 'on_return');
+    const work = getCourseSubmissions(cid);
+    work.course.send_work = true;
+    saveDemoStudentWork(cid, work);
+    DashInbox.setView(cid, 'rollcall');
+    PageDashboard.render();
+  }, sendWork);
+  if (sendWork) await page.locator('#dash-inbox .dash-inbox-rollcall').waitFor();
 }
 
 // Two students with nothing in for the piece, and a photo named for each, kept on window.__files.
@@ -165,14 +150,14 @@ const coverShown = page =>
 const chips = (page, sid) =>
   page.locator('#add-work-class-overlay .awc-row[data-awc-target="' + sid + '"] .awc-file-name');
 
-test('files dropped on the tile while By Assessment shows open Add Work with each under its student, and nothing saved', async ({
+test('files dropped on the tile while Roll Call shows open Add Work with each under its student, and nothing saved', async ({
   page,
 }) => {
   test.setTimeout(90_000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await open(page);
-  await expect(page.locator('.dash-inbox-row').first()).toBeVisible();
+  await expect(page.locator('.dash-inbox-rollcall').first()).toBeVisible();
   // At rest the cover is in the tile and out of sight.
   expect(await coverShown(page)).toBe(false);
   const two = await namedFiles(page, LIGHT);
@@ -180,8 +165,8 @@ test('files dropped on the tile while By Assessment shows open Add Work with eac
   const before = await stored(page);
 
   // Held over the tile: one cover naming the newest piece taking work.
-  await drag(page, '.dash-inbox-row', 'dragenter');
-  expect(await drag(page, '.dash-inbox-row', 'dragover')).toBe(true);
+  await drag(page, '.dash-inbox-rollcall', 'dragenter');
+  expect(await drag(page, '.dash-inbox-rollcall', 'dragover')).toBe(true);
   expect(await coverShown(page)).toBe(true);
   await expect(page.locator('.dash-inbox-drop-cover-title')).toHaveText('Drop to Add to Light Refraction Lab');
   await expect(page.locator('.dash-inbox-drop-cover-hint')).toHaveText(
@@ -189,7 +174,7 @@ test('files dropped on the tile while By Assessment shows open Add Work with eac
   );
   // Crossing from one child to another: the cover does not blink.
   await drag(page, '.dash-inbox-drop-cover', 'dragenter');
-  await drag(page, '.dash-inbox-row', 'dragleave');
+  await drag(page, '.dash-inbox-rollcall', 'dragleave');
   expect(await coverShown(page)).toBe(true);
   await shot(page, 'inbox-drop-cover');
 
@@ -215,76 +200,6 @@ test('files dropped on the tile while By Assessment shows open Add Work with eac
   );
   expect(kept).toEqual([1, 1]);
   expect(errors).toEqual([]);
-});
-
-test('0 to grade, 7 to return: the drop area adds to the piece chosen in Add Work For', async ({ page }) => {
-  test.setTimeout(60_000);
-  await open(page, { caughtUp: true, tile: false });
-  const home = page.locator('#dash-inbox-caught');
-  // As the top bar: work assessed and not returned is not "All Caught Up".
-  await expect(page.locator('.dash-glance-tograde')).toContainText('7 Not Returned');
-  await expect(page.locator('.dash-glance-tograde')).not.toContainText('All Caught Up');
-  await expect(home).not.toContainText('All Caught Up');
-  // As on the board: Add Work For, the drop area, then the two lines under it.
-  expect(await home.evaluate(el => [...el.children].map(c => c.className))).toEqual([
-    'dash-inbox-drop-top',
-    'awt-drop dash-inbox-drop-area',
-    'dash-inbox-drop-line dash-inbox-drop-back',
-    'dash-inbox-drop-line',
-  ]);
-  await expect(home.locator('.dash-inbox-drop-area')).toContainText('Drop the Scan, a Folder or Files');
-  await expect(home.locator('.dash-inbox-drop-area')).toContainText(
-    'Photos or PDFs. Files are matched to students by name.',
-  );
-  await expect(home.locator('.dash-inbox-drop-pick')).toHaveText([
-    'Choose Files…',
-    'Choose a Folder…',
-    'Split a Scan…',
-  ]);
-  // The list's whole space: no rows under it.
-  await expect(page.locator('.dash-inbox-row')).toHaveCount(0);
-  // Grey and dashed at rest: Add Work's own drop area.
-  const look = await home
-    .locator('.dash-inbox-drop-area')
-    .evaluate(el => ({ style: getComputedStyle(el).borderTopStyle, awt: el.classList.contains('awt-drop') }));
-  expect(look).toEqual({ style: 'dashed', awt: true });
-  await expect(home.locator('.dash-inbox-drop-area svg')).toBeVisible();
-  // The two quiet lines.
-  await expect(home.locator('.dash-inbox-drop-back')).toHaveText('Light Refraction Lab: 7 Not Returned Return Them →');
-  await expect(home).toContainText(/Next taking work: .+ · \d+ not in yet Work Wall →/);
-  // Everything fits in the 510 px tile.
-  const fits = await page.evaluate(() => {
-    const list = document.getElementById('dash-inbox-list');
-    return list.scrollHeight <= list.clientHeight + 1;
-  });
-  expect(fits).toBe(true);
-  expect(await coverShown(page)).toBe(false);
-  await shot(page, 'inbox-caught-up-510');
-
-  // "Add Work For" is a chip a piece (board E1).
-  await page.locator('[data-dash-inbox-for-chip="' + CELL + '"]').click();
-  const two = await namedFiles(page, CELL);
-  const before = await stored(page);
-  await drag(page, '.dash-inbox-drop-area', 'dragenter');
-  await drag(page, '.dash-inbox-drop-area', 'dragover');
-  await expect(page.locator('.dash-inbox-drop-cover-title')).toHaveText('Drop to Add to Cell Microscope Lab');
-  // Blue while files are held over it.
-  await expect(page.locator('.dash-inbox-drop-area')).toHaveClass(/is-over/);
-  await drag(page, '.dash-inbox-drop-cover', 'drop');
-  const awc = page.locator('#add-work-class-overlay');
-  await expect(awc).toContainText('Cell Microscope Lab');
-  for (const s of two) await expect(chips(page, s.id)).toHaveText(s.name, { timeout: 20000 });
-  expect(await stored(page)).toBe(before);
-});
-
-test('nothing to grade and nothing to return: All Caught Up, as the top bar says', async ({ page }) => {
-  await open(page, { caughtUp: 'returned' });
-  await expect(page.locator('.dash-glance-tograde')).toContainText('All Caught Up');
-  const home = page.locator('#dash-inbox-caught');
-  await expect(home.locator('.dash-inbox-drop-caught')).toHaveText('All Caught Up');
-  await expect(home).not.toContainText('Not Returned');
-  await expect(home.locator('.dash-inbox-drop-area')).toBeVisible();
-  await shot(page, 'inbox-caught-up-returned-510');
 });
 
 test('a dropped folder lands its files', async ({ page }) => {
@@ -323,7 +238,7 @@ test('a dropped folder lands its files', async ({ page }) => {
     const fire = type => {
       const ev = new Event(type, { bubbles: true, cancelable: true });
       Object.defineProperty(ev, 'dataTransfer', { value: window.__expiring(real) });
-      document.querySelector('.dash-inbox-row').dispatchEvent(ev);
+      document.querySelector('.dash-inbox-rollcall').dispatchEvent(ev);
       ev.dataTransfer.end();
     };
     fire('dragenter');
@@ -337,103 +252,27 @@ test('a dropped folder lands its files', async ({ page }) => {
 
 test('a drag of plain text shows no cover and does nothing', async ({ page }) => {
   await open(page);
-  expect(await drag(page, '.dash-inbox-row', 'dragenter', { text: true })).toBe(false);
-  expect(await drag(page, '.dash-inbox-row', 'dragover', { text: true })).toBe(false);
+  expect(await drag(page, '.dash-inbox-rollcall', 'dragenter', { text: true })).toBe(false);
+  expect(await drag(page, '.dash-inbox-rollcall', 'dragover', { text: true })).toBe(false);
   expect(await coverShown(page)).toBe(false);
-  expect(await drag(page, '.dash-inbox-row', 'drop', { text: true })).toBe(false);
+  expect(await drag(page, '.dash-inbox-rollcall', 'drop', { text: true })).toBe(false);
   await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
 });
 
 test('a drag that leaves the tile, or ends elsewhere, takes the cover away', async ({ page }) => {
   await open(page);
   await namedFiles(page, LIGHT);
-  await drag(page, '.dash-inbox-row', 'dragenter');
+  await drag(page, '.dash-inbox-rollcall', 'dragenter');
   expect(await coverShown(page)).toBe(true);
   await drag(page, '.dash-inbox-drop-cover', 'dragleave');
   expect(await coverShown(page)).toBe(false);
-  await drag(page, '.dash-inbox-row', 'dragenter');
+  await drag(page, '.dash-inbox-rollcall', 'dragenter');
   expect(await coverShown(page)).toBe(true);
   await page.evaluate(() => document.dispatchEvent(new Event('dragend', { bubbles: true })));
   expect(await coverShown(page)).toBe(false);
-  await drag(page, '.dash-inbox-row', 'dragenter');
+  await drag(page, '.dash-inbox-rollcall', 'dragenter');
   await page.keyboard.press('Escape');
   expect(await coverShown(page)).toBe(false);
-});
-
-test('each of the three buttons opens Add Work and its file chooser', async ({ page }) => {
-  await open(page, { caughtUp: true });
-  const awc = page.locator('#add-work-class-overlay');
-  for (const [label, multiple] of [
-    ['Choose Files…', true],
-    ['Choose a Folder…', true],
-    ['Split a Scan…', false],
-  ]) {
-    const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
-    await page.locator('#dash-inbox').getByRole('button', { name: label }).click();
-    const c = await chooser;
-    expect(c.isMultiple()).toBe(multiple);
-    await expect(awc).toContainText('Light Refraction Lab');
-    await page.evaluate(() => AddWorkClass.close());
-    await expect(awc).toHaveCount(0);
-  }
-  /* With the keyboard alone: Tab to Choose Files…, then Enter or Space.
-     Each opens Add Work and clicks the page's own file box, in the page and
-     inside the key's own gesture: the browser's rule for showing a chooser,
-     checked here to its door. The chooser itself is awaited for the mouse
-     above only: on a slowed machine Playwright's keyboard gets no
-     filechooser event from a bare page with one button and one file box
-     (Enter 10 times in 20, Space 4 in 20, the mouse 0 in 20, CPU slowed six
-     times, four workers), so waiting for it after a key tests Playwright. */
-  await page.evaluate(() => {
-    window.__boxClicks = [];
-    const click = HTMLInputElement.prototype.click;
-    HTMLInputElement.prototype.click = function () {
-      window.__boxClicks.push({
-        box: this.getAttribute('data-awt-input'),
-        inAddWork: !!this.closest('#add-work-class-overlay'),
-        inPage: this.isConnected,
-        gesture: navigator.userActivation.isActive,
-      });
-      // Not passed on: no chooser is left open between the keys.
-    };
-    window.__restoreClick = () => (HTMLInputElement.prototype.click = click);
-  });
-  const pick = page.locator('.dash-inbox-drop-pick').first();
-  for (const key of ['Enter', 'Space']) {
-    await page.evaluate(() => (window.__boxClicks = []));
-    await page.locator('.dash-inbox-drop-chip[aria-checked="true"]').focus();
-    await page.keyboard.press('Tab');
-    await expect(pick).toBeFocused();
-    await page.keyboard.press(key);
-    await expect(awc).toBeVisible();
-    await expect(awc).toContainText('Light Refraction Lab');
-    expect(await page.evaluate(() => window.__boxClicks), key).toEqual([
-      { box: 'files', inAddWork: true, inPage: true, gesture: true },
-    ]);
-    await page.evaluate(() => AddWorkClass.close());
-    await expect(awc).toHaveCount(0);
-  }
-  await page.evaluate(() => window.__restoreClick());
-});
-
-test('beside Bulletins (299 px) the nothing-to-grade space fits with no scrolling and its icon hidden', async ({
-  page,
-}) => {
-  await open(page, { caughtUp: true });
-  expect(Math.round(await page.locator('#dash-inbox').evaluate(el => el.getBoundingClientRect().height))).toBe(299);
-  const m = await page.evaluate(() => {
-    const list = document.getElementById('dash-inbox-list');
-    const lb = list.getBoundingClientRect();
-    const kids = [...document.querySelectorAll('#dash-inbox-caught > *')].map(el => el.getBoundingClientRect());
-    return {
-      scrolls: list.scrollHeight > list.clientHeight + 1,
-      inside: kids.every(r => r.top >= lb.top - 0.5 && r.bottom <= lb.bottom + 0.5),
-      icon: getComputedStyle(document.querySelector('.dash-inbox-drop-area svg')).display,
-    };
-  });
-  expect(m).toEqual({ scrolls: false, inside: true, icon: 'none' });
-  await expect(page.locator('#dash-inbox-caught')).toContainText('Next taking work');
-  await shot(page, 'inbox-caught-up-299');
 });
 
 test('with the Bulletins tile showing a file over it is refused, the cover is as before, and the 30-second tick leaves the cover alone', async ({
@@ -445,8 +284,8 @@ test('with the Bulletins tile showing a file over it is refused, the cover is as
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
   await namedFiles(page, LIGHT);
   // Held over the Inbox: the cover shows, as before.
-  await drag(page, '.dash-inbox-row', 'dragenter');
-  expect(await drag(page, '.dash-inbox-row', 'dragover')).toBe(true);
+  await drag(page, '.dash-inbox-rollcall', 'dragenter');
+  expect(await drag(page, '.dash-inbox-rollcall', 'dragover')).toBe(true);
   expect(await coverShown(page)).toBe(true);
   // Held over the Bulletins tile: a near miss, refused (the browser does not open the file in the app's place).
   expect(await drag(page, '.dash-bulletins-tile', 'dragover')).toBe(true);
@@ -482,88 +321,6 @@ test('with Send Work off there is no Inbox, and a file dropped on the Dashboard 
   await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
 });
 
-test('at 390 px the nothing-to-grade space wraps and nothing goes sideways', async ({ page }) => {
-  // A phone opens the phone app; Switch to Desktop is how the Dashboard shows at this width.
-  await page.addInitScript(() => localStorage.setItem('td-mobile-pref', 'desktop'));
-  await page.setViewportSize({ width: 390, height: 844 });
-  await open(page, { caughtUp: true });
-  await page.locator('#dash-inbox').scrollIntoViewIfNeeded();
-  const m = await page.evaluate(() => {
-    const tile = document.getElementById('dash-inbox');
-    const tb = tile.getBoundingClientRect();
-    const list = document.getElementById('dash-inbox-list');
-    const all = [...tile.querySelectorAll('#dash-inbox-caught *')].map(el => el.getBoundingClientRect());
-    return {
-      inside: all.every(r => r.width === 0 || (r.left >= tb.left - 0.5 && r.right <= tb.right + 0.5)),
-      sideways: list.scrollWidth - list.clientWidth,
-    };
-  });
-  expect(m).toEqual({ inside: true, sideways: 0 });
-  await shot(page, 'inbox-caught-up-390');
-});
-
-/* The piece shown is the piece used (review item 1). The clock is pinned on
-   Cell Microscope Lab's due day; it stops taking work after it. The tile is
-   drawn, the clock moves a day on with no draw, and the teacher acts. */
-async function closesToday(page, { lightToo }) {
-  await page.evaluate(lightToo => {
-    const cid = getActiveCourse();
-    const today = courseToday(cid);
-    const later = new Date(Date.parse(today + 'T12:00:00Z') + 5 * 86400000).toISOString().slice(0, 10);
-    getAssessments(cid).find(a => a.id === 'sci8a1').dueDate = today;
-    getAssessments(cid).find(a => a.id === 'sci8a21').dueDate = lightToo ? today : later;
-    const work = getCourseSubmissions(cid);
-    work.assessments = (work.assessments || []).filter(x => x.id !== 'sci8a1');
-    work.assessments.push({ id: 'sci8a1', students_send: 'photos', after_due: 'stop', accept_until: null });
-    saveDemoStudentWork(cid, work);
-    PageDashboard.render();
-  }, lightToo);
-}
-const NOON = new Date('2026-11-18T20:00:00Z');
-const NEXT_DAY = new Date('2026-11-19T20:00:00Z');
-
-test('a button acts on the piece in the box (the default), and opens nothing once that piece stops taking work', async ({
-  page,
-}) => {
-  await page.clock.setFixedTime(NOON);
-  await open(page, { caughtUp: true });
-  await closesToday(page, { lightToo: false });
-  const chosen = page.locator('.dash-inbox-drop-chip[aria-checked="true"]');
-  await expect(chosen).toHaveAttribute('data-dash-inbox-for-chip', CELL);
-  await page.clock.setFixedTime(NEXT_DAY);
-  // No draw since: the box still reads Cell Microscope Lab.
-  await expect(chosen).toHaveAttribute('data-dash-inbox-for-chip', CELL);
-  await page.locator('#dash-inbox').getByRole('button', { name: 'Choose Files…' }).click();
-  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
-  await expect(page.locator('.dash-inbox-drop-notice')).toHaveText('The list of assessments changed. Choose again.');
-  // Drawn again: Cell Microscope Lab is no longer offered.
-  await expect(page.locator('.dash-inbox-drop-for')).toContainText('Light Refraction Lab');
-  await expect(page.locator('.dash-inbox-drop-for')).not.toContainText('Cell Microscope Lab');
-});
-
-test('a drop goes to the piece picked by hand, and to no other once that piece stops taking work', async ({ page }) => {
-  await page.clock.setFixedTime(NOON);
-  await open(page, { caughtUp: true });
-  await closesToday(page, { lightToo: true });
-  await expect(page.locator('.dash-inbox-drop-chip[aria-checked="true"]')).toHaveAttribute(
-    'data-dash-inbox-for-chip',
-    LIGHT,
-  );
-  await page.locator('[data-dash-inbox-for-chip="' + CELL + '"]').click();
-  await namedFiles(page, CELL);
-  const before = await stored(page);
-  await page.clock.setFixedTime(NEXT_DAY);
-  await drag(page, '.dash-inbox-drop-area', 'dragenter');
-  await expect(page.locator('.dash-inbox-drop-cover-title')).toHaveText('Drop to Add to Cell Microscope Lab');
-  expect(await drag(page, '.dash-inbox-drop-cover', 'drop')).toBe(true);
-  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
-  await expect(page.locator('.dash-inbox-drop-notice')).toHaveText(
-    'The list of assessments changed, so those files were not added. Drop them again.',
-  );
-  expect(await coverShown(page)).toBe(false);
-  expect(await stored(page)).toBe(before);
-});
-
 test('a file let go just outside the tile is refused, so the browser does not open it', async ({ page }) => {
   await open(page);
   await namedFiles(page, LIGHT);
@@ -588,27 +345,12 @@ test('a file let go just outside the tile is refused, so the browser does not op
   expect(await drag(page, '#main', 'dragover')).toBe(false);
 });
 
-test('a picture dragged from the Inbox is not taken as files', async ({ page }) => {
-  await open(page);
-  await namedFiles(page, LIGHT);
-  const img = page.locator('#dash-inbox .dash-inbox-img').first();
-  await expect(img).toHaveAttribute('draggable', 'false');
-  await page.evaluate(() =>
-    document.querySelector('#dash-inbox .dash-inbox-img').dispatchEvent(new DragEvent('dragstart', { bubbles: true })),
-  );
-  // Even if the drag reports Files, as Safari's does for a picture.
-  expect(await drag(page, '.dash-inbox-row', 'dragenter')).toBe(false);
-  expect(await coverShown(page)).toBe(false);
-  expect(await drag(page, '.dash-inbox-row', 'drop')).toBe(false);
-  await expect(page.locator('#add-work-class-overlay')).toHaveCount(0);
-});
-
 test('dragenter accepts files at once, so a release in the first instant still drops', async ({ page }) => {
   await open(page);
   const two = await namedFiles(page, LIGHT);
-  expect(await drag(page, '.dash-inbox-row', 'dragenter')).toBe(true);
+  expect(await drag(page, '.dash-inbox-rollcall', 'dragenter')).toBe(true);
   // Straight to the drop, with no dragover between.
-  expect(await drag(page, '.dash-inbox-row', 'drop')).toBe(true);
+  expect(await drag(page, '.dash-inbox-rollcall', 'drop')).toBe(true);
   for (const s of two) await expect(chips(page, s.id)).toHaveText(s.name, { timeout: 20000 });
 });
 
@@ -639,7 +381,7 @@ test('a real drop of a photo on the tile opens Add Work with it placed', async (
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, st.name + '.jpg');
   fs.copyFileSync(SAMPLE_PHOTO, file);
-  await realDrop(page, page.locator('.dash-inbox-row').first(), file);
+  await realDrop(page, page.locator('.dash-inbox-rollcall').first(), file);
   await expect(chips(page, st.id)).toHaveText(st.name + '.jpg', { timeout: 20000 });
   expect(await coverShown(page)).toBe(false);
 });

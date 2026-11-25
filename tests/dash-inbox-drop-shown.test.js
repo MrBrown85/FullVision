@@ -34,11 +34,23 @@ function caughtUp() {
     ),
   );
 }
+// What the tile holds: D5's empty space (DashInbox.emptyHtml, the To Grade view's own fallback) when nothing
+// is to grade, else the tile as drawn, stacks and all.
+function tileHtml() {
+  if (GraderWork.classWorkCounts(CID, ids()).tograde > 0) return DashInbox.html(CID);
+  return (
+    '<section class="dash-inbox" id="dash-inbox"><div class="dash-inbox-body"><ul class="dash-inbox-list" id="dash-inbox-list">' +
+    DashInbox.emptyHtml(CID, { caughtUp: true }) +
+    '</ul></div></section>'
+  );
+}
 function mountTile() {
-  const html = DashInbox.html(CID);
+  const html = tileHtml();
   const dom = parseHTML('<!DOCTYPE html><html><body><main id="main">' + html + '</main></body></html>');
   globalThis.document = dom.document;
-  DashInboxDrop.mount(dom.document.getElementById('dash-inbox'), CID, DashInbox.model());
+  DashInboxDrop.mount(dom.document.getElementById('dash-inbox'), CID, {
+    caughtUp: !dom.document.querySelector('.dash-inbox-stack'),
+  });
   return dom.document;
 }
 function dragEvent(doc, type, dt) {
@@ -173,9 +185,9 @@ describe('the piece shown is the piece used', () => {
       { date: '2026-11-11', dateAssigned: '2026-11-11' },
     );
     const doc = mountTile();
-    expect(doc.querySelector('.dash-inbox-row')).not.toBeNull();
+    expect(doc.querySelector('.dash-inbox-stack')).not.toBeNull();
     const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
-    const row = doc.querySelector('.dash-inbox-row');
+    const row = doc.querySelector('.dash-inbox-stack');
     row.dispatchEvent(dragEvent(doc, 'dragenter', files()));
     expect(doc.querySelector('.dash-inbox-drop-cover-title').textContent).toBe('Drop to Add to Cell Microscope Lab');
     tomorrow();
@@ -190,7 +202,7 @@ describe('drags around the tile', () => {
   it('dragenter accepts files at once, so a release at once still drops', () => {
     const doc = mountTile();
     const enter = dragEvent(doc, 'dragenter', files());
-    doc.querySelector('.dash-inbox-row').dispatchEvent(enter);
+    doc.querySelector('.dash-inbox-stack').dispatchEvent(enter);
     expect(enter.defaultPrevented).toBe(true);
   });
 
@@ -228,7 +240,7 @@ describe('drags around the tile', () => {
   ]) {
     it('the cover never outlasts its drag: ' + what + ' takes it away', () => {
       const doc = mountTile();
-      doc.querySelector('.dash-inbox-row').dispatchEvent(dragEvent(doc, 'dragenter', files()));
+      doc.querySelector('.dash-inbox-stack').dispatchEvent(dragEvent(doc, 'dragenter', files()));
       expect(doc.querySelector('.dash-inbox-drop-cover').hidden).toBe(false);
       fire(doc);
       expect(doc.querySelector('.dash-inbox-drop-cover').hidden).toBe(true);
@@ -293,7 +305,7 @@ describe('drags around the tile', () => {
   });
 
   it('a file let go on the class list beside the tile is refused too; the dock is left alone (D9, 5e)', () => {
-    const html = DashInbox.html(CID);
+    const html = tileHtml();
     const dom = parseHTML(
       '<!DOCTYPE html><html><body><div id="dock-mount"><p id="dock">Dock</p></div>' +
         '<div id="sidebar-mount"><input id="search" type="text"><p id="roster">Cece Adeyemi</p>' +
@@ -332,7 +344,7 @@ describe('drags around the tile', () => {
   it('a drag that began on the page is never taken as files, even if it says Files', () => {
     const doc = mountTile();
     const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
-    const row = doc.querySelector('.dash-inbox-row');
+    const row = doc.querySelector('.dash-inbox-stack');
     row.dispatchEvent(new doc.defaultView.Event('dragstart', { bubbles: true }));
     const enter = dragEvent(doc, 'dragenter', files());
     row.dispatchEvent(enter);
@@ -349,7 +361,7 @@ describe('drags around the tile', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const doc = mountTile();
     const open = vi.spyOn(AddWorkClass, 'open').mockImplementation(() => true);
-    const row = doc.querySelector('.dash-inbox-row');
+    const row = doc.querySelector('.dash-inbox-stack');
     // A drag from the page whose dragend never comes.
     row.dispatchEvent(new doc.defaultView.Event('dragstart', { bubbles: true }));
     // While it goes on its source hears `drag`, and files are not taken.
@@ -376,11 +388,11 @@ describe('drags around the tile', () => {
     try {
       for (const end of ['mousemove', 'pointerdown', 'draw']) {
         let doc = mountTile();
-        doc.querySelector('.dash-inbox-row').dispatchEvent(new doc.defaultView.Event('dragstart', { bubbles: true }));
+        doc.querySelector('.dash-inbox-stack').dispatchEvent(new doc.defaultView.Event('dragstart', { bubbles: true }));
         if (end === 'draw') doc = mountTile();
         else win.dispatchEvent(new Event(end));
         const ev = dragEvent(doc, 'dragenter', files());
-        doc.querySelector('.dash-inbox-row').dispatchEvent(ev);
+        doc.querySelector('.dash-inbox-stack').dispatchEvent(ev);
         expect(ev.defaultPrevented, end).toBe(true);
       }
     } finally {
@@ -391,12 +403,12 @@ describe('drags around the tile', () => {
   });
 
   it('every Inbox picture is drawn not draggable', () => {
-    const html = DashInbox.html(CID);
+    const html = tileHtml();
     const imgs = html.match(/<img [^>]*>/g) || [];
     expect(imgs.length).toBeGreaterThan(0);
     imgs.forEach(i => expect(i).toContain('draggable="false"'));
-    // Every view's own pictures too, each Inbox file in the folder (Flip
-    // Through and Roll Call included when they come): each <img says it, and
+    // Every view's own pictures too, each Inbox file in the folder (Roll
+    // Call included): each <img says it, and
     // so does every picture made with createElement('img').
     const inbox = readdirSync('teacher').filter(f => /^dash-inbox.*\.js$/.test(f));
     expect(inbox).toContain('dash-inbox.js');
@@ -418,7 +430,7 @@ describe('drags around the tile', () => {
     doc.body.appendChild(out);
     let seen = 0;
     doc.addEventListener('dragover', e => e.defaultPrevented && seen++);
-    doc.querySelector('.dash-inbox-row').dispatchEvent(dragEvent(doc, 'drop', files()));
+    doc.querySelector('.dash-inbox-stack').dispatchEvent(dragEvent(doc, 'drop', files()));
     expect(open).toHaveBeenCalledTimes(1);
     expect(doc.querySelectorAll('.dash-inbox-drop-cover').length).toBe(1);
   });

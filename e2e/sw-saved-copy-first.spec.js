@@ -403,8 +403,10 @@ test('offline, the Demo Inbox draws its thumbnails and Bulletins draws its photo
   await appDrawn(page);
   const drawn = sel =>
     page.evaluate(s => [...document.querySelectorAll(s)].map(i => i.complete && i.naturalWidth > 0), sel);
-  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).length, { timeout: 15000 }).toBeGreaterThan(0);
-  await expect.poll(async () => (await drawn('.dash-inbox-pics img')).every(Boolean)).toBe(true);
+  await expect
+    .poll(async () => (await drawn('#dash-inbox img[data-work-pic]')).length, { timeout: 15000 })
+    .toBeGreaterThan(0);
+  await expect.poll(async () => (await drawn('#dash-inbox img[data-work-pic]')).every(Boolean)).toBe(true);
 
   await page.goto(server.origin + '/bulletins');
   await appDrawn(page);

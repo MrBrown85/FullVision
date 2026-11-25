@@ -5,17 +5,15 @@
    is how tests and reviewers see it. Unknown names are off.
 
    dashRow (the Dashboard's middle row) is on since D9, bulletins
-   (Bulletins, stage 1) since B1g and quizzes (Quizzes) since Q6; nothing
+   (Bulletins, stage 1) since B1g, quizzes (Quizzes) since Q6 and inboxStacks
+   (the Inbox redrawn, docs/plans/inbox-redesign-plan.md) since I5; nothing
    asks for any of them any more. The names stay so a browser that still has
-   'fv-build-dashRow', 'fv-build-bulletins' or 'fv-build-quizzes' set, to '1'
-   or '0', changes nothing: a default that is on wins over what the device
-   has.
-
-   inboxStacks (the Inbox redrawn, docs/plans/inbox-redesign-plan.md) is off
-   until its last slice. */
+   'fv-build-dashRow', 'fv-build-bulletins', 'fv-build-quizzes' or
+   'fv-build-inboxStacks' set, to '1' or '0', changes nothing: a default that
+   is on wins over what the device has. */
 (function () {
   /** @type {Record<string, boolean>} */
-  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: false };
+  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true };
 
   /** @param {string} name */
   function on(name) {
