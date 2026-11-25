@@ -40,7 +40,7 @@ test('every sheet dims the page and a tap on the dim closes it', async ({ page }
 
   await tab(page, 'students');
   await expectDimCloses(page, () => page.locator('[data-action="m-sort"]').click());
-  await expectDimCloses(page, () => page.locator('.m-card-all[data-action="m-all-students"]').click());
+  await expectDimCloses(page, () => page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click());
   await expectDimCloses(page, () => page.locator('[data-action="m-settings"]').first().click());
 
   await tab(page, 'observe');

@@ -11,7 +11,6 @@ labels:
   - Settings
   - Switch to Desktop
   - Students
-  - All Students
   - Observe
   - Profile
   - Sweep
@@ -46,7 +45,7 @@ shots:
 
 ## Students
 
-Each student has a card with the overall level and the five newest pieces of work with their results. Swipe left or right to move between cards, or choose **All Students** to find a student by name. On a card, **Observe** records an observation about that student and **Profile** opens the student's record, starting with what the student has said about themselves.
+Each student has a card with the overall level and the five newest pieces of work with their results. Swipe left or right to move between cards, or tap the student's name at the top of the card to find a student by name. On a card, **Observe** records an observation about that student and **Profile** opens the student's record, starting with what the student has said about themselves.
 
 ## Observe
 

@@ -186,11 +186,12 @@ describe('MStudents.renderAllStudents', () => {
 
 /* ── renderDetail ───────────────────────────────────────────── */
 describe('MStudents.renderList', () => {
-  it('shows the card stack and All Students, with no title, search or view switch', () => {
+  it('shows the card stack alone, with no All Students button, title, search or view switch', () => {
     mockDataLayer({});
     const html = MStudents.renderList(CID);
     expect(html).toContain('m-student-card-stack');
-    expect(html).toContain('data-action="m-all-students"');
+    // The class list opens from the name on a card (student-card.test.js).
+    expect(html).not.toContain('m-all-students');
     expect(html).toContain('sync-indicator-dot');
     expect(html).not.toContain('m-title-large');
     expect(html).not.toContain('m-search-input');

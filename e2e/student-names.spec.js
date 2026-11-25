@@ -36,7 +36,7 @@ test('the phone says Jas Gill', async ({ page }) => {
   await page.waitForURL(/teacher-mobile\//);
   await expect(page.locator('.m-card-stack-item[data-depth="0"]')).toBeVisible();
   // The All Students sheet lists every student by the same name.
-  await page.getByRole('button', { name: 'All Students' }).click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click();
   const cell = page.locator('.m-cell[data-sid="st7"]').first();
   await expect(cell).toContainText('Jas Gill');
   await expect(cell.locator('.m-cell-avatar')).toHaveText('JG');

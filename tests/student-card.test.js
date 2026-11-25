@@ -62,6 +62,11 @@ describe('the top of the card', () => {
   it('names the student, the level in words with four bars, Observe and Profile', () => {
     const d = card();
     expect(d.querySelector('.m-sc-who').getAttribute('data-action')).toBe('m-all-students');
+    // Its place in the class sits in the name row when the stack gives one.
+    expect(d.querySelector('.m-sc-place')).toBeNull();
+    expect(doc(MStudentCard.render(st, CID, '6 of 30')).querySelector('.m-sc-who .m-sc-place').textContent).toBe(
+      '6 of 30',
+    );
     expect(d.querySelector('.m-sc-name').textContent).toBe('Cece Adams');
     expect(d.querySelector('.m-sc-word').textContent).toBe('Proficient');
     expect(d.querySelectorAll('.m-sc-bar.is-on').length).toBe(3);

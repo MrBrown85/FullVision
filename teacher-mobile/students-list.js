@@ -86,7 +86,8 @@ window.MStudentsList = (function () {
   }
 
   // Students screen: the card stack only. The list, with search, opens as a
-  // sheet from All Students under the stack (renderAllStudentsSheet).
+  // sheet from the name at the top of a card (renderAllStudentsSheet): the one
+  // way to it, since Nov 25 (there was an All Students button under the stack too).
   function renderList(opts) {
     var cid = opts.cid;
     var students = getStudents(cid);
@@ -101,12 +102,7 @@ window.MStudentsList = (function () {
       body =
         '<div class="m-empty"><div class="m-empty-title">No Students</div><div class="m-empty-subtitle">Add students on the desktop app</div></div>';
     } else {
-      body =
-        '<div class="m-card-stack" id="m-student-card-stack"></div>' +
-        '<div class="m-card-foot">' +
-        '<span class="m-card-count" id="m-student-card-count"></span>' +
-        '<button class="m-card-all" data-action="m-all-students">All Students</button>' +
-        '</div>';
+      body = '<div class="m-card-stack" id="m-student-card-stack"></div>';
     }
 
     // Photos in a class about to go a year unopened (shared/photo-expiry.js): rarely anything.

@@ -132,7 +132,7 @@ test('the student card’s To Grade list, the red count, and Add Work, Then Grad
   const badge = page.locator('.m-tab-item[data-tab="grade"] .m-tab-badge');
   await expect(badge).toHaveText('1');
   // Noor's card: her lab waits to grade.
-  await page.locator('.m-card-all[data-action="m-all-students"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click();
   const row = await page.evaluate(() =>
     sortStudents(getStudents('sci8').slice(), 'alpha').findIndex(s => s.id === 'st2'),
   );
