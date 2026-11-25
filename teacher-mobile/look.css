@@ -691,55 +691,6 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   BULLETINS (L2)
-   The tab already says Bulletins; the page is a step darker than the cards
-   so each bulletin stands off it.
-   ═══════════════════════════════════════════════════════════════ */
-.m-look .m-bulletin-content > .m-title-large {
-  display: none;
-}
-.m-look .m-bulletin-content {
-  padding-top: 12px;
-  background: var(--surface-2);
-}
-@media (prefers-color-scheme: dark) {
-  .m-look .m-bulletin-content {
-    background: var(--bg);
-  }
-}
-.m-look .m-bulletin-card {
-  border-radius: 16px;
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.08),
-    0 2px 10px rgba(0, 0, 0, 0.07);
-}
-/* A file reads as a tile, as a link does. */
-.m-look .m-bulletin-file-line {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--overlay-hover);
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
-}
-/* Who has not seen it is the part to act on: "8 Not Seen" as one button
-   ("Seen by 19 of 27" is read out, tab-bulletins.js). Seen by everyone, it
-   says so. */
-.m-look .m-bulletin-seen .m-bulletin-not-seen {
-  display: inline-block;
-  padding: 7px 14px;
-  border-radius: 16px;
-  background: var(--active-light);
-  color: var(--link);
-  font-size: 15px;
-  font-weight: 600;
-}
-.m-look .m-bulletin-seen:not(:has(.m-bulletin-not-seen)) {
-  color: var(--score-3-text);
-  font-weight: 600;
-}
-
-/* ═══════════════════════════════════════════════════════════════
    UNDO AFTER A RETURN (L3)
    "Returned to Maya · Undo" sits over the tab bar for its seven seconds:
    the one strip of the grading screen the next student is not graded with.
@@ -756,55 +707,6 @@
 .m-look #m-toast.m-toast-low .m-toast-undo {
   min-height: 31px;
   padding: 0 12px;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   WRITE A BULLETIN (L2b)
-   No line saying where it posts. Let Students React is a row like the
-   sheet's others, its switch at the right, as Observe's sheet has it.
-   ═══════════════════════════════════════════════════════════════ */
-.m-look .m-bulletin-to,
-.m-look .m-bulletin-where {
-  display: none;
-}
-.m-look .m-bulletin-switch {
-  flex-direction: row-reverse;
-  justify-content: space-between;
-  min-height: 48px;
-  padding: 4px 12px;
-  border-radius: 10px;
-  background: var(--bg);
-}
-.m-look .m-bulletin-switch input {
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-  flex: none;
-  width: 51px;
-  height: 31px;
-  margin: 0;
-  border-radius: 16px;
-  background: var(--divider-medium);
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-.m-look .m-bulletin-switch input::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: transform 0.15s;
-}
-.m-look .m-bulletin-switch input:checked {
-  background: #34c759;
-}
-.m-look .m-bulletin-switch input:checked::after {
-  transform: translateX(20px);
 }
 
 /* ═══════════════════════════════════════════════════════════════

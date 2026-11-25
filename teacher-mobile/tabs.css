@@ -1,0 +1,950 @@
+/* The phone's four tabs: Students, Observe, Grade and Bulletins share one top
+   bar (MC.tabBar); Observe and Bulletins draw their own screens here.
+   Colours and sizes come from the tokens in teacher/styles.css. */
+
+/* ── The top bar ──────────────────────────────────────────────
+   The Demo pill at the left (Demo Mode only), the class's name and a chevron
+   in the middle (a tap lists the classes), the sync dot and ⋯ at the right.
+   Every control is 44 px to a finger; the Demo pill is drawn 26 px tall in
+   transparent bands that take the taps. */
+.m-tabbar-inner {
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
+  align-items: center;
+  height: 44px;
+  padding: 0 6px;
+}
+.m-tabbar-demo {
+  justify-self: start;
+  height: 44px;
+  margin-left: 6px;
+  padding: 0 9px;
+  border: 0;
+  border-block: 9px solid transparent;
+  border-radius: 13px / 22px;
+  background: var(--demo-pill-bg);
+  background-clip: padding-box;
+  color: var(--demo-pill-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-tabbar-class {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 44px;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+button.m-tabbar-class {
+  cursor: pointer;
+}
+.m-tabbar-class svg {
+  flex: none;
+  color: var(--text-3);
+}
+.m-tabbar-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-tabbar-right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.m-tabbar-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The class list, from the name in the bar. */
+.m-class-sheet-title {
+  margin: 0;
+  padding: 4px 16px 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+.m-class-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-top: 0.5px solid var(--divider-medium);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-class-row[aria-current] {
+  color: var(--link);
+  font-weight: 600;
+}
+.m-class-row-name {
+  min-width: 0;
+}
+
+/* ── Observe ──────────────────────────────────────────────────
+   The Sweep tile and each student's face, in alphabetical order; one track
+   of five; the cards under their day. */
+.m-obs-faces {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.m-obs-faces::-webkit-scrollbar {
+  display: none;
+}
+.m-obs-face {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 52px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-face-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  transition: transform 0.15s;
+}
+.m-obs-face:active .m-obs-face-dot {
+  transform: scale(0.92);
+}
+.m-obs-face-sweep {
+  color: var(--link);
+  font-weight: 600;
+}
+.m-obs-face-sweep .m-obs-face-dot {
+  background: var(--active-light);
+  color: var(--link);
+}
+.m-obs-face > :last-child {
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-obs-track {
+  margin: 0 16px;
+}
+.m-obs-track .m-seg-btn {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.m-obs-track .m-seg-btn:not(.m-seg-active) {
+  color: var(--text-2);
+}
+.m-obs-day {
+  margin: 0;
+  padding: 18px 16px 8px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.m-obs-feed-end {
+  height: 96px;
+}
+
+/* The new-observation button, over the tab bar. */
+.m-fab {
+  position: fixed;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--active-fill);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  z-index: var(--z-fab);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s;
+}
+.m-fab:active {
+  transform: scale(0.92);
+}
+.m-fab svg {
+  width: 24px;
+  height: 24px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-fab,
+  .m-obs-face-dot {
+    transition: none;
+  }
+}
+
+/* ── Observation Cards ─────────────────────────────────────── */
+/* The desktop card's vocabulary (teacher/observations.css): a solid type
+   block in a fixed width so names line up, a meta line, and a faint chevron;
+   the whole card opens the edit sheet. The day is the heading above it. */
+#m-obs-cards {
+  overflow-x: clip;
+}
+/* Show More under the feed's newest observations (MObserve.showMore). */
+.m-obs-more-wrap {
+  padding: 8px 16px 0;
+  text-align: center;
+}
+.m-obs-more {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--link);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-more:active {
+  background: var(--active-light);
+}
+.m-obs-more-count {
+  padding-top: 6px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.m-obs-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14px;
+  gap: 0 8px;
+  align-items: start;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  margin: 0 16px 8px;
+  padding: 12px 10px 12px 14px;
+  position: relative;
+  touch-action: pan-y;
+  transition: transform 0.2s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-card[data-action] {
+  cursor: pointer;
+}
+.m-obs-card:not([data-action]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.m-obs-card.m-obs-swiping {
+  transition: none;
+}
+/* Revealed at the right edge as the card slides left. */
+.m-obs-card[data-action]::after {
+  content: 'Delete';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(100% + 16px);
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  padding-left: 20px;
+  border-radius: 12px;
+  background: var(--priority);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+.m-obs-main {
+  min-width: 0;
+}
+.m-obs-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.m-obs-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 74px;
+  height: 22px;
+  border-radius: var(--radius-xs, 4px);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.m-obs-type[data-sentiment='strength'] {
+  background: var(--score-3);
+}
+.m-obs-type[data-sentiment='growth'] {
+  background: var(--score-4);
+}
+.m-obs-type[data-sentiment='concern'] {
+  background: var(--score-2);
+}
+.m-obs-type[data-sentiment='note'] {
+  background: var(--obs-note);
+  color: var(--obs-note-on);
+}
+.m-obs-type-none {
+  border: 1px dashed var(--border-2);
+}
+.m-obs-student-name {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-with {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.m-obs-time {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.m-obs-text {
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.45;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.m-obs-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.m-obs-context {
+  color: var(--text-3);
+}
+.m-obs-assessment {
+  color: var(--link);
+  font-weight: 500;
+}
+.m-obs-meta .m-obs-link {
+  color: var(--text-2);
+}
+.m-obs-meta .obsc-pill-competency {
+  background: none;
+  color: var(--link);
+  font-weight: 500;
+}
+/* The tags flow on the meta line with the context. */
+.m-obs-tags {
+  display: contents;
+}
+/* A tag: a chip on other screens (the sweep), plain text with its dot on
+   the card. */
+.m-obs-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--overlay-hover);
+  color: var(--text-2);
+}
+.m-obs-meta .m-obs-tag-chip {
+  gap: 5px;
+  font-size: inherit;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  white-space: nowrap;
+}
+.m-obs-tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.m-obs-quoted {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs, 4px);
+  padding: 0 6px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.m-obs-chev {
+  align-self: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-3);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+/* ── Bulletins: the fourth tab, its sheets and Post a Photo ───
+   The page is a step darker than the cards, so each bulletin stands off it. */
+.m-bulletin-content {
+  padding-top: 12px;
+  background: var(--surface-2);
+}
+@media (prefers-color-scheme: dark) {
+  .m-bulletin-content {
+    background: var(--bg);
+  }
+}
+.m-bulletin-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 16px 6px;
+}
+.m-bulletin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--link);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-bulletin-btn-main {
+  background: var(--active-fill);
+  color: #fff;
+}
+.m-bulletin-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.m-bulletin-btn:active:not(:disabled) {
+  opacity: 0.8;
+}
+.m-bulletin-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+.m-bulletin-btn-soft {
+  background: var(--bg);
+}
+.m-bulletin-note,
+.m-bulletin-empty {
+  margin: 0 16px 12px;
+  font-size: 15px;
+  color: var(--text-2);
+}
+.m-bulletin-empty {
+  padding: 24px 0;
+  text-align: center;
+  font-weight: 600;
+}
+.m-bulletin-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 16px 24px;
+}
+/* "Today", "Sunday": one heading for each day's cards. */
+.m-bulletin-day {
+  margin: 6px 0 -2px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.m-bulletin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 2px 10px rgba(0, 0, 0, 0.07);
+}
+/* Only a reminder says what it is, and until when. */
+.m-bulletin-reminder {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--active-light);
+  color: var(--link);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.m-bulletin-words {
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.m-bulletin-photo {
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--overlay-pressed);
+}
+.m-bulletin-photo img {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  min-height: 96px;
+  object-fit: cover;
+}
+/* A file and a link are tiles: the name, then what it is. */
+.m-bulletin-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--overlay-hover);
+  overflow-wrap: anywhere;
+}
+.m-bulletin-tile-title {
+  color: var(--link);
+  font-size: 15px;
+  font-weight: 600;
+}
+.m-bulletin-tile-sub {
+  font-size: 13px;
+  color: var(--text-2);
+}
+/* Who has not seen it is the part to act on: "8 Not Seen" is one button.
+   Seen by everyone, it says so. */
+.m-bulletin-seen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 22px;
+  background: var(--active-light);
+  color: var(--link);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-bulletin-seen.is-all {
+  padding: 0 4px;
+  background: none;
+  color: var(--score-3-text);
+}
+.m-bulletin-seen-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.m-bulletin-seen.is-waiting {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-3);
+  cursor: default;
+}
+.m-bulletin-text-btn {
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* Sheets: the app's own (presentSheet), with a head row of their own. */
+.m-bulletin-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.m-bulletin-sheet-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.m-bulletin-write .m-bulletin-sheet-head {
+  grid-template-columns: 64px 1fr 64px;
+}
+.m-bulletin-sheet-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.m-bulletin-write .m-bulletin-sheet-title {
+  text-align: center;
+}
+.m-bulletin-head-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+.m-bulletin-sheet-head > .m-bulletin-head-btn:last-child {
+  text-align: right;
+}
+.m-bulletin-hint {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.m-bulletin-sec {
+  margin: 8px 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.m-list.m-bulletin-names {
+  margin: 0 0 8px;
+  background: var(--bg);
+}
+.m-bulletin-names .m-cell {
+  cursor: default;
+}
+.m-bulletin-names .m-cell-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+.m-segmented.m-bulletin-kinds {
+  margin: 4px 0 4px;
+}
+.m-bulletin-kinds .m-seg-btn {
+  min-height: 44px;
+  font-size: 15px;
+}
+.m-bulletin-label {
+  margin: 8px 0 0;
+}
+.m-bulletin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 15px;
+  color: var(--text);
+}
+/* Safari draws a select at its own height unless it draws it plainly: the row's value
+   shows in link blue, as Settings rows do, and the whole 44 px is the target. A chevron
+   drawn from two borders (not a font glyph) says it opens a list. */
+.m-bulletin-row select {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.m-bulletin-row-pick {
+  position: relative;
+}
+.m-bulletin-row-pick select {
+  padding-right: 18px;
+}
+.m-bulletin-row-pick::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -6px;
+  border-right: 2px solid var(--link);
+  border-bottom: 2px solid var(--link);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.m-bulletin-row input,
+.m-bulletin-row select {
+  min-height: 44px;
+  min-width: 0;
+  max-width: 60%;
+  border: none;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-align: right;
+}
+.m-bulletin-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.m-bulletin-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.m-bulletin-two {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+.m-bulletin-write .m-bulletin-btn {
+  background: var(--bg);
+}
+.m-bulletin-file-input {
+  display: none;
+}
+.m-bulletin-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 15px;
+  color: var(--text);
+}
+.m-bulletin-switch input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 31px;
+  margin: 0;
+  border-radius: 16px;
+  background: var(--divider-medium);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.m-bulletin-switch input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s;
+}
+.m-bulletin-switch input:checked {
+  background: #34c759;
+}
+.m-bulletin-switch input:checked::after {
+  transform: translateX(20px);
+}
+.m-bulletin-msg {
+  min-height: 18px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.m-bulletin-post {
+  margin-top: 4px;
+}
+.m-bulletin-confirm-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.m-bulletin-confirm-ok {
+  background: var(--active-fill);
+  color: #fff;
+}
+/* A delete: red, as the phone's other in-sheet destructive confirm (Reset Demo Data) is, in the
+   deeper red white words read on at 4.5:1 in light and dark (--danger's light value). */
+.m-bulletin-confirm-ok.is-danger {
+  background: #c62828;
+}
+.m-bulletin-confirm-cancel {
+  background: var(--bg);
+}
+
+/* Post a Photo: Add Work's camera screen (.m-addwork), with the photo, its
+   caption and the two buttons under it. */
+.m-bulletin-faces {
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+  color: #ffd60a;
+}
+.m-addwork-view.m-bulletin-shot {
+  justify-content: center;
+  padding: 8px;
+}
+.m-bulletin-shot-img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.m-bulletin-cap-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.m-bulletin-caption {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: #2c2c2e;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+}
+.m-bulletin-camera .m-bulletin-two {
+  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: row;
+}
+.m-addwork-choice.m-bulletin-retake {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2c2c2e;
+}
+
+/* A card's parts (drawn one by one, so a changed count changes one line). */
+.m-bulletin-part:empty {
+  display: none;
+}
+.m-bulletin-returned {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 14px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.m-bulletin-returned-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.m-bulletin-delete {
+  align-self: center;
+  margin-top: 8px;
+  color: var(--danger, #c62828);
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-bulletin-switch input,
+  .m-bulletin-switch input::after {
+    transition: none;
+  }
+}

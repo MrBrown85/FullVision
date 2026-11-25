@@ -40,8 +40,6 @@ window.MComponents = (function () {
         _esc(opts.backLabel) +
         '</span></button>';
     }
-    // `classId`: a tab's first screen names the open class at the left.
-    if (!back && opts.classId) back = classLabelHTML(opts.classId);
     var actions = '';
     if (opts.rightHTML) {
       actions = '<div class="m-nav-bar-actions">' + opts.rightHTML + '</div>';
@@ -76,18 +74,42 @@ window.MComponents = (function () {
     );
   }
 
-  // The open class's name, so a teacher always knows which class they are in.
-  function classLabelHTML(cid) {
+  /* The top bar of each tab's first screen: the Demo pill at the left (Demo
+     Mode only), the open class's name with a chevron in the middle (a tap
+     opens the class list), the sync dot and ⋯ at the right. ⋯ opens
+     Settings. The sync dot is the only place a sync problem shows.
+     opts.id names the bar; opts.rightHTML adds a button before the dot. */
+  function tabBar(cid, opts) {
+    opts = opts || {};
     var course = (typeof COURSES !== 'undefined' && cid && COURSES[cid]) || null;
-    var name = course && course.name ? course.name : '';
-    if (!name) return '';
+    var name = course && course.name ? course.name : 'FullVision';
+    var several = typeof getPickerCourses === 'function' && getPickerCourses(cid).length > 1;
+    var demo = typeof isDemoMode === 'function' && isDemoMode();
+    var chevron =
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+    var title = several
+      ? '<button type="button" class="m-tabbar-class" data-action="m-class-switch" aria-label="' +
+        _esc(name) +
+        ', choose a class"><span class="m-tabbar-name">' +
+        _esc(name) +
+        '</span>' +
+        chevron +
+        '</button>'
+      : '<h1 class="m-tabbar-class"><span class="m-tabbar-name">' + _esc(name) + '</span></h1>';
     return (
-      '<div class="m-nav-bar-class" title="' +
-      _esc(name) +
-      '">' +
-      '<span class="m-nav-bar-class-name">' +
-      _esc(name) +
-      '</span></div>'
+      '<div class="m-nav-bar m-tabbar" id="m-nav-bar-' +
+      (opts.id || 'main') +
+      '"><div class="m-tabbar-inner">' +
+      (demo
+        ? '<button type="button" class="m-tabbar-demo" data-action="m-demo-menu" aria-haspopup="dialog" aria-label="Demo Mode">Demo</button>'
+        : '<span></span>') +
+      title +
+      '<div class="m-tabbar-right">' +
+      (opts.rightHTML || '') +
+      '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+      '<button type="button" class="m-tabbar-more" data-action="m-settings" aria-label="More">' +
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' +
+      '</button></div></div></div>'
     );
   }
 
@@ -587,6 +609,7 @@ window.MComponents = (function () {
     avatarColor: avatarColor,
     avatarInitials: avatarInitials,
     navBar: navBar,
+    tabBar: tabBar,
     presentSheet: presentSheet,
     dismissSheet: dismissSheet,
     confirmSheet: confirmSheet,

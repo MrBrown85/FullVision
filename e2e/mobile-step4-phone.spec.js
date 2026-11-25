@@ -52,12 +52,12 @@ test('grading screen shows a visible sync dot', async ({ page }) => {
 // Group 2 #33: each tab's first screen names the open class.
 test('every tab names the open class', async ({ page }) => {
   await openPhone(page);
-  await expect(page.locator('#m-nav-bar-students-list .m-nav-bar-class')).toHaveText('Science 8');
-  await page.locator('.m-tab-item[data-tab="grade"]').click();
-  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-class')).toBeVisible();
-  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-class')).toHaveText('Science 8');
-  await page.locator('.m-tab-item[data-tab="observe"]').click();
-  await expect(page.locator('#m-nav-bar-obs-feed .m-nav-bar-class')).toHaveText('Science 8');
+  const name = tab => page.locator('#m-nav-stack .m-screen:last-child .m-tabbar-name');
+  await expect(name()).toHaveText('Science 8');
+  for (const tab of ['grade', 'observe', 'bulletins']) {
+    await page.locator(`.m-tab-item[data-tab="${tab}"]`).click();
+    await expect(name()).toHaveText('Science 8');
+  }
 });
 
 // Group 2 #34: the grading card has the Overall Comment, shows a saved one,
@@ -375,7 +375,7 @@ test('phone controls are finger-sized', async ({ page }) => {
       })
       .map(e => e.outerHTML.slice(0, 80) + ' ' + Math.round(e.getBoundingClientRect().height));
   await openPhone(page);
-  await expect(page.locator('.m-demo-pill').first()).toBeInViewport();
+  await expect(page.locator('.m-tabbar-demo').first()).toBeInViewport();
   expect(await page.evaluate(small)).toEqual([]);
   await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
   await page.waitForTimeout(500);

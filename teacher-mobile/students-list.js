@@ -91,18 +91,9 @@ window.MStudentsList = (function () {
     var cid = opts.cid;
     var students = getStudents(cid);
 
-    var nav = MC.navBar({
+    var nav = MC.tabBar(cid, {
       id: 'students-list',
-      title: 'Students',
-      classId: cid,
-      rightHTML:
-        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
-        '<button class="m-nav-bar-action" data-action="m-sort" title="Sort">' +
-        MC.ICONS.sort +
-        '</button>' +
-        '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' +
-        MC.ICONS.settings +
-        '</button>',
+      rightHTML: '<button class="m-nav-bar-action" data-action="m-sort" title="Sort">' + MC.ICONS.sort + '</button>',
     });
 
     var body;

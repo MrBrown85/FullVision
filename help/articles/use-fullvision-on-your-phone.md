@@ -10,13 +10,12 @@ demo: /teacher-mobile/
 labels:
   - Settings
   - Switch to Desktop
-  - Active Class
   - Students
   - All Students
   - Observe
   - View Profile
   - Customize Card
-  - Start a sweep
+  - Sweep
   - Recent
   - All
   - Missing
@@ -41,8 +40,8 @@ shots:
 ## Open the Phone App
 
 1. On a phone, open fullvision.ca and sign in. The phone app opens with the class on the **Students** tab.
-2. To use the full desktop layout on the phone instead, choose **Settings** (the gear at the top right), then **Switch to Desktop**. The phone keeps this choice until the next sign-out.
-3. With more than one class, choose **Settings** and pick a class under **Active Class**.
+2. To use the full desktop layout on the phone instead, choose the ⋯ at the top right, then **Switch to Desktop**. The phone keeps this choice until the next sign-out.
+3. With more than one class, choose the class's name at the top of any tab and pick another class from the list.
 
 ![The phone app's Students tab with one student's card and the tab bar](img/use-fullvision-on-your-phone.jpg 'The Students tab. The tab bar at the foot switches between Students, Observe, Grade and Bulletins.')
 
@@ -52,7 +51,7 @@ Each student has a card with the overall level and a level for each competency. 
 
 ## Observe
 
-The class's observations are listed newest first. Choose the + button to write an observation, or **Start a sweep** to go through the class one student at a time and record a quick observation for each.
+The class's observations are listed newest first. Choose the + button to write an observation, or **Sweep** at the left of the row of students to go through the class one student at a time and record a quick observation for each.
 
 ## Grade
 

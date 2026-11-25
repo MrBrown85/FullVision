@@ -18,6 +18,9 @@ window.MObserve = (function () {
   var FEED_PAGE = 30;
   var _feedShown = FEED_PAGE;
 
+  var SWEEP_ICON =
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.5-3.3 2.8-5 5.5-5s5 1.7 5.5 5"/><circle cx="17" cy="9.5" r="2.5"/><path d="M16 14.2c2.6-.3 4.2 1.3 4.6 4.3"/></svg>';
+
   /* Type, context and tags render as text; tags keep their colour dot. */
   function typePill(sentiment) {
     var s = OBS_SENTIMENTS[sentiment];
@@ -57,10 +60,11 @@ window.MObserve = (function () {
   }
 
   /* One observation card, as the desktop feed draws it (shared/obs-card.js):
-     type block, name, time, the note, and a meta line of context, linked
+     type block, name, the note, and a meta line of context, linked
      assessment or competency, tags, and "Quoted in Report N". The whole
      card opens the edit sheet; the name filters the feed to that student.
-     opts: showStudent (default true), when ('time' | 'date'),
+     opts: showStudent (default true), when ('date': the card says its day, as
+           on a profile; the feed's day headings say it there),
            editable (default true: tap opens the sheet, swipe deletes). */
   // html-safe: every text value goes through MC.esc; ids, OBS_SENTIMENTS labels and obsTagColor's constant colours are ours; obsPrivateLabelHtml and linkPillsHtml escape their own text.
   function cardHtml(cid, ob, ctx, opts) {
@@ -68,7 +72,7 @@ window.MObserve = (function () {
     var p = ObsCard.parts(ob, ctx);
     var st = ctx.studentsById[ob.studentId];
     var editable = opts.editable !== false;
-    var when = opts.when === 'date' ? ObsCard.cardWhen(ob) : ObsCard.cardTime(ob);
+    var when = opts.when === 'date' ? ObsCard.cardWhen(ob) : '';
     var tags = tagChips(ob.dims);
     var meta =
       obsPrivateLabelHtml(ob) +
@@ -113,62 +117,49 @@ window.MObserve = (function () {
 
   /* ── Observation Feed Screen ────────────────────────────────── */
   function renderFeed(cid) {
-    var nav = MC.navBar({
-      id: 'obs-feed',
-      title: 'Observations',
-      compact: true,
-      classId: cid,
-      rightHTML:
-        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
-        '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' +
-        MC.ICONS.settings +
-        '</button>',
-    });
+    var nav = MC.tabBar(cid, { id: 'obs-feed' });
 
-    // Build filter pills
-    var students = getStudents(cid);
-    students = sortStudents(students.slice(), 'alpha');
-    var filters =
-      '<div class="m-filter-strip">' +
-      '<button class="m-filter-pill m-filter-active" data-action="m-obs-filter" data-filter="all">All</button>';
+    // The sweep, then each student's face in alphabetical order (a teacher
+    // finds a face by where it is, so the row never reorders itself).
+    var students = sortStudents(getStudents(cid).slice(), 'alpha');
+    var faces =
+      '<div class="m-obs-faces">' +
+      '<button type="button" class="m-obs-face m-obs-face-sweep" data-action="m-sweep-start">' +
+      '<span class="m-obs-face-dot">' +
+      SWEEP_ICON +
+      '</span>Sweep</button>';
+    students.forEach(function (st) {
+      faces +=
+        '<button type="button" class="m-obs-face" data-action="m-obs-quick-menu" data-sid="' +
+        st.id +
+        '"><span class="m-obs-face-dot" style="background:' +
+        MC.avatarColor(st.id) +
+        '">' +
+        MC.esc(MC.avatarInitials(st)) +
+        '</span>' +
+        MC.esc(st.preferred || st.firstName || displayName(st)) +
+        '</button>';
+    });
+    faces += '</div>';
+
+    // One track of five: All and the four types.
+    var track =
+      '<div class="m-segmented m-obs-track" role="group" aria-label="Show">' +
+      '<button type="button" class="m-seg-btn m-seg-active" aria-pressed="true" data-action="m-obs-filter" data-filter="all">All</button>';
     Object.keys(OBS_SENTIMENTS).forEach(function (key) {
-      var s = OBS_SENTIMENTS[key];
-      filters +=
-        '<button class="m-filter-pill" data-action="m-obs-filter" data-filter="sentiment:' +
+      track +=
+        '<button type="button" class="m-seg-btn" aria-pressed="false" data-action="m-obs-filter" data-filter="sentiment:' +
         key +
         '">' +
-        s.label +
+        MC.esc(OBS_SENTIMENTS[key].label) +
         '</button>';
     });
-    filters += '</div>';
+    track += '</div>';
 
-    // Quick-post avatar bar
-    var quickBar = '<div class="m-quick-bar" id="m-quick-bar">';
-    students.forEach(function (st) {
-      var color = MC.avatarColor(st.id);
-      var inits = MC.avatarInitials(st);
-      var firstName = MC.esc(st.preferred || st.firstName || displayName(st));
-      quickBar +=
-        '<button class="m-quick-avatar" data-action="m-obs-quick-menu" data-sid="' +
-        st.id +
-        '">' +
-        '<div class="m-quick-dot" style="background:' +
-        color +
-        '">' +
-        MC.esc(inits) +
-        '</div>' +
-        '<span class="m-quick-name">' +
-        firstName +
-        '</span>' +
-        '</button>';
-    });
-    quickBar += '</div>';
-
-    // Render observation cards grouped by date, the newest first page of them
+    // The cards grouped by day, the newest first page of them
     _feedShown = FEED_PAGE;
     var cardHTML = _renderObsCards(cid, getAllQuickObs(cid), 'all');
 
-    // FAB
     var fab =
       '<button class="m-fab" data-action="m-obs-new" aria-label="New observation">' + MC.ICONS.plus + '</button>';
 
@@ -176,13 +167,12 @@ window.MObserve = (function () {
       '<div class="m-screen" id="m-screen-obs-feed">' +
       nav +
       '<div class="m-screen-content" id="m-obs-feed-content">' +
-      '<div class="m-sweep-start-wrap"><button class="m-sweep-start" data-action="m-sweep-start">Start a sweep</button></div>' +
-      quickBar +
-      filters +
+      faces +
+      track +
       '<div id="m-obs-cards">' +
       cardHTML +
       '</div>' +
-      '<div style="height:80px"></div>' +
+      '<div class="m-obs-feed-end"></div>' +
       '</div>' +
       fab +
       '</div>'
@@ -231,7 +221,7 @@ window.MObserve = (function () {
     list.slice(from, to).forEach(function (ob) {
       var group = dayLabel(ObsCard.obDay(ob));
       if (group !== lastGroup) {
-        html += '<div class="m-obs-date-group">' + MC.esc(group) + '</div>';
+        html += '<h2 class="m-obs-day">' + MC.esc(group) + '</h2>';
         lastGroup = group;
       }
       html += cardHtml(cid, ob, ctx);
@@ -282,8 +272,10 @@ window.MObserve = (function () {
     _activeFilter = filter;
     _feedShown = FEED_PAGE;
     // Update pill active states
-    document.querySelectorAll('.m-filter-pill').forEach(function (pill) {
-      pill.classList.toggle('m-filter-active', pill.getAttribute('data-filter') === filter);
+    document.querySelectorAll('.m-obs-track .m-seg-btn').forEach(function (btn) {
+      var on = btn.getAttribute('data-filter') === filter;
+      btn.classList.toggle('m-seg-active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     // Re-render cards
     var allObs = getAllQuickObs(cid);
@@ -685,7 +677,8 @@ window.MObserve = (function () {
   var _newDraft = '';
   function presentNewObsSheet(cid, presetSid) {
     resetSheetState();
-    _selectedStudents = presetSid ? [presetSid] : [];
+    // presetSid: one student's id, or a list of them (the students who have not seen a bulletin).
+    _selectedStudents = Array.isArray(presetSid) ? presetSid.slice() : presetSid ? [presetSid] : [];
     MC.presentSheet(_editSheetHtml(cid, null, null, null), {
       onClose: function () {
         var ta = document.getElementById('m-obs-text');

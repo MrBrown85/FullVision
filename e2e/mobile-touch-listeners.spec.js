@@ -72,7 +72,7 @@ test('no touch move listener blocks a scroll at rest', async ({ page }) => {
 test('a pull at the top of a list listens while the finger is down, and still pulls', async ({ page }) => {
   await enterDemo(page);
   await page.locator('.m-tab-item[data-tab="observe"]').click();
-  const strip = page.locator('#m-obs-feed-content .m-filter-strip');
+  const strip = page.locator('#m-obs-feed-content .m-obs-faces');
   await expect(strip).toBeVisible();
   const box = await strip.boundingBox();
   const x = box.x + 40;

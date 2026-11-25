@@ -33,7 +33,7 @@ async function nameBelowBar(page) {
 test('the first student picked in a sweep is named just under the Sweep bar', async ({ page }) => {
   await enterDemo(page);
   await page.locator('.m-tab-item[data-tab="observe"]').click();
-  await page.getByRole('button', { name: 'Start a sweep' }).click();
+  await page.getByRole('button', { name: 'Sweep' }).click();
   // Safari has no scroll anchoring, so Chromium's would hide the bug.
   await page.evaluate(() => (document.getElementById('m-sweep-content').style.overflowAnchor = 'none'));
   await page.locator('.m-sweep-tile[data-state=""]').first().click();
