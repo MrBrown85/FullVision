@@ -1193,6 +1193,34 @@ body.offline-active #app-dock {
   outline: 2px solid var(--active);
   outline-offset: -1px;
 }
+/* A native select in a toolbar, filled grey like the ⋯ and Filter buttons: no
+   border, the app's chevron. Beside .term-select (the Reports bar's Report and
+   Copy; the Dashboard's sort). */
+.grey-select,
+.term-select.grey-select {
+  height: var(--control-h);
+  padding: 0 30px 0 12px;
+  border: 0;
+  border-radius: 8px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(118, 118, 128, 0.12) var(--select-chevron) no-repeat right 10px center;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.15s;
+}
+.grey-select:hover,
+.term-select.grey-select:hover {
+  background-color: rgba(118, 118, 128, 0.2);
+}
+.grey-select:focus-visible,
+.term-select.grey-select:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
 
 /* Class picker — one look wherever it appears: the roster sidebar and the
    Dashboard, Gradebook and Assignments toolbars. Pages add only layout
@@ -1281,8 +1309,9 @@ body.offline-active #app-dock {
 /* The look the Assignments, Gradebook and Bulletins bars share (Colin, Nov 25):
    buttons 32px tall with 12px sides and small type, the secondary one a tint
    of the blue, the quiet one grey. Each page's own class opens the rule
-   (.assess-toolbar here, .bulletin-page for the write bar). */
-:is(.assess-toolbar, .bulletin-page) .tb-action-btn {
+   (.assess-toolbar here, .report-toolbar for Reporting's primary buttons,
+   .bulletin-page for the write bar). */
+:is(.assess-toolbar, .report-toolbar, .bulletin-page) .tb-action-btn {
   padding: 0 12px;
   font-size: var(--text-sm);
 }

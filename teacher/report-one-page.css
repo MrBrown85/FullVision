@@ -745,12 +745,22 @@
   min-width: calc(40px / var(--sheet-zoom, 1));
   min-height: 1em;
 }
-/* The line under a statement that has none shows only on its row. */
-.studio-one .one-w-ph {
+/* The line under a statement that has none shows only on its row, over
+   the gap under the statement: it takes no room, so the rows are as tall
+   on screen as they print. (It took a line in every row: a reflection
+   with no such lines ran past the foot of its page on screen, and pushed
+   the response under it off the page. Colin, 2026-11-25.) */
+.studio-one span.one-wt.one-w-ph {
   display: none;
+  position: absolute;
+  z-index: 2;
+  margin: calc(-1px / var(--sheet-zoom, 1)) 0 0 calc(-4px / var(--sheet-zoom, 1));
+  padding: calc(1px / var(--sheet-zoom, 1)) calc(4px / var(--sheet-zoom, 1));
+  background: #fff;
+  box-shadow: 0 0 0 calc(1px / var(--sheet-zoom, 1)) rgba(0, 0, 0, 0.1);
 }
-.studio-one tr:hover .one-w-ph,
-.studio-one .one-w-ph:focus {
+.studio-one tr:hover span.one-wt.one-w-ph,
+.studio-one span.one-wt.one-w-ph:focus {
   display: block;
 }
 .studio-one .one-w-empty td,
@@ -813,6 +823,8 @@
 .studio-one .one-w-grip {
   transform: translate(calc(-100% - 6px / var(--sheet-zoom, 1)), -50%);
   cursor: grab;
+  /* A finger on the grip drags the row, not the page. */
+  touch-action: none;
 }
 .studio-one .one-w-at-foot {
   margin-top: calc(-12px / var(--sheet-zoom, 1));
@@ -921,6 +933,20 @@
 }
 .studio-one tr.one-w-lift > td {
   background: #fff;
+}
+/* While a row is dragged it shows past the foot of its page and over the
+   page it is dragged to (a page's body otherwise clips what overflows it). */
+.rb-preview.studio-pages.one-w-drag-on .report-sheet .sheet-body {
+  overflow: visible;
+}
+.rb-preview .sheet-zoom.one-w-from {
+  position: relative;
+  z-index: 5;
+}
+/* The ⠿ and ⋯ wait in the margins until the drop: the rows have moved from beside them. */
+body.one-w-dragging .one-wl > .one-w-more,
+body.one-w-dragging .one-wl > .one-w-grip {
+  opacity: 0;
 }
 body.one-w-dragging,
 body.one-w-dragging * {

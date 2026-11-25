@@ -12,6 +12,7 @@
   },
   "files": [
     "teacher/obs-roster.js",
+    "teacher/report-one-word-ops.js",
     "teacher/report-one-words.js",
     "teacher/report-one-copy.js",
     "teacher/report-one-undo.js",
@@ -88,6 +89,7 @@
     "teacher/grade-change.js",
     "teacher/expand-motion.js",
     "teacher/report-print-paper.js",
+    "teacher/report-toolbar.js",
     "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js",
     "teacher-mobile/crit-own.js",
