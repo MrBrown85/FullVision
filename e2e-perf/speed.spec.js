@@ -355,7 +355,7 @@ test('Phone grade tab', async ({ page }, testInfo) => {
   const t0 = await page.evaluate(() => performance.now());
   const open = await clickNumbers(
     page,
-    () => page.locator('#m-grade-list .m-cell[data-aid="assess-030"]').click(),
+    () => page.locator('#m-grade-list .m-tg-row[data-aid="assess-030"]').click(),
     () => swiper.waitFor(),
   );
   // Checked every frame, so the frame the slide ends on is the one counted.
