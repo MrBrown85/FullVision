@@ -38,214 +38,27 @@ window.ReportOneWords = (function () {
   /** @type {any} */
   var _hotRow = null;
 
-  /* ── The wording, changed (pure; the tests call these) ─────────────── */
-
-  function clone(w) {
-    return JSON.parse(JSON.stringify(w || {}));
-  }
-  function _item(x) {
-    return x && typeof x === 'object' ? x : { label: x == null ? '' : String(x) };
-  }
-  function groupOf(w, i) {
-    var it = w.items && w.items[i];
-    return it && typeof it === 'object' && it.group != null ? String(it.group) : '';
-  }
-  /* The run of statements under one heading: [start, end). */
-  function blockAt(w, i) {
-    var g = groupOf(w, i);
-    var s = i;
-    var e = i + 1;
-    while (s > 0 && groupOf(w, s - 1) === g) s--;
-    while (e < w.items.length && groupOf(w, e) === g) e++;
-    return { start: s, end: e, group: g };
-  }
-  function blocks(w) {
-    var out = [];
-    for (var i = 0; i < (w.items || []).length;) {
-      var b = blockAt(w, i);
-      out.push(b);
-      i = b.end;
-    }
-    return out;
-  }
-  /* A statement that has to carry a heading becomes an object; one that
-     doesn't keeps the shape it had. */
-  function _setGroup(w, i, g) {
-    var it = w.items[i];
-    if (typeof it === 'object' && it) it.group = g;
-    else if (g) w.items[i] = { label: it == null ? '' : String(it), group: g };
-  }
-  function uniqueName(w, base) {
-    var names = blocks(w).map(function (b) {
-      return b.group;
-    });
-    var n = base;
-    for (var k = 2; names.indexOf(n) >= 0; k++) n = base + ' ' + k;
-    return n;
-  }
-  /* The text at a path ("items.3.label", "head.4", "scale.1", "intro"). */
-  function textAt(w, path) {
-    var p = path.split('.');
-    if (p[0] === 'head') return groupOf(w, +p[1]);
-    if (p[0] === 'items') {
-      var it = _item(w.items[+p[1]]);
-      return String((p[2] === 'prompt' ? it.prompt : it.label) || '');
-    }
-    if (p.length > 1) return String((w[p[0]] || [])[+p[1]] || '');
-    return String(w[p[0]] == null ? '' : w[p[0]]);
-  }
-  function setText(w, path, text) {
-    w = clone(w);
-    var p = path.split('.');
-    var i = +p[1];
-    if (p[0] === 'head') {
-      // Renames this heading's run only: two headings may share a name.
-      var b = blockAt(w, i);
-      for (var k = b.start; k < b.end; k++) _setGroup(w, k, text);
-    } else if (p[0] === 'items') {
-      var it = w.items[i];
-      if (p[2] === 'prompt') {
-        it = _item(it);
-        it.prompt = text;
-        w.items[i] = it;
-      } else if (typeof it === 'object' && it) it.label = text;
-      else w.items[i] = text;
-    } else if (p.length > 1) w[p[0]][i] = text;
-    else w[p[0]] = text;
-    return w;
-  }
-  /* A blank statement, at `at`, under heading g. */
-  function addItem(w, at, g) {
-    w = clone(w);
-    var objs = (w.items || []).some(function (x) {
-      return x && typeof x === 'object';
-    });
-    w.items.splice(at, 0, objs || g ? { label: '', prompt: '', group: g || '' } : '');
-    return w;
-  }
-  /* A new heading before statement `at`: it takes the statements from `at`
-     to the end of their run. At the end of a run it starts with one blank
-     statement, so it is kept. */
-  function addHeading(w, at, name) {
-    w = clone(w);
-    var prev = at > 0 ? blockAt(w, at - 1) : null;
-    var end = prev ? prev.end : 0;
-    if (at >= end) w.items.splice(at, 0, { label: '', prompt: '', group: name });
-    else for (var k = at; k < end; k++) _setGroup(w, k, name);
-    return w;
-  }
-  /* Moves statement `from` to sit before statement `before` (items.length:
-     the end), under heading g. */
-  function moveItem(w, from, before, g) {
-    w = clone(w);
-    var it = w.items.splice(from, 1)[0];
-    var to = before > from ? before - 1 : before;
-    w.items.splice(to, 0, it);
-    _setGroup(w, to, g);
-    return _dropBlankStrays(w);
-  }
-  /* Moves the run that starts at `start` to sit before statement `before`. */
-  function moveBlock(w, start, before) {
-    w = clone(w);
-    var b = blockAt(w, start);
-    if (before > b.start && before <= b.end) return w;
-    var run = w.items.splice(b.start, b.end - b.start);
-    var to = before > b.start ? before - run.length : before;
-    Array.prototype.splice.apply(w.items, [to, 0].concat(run));
-    return w;
-  }
-  function moveBlockBy(w, start, dir) {
-    var all = blocks(w);
-    var at = -1;
-    all.forEach(function (b, k) {
-      if (b.start === start) at = k;
-    });
-    var other = all[at + dir];
-    if (at < 0 || !other) return clone(w);
-    return dir < 0 ? moveBlock(w, start, other.start) : moveBlock(w, start, other.end);
-  }
-  /* One step up or down; past the edge of its run it joins the run next to it. */
-  function moveItemBy(w, i, dir) {
-    var b = blockAt(w, i);
-    var j = i + dir;
-    if (j < 0 || j >= w.items.length) return clone(w);
-    if (j >= b.start && j < b.end) return moveItem(w, i, dir < 0 ? j : j + 1, b.group);
-    var into = blockAt(w, j);
-    return moveItem(w, i, dir < 0 ? into.end : into.start, into.group);
-  }
-  /* The heading goes; its statements join the run above (or, the first,
-     the one below). */
-  function removeHeading(w, start) {
-    w = clone(w);
-    var b = blockAt(w, start);
-    var g = b.start > 0 ? groupOf(w, b.start - 1) : b.end < w.items.length ? groupOf(w, b.end) : '';
-    for (var k = b.start; k < b.end; k++) _setGroup(w, k, g);
-    return _dropBlankStrays(w);
-  }
-  /* A blank statement is kept only as the one statement under a heading. */
-  function _dropBlankStrays(w) {
-    w.items = w.items.filter(function (x, i) {
-      if (String(_item(x).label || '').trim()) return true;
-      var b = blockAt(w, i);
-      return b.group && b.end - b.start === 1;
-    });
-    return w;
-  }
-  function addAt(w, field, at, value) {
-    w = clone(w);
-    w[field].splice(at, 0, value == null ? '' : value);
-    return w;
-  }
-  function removeAt(w, field, i) {
-    w = clone(w);
-    w[field].splice(i, 1);
-    return field === 'items' ? _dropBlankStrays(w) : w;
-  }
-  function moveAt(w, field, i, dir) {
-    w = clone(w);
-    var j = i + dir;
-    if (j < 0 || j >= w[field].length) return w;
-    var x = w[field].splice(i, 1)[0];
-    w[field].splice(j, 0, x);
-    return w;
-  }
-  /* Lines pasted into a statement: one statement a line. "Name – the line
-     under it" or a tab splits a line into the two. */
-  function pasteItems(w, at, g, text, replace) {
-    w = clone(w);
-    var lines = String(text || '')
-      .split(/\r?\n/)
-      .map(function (s) {
-        return s.trim();
-      })
-      .filter(Boolean);
-    var fresh = lines.map(function (l) {
-      var p = l.split(/\t|\s+[–—-]\s+/);
-      return { label: p[0].trim(), prompt: (p.slice(1).join(' – ') || '').trim(), group: g || '' };
-    });
-    Array.prototype.splice.apply(w.items, [at, replace ? 1 : 0].concat(fresh));
-    return { w: w, n: fresh.length };
-  }
-  /* What is saved: blank lines left out (a blank statement kept as the one
-     statement under a heading); a blank heading or instructions print the
-     original. */
-  function clean(w) {
-    var out = {};
-    Object.keys(w || {}).forEach(function (f) {
-      var v = w[f];
-      if (typeof v === 'string') {
-        if (v.trim()) out[f] = v;
-      } else if (Array.isArray(v)) {
-        if (f === 'items') out[f] = _dropBlankStrays({ items: v.slice() }).items;
-        else if (f === 'scale') out[f] = v.slice();
-        else
-          out[f] = v.filter(function (x) {
-            return String(x == null ? '' : x).trim();
-          });
-      } else out[f] = v;
-    });
-    return out;
-  }
+  /* The wording, changed: pure, in report-one-word-ops.js. */
+  var O = window.ReportOneWordOps;
+  var _item = O.item;
+  var groupOf = O.groupOf;
+  var blockAt = O.blockAt;
+  var blocks = O.blocks;
+  var textAt = O.textAt;
+  var setText = O.setText;
+  var addItem = O.addItem;
+  var addHeading = O.addHeading;
+  var moveItem = O.moveItem;
+  var moveItemBy = O.moveItemBy;
+  var moveBlock = O.moveBlock;
+  var moveBlockBy = O.moveBlockBy;
+  var removeHeading = O.removeHeading;
+  var addAt = O.addAt;
+  var removeAt = O.removeAt;
+  var moveAt = O.moveAt;
+  var pasteItems = O.pasteItems;
+  var uniqueName = O.uniqueName;
+  var clean = O.clean;
 
   /* ── Small helpers ──────────────────────────────────────────────── */
 
@@ -497,6 +310,7 @@ window.ReportOneWords = (function () {
         more.style.top = px(mid);
       }
       el._oneMore = more;
+      /** @type {any} */ (more)._oneRow = el;
       layer.appendChild(more);
       if (!rated) return;
       var grip = _el('button', MINE + ' no-print one-w-grip', '⠿');
@@ -509,7 +323,11 @@ window.ReportOneWords = (function () {
       grip.style.top = px(path.indexOf('head.') === 0 ? top + r.rect.height / z : mid);
       if (path.indexOf('head.') === 0) grip.classList.add('one-w-at-foot');
       el._oneGrip = grip;
+      /** @type {any} */ (grip)._oneRow = el;
       layer.appendChild(grip);
+    });
+    job.sheet._oneWRows = job.rows.map(function (r) {
+      return r.el;
     });
   }
 
@@ -1045,11 +863,39 @@ window.ReportOneWords = (function () {
     });
     return out;
   }
+  /* The row the pointer is on, or beside: on its ⠿ or ⋯, or at its height
+     anywhere across the sheet. The ⠿ and ⋯ sit in the page's margins, off
+     the row, so the row stays the one whose controls show all the way to
+     them (they went as the pointer left the row for one: Colin,
+     2026-11-25). Of two rows side by side, the one last pointed at, else
+     the nearer. */
+  function _rowNear(t, x, y) {
+    var row = t.closest('[data-wrow], tr[data-whead]');
+    if (row) return row;
+    var btn = t.closest('.one-w-more, .one-w-grip');
+    if (btn) return btn._oneRow || _hotRow;
+    var sheet = t.closest('.report-sheet');
+    var rows = (sheet && sheet._oneWRows) || [];
+    var best = /** @type {any} */ (null);
+    var bestD = Infinity;
+    for (var i = 0; i < rows.length; i++) {
+      if (!rows[i].isConnected) continue;
+      var r = rows[i].getBoundingClientRect();
+      if (y < r.top || y > r.bottom) continue;
+      if (rows[i] === _hotRow) return _hotRow;
+      var d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+      if (d < bestD) {
+        bestD = d;
+        best = rows[i];
+      }
+    }
+    return best;
+  }
   var _moveFrame = 0;
   function _onMove(e) {
     var t = e.target;
     if (_drag || _menu || !t.closest) return;
-    _showRow(t.closest('[data-wrow], tr[data-whead]') || (t.closest('.one-w-more, .one-w-grip') && _hotRow));
+    _showRow(_rowNear(t, e.clientX, e.clientY));
     if (t.closest('.one-w-ins')) return;
     var x = e.clientX;
     var y = e.clientY;
@@ -1217,18 +1063,54 @@ window.ReportOneWords = (function () {
       cands: all.filter(function (r) {
         return dragged.indexOf(r) < 0;
       }),
+      x: e.clientX,
+      y: e.clientY,
       y0: e.clientY,
       grab: e.clientY - top,
       h: bottom - top,
       b: -1,
+      // The pages scroll under a drag (the wheel, or the pointer held at
+      // the pane's edge): every place read at the press is that far off.
+      pane: _preview,
+      top0: _preview ? _preview.scrollTop : 0,
+      from: dragged[0].el.closest('.sheet-zoom'),
+      frame: 0,
     };
     dragged.forEach(function (r) {
       r.el.classList.add('one-w-lift');
     });
     document.body.classList.add('one-w-dragging');
+    // The lifted row shows past the foot of its page, and over the next.
+    if (_drag.pane) _drag.pane.classList.add('one-w-drag-on');
+    if (_drag.from) _drag.from.classList.add('one-w-from');
     window.addEventListener('pointermove', _onDragMove);
     window.addEventListener('pointerup', _onDragEnd);
     window.addEventListener('pointercancel', _onDragEnd);
+    window.addEventListener('keydown', _onDragKey, true);
+    if (_drag.pane) _drag.pane.addEventListener('scroll', _dragTo);
+    _drag.frame = requestAnimationFrame(_dragEdge);
+  }
+  /* How far the pages have scrolled since the press, in screen px. */
+  function _scrolled() {
+    return _drag && _drag.pane ? _drag.pane.scrollTop - _drag.top0 : 0;
+  }
+  /* Held near the top or the foot of the pane, the pages scroll. */
+  function _dragEdge() {
+    var d = _drag;
+    if (!d) return;
+    d.frame = requestAnimationFrame(_dragEdge);
+    if (!d.pane) return;
+    var r = d.pane.getBoundingClientRect();
+    var edge = 56;
+    var by = d.y < r.top + edge ? d.y - (r.top + edge) : d.y > r.bottom - edge ? d.y - (r.bottom - edge) : 0;
+    if (by) d.pane.scrollTop += Math.max(-18, Math.min(18, by / 3));
+  }
+  function _onDragKey(e) {
+    if (e.key !== 'Escape' || !_drag) return;
+    e.preventDefault();
+    e.stopPropagation();
+    _drag.b = -1;
+    _onDragEnd();
   }
   /* The boundary the pointer is over: an index into the rows not dragged
      (cands), the dragged rows going before cands[b]. A heading lands only
@@ -1254,15 +1136,17 @@ window.ReportOneWords = (function () {
       }
     });
     var center = y - d.grab + Math.min(d.h, 60) / 2;
+    var off = _scrolled();
     var b = -1;
     var firstHere = -1;
     c.forEach(function (r, k) {
       if (r.sheet !== sheet) return;
       if (firstHere < 0) firstHere = k;
-      if (r.rect.top + r.rect.height / 2 < center) b = k + 1;
+      if (r.rect.top - off + r.rect.height / 2 < center) b = k + 1;
     });
     if (b < 0) b = firstHere < 0 ? 0 : firstHere;
-    if (!d.isHead) return b;
+    // A statement dropped over the first heading goes under it: it keeps a heading.
+    if (!d.isHead) return b === 0 && c[0].head ? 1 : b;
     // Snap to the nearest place between runs.
     var best = b;
     var bestGap = Infinity;
@@ -1277,13 +1161,20 @@ window.ReportOneWords = (function () {
     return best;
   }
   function _onDragMove(e) {
+    if (!_drag) return;
+    _drag.x = e.clientX;
+    _drag.y = e.clientY;
+    _dragTo();
+  }
+  /* The lifted rows under the pointer, and the other rows out of their way. */
+  function _dragTo() {
     var d = _drag;
     if (!d) return;
-    var dy = e.clientY - d.y0;
+    var dy = d.y - d.y0 + _scrolled();
     d.dragged.forEach(function (r) {
       r.el.style.transform = 'translateY(' + dy / r.zoom + 'px)';
     });
-    var b = _boundary(e.clientX, e.clientY);
+    var b = _boundary(d.x, d.y);
     if (b === d.b) return;
     d.b = b;
     // The rows after the dragged ones close up in their table; the rows from
@@ -1304,9 +1195,16 @@ window.ReportOneWords = (function () {
     window.removeEventListener('pointermove', _onDragMove);
     window.removeEventListener('pointerup', _onDragEnd);
     window.removeEventListener('pointercancel', _onDragEnd);
+    window.removeEventListener('keydown', _onDragKey, true);
     document.body.classList.remove('one-w-dragging');
     _drag = null;
     if (!d) return;
+    cancelAnimationFrame(d.frame);
+    if (d.pane) {
+      d.pane.removeEventListener('scroll', _dragTo);
+      d.pane.classList.remove('one-w-drag-on');
+    }
+    if (d.from) d.from.classList.remove('one-w-from');
     // Where every row is on screen now, by its words, to glide from.
     var from = {};
     d.all.forEach(function (r) {
@@ -1451,24 +1349,6 @@ window.ReportOneWords = (function () {
     open: open,
     beforePrint: beforePrint,
     // The wording, changed: pure, for the tests.
-    ops: {
-      blockAt: blockAt,
-      blocks: blocks,
-      textAt: textAt,
-      setText: setText,
-      addItem: addItem,
-      addHeading: addHeading,
-      moveItem: moveItem,
-      moveItemBy: moveItemBy,
-      moveBlock: moveBlock,
-      moveBlockBy: moveBlockBy,
-      removeHeading: removeHeading,
-      addAt: addAt,
-      removeAt: removeAt,
-      moveAt: moveAt,
-      pasteItems: pasteItems,
-      uniqueName: uniqueName,
-      clean: clean,
-    },
+    ops: O,
   };
 })();
