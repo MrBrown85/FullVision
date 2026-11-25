@@ -903,6 +903,28 @@ window.PageReports = (function () {
     return reportPrintTitle(activeCourse, chosen.map(fullName), ReportBlocks.reportContext().termLabel);
   }
 
+  /* After a print on Legal: did the pages come out small? Use Letter
+     Instead switches the class to Letter and opens the Print box again
+     (teacher/print-legal.js). */
+  function _afterPrintPaper(paper) {
+    if (typeof PrintLegal === 'undefined') return;
+    PrintLegal.after({
+      paper: paper,
+      useLetter: function () {
+        if (!_mounted) return;
+        if (viewingIssue) {
+          // A copy keeps the paper it was laid out for: back to the live reports.
+          viewingIssue = null;
+          var sel = document.getElementById('report-copy');
+          if (sel) sel.value = '';
+        }
+        setPaper('letter');
+        renderReports();
+        openIssueDialog();
+      },
+    });
+  }
+
   /* Print This Copy prints the whole copy, every student in it, whatever
      the canvas shows: like _printNow, the canvas shows Everyone for the
      print and goes back afterwards. */
@@ -930,9 +952,14 @@ window.PageReports = (function () {
         rec.termLabel,
       ),
     );
+    var asked = false;
     var restore = function () {
       window.removeEventListener('afterprint', restore);
       restoreTitle();
+      if (!asked) {
+        asked = true;
+        _afterPrintPaper(rec.paper);
+      }
       if (!wasOne) return;
       wasOne = false;
       studioView = 'one';
@@ -962,9 +989,15 @@ window.PageReports = (function () {
         renderReports();
       }
       var restoreTitle = setPrintTitle(_liveReportTitle());
+      var paper = reportPaper;
+      var asked = false;
       var restore = function () {
         window.removeEventListener('afterprint', restore);
         restoreTitle();
+        if (!asked) {
+          asked = true;
+          _afterPrintPaper(paper);
+        }
         if (wasOne) {
           studioView = 'one';
           renderReports();
@@ -1029,6 +1062,9 @@ window.PageReports = (function () {
     html += '<span class="issue-k">Sheets</span><span id="issue-sheets" aria-live="polite">';
     html += (wait ? ReportPrintPaper.COUNTING : ReportPrintPaper.sheetsLine(sheets)) + '</span>';
     html += ReportPrintPaper.rowsHtml(wait || reportPaper) + '</div>';
+    var legal = (wait || reportPaper) === 'legal';
+    // The print box may open on Letter whatever the page asks (teacher/print-legal.js).
+    if (legal && typeof PrintLegal !== 'undefined') html += PrintLegal.stepHtml();
     html += '<fieldset class="issue-group"><legend>Which Students</legend>';
     html +=
       '<label class="issue-option"><input type="radio" name="issue-who" value="all" checked><span>All ' +
@@ -1092,7 +1128,10 @@ window.PageReports = (function () {
     }
     html +=
       '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-issue="cancel">Cancel</button>';
-    html += '<button type="button" class="confirm-ok primary" data-issue="go">Print</button></div>';
+    html +=
+      '<button type="button" class="confirm-ok primary" data-issue="go">' +
+      (legal ? 'Print on Legal' : 'Print') +
+      '</button></div>';
     html += '</div>';
     return html;
   }
@@ -1102,6 +1141,7 @@ window.PageReports = (function () {
   var _restoreOneAfterPrint = false;
   function openIssueDialog() {
     closeIssueDialog();
+    if (typeof PrintLegal !== 'undefined') PrintLegal.close();
     // Laid out from the data now, as on every print path: what prints and is saved.
     if (studioView === 'one') {
       studioView = 'all';

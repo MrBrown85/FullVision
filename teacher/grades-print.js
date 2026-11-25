@@ -1118,8 +1118,21 @@
   function print(cid, opts) {
     var model = stage(cid, opts);
     if (!model.pages.length) return model;
-    activatePrintMode(model.opts.paper);
-    printThen(deactivatePrintMode, printTitle(model));
+    var paper = model.opts.paper;
+    var given = _given;
+    activatePrintMode(paper);
+    printThen(function () {
+      deactivatePrintMode();
+      // On Legal: did the pages come out small? (teacher/print-legal.js)
+      if (typeof PrintLegal !== 'undefined')
+        PrintLegal.after({
+          paper: paper,
+          useLetter: function () {
+            _savePaper(cid, 'letter');
+            open(cid, given);
+          },
+        });
+    }, printTitle(model));
     return model;
   }
 
@@ -1370,7 +1383,10 @@
       _menuRow(menus, opts, 'paper', 'Paper') +
       _menuRow(menus, opts, 'size', 'Text Size');
 
-    return _group('Content', content) + _group('Students', students) + _group('Page', page);
+    // On Legal, under the Page rows: which setting to change in the browser's
+    // print box, which may open on Letter (teacher/print-legal.js).
+    var legal = opts.paper === 'legal' && window.PrintLegal ? PrintLegal.stepHtml() : '';
+    return _group('Content', content) + _group('Students', students) + _group('Page', page) + legal;
   }
 
   /* Widths of the name dashes on the picture's rows, in turn. */
@@ -1520,9 +1536,13 @@
     if (!_state) return;
     var model = buildModel(_state.cid, _state.opts);
     var preview = document.getElementById('gpd-preview');
+    var legal = _state.opts.paper === 'legal';
     if (preview) preview.innerHTML = _previewHtml(model);
     var btn = document.querySelector('#' + OVERLAY_ID + ' [data-gp="print"]');
-    if (btn) btn.disabled = !model.rows.length;
+    if (btn) {
+      btn.disabled = !model.rows.length;
+      btn.textContent = legal ? 'Print on Legal' : 'Print';
+    }
   }
 
   /* Redraws the rows after a change, keeping the scroll and the focus. */
@@ -1588,6 +1608,7 @@
       .join('');
     overlay.appendChild(menu);
     btn.setAttribute('aria-expanded', 'true');
+    menu.dataset.top = String(btn.getBoundingClientRect().top);
     // Under the value, right edges lined up; above it when there is no room below.
     var r = btn.getBoundingClientRect();
     var h = menu.offsetHeight;
@@ -1629,8 +1650,12 @@
     return true;
   }
 
+  // What the dialog was opened with, for Use Letter Instead after a print.
+  var _given = undefined;
   function open(cid, given) {
     close();
+    _given = given;
+    if (window.PrintLegal) PrintLegal.close();
     _state = { cid: cid, opts: _loadOptions(cid, given), trigger: document.activeElement };
     var overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
@@ -1698,10 +1723,17 @@
         _openMenu(overlay, t);
       }
     });
+    // A scroll that moves the row an open menu hangs from closes it. A
+    // scroll that leaves the row where it was does not: the click that
+    // opened the menu may scroll the row into view, and that scroll is
+    // reported after the menu is open.
     overlay.addEventListener(
       'scroll',
       function () {
-        _closeMenu(false);
+        var menu = document.getElementById('gpd-menu');
+        var btn = menu && document.getElementById('gpd-' + menu.dataset.for);
+        if (!menu || !btn) return;
+        if (Math.abs(btn.getBoundingClientRect().top - Number(menu.dataset.top)) > 1) _closeMenu(false);
       },
       true,
     );

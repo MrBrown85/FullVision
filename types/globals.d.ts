@@ -441,3 +441,15 @@ declare function getReportConfig(cid: string): any;
 declare function saveReportConfig(cid: string, config: unknown): void;
 declare function printClassName(course: unknown): string;
 declare function isCourseArchived(cid: string): boolean;
+
+// Printing on Legal paper (teacher/print-legal.js).
+interface Window {
+  PrintLegal: {
+    browser(ua?: string): string;
+    stepText(b: string): string;
+    stepHtml(b?: string, lead?: string): string;
+    after(opts: { paper: string; useLetter?: () => void }): void;
+    close(): void;
+  };
+}
+declare var PrintLegal: Window['PrintLegal'];

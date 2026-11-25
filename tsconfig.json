@@ -13,6 +13,7 @@
   "files": [
     "teacher/obs-roster.js",
     "teacher/obs-toolbar.js",
+    "teacher/print-legal.js",
     "teacher/report-one-word-ops.js",
     "teacher/report-one-words.js",
     "teacher/report-one-copy.js",

@@ -16,7 +16,7 @@ window.ReportPrintPaper = (function () {
   /** @type {Record<string, string>} */
   var SENTENCE = {
     letter: 'Letter paper (8.5 × 11 in).',
-    legal: 'Load Legal paper (8.5 × 14 in). On Letter paper these pages print shrunken.',
+    legal: 'Load Legal paper (8.5 × 14 in).',
   };
 
   /** What a paper needs, in one plain sentence (fixed text, no markup).

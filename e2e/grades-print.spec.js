@@ -69,7 +69,8 @@ async function stageFromDialog(page, dialog) {
     window.__holdCleanup = true;
     window.setTimeout = (fn, ms, ...rest) => (window.__holdCleanup && !ms ? 0 : realSetTimeout(fn, ms, ...rest));
   });
-  await dialog.getByRole('button', { name: 'Print', exact: true }).click();
+  // "Print", or "Print on Legal" (teacher/print-legal.js).
+  await dialog.locator('[data-gp="print"]').click();
   await expect(page.locator('body.grades-print-active')).toHaveCount(1);
   expect(await page.evaluate(() => window.__printed)).toBe(1);
 }

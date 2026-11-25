@@ -1,0 +1,151 @@
+/* Printing on Legal paper (teacher/print-legal.js): the step in the Print
+   box, and the question at the foot of the screen after a Legal print.
+   Nothing here prints. */
+
+/* The step: a sentence, a picture of the print box's settings, its words. */
+.pl-step {
+  margin-top: 12px;
+  padding: 10px 12px 12px;
+  border-radius: 9px;
+  background: var(--active-light);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+}
+.pl-say {
+  font-weight: 600;
+}
+.pl-pic {
+  width: 260px;
+  margin: 8px 0;
+  padding: 4px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  font-size: 12px;
+}
+.pl-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 10px 0 30px;
+}
+.pl-row + .pl-row {
+  border-top: 1px solid var(--border);
+}
+.pl-dim {
+  color: var(--text-3);
+}
+.pl-k {
+  font-weight: 500;
+}
+.pl-v {
+  color: var(--text-2);
+}
+.pl-hit {
+  box-shadow: inset 3px 0 0 var(--active);
+}
+.pl-paper .pl-v {
+  padding: 2px 8px;
+  border: 1.5px solid var(--active);
+  border-radius: 6px;
+  color: var(--link);
+  font-weight: 600;
+}
+.pl-n {
+  position: absolute;
+  left: 8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--active);
+  color: #fff;
+  font: 700 10px/16px var(--font-base);
+  text-align: center;
+}
+.pl-text {
+  color: var(--text-2);
+}
+
+/* After a Legal print: a bar at the foot of the screen. */
+.print-legal-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 10003;
+  width: min(680px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.plb-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.plb-q {
+  flex: 1 1 auto;
+}
+.plb-acts {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+.plb-acts button {
+  font: 600 13px var(--font-base);
+  color: var(--link);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.plb-acts button:hover {
+  background: var(--active-light);
+}
+.plb-acts .plb-how-btn {
+  color: #fff;
+  background: var(--active);
+}
+.plb-acts .plb-how-btn:hover {
+  background: var(--active);
+  filter: brightness(1.08);
+}
+.plb-acts .plb-x {
+  color: var(--text-3);
+  font-size: 18px;
+  line-height: 1;
+}
+.plb-acts button:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.plb-how .pl-step {
+  margin-top: 10px;
+}
+@media (max-width: 640px) {
+  .plb-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .plb-acts {
+    flex-wrap: wrap;
+  }
+}
+@media print {
+  .print-legal-bar {
+    display: none !important;
+  }
+}
