@@ -94,6 +94,7 @@
     "teacher-mobile/grade-reader.js",
     "teacher-mobile/level-sheet.js",
     "teacher-mobile/pull-refresh.js",
+    "teacher-mobile/screen-keep.js",
     "teacher-mobile/pin-page.js",
     "teacher-mobile/bulletins-model.js",
     "teacher-mobile/tab-bulletins.js",

@@ -53,7 +53,7 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 ### Mobile PWA
 
 - Entry point: `teacher-mobile/index.html`
-- Shell: `teacher-mobile/shell.js`, with `tab-bar.js` (the tab bar, and the tab last used on this device, which the app reopens on), `pull-refresh.js` (pull to refresh) and `pin-page.js` (puts the page back at the top when iOS leaves it scrolled; the page is pinned to the screen and only each screen's content scrolls)
+- Shell: `teacher-mobile/shell.js`, with `tab-bar.js` (the tab bar, and the tab last used on this device, which the app reopens on), `pull-refresh.js` (pull to refresh), `screen-keep.js` (what a screen keeps when it is drawn again after a sync: its scroll, its open rows and, in the grader, the same students with the same one on screen) and `pin-page.js` (puts the page back at the top when iOS leaves it scrolled; the page is pinned to the screen and only each screen's content scrolls)
 - Shared pieces: `components.js` (`MComponents` / `MC`; `MC.tabBar` is the top bar of every tab: the Demo pill, the class name with its class list, the sync dot and ⋯), `tabs.css` (the tabs' top bar, Observe and Bulletins), `card-stack.js`, `student-card.js` (the Students card), `students.css` (the card's and the profile's styles)
 - Main tab modules:
   - `tab-students.js`, with `students-list.js` and `student-detail.js` (the profile: the student's own words first, an open concern's follow-up, + Observe with their words quoted)

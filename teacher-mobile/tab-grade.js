@@ -1266,7 +1266,7 @@ window.MGrade = (function () {
         _student = null;
       }
       // A grading screen opened afresh shows each not-in card's criteria collapsed.
-      if (!(opts && opts.keep)) _paperOpen = {};
+      if (!(opts && (opts.keep || opts.pinned))) _paperOpen = {};
       if (opts && opts.student) {
         // The student's pieces: the list given (a piece shown after another),
         // or their To Grade list now. A piece no longer on it opens as usual.
@@ -1292,7 +1292,8 @@ window.MGrade = (function () {
         }
       }
       if (opts && opts.only === 'tograde') {
-        var waiting = MGradePhotos.toGrade(cid, assessment);
+        // Drawn again (opts.pinned): the students it had, though one graded since no longer waits.
+        var waiting = opts.pinned || MGradePhotos.toGrade(cid, assessment);
         if (waiting.length) {
           _onlyAid = aid;
           _onlyIds = waiting;
