@@ -3477,6 +3477,7 @@ function _pushHydratedScore(scores, sid, entry) {
     // A criterion note the server no longer has is gone here too.
     if (!entry.critNote) delete existing.critNote;
     if (!entry.critBeyond) delete existing.critBeyond;
+    if (!entry.critOwn) delete existing.critOwn;
     Object.assign(existing, entry);
   } else scores[sid].push(entry);
 }
@@ -3491,6 +3492,7 @@ function _scoreEntryFromCanonical(
   criterionComment,
   criterionBeyond,
   reportNote,
+  criterionOwn,
 ) {
   var entry = {
     // Deterministic, so loading the same server data twice writes the same
@@ -3514,6 +3516,9 @@ function _scoreEntryFromCanonical(
   if (criterionComment) entry.critNote = String(criterionComment);
   // A single-point rubric's Went Beyond note (rubric_score.beyond).
   if (criterionBeyond) entry.critBeyond = String(criterionBeyond);
+  // Pair and group work: the line for this student alone under the
+  // group's comment (rubric_score.own_comment). Never copied to the group.
+  if (criterionOwn) entry.critOwn = String(criterionOwn);
   // The Note for the Report on the whole piece (score.report_note), set on
   // every score entry of the cell, like the overall comment.
   if (reportNote) entry.reportNote = String(reportNote);
@@ -3671,6 +3676,8 @@ async function _hydrateAssessmentDetails(cid) {
                 rubricScore.modifier,
                 rubricScore.comment,
                 rubricScore.beyond,
+                undefined,
+                rubricScore.own,
               ),
             );
           });
@@ -3782,6 +3789,7 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
               rubricScore.comment,
               rubricScore.beyond,
               reportNote,
+              rubricScore.own,
             ),
           );
         });
@@ -4109,13 +4117,15 @@ function _bundleCells(gb) {
   sorted(gb.criterion_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
     if (cell && criteria[r[2]])
-      // A seventh value, Went Beyond, from migrations/20261027_single_point_rubric.sql.
+      // A seventh value, Went Beyond, from migrations/20261027_single_point_rubric.sql;
+      // an eighth, the line for one student, from migrations/2026112410_criterion_own_line.sql.
       cell.rubric_scores.push({
         criterion_id: criteria[r[2]],
         value: r[3],
         modifier: r[4],
         comment: r[5] || null,
         beyond: r[6] || null,
+        own: r[7] || null,
       });
   });
   // A points-scored assessment is scored as a whole; get_assessment_detail
@@ -5282,7 +5292,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
     if (criterion) {
       ops.push({
         rpc: 'upsert_rubric_score',
-        params: {
+        params: _withOwnLine(cid, sid, aid, tid, {
           p_enrollment_id: sid,
           p_assessment_id: aid,
           p_criterion_id: tid,
@@ -5290,7 +5300,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
           p_modifier: modifier,
           p_comment: criterionComment,
           p_beyond: criterionBeyond,
-        },
+        }),
       });
     } else if (isRubric) {
       // A competency key on rubric work is a stale entry: nothing to send.
@@ -5300,7 +5310,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
       if (isAssessmentTag || getTagById(cid, tid)) return;
       ops.push({
         rpc: 'upsert_rubric_score',
-        params: {
+        params: _withOwnLine(cid, sid, aid, tid, {
           p_enrollment_id: sid,
           p_assessment_id: aid,
           p_criterion_id: tid,
@@ -5308,7 +5318,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
           p_modifier: modifier,
           p_comment: criterionComment,
           p_beyond: criterionBeyond,
-        },
+        }),
       });
     } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag)) {
       // An unlinked assessment's single score. On proficiency work 0 clears
@@ -5366,6 +5376,17 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
      `critBeyond`.
    Each is set on every score key the criterion fans out to. */
 var _CRITERION_NOTE_PARAMS = { critNote: 'p_comment', critBeyond: 'p_beyond' };
+/* The line for one student on pair or group work: rubric_score.own_comment,
+   cached as `critOwn`, saved for that student only (never through
+   _groupWrite) and kept when the group's grade is copied to them. It is
+   sent only when there is one, or when it is being cleared: the server
+   keeps its own when the param is left out. */
+var _CRITERION_OWN_PARAM = 'p_own_comment';
+function _withOwnLine(cid, sid, aid, tid, params) {
+  var own = _rubricCriterionNoteFor(cid, sid, aid, tid, 'critOwn');
+  if (own) params[_CRITERION_OWN_PARAM] = own;
+  return params;
+}
 
 /* The cached note (`field`) for the criterion holding score key `tid`. */
 function _rubricCriterionNoteFor(cid, sid, aid, tid, field) {
@@ -5393,6 +5414,9 @@ function getRubricCriterionComment(cid, sid, aid, criterion) {
 }
 function getRubricCriterionBeyond(cid, sid, aid, criterion) {
   return _getRubricCriterionNote(cid, sid, aid, criterion, 'critBeyond');
+}
+function getRubricCriterionOwn(cid, sid, aid, criterion) {
+  return _getRubricCriterionNote(cid, sid, aid, criterion, 'critOwn');
 }
 
 /* Save (or clear, with '') one note on one criterion. The cache changes at
@@ -5457,6 +5481,8 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
       params[_CRITERION_NOTE_PARAMS[f]] =
         f === field ? note : _getRubricCriterionNote(cid, sid, aid, criterion, f) || null;
     });
+    var own = field === 'critOwn' ? note : _getRubricCriterionNote(cid, sid, aid, criterion, 'critOwn');
+    if (own || field === 'critOwn') params[_CRITERION_OWN_PARAM] = own;
     _trackPendingSync(
       _writeRpc('upsert_rubric_score', params).then(function (res) {
         if (res.error) _reportScoreWriteFailure('upsert_rubric_score', res.error);
@@ -5474,6 +5500,11 @@ function _saveRubricCriterionCommentOne(cid, sid, aid, criterionId, text) {
 }
 function _saveRubricCriterionBeyondOne(cid, sid, aid, criterionId, text) {
   return _saveRubricCriterionNote(cid, sid, aid, criterionId, text, 'critBeyond');
+}
+/* The line for one student under a group's criterion comment: theirs
+   alone, so it is not a group write. */
+function saveRubricCriterionOwn(cid, sid, aid, criterionId, text) {
+  return _saveRubricCriterionNote(cid, sid, aid, criterionId, text, 'critOwn');
 }
 
 /* ── Competency comments ───────────────────────────────────────────────
@@ -5709,7 +5740,8 @@ function _scoreEntryRemoteChanged(a, b) {
     (a.mod || 0) !== (b.mod || 0) ||
     (a.note || '') !== (b.note || '') ||
     (a.critNote || '') !== (b.critNote || '') ||
-    (a.critBeyond || '') !== (b.critBeyond || '')
+    (a.critBeyond || '') !== (b.critBeyond || '') ||
+    (a.critOwn || '') !== (b.critOwn || '')
   );
 }
 
@@ -6000,7 +6032,11 @@ function getAssignmentStatus(cid, sid, aid) {
 function hasScoreOrFeedback(cid, sid, aid) {
   var assess = _assessmentById(cid, aid);
   var entered = (getScores(cid)[sid] || []).some(function (e) {
-    return e && e.assessmentId === aid && (isScoreEntered(assess, e) || !!e.note || !!e.critNote || !!e.critBeyond);
+    return (
+      e &&
+      e.assessmentId === aid &&
+      (isScoreEntered(assess, e) || !!e.note || !!e.critNote || !!e.critBeyond || !!e.critOwn)
+    );
   });
   if (entered) return true;
   var dibels = getDibelsScores(cid)[sid + ':' + aid];
@@ -6286,7 +6322,7 @@ function _migrateRubricScoreKeys(cid, scores) {
           return;
         }
         // The criterion's own entry wins; a note only the old entry holds moves.
-        ['critNote', 'critBeyond'].forEach(function (field) {
+        ['critNote', 'critBeyond', 'critOwn'].forEach(function (field) {
           if (legacy[field] && !has[field]) has[field] = legacy[field];
         });
       });
@@ -7283,6 +7319,8 @@ function _gradeOf(a, entries, checks) {
       grade.modifier = part.modifier;
     } else if (onRubric) {
       part.beyond = e.critBeyond || null;
+      // The server's copy has `own` only when there is one (_grade_copy_entry).
+      if (e.critOwn) part.own = String(e.critOwn);
       grade.criteria[e.tagId] = part;
     } else grade.tags[e.tagId] = part;
   });
@@ -7600,11 +7638,12 @@ function _gradeCopyEntries(cid, sid, aid, copy, own, working) {
       (mine.score == null || mine.score === '' ? null : Number(mine.score)) === e.score &&
       (mine.mod || 0) === (e.mod || 0) &&
       (mine.critNote || '') === (e.critNote || '') &&
-      (mine.critBeyond || '') === (e.critBeyond || '');
+      (mine.critBeyond || '') === (e.critBeyond || '') &&
+      (mine.critOwn || '') === (e.critOwn || '');
     if (same) return mine;
     var out = Object.assign({}, mine, { score: e.score });
     if (!sameComment) out.note = e.note;
-    ['mod', 'critNote', 'critBeyond'].forEach(function (f) {
+    ['mod', 'critNote', 'critBeyond', 'critOwn'].forEach(function (f) {
       if (e[f]) out[f] = e[f];
       else delete out[f];
     });
@@ -8226,12 +8265,33 @@ function _replaceGroupEntries(cid, scores, a, m, entries) {
   var aid = a.id;
   _scoresApart['gb-scores-' + cid] = true; // memory changes here; the save comes later
   var reportNote = getScoreReportNote(cid, m, aid);
+  // The member's own lines (critOwn) are theirs: kept, never copied.
+  var own = {};
+  (scores[m] || []).forEach(function (e) {
+    if (e && e.assessmentId === aid && e.critOwn) own[e.tagId] = e.critOwn;
+  });
   var next = entries.map(function (e) {
     var copy = _cloneValue(e);
     copy.id = m + ':' + aid + ':' + e.tagId;
     if (reportNote) copy.reportNote = reportNote;
     else delete copy.reportNote;
+    if (own[e.tagId]) copy.critOwn = own[e.tagId];
+    else delete copy.critOwn;
+    delete own[e.tagId];
     return copy;
+  });
+  Object.keys(own).forEach(function (tid) {
+    next.push({
+      id: m + ':' + aid + ':' + tid,
+      assessmentId: aid,
+      tagId: tid,
+      score: 0,
+      date: a.date || courseToday(cid),
+      type: scoreTypeFor(a),
+      note: '',
+      critOwn: own[tid],
+      created: new Date().toISOString(),
+    });
   });
   if (!next.length && reportNote) {
     var key = _noteOnlyScoreKey(cid, a);

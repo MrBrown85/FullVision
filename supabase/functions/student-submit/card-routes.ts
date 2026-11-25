@@ -204,14 +204,16 @@ function classes(v: unknown): Json[] {
 /* A copy of a grade, as student_submit._returned_grade gives it
    (migrations/2026110902_grade_return.sql, 3): the score, the Overall
    Comment, a level per competency, a level per rubric criterion with its
-   Work On and Went Beyond notes, and the ticked checkboxes. */
+   Work On and Went Beyond notes and, on pair or group work, the line for this
+   student alone (own, migrations/2026112410_criterion_own_line.sql), and the
+   ticked checkboxes. */
 const LEVEL = ['value', 'modifier', 'comment'];
 export function gradeCopy(v: unknown): Json | null {
   if (!isObject(v)) return null;
   return {
     ...pick(v, ['v', ...LEVEL]),
     tags: byId(v.tags, t => pick(t, LEVEL)),
-    criteria: byId(v.criteria, c => pick(c, [...LEVEL, 'beyond'])),
+    criteria: byId(v.criteria, c => pick(c, [...LEVEL, 'beyond', 'own'])),
     checks: list(v.checks).filter(id => typeof id === 'string' && UUID.test(id)),
   };
 }

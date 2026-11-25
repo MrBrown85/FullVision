@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, WORK, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const KEY = 'fv-s-session';
 const SIGNED_OUT = 'You are signed out. Scan or type your card to open your page again.';
 const UNREACHED = "Couldn't reach FullVision. Check your internet and try again.";

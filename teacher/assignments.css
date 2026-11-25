@@ -5807,6 +5807,61 @@ body.af-comp-open #gb-tooltip {
   background: rgba(0, 122, 255, 0.2);
   outline: none;
 }
+/* Line for One Student (group work): a member's own field under the
+   group's, and the buttons that open one. */
+.rsg-crit-own {
+  margin: 6px 0 0 24px;
+}
+.rsg-crit-own-label {
+  display: block;
+  margin: 0 0 3px 2px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-2);
+}
+.rsg-crit-own .rsg-crit-input {
+  padding-right: 12px;
+}
+.rsg-crit-each {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.rsg-crit-each-btn {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.rsg-crit-each-btn:hover,
+.rsg-crit-each-btn:focus-visible {
+  background: rgba(0, 122, 255, 0.1);
+  outline: none;
+}
+/* A saved line for one student, under the group's comment. */
+.rsg-crit-own-note {
+  margin: 3px 0 0 13px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+.rsg-crit-own-note b {
+  color: var(--text);
+  font-weight: 700;
+}
+.rsg-crit-own-note:hover {
+  color: var(--text);
+}
 /* The saved comment opens to edit with a click. */
 .rsg-criterion-row .rsg-crit-note {
   cursor: text;
@@ -6230,6 +6285,82 @@ body.af-comp-open #gb-tooltip {
 .grader-step:disabled {
   opacity: 0.35;
   cursor: default;
+}
+/* In a queue (I3): on a piece's last step Next names the next piece. The
+   title is cut with an ellipsis so the row keeps its shape. */
+.grader-step.is-queue {
+  width: auto;
+  min-width: 0;
+  max-width: 250px;
+  flex: 0 1 auto;
+  padding: 0 12px;
+  gap: 0;
+  background: var(--active-fill);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.grader-step.is-queue .grader-next-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grader-step.is-queue .grader-next-pre,
+.grader-step.is-queue .grader-next-arrow {
+  flex: none;
+  white-space: pre;
+}
+/* All Caught Up (I3): over the dialog after the last piece in a queue. */
+.grader-caught-up {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--bg);
+  border-radius: inherit;
+}
+.grader-caught-up-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.grader-caught-up-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.grader-caught-up-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.grader-caught-up-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grader-caught-up-n {
+  flex: none;
+  font-weight: 600;
+}
+.grader-caught-up-actions {
+  display: flex;
+  gap: 10px;
 }
 .grader-spacer {
   flex: 1;

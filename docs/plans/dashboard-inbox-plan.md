@@ -1,5 +1,7 @@
 # The Dashboard's middle row: Inbox and Competencies (2026-11-17)
 
+_The Inbox's views (By Assessment, Side by Side, Flip Through, the old Roll Call) were replaced by `inbox-redesign-plan.md` on 2026-11-24; the rest of this plan stands._
+
 **Status (Nov 17, late night).** A plan. Nothing is built. Every design choice is now settled: Colin's own are quoted below, and the rest were chosen by the orchestrating session under Colin's delegation, Nov 17 ("make whatever choices you think is best"). No builder starts until the orchestrating session has reviewed this plan. Nothing here needs SQL or changes a grade, so nothing in this build waits on Colin; a release still needs his word.
 
 **What it is for.** Teachers told Colin the Dashboard is "overwhelming". The top bar and the student cards stay as they are. The calm comes from the row between them: on the left two thirds, an Inbox of the work that has come in with the Bulletins tile under it; on the right third, one Competencies tile as tall as both. The row fills the rest of the first view, so the Students heading and the cards start below it.

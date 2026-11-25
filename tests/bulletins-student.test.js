@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 const routes = page => page.calls.map(c => c.body.route);
 const tabs = page => [...page.root().querySelectorAll('.sp-tabs-bottom .sp-tab')].map(t => t.getAttribute('data-tab'));
 const current = page =>

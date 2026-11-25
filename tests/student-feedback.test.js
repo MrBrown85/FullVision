@@ -23,7 +23,7 @@ import {
   samplePage,
 } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = new Date().toLocaleDateString('en-CA');
 
 const q = (page, sel) => page.root().querySelector(sel);
 const qa = (page, sel) => [...page.root().querySelectorAll(sel)];

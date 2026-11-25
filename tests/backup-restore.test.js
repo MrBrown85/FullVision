@@ -498,6 +498,7 @@ describe('restore class from backup', () => {
           modifier: 0,
           comment: 'Neat',
           beyond: null,
+          own_comment: null,
         },
         {
           enrollment_id: id(E1),
@@ -507,6 +508,7 @@ describe('restore class from backup', () => {
           modifier: 1,
           comment: null,
           beyond: 'Extra mile',
+          own_comment: null,
         },
       ]),
     );

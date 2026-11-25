@@ -237,11 +237,12 @@ grant execute on routine public._fv_release_orphan_teacher_email() to service_ro
 revoke all on routine public._fv_teacher_sign_in_deleted() from public;
 grant execute on routine public._fv_teacher_sign_in_deleted() to service_role;
 revoke all on routine public._fv_timezone(p_tz text) from public;
+grant execute on routine public._fv_timezone(p_tz text) to authenticated;
 grant execute on routine public._fv_timezone(p_tz text) to service_role;
 revoke all on routine public._grade_copy(p_enrollment_id uuid, p_assessment_id uuid) from public;
 grant execute on routine public._grade_copy(p_enrollment_id uuid, p_assessment_id uuid) to service_role;
-revoke all on routine public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean) from public;
-grant execute on routine public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean) to service_role;
+revoke all on routine public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean, p_own text) from public;
+grant execute on routine public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean, p_own text) to service_role;
 revoke all on routine public._grade_copy_in_use(p_copy jsonb, p_assessment_id uuid) from public;
 grant execute on routine public._grade_copy_in_use(p_copy jsonb, p_assessment_id uuid) to service_role;
 revoke all on routine public._grade_copy_of(p_value numeric, p_modifier integer, p_comment text, p_tags jsonb, p_criteria jsonb, p_checks jsonb) from public;
@@ -930,9 +931,9 @@ grant execute on routine public.upsert_reflection(p_enrollment_id uuid, p_sectio
 revoke all on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) from public;
 grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) to authenticated;
 grant execute on routine public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) to service_role;
-revoke all on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) from public;
-grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) to authenticated;
-grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) to service_role;
+revoke all on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text, p_own_comment text) from public;
+grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text, p_own_comment text) to authenticated;
+grant execute on routine public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text, p_own_comment text) to service_role;
 revoke all on routine public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) from public;
 grant execute on routine public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) to authenticated;
 grant execute on routine public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) to service_role;

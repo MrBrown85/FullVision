@@ -733,13 +733,18 @@
     return Math.max(1, longest) * EM_A_LETTER;
   }
 
-  /* Sizes the bottom bar that has Bulletins in it, from the bar as drawn:
-     each tab as wide as its longest word needs, and one label size for all,
-     the bar's own width less 2 px a side for each tab over the words' widths,
-     12 px at most. Counts the tabs that are there (three, four, five), and
-     measures the bar's own width and zoom, so it holds in the student's page
-     and in the preview's phone frame at every Text Size. A bar without
-     Bulletins is left as s/page-view.css draws it. */
+  /* Sizes the bottom bar that has Bulletins in it, from the bar as drawn.
+     The tabs are equal, so the icons are evenly spaced (Colin, Nov 24 2026:
+     they sat off-centre when each tab was as wide as its label's longest
+     word). Each label is as wide as its longest word and centred under its
+     icon; it may reach past its tab into a neighbour's room, never into the
+     neighbour's label or off the bar. One label size for all, the largest
+     that keeps every two neighbours apart (2 px each side of every tab, on
+     the screen) and the end labels on the bar, 12 px at most. Counts the
+     tabs that are there (three, four, five), and measures the bar's own
+     width and zoom, so it holds in the student's page and in the preview's
+     phone frame at every Text Size. A bar without Bulletins is left as
+     s/page-view.css draws it. */
   function fitTabs(root) {
     if (!root || !root.querySelectorAll) return;
     Array.prototype.forEach.call(root.querySelectorAll('.sp-tabs-bottom'), function (bar) {
@@ -755,15 +760,35 @@
         var l = t.querySelector('.sp-tab-label');
         return wordEms(l ? l.textContent : '');
       });
-      var sum = ems.reduce(function (a, b) {
-        return a + b;
-      }, 0);
-      var font = Math.min(12, (r.width / z - (tabs.length * 4) / z) / sum);
+      // A tab's width less 2 px a side on the screen, in the page's pixels:
+      // the room an end label has, and two neighbours share.
+      var room = r.width / z / tabs.length - 4 / z;
+      var font = Math.min(12, room / ems[0], room / ems[ems.length - 1]);
+      for (var k = 0; k + 1 < ems.length; k++) font = Math.min(font, (2 * room) / (ems[k] + ems[k + 1]));
       bar.classList.add('sp-bulletin-tabs');
       bar.style.setProperty('--sp-bulletin-tab-font', font + 'px');
       bar.style.setProperty('--sp-bulletin-tab-pad', 2 / z + 'px');
-      tabs.forEach(function (t, k) {
-        t.style.flexGrow = String(ems[k]);
+      var widths = ems.map(function (e) {
+        return e * font;
+      });
+      tabs.forEach(function (t, i) {
+        t.style.flexGrow = '';
+        var l = t.querySelector('.sp-tab-label');
+        if (l) l.style.width = widths[i] + 'px';
+      });
+      // A label of two words ("My Learning") stays on one line where it
+      // fits whole, as drawn, beside its neighbours and on the bar.
+      tabs.forEach(function (t, i) {
+        var l = t.querySelector('.sp-tab-label');
+        if (!l || !/\s/.test(l.textContent.trim())) return;
+        l.style.width = 'max-content';
+        var whole = Math.ceil(l.getBoundingClientRect().width / z) + 1;
+        var fits =
+          whole <= (i === 0 || i === tabs.length - 1 ? room : 2 * room) &&
+          (i === 0 || (whole + widths[i - 1]) / 2 <= room) &&
+          (i === tabs.length - 1 || (whole + widths[i + 1]) / 2 <= room);
+        if (fits) widths[i] = Math.max(widths[i], whole);
+        l.style.width = widths[i] + 'px';
       });
     });
   }

@@ -168,3 +168,46 @@ test.describe('Criterion comment, typed in place', () => {
     expect(notes).toEqual(['Strong question.', 'Strong question.']);
   });
 });
+
+test.describe('Line for One Student', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+  });
+
+  test('a line for one member is theirs alone, under the group’s comment', async ({ page }) => {
+    await openGrid(page, { ...ASSESSMENT, collaboration: 'group', groups: [['stu-001', 'stu-002']] });
+    await commentButton(page, 'stu-001', 'crit-hyp').click();
+    await field(page).fill('Strong question.');
+    const each = page.locator('.rsg-crit-each');
+    await expect(each.getByRole('button')).toHaveText(['Alice', 'Bob']);
+    await each.getByRole('button', { name: 'Bob' }).click();
+    const own = page.locator('#crit-own-stu-002');
+    await expect(own).toBeFocused();
+    await own.fill('Bob, your sketch made it clear.');
+    // Tab walks back to the group's field with Shift+Tab, Escape puts both away.
+    await own.press('Shift+Tab');
+    await expect(field(page)).toBeFocused();
+    await field(page).press('Escape');
+
+    const notes = row(page, 'stu-001', 'crit-hyp');
+    await expect(notes.locator('.rsg-crit-note')).toHaveText('Strong question.');
+    await expect(notes.locator('.rsg-crit-own-note')).toHaveText('Bob Only: Bob, your sketch made it clear.');
+    const lines = await page.evaluate(
+      ({ cid }) =>
+        ['stu-001', 'stu-002'].map(sid =>
+          (getScores(cid)[sid] || [])
+            .filter(e => e.assessmentId === 'assess-cc' && e.tagId === 'crit-hyp')
+            .map(e => [e.critNote || '', e.critOwn || ''].join('|'))
+            .join(','),
+        ),
+      { cid: TEST_COURSE.id },
+    );
+    expect(lines).toEqual(['Strong question.|', 'Strong question.|Bob, your sketch made it clear.']);
+
+    // A click on the line opens it again at Bob's field.
+    await notes.locator('.rsg-crit-own-note').click();
+    await expect(page.locator('#crit-own-stu-002')).toBeFocused();
+  });
+});

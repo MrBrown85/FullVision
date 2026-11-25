@@ -181,11 +181,11 @@ test('the front page Demo Mode: the top bar, the Inbox and Assignments agree on 
   const cell = page.locator('.dash-glance-tograde');
   await expect(cell.locator('.dash-glance-value')).toHaveText('4');
   await expect(cell.locator('.dash-glance-sub')).toContainText('2 Not Returned');
-  const rows = await page.evaluate(() => DashInbox.model().rows.reduce((n, r) => n + r.tograde, 0));
+  const rows = await page.evaluate(() => DashInbox.model().stacks.reduce((n, r) => n + r.tograde, 0));
   expect(rows).toBe(4);
-  await expect(page.locator('#dash-inbox .dash-inbox-row[data-aid="' + LIGHT + '"] .dash-inbox-counts')).toContainText(
-    '4 to grade',
-  );
+  await expect(
+    page.locator('#dash-inbox .dash-inbox-stack[data-aid="' + LIGHT + '"] .dash-inbox-stack-count'),
+  ).toHaveText('4');
   await page
     .locator('a, button', { hasText: /^Assignments$/ })
     .first()

@@ -2801,6 +2801,7 @@ export type Database = {
           enrollment_id: string
           id: string
           modifier: number
+          own_comment: string | null
           updated_at: string
           value: number | null
         }
@@ -2813,6 +2814,7 @@ export type Database = {
           enrollment_id: string
           id?: string
           modifier?: number
+          own_comment?: string | null
           updated_at?: string
           value?: number | null
         }
@@ -2824,6 +2826,7 @@ export type Database = {
           enrollment_id?: string
           id?: string
           modifier?: number
+          own_comment?: string | null
           updated_at?: string
           value?: number | null
         }
@@ -3990,6 +3993,7 @@ export type Database = {
           p_comment: string
           p_criterion: boolean
           p_modifier: number
+          p_own?: string
           p_value: number
         }
         Returns: Json
@@ -5311,6 +5315,7 @@ export type Database = {
           p_criterion_id: string
           p_enrollment_id: string
           p_modifier?: number
+          p_own_comment?: string
           p_value: number
         }
         Returns: string

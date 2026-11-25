@@ -50,6 +50,7 @@ export const WRITERS = {
   saveTagComment: ['comment', "a competency's comment on work with no rubric"],
   saveRubricCriterionComment: ['comment', "a rubric criterion's comment (Work On)"],
   saveRubricCriterionBeyond: ['comment', "a single-point rubric criterion's Went Beyond note"],
+  saveRubricCriterionOwn: ['comment', 'a line under a group criterion comment for one student alone'],
   saveScoreReportNote: ['note', 'the Note for the Report'],
   // ticks and DIBELS
   setRubricCheck: ['tick', "one box of an Advanced Rubric's checklist"],
@@ -86,6 +87,7 @@ export const WRITERS = {
   'Grader.setTick': ['tick', 'an Advanced Rubric box'],
   'Grader.setCriterionComment': ['comment', "a criterion's comment"],
   'Grader.setWentBeyond': ['comment', 'Went Beyond'],
+  'Grader.setCriterionOwn': ['comment', 'a line for one student under a group criterion comment'],
   'Grader.setCompetencyComment': ['comment', "a competency's comment"],
   'Grader.setOverallComment': ['comment', 'the Overall Comment'],
   'Grader.setDibels': ['dibels', 'a DIBELS window'],

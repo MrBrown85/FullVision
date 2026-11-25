@@ -113,7 +113,13 @@ window.StudentOverview = (function () {
           text:
             v != null ? (six ? RS.label(rubric, RS.fromValue(rubric, v)) + ' · ' : '') + nearestScoreLevelName(v) : '',
           lv: v != null ? nearestScoreLevel(v).level : 0,
-          comment: getRubricCriterionComment(cid, studentId, a.id, crit),
+          // On group work, the line for this student alone follows the group's comment.
+          comment: [
+            getRubricCriterionComment(cid, studentId, a.id, crit),
+            getRubricCriterionOwn(cid, studentId, a.id, crit),
+          ]
+            .filter(Boolean)
+            .join(' '),
           beyond: single ? getRubricCriterionBeyond(cid, studentId, a.id, crit) : '',
         });
       });

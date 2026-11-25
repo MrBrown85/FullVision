@@ -20,10 +20,9 @@
     <link rel="stylesheet" href="/teacher/dashboard.css" />
     <link rel="stylesheet" href="/teacher/dash-competencies.css" />
     <link rel="stylesheet" href="/teacher/dash-inbox.css" />
-    <link rel="stylesheet" href="/teacher/dash-inbox-pick.css" />
-    <link rel="stylesheet" href="/teacher/dash-inbox-side.css" />
-    <link rel="stylesheet" href="/teacher/dash-inbox-flip.css" />
-    <link rel="stylesheet" href="/teacher/dash-inbox-roll.css" />
+    <link rel="stylesheet" href="/teacher/dash-inbox-stacks.css" />
+    <link rel="stylesheet" href="/teacher/dash-inbox-rollcall.css" />
+    <link rel="stylesheet" href="/teacher/dash-inbox-targets.css" />
     <link rel="stylesheet" href="/teacher/assignments.css" />
     <link rel="stylesheet" href="/teacher/student.css" />
     <link rel="stylesheet" href="/teacher/work-wall.css" />
@@ -221,10 +220,12 @@
     <script src="/teacher/dash-inbox.js"></script>
     <!-- The Inbox's All Caught Up and file drop (D5); calls AddWorkClass at click and drop time -->
     <script src="/teacher/dash-inbox-drop.js"></script>
-    <script src="/teacher/dash-inbox-pick.js"></script>
-    <script src="/teacher/dash-inbox-side.js"></script>
-    <script src="/teacher/dash-inbox-flip.js"></script>
-    <script src="/teacher/dash-inbox-roll.js"></script>
+    <!-- The redrawn Inbox: the queue and the To Grade stacks -->
+    <script src="/teacher/dash-inbox-queue.js"></script>
+    <script src="/teacher/dash-inbox-stacks.js"></script>
+    <!-- Nothing waiting, and a scan held over the tile -->
+    <script src="/teacher/dash-inbox-targets.js"></script>
+    <script src="/teacher/dash-inbox-rollcall.js"></script>
     <script src="/teacher/dash-observations.js"></script>
     <script src="/teacher/dash-student-cards.js"></script>
     <script src="/teacher/dash-insights.js"></script>
@@ -271,6 +272,7 @@
     <script src="/teacher/rubric-words.js"></script>
     <script src="/teacher/assign-draft.js"></script>
     <script src="/teacher/assessment-type-field.js"></script>
+    <script src="/teacher/crit-comment.js"></script>
     <script src="/teacher/page-assignments.js"></script>
     <script src="/teacher/card-menu.js"></script>
     <script src="/teacher/assign-competency-picker.js"></script>

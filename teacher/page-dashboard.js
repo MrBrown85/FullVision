@@ -61,9 +61,6 @@ window.PageDashboard = (function () {
     if (view !== DashOverview.compView(activeCourse, _readPref(COMP_VIEW_KEY + activeCourse))) _compFade = true;
     _writePref(COMP_VIEW_KEY + activeCourse, view);
   };
-  _viewSetters.inbox = function (key) {
-    if (window.DashInbox) DashInbox.setView(activeCourse, key);
-  };
   // The next render slides the student cards to their new places (the
   // filter was set or cleared, or the sort changed).
   var _slideCards = false;

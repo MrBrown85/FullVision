@@ -12,7 +12,9 @@ import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+// The student page reads today on the device's own clock, so the tests do too:
+// the UTC day is tomorrow there from 4 pm Pacific.
+const TODAY = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const ON = { 'fv-build-quizzes': '1' };
 const MIN = 60 * 1000;
 const SECRET = 'My private answer 7491';

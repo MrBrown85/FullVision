@@ -333,6 +333,7 @@ create table rubric_score (
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, as tag_score (20261013_proficiency_plus_minus)
   comment       text,                                                -- the teacher's note on this criterion, printed on the rubric handout (20261018_rubric_score_comment); Work On on a single-point rubric
   beyond        text,                                                -- Went Beyond, single-point rubrics (20261027_single_point_rubric)
+  own_comment   text,                                                -- the line for this student alone on pair or group work, never copied to group mates; null when none (2026112410_criterion_own_line)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, criterion_id)
 );
@@ -374,7 +375,7 @@ create table rubric_check_score (
 -- course); the restore sets the backup's state. Teachers read their own rows;
 -- nobody writes it directly. A copy is { v, value, modifier, comment, tags
 -- {tag id: {value, modifier, comment}}, criteria {criterion id: {value,
--- modifier, comment, beyond}}, checks [check ids] }; status and report_note
+-- modifier, comment, beyond, own (only when set)}}, checks [check ids] }; status and report_note
 -- are never in one. Students are sent only the part of a copy the work's
 -- scoring uses now (_grade_copy_in_use), and nothing while the piece is
 -- Missing or Excused.

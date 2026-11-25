@@ -371,30 +371,11 @@ for (const width of WIDTHS) {
             await look('the feed');
             await page.evaluate(() => window.scrollTo(0, 0));
             await look('the feed, top');
-            // The four tabs: icons in one row, every label whole.
-            const tabs = await bar(page)
-              .locator('.sp-tab')
-              .evaluateAll(els =>
-                els.map(t => ({
-                  icon: Math.round(t.querySelector('.sp-tab-icon').getBoundingClientRect().top),
-                  /* Where the words are drawn (a range over the label's text), inside the tab's own
-                 box, and no word drawn on two lines: a label's box can grow past its tab. */
-                  fits: (() => {
-                    const l = t.querySelector('.sp-tab-label');
-                    const b = t.getBoundingClientRect();
-                    const range = document.createRange();
-                    range.selectNodeContents(l);
-                    const rects = [...range.getClientRects()].filter(r => r.width > 0);
-                    const lines = new Set(rects.map(r => Math.round(r.top))).size;
-                    return (
-                      rects.every(r => r.left >= b.left - 1 && r.right <= b.right + 1) &&
-                      lines <= l.textContent.split(' ').length
-                    );
-                  })(),
-                })),
-              );
+            // The four tabs: icons in one row and evenly spaced, every label whole and clear of the next.
+            const tabs = await tabLabels(page, '#app');
             expect(tabs).toHaveLength(4);
             expect(new Set(tabs.map(t => t.icon)).size).toBe(1);
+            expect(tabs[0].even, 'icons evenly spaced').toBe(true);
             expect(tabs.filter(t => !t.fits)).toEqual([]);
             // The link's question.
             await page.locator('.sp-bulletin-link').click();
@@ -477,29 +458,45 @@ for (const width of WIDTHS) {
   }
 }
 
-/* The bar with Bulletins in it (StudentBulletinsView.fitTabs): every label whole, inside its tab, at
-   every width and Text Size in both fonts; the drawn size never smaller at a bigger Text Size; five
-   tabs fit as well as four; and in the teacher's Preview as Student, sized from the phone frame's bar,
-   not the teacher's window. */
+/* The bar with Bulletins in it (StudentBulletinsView.fitTabs): the icons evenly spaced; every label
+   whole, on the bar and clear of its neighbours' words, at every width and Text Size in both fonts; the
+   drawn size never smaller at a bigger Text Size; five tabs fit as well as four; and in the teacher's
+   Preview as Student, sized from the phone frame's bar, not the teacher's window. A label may reach
+   past its own tab (they are equal, Nov 24 2026), never into the next label. */
 async function tabLabels(page, scope) {
-  return page.locator(scope + ' .sp-tabs-bottom .sp-tab-label').evaluateAll(els =>
-    els.map(el => {
-      const tab = el.closest('.sp-tab').getBoundingClientRect();
+  return page.locator(scope + ' .sp-tabs-bottom').evaluate(bar => {
+    const b = bar.getBoundingClientRect();
+    const tabs = [...bar.querySelectorAll(':scope > .sp-tab')];
+    const drawnWords = tabs.map(t => {
       const range = document.createRange();
-      range.selectNodeContents(el);
-      const rects = [...range.getClientRects()].filter(r => r.width > 0);
+      range.selectNodeContents(t.querySelector('.sp-tab-label'));
+      return [...range.getClientRects()].filter(r => r.width > 0);
+    });
+    const centres = tabs.map(t => {
+      const i = t.querySelector('.sp-tab-icon').getBoundingClientRect();
+      return i.left + i.width / 2;
+    });
+    const steps = centres.slice(1).map((c, k) => c - centres[k]);
+    return tabs.map((t, k) => {
+      const el = t.querySelector('.sp-tab-label');
+      const rects = drawnWords[k];
       const lines = new Set(rects.map(r => Math.round(r.top))).size;
-      const icon = el.closest('.sp-tab').querySelector('.sp-tab-icon').getBoundingClientRect();
+      const icon = t.querySelector('.sp-tab-icon').getBoundingClientRect();
+      const clear = j =>
+        !drawnWords[j] || rects.every(r => drawnWords[j].every(o => r.right <= o.left - 1 || r.left >= o.right + 1));
       return {
         text: el.textContent,
         drawn: Math.round(parseFloat(getComputedStyle(el).fontSize) * (icon.width / 22) * 10) / 10,
         fits:
-          rects.every(r => r.left >= tab.left - 1 && r.right <= tab.right + 1) &&
-          lines <= el.textContent.split(' ').length,
+          rects.every(r => r.left >= b.left - 1 && r.right <= b.right + 1) &&
+          lines <= el.textContent.split(' ').length &&
+          clear(k - 1) &&
+          clear(k + 1),
         icon: Math.round(icon.top),
+        even: Math.max(...steps) - Math.min(...steps) <= 1.5,
       };
-    }),
-  );
+    });
+  });
 }
 
 for (const width of WIDTHS) {
@@ -523,6 +520,7 @@ for (const width of WIDTHS) {
             font + ' ' + size,
           ).toEqual([]);
           expect(new Set(labels.map(l => l.icon)).size).toBe(1);
+          expect(labels[0].even, 'icons evenly spaced').toBe(true);
           drawn.push(labels[1].drawn);
         }
         expect(drawn[1], font + ': Large against Normal ' + drawn).toBeGreaterThanOrEqual(drawn[0]);
@@ -545,6 +543,7 @@ for (const width of WIDTHS) {
       expect(labels).toHaveLength(5);
       expect(labels.filter(l => !l.fits)).toEqual([]);
       expect(new Set(labels.map(l => l.icon)).size).toBe(1);
+      expect(labels[0].even, 'icons evenly spaced').toBe(true);
     });
   });
 }
@@ -583,6 +582,7 @@ test.describe('Preview as Student, a desktop window', () => {
           font + ' ' + size,
         ).toEqual([]);
         expect(new Set(labels.map(l => l.icon)).size).toBe(1);
+        expect(labels[0].even, 'icons evenly spaced').toBe(true);
       }
     }
   });

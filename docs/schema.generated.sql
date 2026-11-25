@@ -1260,6 +1260,7 @@ table public.rubric_score (rls on)
   modifier smallint not null default 0
   comment text
   beyond text
+  own_comment text
   constraint rubric_score_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
   constraint rubric_score_criterion_id_fkey FOREIGN KEY (criterion_id) REFERENCES public.criterion(id) ON DELETE CASCADE
   constraint rubric_score_enrollment_id_assessment_id_criterion_id_key UNIQUE (enrollment_id, assessment_id, criterion_id)
@@ -1880,7 +1881,7 @@ function public._fv_release_orphan_teacher_email() returns void security definer
 function public._fv_teacher_sign_in_deleted() returns trigger security definer
 function public._fv_timezone(p_tz text) returns text
 function public._grade_copy(p_enrollment_id uuid, p_assessment_id uuid) returns jsonb security definer
-function public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean) returns jsonb
+function public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean, p_own text) returns jsonb
 function public._grade_copy_in_use(p_copy jsonb, p_assessment_id uuid) returns jsonb security definer
 function public._grade_copy_of(p_value numeric, p_modifier integer, p_comment text, p_tags jsonb, p_criteria jsonb, p_checks jsonb) returns jsonb
 function public._grade_copy_remap(p_copy jsonb, p_criterion_map jsonb, p_check_map jsonb, p_tag_map jsonb) returns jsonb
@@ -2163,7 +2164,7 @@ function public.upsert_observation_template(p_id uuid, p_course_id uuid, p_body 
 function public.upsert_questionnaire(p_course_id uuid, p_kind text, p_title text, p_template_id text, p_theme text, p_report_period integer, p_parent_id uuid, p_opens_on date, p_closes_on date, p_is_on boolean, p_myed_comment text, p_questions jsonb, p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) returns uuid
 function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) returns uuid
-function public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) returns uuid
+function public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text, p_own_comment text) returns uuid
 function public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) returns uuid
 function public.upsert_section(p_id uuid, p_subject_id uuid, p_name text, p_color text, p_competency_group_id uuid, p_display_order integer, p_idempotency_key uuid) returns uuid
 function public.upsert_section_override(p_enrollment_id uuid, p_section_id uuid, p_level integer, p_reason text) returns uuid

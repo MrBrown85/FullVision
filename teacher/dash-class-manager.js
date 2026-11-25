@@ -1219,7 +1219,7 @@ window.DashClassManager = (function () {
         designations: designations,
         attendance: [],
         sortName: sortName,
-        enrolledDate: new Date().toISOString().slice(0, 10),
+        enrolledDate: courseToday(cmSelectedCourse),
       });
     }
     saveStudents(cmSelectedCourse, students);
@@ -3133,7 +3133,7 @@ window.DashClassManager = (function () {
         designations: (p.designations || []).slice(),
         attendance: [],
         sortName: ((p.lastName || '') + ' ' + (p.firstName || '')).trim(),
-        enrolledDate: new Date().toISOString().slice(0, 10),
+        enrolledDate: courseToday(cid),
       };
       students.push(fresh);
       addedIds.push(fresh.id);
@@ -8195,7 +8195,7 @@ window.DashClassManager = (function () {
     var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'gradebook-' + cid + '-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.download = 'gradebook-' + cid + '-' + courseToday(cid) + '.json';
     a.click();
   }
 

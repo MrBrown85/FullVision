@@ -66,17 +66,21 @@ describe('white on the primary blue fill', () => {
     expect((a + 0.05) / (b + 0.05)).toBeGreaterThanOrEqual(3.0);
   });
 
-  it('the Dashboard Inbox buttons put no white on the bare --active blue', () => {
-    // Board A draws Grade Submissions as a ghost button in the link colour and
-    // +N as a white label, so neither is white on blue now; any rule for them
-    // that does put white text on a blue fill must use the fill token.
-    const css = read('teacher/dash-inbox.css');
-    for (const sel of ['dash-inbox-new', 'dash-inbox-grade']) {
-      const rules = css.match(new RegExp(`\\.${sel}\\s*\\{[^}]*\\}`, 'g')) || [];
-      expect(rules.length, sel).toBeGreaterThan(0);
+  it('the Dashboard Inbox puts no white on the bare --active blue', () => {
+    // The Inbox's primary button is the app's .btn-primary (the fill token); any
+    // rule of the tile's own that puts white text on a blue fill must use the
+    // fill token too.
+    const files = fs.readdirSync('teacher').filter(f => /^dash-inbox.*\.css$/.test(f));
+    expect(files).toContain('dash-inbox.css');
+    for (const f of files) {
+      const css = read('teacher/' + f);
+      const rules = css.match(/[^{}]+\{[^}]*\}/g) || [];
       for (const r of rules) {
-        expect(r, sel).not.toMatch(/background:\s*var\(--active\)\s*;/);
-        if (/color:\s*#fff/.test(r)) expect(r, sel).toMatch(/background:\s*var\(--active-fill\)/);
+        expect(r, f).not.toMatch(
+          /background(-color)?:\s*var\(--active\)\s*;[^}]*color:\s*#fff|color:\s*#fff[^}]*background(-color)?:\s*var\(--active\)\s*;/,
+        );
+        if (/color:\s*#fff/.test(r) && /background(-color)?:\s*var\(--active/.test(r))
+          expect(r, f).toMatch(/background(-color)?:\s*var\(--active-fill\)/);
       }
     }
   });

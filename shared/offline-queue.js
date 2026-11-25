@@ -307,13 +307,13 @@
   };
 
   /* Params a cell write may leave null to mean "keep the saved one": the
-     server keeps the comment or Went Beyond when it is null and clears it
-     when it is ''. A replacement takes these from the write it replaces when
+     server keeps the comment, Went Beyond or a line for one student when it
+     is null (or left out) and clears it when it is ''. A replacement takes these from the write it replaces when
      it leaves them null, so a comment cleared offline isn't kept again by a
      level change queued after it. */
   var KEEP_WHEN_NULL = {
     upsert_tag_score: ['p_comment'],
-    upsert_rubric_score: ['p_comment', 'p_beyond'],
+    upsert_rubric_score: ['p_comment', 'p_beyond', 'p_own_comment'],
   };
   function _carryKept(entry, replaced) {
     // A Mark Up save names the rev its screen last read. Two saves in a row

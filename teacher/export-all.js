@@ -550,7 +550,13 @@
           crits.forEach(function (crit) {
             if (!crit) return;
             var lv = rubricCriterionLevel(cid, st.id, a, crit);
-            var workOn = text(ReportScores.getRubricCriterionComment(cid, st.id, a.id, crit));
+            // On group work, the line for this student alone follows the group's comment.
+            var workOn = [
+              text(ReportScores.getRubricCriterionComment(cid, st.id, a.id, crit)),
+              text(ReportScores.getRubricCriterionOwn(cid, st.id, a.id, crit)),
+            ]
+              .filter(Boolean)
+              .join(' ');
             var beyond = text(ReportScores.getRubricCriterionBeyond(cid, st.id, a.id, crit));
             if (!(lv > 0) && !workOn && !beyond) return;
             var lt = criterionLevelText(lv);

@@ -2193,6 +2193,7 @@ describe('rubric-print', () => {
         modifier: 1,
         comment: 'Nice work',
         beyond: null,
+        own: null,
       });
     });
 
@@ -2222,6 +2223,63 @@ describe('rubric-print', () => {
       // A level change sends the saved Went Beyond along.
       upsertScore(CID, SID, AID, CRIT_A, 4, '2026-10-03', 'summative', '');
       expect(rubricCalls()[1].payload.p_beyond).toBe('Added a trend line');
+    });
+
+    it('a line for one student is theirs: saved and sent for them alone, kept when the group grade is copied', () => {
+      const list = getAssessments(CID);
+      Object.assign(
+        list.find(a => a.id === AID),
+        { collaboration: 'group', groups: [[SID, SID2]] },
+      );
+      saveAssessments(CID, list);
+      const crit = getRubricById(CID, RUBRIC).criteria[0];
+
+      saveRubricCriterionOwn(CID, SID2, AID, CRIT_A, 'Your table was the clearest.');
+      expect(getRubricCriterionOwn(CID, SID2, AID, crit)).toBe('Your table was the clearest.');
+      expect(getRubricCriterionOwn(CID, SID, AID, crit)).toBe('');
+      let calls = rubricCalls();
+      expect(calls).toHaveLength(1);
+      expect(calls[0].payload.p_enrollment_id).toBe(SID2);
+      expect(calls[0].payload.p_own_comment).toBe('Your table was the clearest.');
+
+      // The group's comment, written on the first member, fills both; the
+      // second keeps their own line and the first never gets it.
+      saveRubricCriterionComment(CID, SID, AID, CRIT_A, 'Clear variables.');
+      expect(getRubricCriterionComment(CID, SID2, AID, crit)).toBe('Clear variables.');
+      expect(getRubricCriterionOwn(CID, SID2, AID, crit)).toBe('Your table was the clearest.');
+      expect(getRubricCriterionOwn(CID, SID, AID, crit)).toBe('');
+      calls = rubricCalls().slice(1);
+      calls.forEach(c => {
+        const mine = c.payload.p_enrollment_id === SID2 && c.payload.p_criterion_id === CRIT_A;
+        if (mine) expect(c.payload.p_own_comment).toBe('Your table was the clearest.');
+        else expect('p_own_comment' in c.payload).toBe(false);
+      });
+      expect(calls.some(c => c.payload.p_enrollment_id === SID2 && c.payload.p_criterion_id === CRIT_A)).toBe(true);
+      // Their own line does not make them Graded Separately.
+      expect(
+        isGradedSeparately(
+          getAssessments(CID).find(a => a.id === AID),
+          SID2,
+        ),
+      ).toBe(false);
+
+      // Cleared, it goes as '' (the server removes it).
+      saveRubricCriterionOwn(CID, SID2, AID, CRIT_A, '');
+      expect(rubricCalls().pop().payload.p_own_comment).toBe('');
+      expect(getRubricCriterionOwn(CID, SID2, AID, crit)).toBe('');
+    });
+
+    it('reads the line for one student from the eighth element', () => {
+      const cells = _bundleCells({
+        students: [{ enrollment_id: SID }],
+        assessments: [{ id: AID }],
+        tag_index: [],
+        criterion_index: [CRIT_A],
+        score_rows: [],
+        tag_rows: [],
+        criterion_rows: [[0, 0, 0, 3, 0, 'Group note', null, 'Just yours']],
+      });
+      expect(cells[SID][AID].rubric_scores[0].own).toBe('Just yours');
     });
 
     it('knows the single-point style', () => {

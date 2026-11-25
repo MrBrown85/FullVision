@@ -115,10 +115,10 @@ interface Window {
   DashInboxModel: unknown;
   DashInbox: unknown;
   DashInboxDrop: unknown;
-  DashInboxPick: unknown;
-  DashInboxSide: unknown;
+  DashInboxQueue: unknown;
+  DashInboxStacks: unknown;
   PageDashboard: unknown;
-  DashInboxRoll: unknown;
+  DashInboxRollCall: unknown;
   CmGradingBars: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
@@ -402,8 +402,8 @@ declare var DashInsights: any; // teacher/dash-insights.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
 declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
 declare var DashInbox: any; // teacher/dash-inbox.js
-declare var DashInboxPick: any; // teacher/dash-inbox-pick.js
-declare var DashInboxSide: any; // teacher/dash-inbox-side.js
+declare var DashInboxQueue: any; // teacher/dash-inbox-queue.js
+declare var DashInboxStacks: any; // teacher/dash-inbox-stacks.js
 declare var PageDashboard: any; // teacher/page-dashboard.js
 declare var BuildFlags: { on(name: string): boolean };
 declare var WorkThumbs: any;

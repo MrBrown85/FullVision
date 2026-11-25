@@ -584,6 +584,7 @@
             modifier: modifierFor(lv, e.mod),
             comment: orNull(e.critNote),
             beyond: orNull(e.critBeyond),
+            own_comment: orNull(e.critOwn),
           });
         } else if (linked.indexOf(e.tagId) >= 0 && tagIds[e.tagId]) {
           if (!lv) return;
