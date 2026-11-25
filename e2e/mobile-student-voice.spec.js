@@ -12,30 +12,19 @@ test("Cece's own goals and answers show on her phone profile", async ({ page }) 
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   const screen = page.locator('#m-screen-student-detail');
-  await expect(screen.locator('.m-hero, .m-nav-bar').first()).toContainText('Cece');
+  await expect(screen.locator('.m-sp-name')).toContainText('Cece');
 
-  // Goals are part of the Learner Profile, as on the desktop student page.
-  await screen.locator('.m-st-tab[data-tab="profile"]').click();
-  const goals = screen.locator('#m-st-panel-profile');
-  await expect(goals).toContainText('Cece’s Own Goals');
-  await expect(goals).toContainText('Hand in labs on time');
-  await expect(goals).toContainText('Working On It');
-  await expect(goals).toContainText('Core Competency Goal · Personal Awareness & Responsibility');
-
-  const words = screen.locator('#m-st-panel-profile');
-  await expect(words).toContainText('In Cece’s Words');
-  await expect(words).toContainText('About Me');
-  await expect(words).toContainText('I ask a lot of questions');
-  await expect(words).toContainText('Personal Awareness & Responsibility: Growing');
-  await expect(words).toContainText('Learning Dispositions');
-
-  // The chosen tab stays in view in the strip.
-  const inView = await screen.locator('.m-st-tab[data-tab="profile"]').evaluate(el => {
-    const strip = el.closest('.m-st-tabs').getBoundingClientRect();
-    const r = el.getBoundingClientRect();
-    return r.left >= strip.left - 1 && r.right <= strip.right + 1;
-  });
-  expect(inView).toBe(true);
+  // Her goal and check-in, About Me, and her reflections, first on the profile.
+  const goal = screen.locator('.m-sp-card', { has: page.locator('h2', { hasText: 'Cece’s Goal' }) });
+  await expect(goal).toContainText('Hand in labs on time');
+  await expect(goal).toContainText('Working On It');
+  await expect(goal).toContainText('Core Competency: Personal Awareness & Responsibility');
+  const about = screen.locator('.m-sp-card', { has: page.locator('h2', { hasText: 'About Me' }) });
+  await expect(about).toContainText('I ask a lot of questions');
+  const refl = screen.locator('.m-sp-card', { has: page.locator('h2', { hasText: 'Reflections' }) });
+  await refl.locator('summary').first().click();
+  await expect(refl.locator('details[open]').first()).toBeVisible();
+  await expect(screen).toContainText('Personal Awareness & Responsibility: Growing');
 });

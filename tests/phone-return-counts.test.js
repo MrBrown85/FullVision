@@ -170,7 +170,7 @@ function phone() {
     // The next question takes the sheet's place; nothing here waits for
     // this one to slide away.
   });
-  // The grading screen: who the Draft mark is shown for, card by card.
+  // The grading screen: for whom Return and Next is ready, card by card.
   WORK.forEach(aid => {
     // html-safe: MGrade.renderSwiper escapes names and text; a test page
     stack().innerHTML = MGrade.renderSwiper(CID, aid);
@@ -179,12 +179,11 @@ function phone() {
     out.drafts[aid] = [];
     cards.forEach((card, i) => {
       MGrade.jumpToStudent(i, true);
-      if (!document.querySelector('#m-grade-return .m-draft-mark')) return;
+      const ready = document.querySelector('#m-grade-return-act .m-grade-return-btn');
+      if (!ready || ready.hasAttribute('disabled')) return;
       // A pair's card stands for both partners.
-      const members = Array.from(card.querySelectorAll('.m-group-pill[data-val="NS"]')).map(p =>
-        p.getAttribute('data-sid'),
-      );
-      (members.length ? members : [card.getAttribute('data-sid')]).forEach(sid => out.drafts[aid].push(sid));
+      const unit = MGrade.moreContext().unit;
+      (unit.view ? unit.view.members : [card.getAttribute('data-sid')]).forEach(sid => out.drafts[aid].push(sid));
     });
     out.drafts[aid].sort();
   });
@@ -245,7 +244,7 @@ describe('the phone’s To Return and the gradebook agree', () => {
     });
   });
 
-  it('on which grades are drafts: the Draft mark on the phone is the dashed cell on the desktop', () => {
+  it('on which grades are drafts: Return and Next is ready on the phone where the cell is dashed on the desktop', () => {
     const desk = gradebook();
     const hand = phone();
     WORK.forEach(aid => {

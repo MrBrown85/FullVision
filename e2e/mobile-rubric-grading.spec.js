@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { scoreBy } from './phone-jump.js';
 
 /* Phone grading by rubric criterion (Rubric Bank plan §5, PR 10). An
    assessment with a rubric of its own opens in Rubric view: one row per
@@ -49,17 +50,24 @@ test.describe('Phone grading by rubric criterion', () => {
   test('a rubric assessment opens by criterion; Competencies switches back', async ({ page }) => {
     await openLab(page, false, 'Science Fair Proposal');
     const card = firstCard(page);
-    await expect(page.getByRole('button', { name: 'Rubric', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    // Competencies or Rubric is under ⋯.
+    await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+    // It is on the Rubric view, so the sheet offers the other.
+    await expect(page.locator('#m-sheet-container .m-more-sheet [data-action="m-grade-view"]')).toHaveText(
+      'Grade by Competencies',
+    );
+    await page.locator('#m-sheet-backdrop').click({ position: { x: 10, y: 10 } });
+    await expect(page.locator('#m-sheet-container .m-more-sheet')).toHaveCount(0);
     await expect(card.locator('.m-crit-group')).toHaveCount(3);
     await expect(card.locator('.m-crit-name').first()).toHaveText('Variable Identification');
-    await expect(card.locator('.m-checks-btn')).toHaveCount(0);
+    await expect(card.locator('.m-crit-toggle[aria-label*="checklist"]')).toHaveCount(0);
 
     // A level saves under every competency of the criterion.
     const group = card.locator('.m-crit-group').first();
     const target = (await group.locator('.m-score-btn.m-score-active').count()) ? '1' : '4';
     await group.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(
-      target,
+    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active')).toHaveText(
+      target === '1' ? 'EMG' : 'EXT',
     );
     const saved = await page.evaluate(() => {
       const cid = Object.keys(COURSES)[0];
@@ -73,7 +81,7 @@ test.describe('Phone grading by rubric criterion', () => {
     expect(new Set(saved).size).toBe(1);
     expect(saved[0]).toBe(Number(target));
 
-    await page.getByRole('button', { name: 'Competencies', exact: true }).click();
+    await scoreBy(page, 'Competencies');
     await expect(firstCard(page).locator('.m-crit-group')).toHaveCount(0);
     await expect(firstCard(page).locator('.m-score-group').first()).toBeVisible();
   });
@@ -86,19 +94,19 @@ test.describe('Phone grading by rubric criterion', () => {
       await group().locator('.m-score-btn.m-score-active').click();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
 
-    await group().locator('.m-checks-btn').click();
+    await group().locator('.m-crit-toggle').click();
     await expect(group().locator('.m-checklist-head')).toHaveText('No Level Suggested Yet');
     await group().getByLabel('Repeats trials').check();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
     await group().getByLabel('Explains an odd result').check();
-    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('4');
+    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('EXT');
     await expect(group().locator('.m-checklist-head')).toHaveText('Suggested: Extending');
-    await expect(group().locator('.m-checks-btn')).toHaveText('2');
+    await expect(group().locator('.m-crit-toggle')).toHaveAttribute('aria-label', /, checklist, 2 ticked$/);
 
     // A level picked by hand stays.
     await group().locator('.m-score-btn[data-score="2"]').click();
     await group().getByLabel('Records units').check();
-    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('DEV');
   });
 });
 
@@ -122,7 +130,8 @@ for (const width of [390, 320]) {
       const card = document.querySelector('.m-swiper-card');
       const split = [];
       card.querySelectorAll('.m-crit-name').forEach(el => {
-        const text = el.firstChild;
+        // A name with a chevron is a button, its words in a span.
+        const text = (el.querySelector('span') || el).firstChild;
         if (!text || text.nodeType !== 3) return;
         let at = 0;
         for (const word of text.data.split(' ')) {

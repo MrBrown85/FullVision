@@ -1,6 +1,6 @@
 // @ts-check
 /* bulletins-model.js — the phone's Bulletins feed as data: each card's kind,
-   time and Seen line, newest first (teacher-mobile/tab-bulletins.js draws
+   day and Seen line, newest first (teacher-mobile/tab-bulletins.js draws
    it; slice B1f). Pure: no page, no storage; moved here from the tab for its
    size, unchanged. */
 window.MBulletinsModel = (function () {
@@ -20,27 +20,25 @@ window.MBulletinsModel = (function () {
     return DAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate();
   }
 
+  var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
   /**
-   * The time on a card: Just Now in its first minute, the time today, the
-   * weekday this week, else the date.
+   * The day heading over a card: Today, Yesterday, the weekday within the
+   * week, else the date ("Fri, Nov 13"). Cards of one day share a heading.
    * @param {string | null} iso @param {Date} [now]
    */
-  function timeText(iso, now) {
+  function dayLabel(iso, now) {
     if (!iso) return '';
     var at = new Date(iso);
     if (isNaN(at.getTime())) return '';
     var t = now || new Date();
-    if (t.getTime() - at.getTime() < 60000) return 'Just Now';
     var a = new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
     var b = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
     var back = Math.round((b - a) / 86400000);
-    if (back === 0) {
-      var h = at.getHours();
-      return (h % 12 || 12) + ':' + String(at.getMinutes()).padStart(2, '0') + (h < 12 ? ' a.m.' : ' p.m.');
-    }
+    if (back <= 0) return 'Today';
     if (back === 1) return 'Yesterday';
-    if (back > 1 && back < 7) return DAYS[at.getDay()];
-    return MONTHS[at.getMonth()] + ' ' + at.getDate();
+    if (back < 7) return WEEKDAYS[at.getDay()];
+    return DAYS[at.getDay()] + ', ' + MONTHS[at.getMonth()] + ' ' + at.getDate();
   }
 
   /** Announcement, Reminder · Until Thu, Nov 19, or Photo of the Board. @param {any} b */
@@ -112,8 +110,7 @@ window.MBulletinsModel = (function () {
         pinned: !!b.pinned,
         kind: kindLabel(b),
         reminder: b.kind === 'reminder',
-        time: timeText(time, now),
-        fresh: timeText(time, now) === 'Just Now',
+        day: dayLabel(time, now),
         body: String(b.body || ''),
         photo: photo
           ? { id: String(photo.id), ready: photo.status === 'ready' || (photo.paths || []).length > 0 }
@@ -131,7 +128,7 @@ window.MBulletinsModel = (function () {
 
   return {
     dayText: dayText,
-    timeText: timeText,
+    dayLabel: dayLabel,
     kindLabel: kindLabel,
     seenLine: seenLine,
     pausedText: pausedText,

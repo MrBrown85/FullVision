@@ -8,6 +8,7 @@
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
+import { jumpTo } from './phone-jump.js';
 
 const LAB = 'sci8a1';
 const SHOTS = process.env.FV_SHOTS || '';
@@ -136,12 +137,13 @@ test.describe('phone', () => {
     await page.locator('.m-tab-item[data-tab="grade"]').click();
     await expect(page.locator('#m-screen-grade-picker')).toBeVisible();
     await page.locator('.m-seg-btn[data-val="all"]').click();
-    await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+    await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
     await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-    await page.locator('#m-thumb-strip .m-thumb[data-sid="st2"]').click();
+    await jumpTo(page, 'st2');
     const card = page.locator('.m-swiper-card[data-sid="st2"]');
-    const unsubmit = card.locator('[data-action="m-work-unsubmit"]');
-    await unsubmit.scrollIntoViewIfNeeded();
+    // Unsubmit is under ⋯.
+    await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+    const unsubmit = page.locator('#m-sheet-container .m-more-sheet [data-action="m-work-unsubmit"]');
     await expect(unsubmit).toHaveText('Unsubmit');
     await unsubmit.click();
     const sheet = page.locator('#m-sheet-container .m-confirm-sheet');

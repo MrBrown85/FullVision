@@ -9,6 +9,7 @@
  * the sample is changed by the test before it reads.
  */
 import { test, expect } from '@playwright/test';
+import { jumpTo } from './phone-jump.js';
 
 const LIGHT = 'sci8a21'; // Light Refraction Lab
 const SHOTS = process.env.FV_SHOTS || '';
@@ -145,8 +146,8 @@ test.describe('phone, 375 wide', () => {
     await expect(seg).toHaveClass(/m-seg-active/);
     await expect(seg.locator('.m-seg-count')).toHaveText(String(at.classToGrade));
     const row = page.locator('.m-tg-row[data-aid="' + LIGHT + '"]');
-    await expect(row.locator('.m-tg-pill')).toHaveText(at.piece.tograde + ' to grade');
-    await expect(row.locator('.m-tg-notin')).toHaveText(at.piece.notin + ' not in');
+    await expect(row.locator('.m-tg-pill')).toHaveText(at.piece.tograde + ' to Grade');
+    await expect(row.locator('.m-tg-notin')).toHaveText(at.piece.notin + ' Not In');
     await expect(page.locator('#m-grade-caught')).toBeHidden();
     await shot(page, 'Demo-sample-phone-to-grade-375');
 
@@ -154,11 +155,12 @@ test.describe('phone, 375 wide', () => {
     await row.locator('[data-action="m-grade-row-menu"]').click();
     await page.locator('#m-sheet-container .m-tg-menu [data-only="tograde"]').click();
     await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of ' + at.piece.tograde + ' to grade');
+    // The bar names the card on screen; the progress line has a segment for each piece waiting.
+    await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-title-text')).not.toHaveText('');
+    await expect(page.locator('#m-grade-progress .m-prog-seg')).toHaveCount(at.piece.tograde);
     // The pair comes first; the next is Ines, with her page.
-    await page.locator('#m-thumb-strip .m-thumb').nth(1).click();
+    await jumpTo(page, 1);
     const card = page.locator('.m-swiper-card[data-sid="st11"]');
-    await expect(card.locator('.m-work-sent')).toContainText('Submitted');
     await expect(card.locator('.m-work-page img').first()).toHaveAttribute(
       'src',
       /sample-work\/light-lab-ines-1\.jpg$/,

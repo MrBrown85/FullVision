@@ -33,10 +33,9 @@ test.describe('Observation cards, phone', () => {
     await expect(card).toBeVisible();
     await expect(page.locator('.m-obs-edit-btn, .m-obs-delete-btn')).toHaveCount(0);
     await expect(card.locator('.m-obs-chev')).toBeVisible();
-    await expect(card.locator('.m-obs-time')).toHaveText(/^\d{1,2}:\d{2}\s?[ap]\.m\.$/);
-    await expect(page.locator('.m-obs-date-group').first()).toHaveText(
-      /^(Today|Yesterday|\w{3}, \w{3} \d{1,2}(, \d{4})?)$/,
-    );
+    // The day is the heading over the card; the card says no time.
+    await expect(card.locator('.m-obs-time')).toHaveCount(0);
+    await expect(page.locator('.m-obs-day').first()).toHaveText(/^(Today|Yesterday|\w{3}, \w{3} \d{1,2}(, \d{4})?)$/);
 
     await card.locator('.m-obs-text').click();
     await expect(page.locator('.m-sheet.m-sheet-visible #m-obs-text')).toBeVisible();
@@ -286,7 +285,7 @@ test.describe('Phone quick menu (D4)', () => {
   test('a student avatar opens one-tap starter rows; one tap posts', async ({ page }) => {
     await enterDemo(page, { phone: true });
     await page.locator('.m-tab-item[data-tab="observe"]').click();
-    await page.locator('.m-quick-avatar').first().click();
+    await page.locator('.m-obs-face[data-action="m-obs-quick-menu"]').first().click();
     const rows = page.locator('.m-quick-row:not(.m-quick-own)');
     await expect(rows.first()).toBeVisible();
     await expect(page.locator('.m-quick-title')).not.toBeEmpty();
@@ -302,8 +301,8 @@ test.describe('Phone quick menu (D4)', () => {
   test('Write Your Own… opens the observation sheet for that student', async ({ page }) => {
     await enterDemo(page, { phone: true });
     await page.locator('.m-tab-item[data-tab="observe"]').click();
-    const avatar = page.locator('.m-quick-avatar').first();
-    const first = (await avatar.locator('.m-quick-name').textContent()).trim();
+    const avatar = page.locator('.m-obs-face[data-action="m-obs-quick-menu"]').first();
+    const first = (await avatar.textContent()).trim().replace(/^[A-Z]{2}/, '');
     await avatar.click();
     await page.getByRole('button', { name: 'Write Your Own…' }).click();
     const sheet = page.locator('#m-obs-edit');

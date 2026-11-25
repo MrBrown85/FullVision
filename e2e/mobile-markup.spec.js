@@ -4,6 +4,7 @@
  * real pointer events; nothing is sent.
  */
 import { test, expect } from '@playwright/test';
+import { jumpTo } from './phone-jump.js';
 
 test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 
@@ -32,16 +33,16 @@ async function openPhone(page) {
 const marked = page =>
   page.evaluate(LAB => getAssessmentMarkup('sci8', LAB).find(r => r.marks.marks.length > 2).enrollment_id, LAB);
 
-test('Mark Up from the photos full screen: draw, a tick, a note, two fingers zoom, Done saves', async ({ page }) => {
+test('Mark Up from the paper’s pencil: draw, a tick, a note, two fingers zoom, Done saves', async ({ page }) => {
   await openPhone(page);
   const sid = await marked(page);
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
+  await jumpTo(page, sid);
   const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
-  await card.locator('.m-work-full').click();
-  await page.locator('#m-sheet-container [data-action="m-markup-open"]').first().click();
+  // The pencil on the paper is Mark Up for the page in view.
+  await card.locator('[data-action="m-markup-open"]').click();
 
   const mk = page.locator('#m-markup');
   await expect(mk.locator('.m-markup-title')).toHaveText('Mark Up');

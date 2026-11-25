@@ -75,11 +75,55 @@ const EDIT_OB = {
 
 /* ── renderFeed ─────────────────────────────────────────────── */
 describe('MObserve.renderFeed', () => {
-  it('renders the observation feed with title', () => {
+  it('draws the tabs’ top bar, the faces and one track, with no title', () => {
     mockDataLayer({});
-    const html = MObserve.renderFeed(CID);
-    expect(html).toContain('Observations');
-    expect(html).toContain('m-screen');
+    const doc = parseHTML(MObserve.renderFeed(CID)).document;
+    expect(doc.querySelector('#m-screen-obs-feed .m-tabbar')).toBeTruthy();
+    expect(doc.querySelector('.m-nav-bar-title-inline')).toBeNull();
+    expect(doc.querySelector('.m-obs-faces')).toBeTruthy();
+    expect(doc.querySelectorAll('.m-obs-track').length).toBe(1);
+  });
+
+  it('puts the Sweep tile first, then the faces in alphabetical order, whatever the observations', () => {
+    mockDataLayer({
+      sortStudents: arr => arr.slice().sort((a, b) => a.lastName.localeCompare(b.lastName)),
+      getStudents: () => [
+        { id: 's3', firstName: 'Zed', lastName: 'Zhang' },
+        { id: 's1', firstName: 'Ada', lastName: 'Adams' },
+        { id: 's2', firstName: 'Bo', lastName: 'Berg' },
+      ],
+      getAllQuickObs: () => [
+        { id: 'o1', studentId: 's3', text: 'newest', sentiment: 'note', created: new Date().toISOString(), dims: [] },
+      ],
+    });
+    const faces = [...parseHTML(MObserve.renderFeed(CID)).document.querySelectorAll('.m-obs-face')];
+    expect(faces.map(f => f.getAttribute('data-action'))).toEqual([
+      'm-sweep-start',
+      'm-obs-quick-menu',
+      'm-obs-quick-menu',
+      'm-obs-quick-menu',
+    ]);
+    expect(faces.slice(1).map(f => f.getAttribute('data-sid'))).toEqual(['s1', 's2', 's3']);
+    expect(faces[0].textContent).toBe('Sweep');
+  });
+
+  it('says nothing of time on a card: the day is the heading', () => {
+    mockDataLayer({
+      getAllQuickObs: () => [
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'Great work',
+          sentiment: 'strength',
+          created: new Date().toISOString(),
+          dims: [],
+        },
+      ],
+    });
+    const doc = parseHTML(MObserve.renderFeed(CID)).document;
+    expect(doc.querySelector('.m-obs-card')).toBeTruthy();
+    expect(doc.querySelector('.m-obs-time')).toBeNull();
+    expect(doc.querySelector('h2.m-obs-day')).toBeTruthy();
   });
 
   it('shows empty state when no observations', () => {
@@ -113,7 +157,7 @@ describe('MObserve.renderFeed', () => {
     const html = MObserve.renderFeed(CID);
     expect(html).toContain('Great work');
     expect(html).toContain('Needs support');
-    expect(html).toContain('m-obs-date-group'); // date group headers
+    expect(html).toContain('m-obs-day'); // day headings
   });
 
   it('includes FAB with aria-label for accessibility', () => {
@@ -123,14 +167,12 @@ describe('MObserve.renderFeed', () => {
     expect(html).toContain('aria-label="New observation"');
   });
 
-  it('renders filter pills including sentiment options', () => {
+  it('draws one track of five: All and the four types, All chosen', () => {
     mockDataLayer({});
-    const html = MObserve.renderFeed(CID);
-    expect(html).toContain('m-filter-pill');
-    expect(html).toContain('All');
-    expect(html).toContain('Strength');
-    expect(html).toContain('Growth');
-    expect(html).toContain('Concern');
+    const segs = [...parseHTML(MObserve.renderFeed(CID)).document.querySelectorAll('.m-obs-track .m-seg-btn')];
+    expect(segs.map(b => b.textContent)).toEqual(['All', 'Strength', 'Growth', 'Concern', 'Note']);
+    expect(segs.map(b => b.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false', 'false', 'false']);
+    expect(segs[0].classList.contains('m-seg-active')).toBe(true);
   });
 
   it('shows student name filters for students with observations', () => {

@@ -33,15 +33,19 @@ window.MComponents = (function () {
   function navBar(opts) {
     var back = '';
     if (opts.backLabel) {
-      back =
-        '<button class="m-nav-bar-back" data-action="m-back">' +
-        ICONS.chevronLeft +
-        '<span>' +
-        _esc(opts.backLabel) +
-        '</span></button>';
+      // `backIconOnly`: the chevron alone; the label is what a screen reader says.
+      back = opts.backIconOnly
+        ? '<button class="m-nav-bar-back" data-action="m-back" aria-label="' +
+          _esc(opts.backLabel) +
+          '">' +
+          ICONS.chevronLeft +
+          '</button>'
+        : '<button class="m-nav-bar-back" data-action="m-back">' +
+          ICONS.chevronLeft +
+          '<span>' +
+          _esc(opts.backLabel) +
+          '</span></button>';
     }
-    // `classId`: a tab's first screen names the open class at the left.
-    if (!back && opts.classId) back = classLabelHTML(opts.classId);
     var actions = '';
     if (opts.rightHTML) {
       actions = '<div class="m-nav-bar-actions">' + opts.rightHTML + '</div>';
@@ -76,18 +80,42 @@ window.MComponents = (function () {
     );
   }
 
-  // The open class's name, so a teacher always knows which class they are in.
-  function classLabelHTML(cid) {
+  /* The top bar of each tab's first screen: the Demo pill at the left (Demo
+     Mode only), the open class's name with a chevron in the middle (a tap
+     opens the class list), the sync dot and ⋯ at the right. ⋯ opens
+     Settings. The sync dot is the only place a sync problem shows.
+     opts.id names the bar; opts.rightHTML adds a button before the dot. */
+  function tabBar(cid, opts) {
+    opts = opts || {};
     var course = (typeof COURSES !== 'undefined' && cid && COURSES[cid]) || null;
-    var name = course && course.name ? course.name : '';
-    if (!name) return '';
+    var name = course && course.name ? course.name : 'FullVision';
+    var several = typeof getPickerCourses === 'function' && getPickerCourses(cid).length > 1;
+    var demo = typeof isDemoMode === 'function' && isDemoMode();
+    var chevron =
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+    var title = several
+      ? '<button type="button" class="m-tabbar-class" data-action="m-class-switch" aria-label="' +
+        _esc(name) +
+        ', choose a class"><span class="m-tabbar-name">' +
+        _esc(name) +
+        '</span>' +
+        chevron +
+        '</button>'
+      : '<h1 class="m-tabbar-class"><span class="m-tabbar-name">' + _esc(name) + '</span></h1>';
     return (
-      '<div class="m-nav-bar-class" title="' +
-      _esc(name) +
-      '">' +
-      '<span class="m-nav-bar-class-name">' +
-      _esc(name) +
-      '</span></div>'
+      '<div class="m-nav-bar m-tabbar" id="m-nav-bar-' +
+      (opts.id || 'main') +
+      '"><div class="m-tabbar-inner">' +
+      (demo
+        ? '<button type="button" class="m-tabbar-demo" data-action="m-demo-menu" aria-haspopup="dialog" aria-label="Demo Mode">Demo</button>'
+        : '<span></span>') +
+      title +
+      '<div class="m-tabbar-right">' +
+      (opts.rightHTML || '') +
+      '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+      '<button type="button" class="m-tabbar-more" data-action="m-settings" aria-label="More">' +
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' +
+      '</button></div></div></div>'
     );
   }
 
@@ -284,7 +312,7 @@ window.MComponents = (function () {
     clearTimeout(_toastOutTimer);
     el.innerHTML = '<div class="m-toast-item"><span>' + _esc(message) + '</span>' + undoBtn + '</div>';
     _placeToast(el);
-    // `low`: over the tab bar, so it covers nothing on the screen above it (look.css).
+    // `low`: over the tab bar, so it covers nothing on the screen above it (grade.css).
     el.classList.toggle('m-toast-low', !!opts.low);
     if (opts.onUndo) {
       el.querySelector('[data-action="m-toast-undo"]').onclick = function () {
@@ -424,20 +452,13 @@ window.MComponents = (function () {
      (competencies that disagree: the lowest, outlined, no + or −), action,
      attrs (the data attributes every button carries; ids are ours). */
   // html-safe: levels are numbers, words constants, attrs ours
-  // The phone's new look (docs/plans/phone-look-plan.md), whose styles are look.css.
-  function _look() {
-    var flags = /** @type {any} */ (window).BuildFlags;
-    return !!(flags && flags.on('phoneLook'));
-  }
-
-  // "PRF", and "PRF +" on the chosen level: what the new look's track reads (look.css).
+  // "PRF", and "PRF +" on the chosen level: what the grader's track reads.
   function _levelCode(lv, mod) {
     return levelCode(lv) + (mod ? ' ' + scoreModSuffix(mod) : '');
   }
 
   function levelButtonsHTML(opts) {
     var mod = opts.mixed ? 0 : opts.mod;
-    var look = _look();
     return opts.order
       .map(function (lv) {
         var on = opts.level === lv;
@@ -451,81 +472,17 @@ window.MComponents = (function () {
           '" data-score="' +
           lv +
           '"' +
-          (look ? ' data-code="' + _levelCode(lv, on ? mod : 0) + '"' : '') +
           opts.attrs +
           ' aria-label="' +
           fig +
           ', ' +
           scoreLevelText(lv) +
-          '"><span class="m-level-fig">' +
-          fig +
-          '</span><span class="m-level-word">' +
-          scoreLevelText(lv) +
+          '"><span class="m-level-code">' +
+          _levelCode(lv, on ? mod : 0) +
           '</span></button>'
         );
       })
       .join('');
-  }
-
-  /* Each chip's letters on the grading screen's strip (tab-grade.js): the
-     initials, or, where students share them (two JC), the shortest start of
-     the first name, with the last initial, that tells them apart ("JaC" and
-     "JoC"; "JasC" and "JaqC"), else of the last name ("JCha" and "JChe"). A
-     group's chip keeps its G1 / P1. */
-  function chipTexts(students, units) {
-    var first = function (st) {
-      return String(st.preferred || st.firstName || '');
-    };
-    var last = function (st) {
-      return String(st.lastName || '');
-    };
-    var cap = function (s) {
-      return s.charAt(0).toUpperCase() + s.slice(1);
-    };
-    var out = students.map(function (st, i) {
-      return units[i] && units[i].view ? units[i].thumb : avatarInitials(st);
-    });
-    var groups = {};
-    out.forEach(function (txt, i) {
-      if (units[i] && units[i].view) return;
-      (groups[txt] = groups[txt] || []).push(i);
-    });
-    Object.keys(groups).forEach(function (key) {
-      var idxs = groups[key];
-      if (idxs.length < 2) return;
-      var ways = [];
-      for (var k = 2; k <= 5; k++) {
-        ways.push(
-          (function (n) {
-            return function (st) {
-              return cap(first(st).slice(0, n)) + last(st).charAt(0).toUpperCase();
-            };
-          })(k),
-        );
-      }
-      for (var m = 2; m <= 5; m++) {
-        ways.push(
-          (function (n) {
-            return function (st) {
-              return first(st).charAt(0).toUpperCase() + cap(last(st).slice(0, n));
-            };
-          })(m),
-        );
-      }
-      idxs.forEach(function (i) {
-        var st = students[i];
-        var mine = null;
-        for (var w = 0; w < ways.length && !mine; w++) {
-          var t = ways[w](st);
-          var clash = idxs.some(function (j) {
-            return j !== i && ways[w](students[j]) === t;
-          });
-          if (!clash) mine = t;
-        }
-        out[i] = mine || key;
-      });
-    });
-    return out;
   }
 
   // A row's buttons after a save, without drawing the row again; `mixed` as levelButtonsHTML draws it.
@@ -537,10 +494,9 @@ window.MComponents = (function () {
       var fig = on ? formatScoreLevel(lv, mod) : String(lv);
       btn.classList.toggle('m-score-active', on);
       btn.classList.toggle('m-score-mixed', on && !!mixed);
-      if (btn.hasAttribute('data-code')) btn.setAttribute('data-code', _levelCode(lv, on ? mod : 0));
       btn.setAttribute('aria-label', fig + ', ' + scoreLevelText(lv));
-      var f = btn.querySelector('.m-level-fig');
-      if (f) f.textContent = fig;
+      var code = btn.querySelector('.m-level-code');
+      if (code) code.textContent = _levelCode(lv, on ? mod : 0);
     });
   }
 
@@ -568,8 +524,10 @@ window.MComponents = (function () {
           '><span class="m-mod-sign" aria-hidden="true">' +
           scoreModSuffix(m) +
           '</span>' +
-          // The new look shows the sign alone; the word is still read out.
-          (_look() ? '<span class="m-mod-word">' + (m > 0 ? 'Plus' : 'Minus') + '</span>' : m > 0 ? 'Plus' : 'Minus') +
+          // The sign alone shows; the word is still read out.
+          '<span class="m-sr">' +
+          (m > 0 ? 'Plus' : 'Minus') +
+          '</span>' +
           '</button>'
         );
       })
@@ -579,7 +537,6 @@ window.MComponents = (function () {
   return {
     levelButtonsHTML: levelButtonsHTML,
     paintLevelButtons: paintLevelButtons,
-    chipTexts: chipTexts,
     fineTuneLabel: fineTuneLabel,
     fineTuneButtonsHTML: fineTuneButtonsHTML,
     scoredAssessmentCount: scoredAssessmentCount,
@@ -587,6 +544,7 @@ window.MComponents = (function () {
     avatarColor: avatarColor,
     avatarInitials: avatarInitials,
     navBar: navBar,
+    tabBar: tabBar,
     presentSheet: presentSheet,
     dismissSheet: dismissSheet,
     confirmSheet: confirmSheet,

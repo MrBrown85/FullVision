@@ -33,7 +33,7 @@ async function nameBelowBar(page) {
 test('the first student picked in a sweep is named just under the Sweep bar', async ({ page }) => {
   await enterDemo(page);
   await page.locator('.m-tab-item[data-tab="observe"]').click();
-  await page.getByRole('button', { name: 'Start a sweep' }).click();
+  await page.getByRole('button', { name: 'Sweep' }).click();
   // Safari has no scroll anchoring, so Chromium's would hide the bug.
   await page.evaluate(() => (document.getElementById('m-sweep-content').style.overflowAnchor = 'none'));
   await page.locator('.m-sweep-tile[data-state=""]').first().click();
@@ -54,7 +54,7 @@ test('the first student picked in a sweep is named just under the Sweep bar', as
 test('a Students search with no match says so', async ({ page }) => {
   await enterDemo(page);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('[data-action="m-all-students"]').click();
+  await page.locator('.m-card-all[data-action="m-all-students"]').click();
   const search = page.locator('.m-search-input');
   await search.fill('zz');
   await expect(page.locator('#m-student-search-empty')).toHaveText('No students match “zz”.');

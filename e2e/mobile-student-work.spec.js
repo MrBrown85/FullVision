@@ -11,6 +11,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { jumpTo } from './phone-jump.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -74,9 +75,10 @@ test('with the build switch off, the Grade tab opens on Recent and shows no work
   await openGradeTab(page);
   await expect(page.locator('.m-seg-btn[data-val="recent"]')).toHaveClass(/m-seg-active/);
   await expect(page.locator('.m-seg-btn[data-val="tograde"]')).toHaveCount(0);
-  await expect(page.locator('.m-tg-row')).toHaveCount(0);
+  // The rows carry no counts, no ⋯ and no All Caught Up.
+  await expect(page.locator('.m-tg-pill, .m-tg-notin, .m-tg-more, #m-grade-caught')).toHaveCount(0);
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   await expect(page.locator('.m-work')).toHaveCount(0);
 });
@@ -102,8 +104,8 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
   await expect(seg.locator('.m-seg-count')).toHaveText('2');
   const row = page.locator('.m-tg-row[data-aid="' + LAB + '"]');
   await expect(row).toBeVisible();
-  await expect(row.locator('.m-tg-pill')).toHaveText('2 to grade');
-  await expect(row.locator('.m-tg-notin')).toContainText('not in');
+  await expect(row.locator('.m-tg-pill')).toHaveText('2 to Grade');
+  await expect(row.locator('.m-tg-notin')).toContainText('Not In');
   await shot(page, 'S7-F1-to-grade-first');
 
   await row.locator('[data-action="m-grade-row-menu"]').click();
@@ -115,14 +117,11 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
   await menu.locator('[data-only="tograde"]').click();
 
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-  await expect(page.locator('#m-thumb-strip .m-thumb')).toHaveCount(2);
-  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of 2 to grade');
+  await expect(page.locator('#m-grade-progress .m-prog-seg')).toHaveCount(2);
   const card = page.locator('.m-swiper-card').first();
-  await expect(card.locator('.m-work-sent')).toContainText('Submitted');
-  await expect(card.locator('.m-work-sent')).toContainText('2 photos');
   await expect(card.locator('.m-work-note')).toHaveText('Page 2 has my answers.');
   await expect(card.locator('.m-work-page img').first()).toHaveAttribute('src', /sample-work\/cell-lab-noor-1\.jpg$/);
-  await expect(card.locator('.m-work-dot')).toHaveCount(2);
+  await expect(card.locator('.m-work-count')).toHaveText('1 of 2');
   await page.waitForTimeout(400);
   await shot(page, 'S7-F2-speed-grader-photos');
 
@@ -135,20 +134,23 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
   await card.locator('.m-work-pin-btn').click();
   await expect(card.locator('.m-work-pin')).not.toHaveClass(/is-on/);
 
-  // Full screen: every page.
+  // Full Screen: every page, on a black page, with one bar of marks under it.
   await card.locator('.m-work-full').click();
-  await expect(page.locator('#m-sheet-container .m-work-sheet-page')).toHaveCount(2);
-  await expect(page.locator('#m-sheet-container .m-work-sheet-page').first()).toHaveAttribute(
+  await expect(page.locator('#m-reader .m-reader-page')).toHaveCount(2);
+  await expect(page.locator('#m-reader .m-reader-page').first()).toHaveAttribute(
     'src',
     /sample-work\/cell-lab-noor-1\.jpg$/,
   );
+  await expect(page.locator('#m-reader .m-reader-bar')).toBeVisible();
+  await page.locator('#m-reader [data-action="m-reader-close"]').click();
+  await expect(page.locator('#m-reader')).toHaveCount(0);
 });
 
 test('the grader fills the card on screen and its neighbours, the rest when reached', async ({ page }) => {
   await openPhone(page);
   await openGradeTab(page);
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   const cards = page.locator('.m-swiper-card');
   const withWork = await cards.evaluateAll(els =>
@@ -160,7 +162,7 @@ test('the grader fills the card on screen and its neighbours, the rest when reac
   const fullPage = /sample-work\/[a-z-]+-\d\.jpg$/;
   await expect(strip(withWork[0])).toHaveAttribute('src', fullPage);
   await expect(strip(far)).not.toHaveAttribute('src', /./);
-  await page.locator('#m-thumb-strip .m-thumb').nth(far).click();
+  await jumpTo(page, far);
   await expect(strip(far)).toHaveAttribute('src', fullPage);
 });
 
@@ -194,7 +196,7 @@ test('the filter applies as you tap', async ({ page }) => {
   await expect(sheet.locator('.m-live-filter-count')).toHaveText('Showing ' + total + ' of ' + total);
   await sheet.locator('[data-kind="gradedStatus"][data-val="has-ungraded"]').click();
   // The list under the sheet changes at once.
-  const shown = await page.locator('#m-grade-list .m-cell:visible').count();
+  const shown = await page.locator('#m-grade-list .m-tg-row:visible').count();
   await expect(sheet.locator('.m-live-filter-count')).toHaveText('Showing ' + shown + ' of ' + total);
   await expect(sheet.locator('[data-val="has-ungraded"]')).toHaveAttribute('aria-pressed', 'true');
   await page.waitForTimeout(300); // the chip's colour fades in

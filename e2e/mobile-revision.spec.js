@@ -34,7 +34,7 @@ test('For Revision, the sheet, then Revising with Take Back', async ({ page }) =
   await expect(page.locator('.m-card-stack-item').first()).toBeVisible();
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + CHECK + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + CHECK + '"]').click();
 
   const act = page.locator('#m-grade-return-act');
   await expect(act.locator('[data-action="m-grade-revision"]')).toHaveText('For Revision');

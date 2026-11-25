@@ -1,7 +1,8 @@
 /**
- * The phone grader's level buttons (the board "Phone Speed Grader With
- * Photos"): each level's figure and word, in the class's level order, then
- * − Minus and + Plus. The classic grader (Send Work off) and the grader with
+ * The phone grader's level buttons (the board "Phone Grader, Redesigned"):
+ * one track of the levels' codes (EMG, DEV, PRF, EXT), in the class's level
+ * order, the chosen one carrying its + or −; − Minus and + Plus beside the
+ * criterion's name. The classic grader (Send Work off) and the grader with
  * photos (the build switch and Send Work on) draw them the same way, and a
  * tap writes what it wrote before the buttons were redrawn. Demo Mode's
  * Science 8: the Cell Microscope Lab is an Advanced Rubric; the Immune System
@@ -190,12 +191,9 @@ describe('the level control is drawn the same on both graders', () => {
     const group = card('st3').querySelector('.m-crit-group[data-critid="' + firstCrit().id + '"]');
     return { levels: group.querySelector('.m-score-btns'), fine: group.querySelector('.m-score-mods') };
   }
-  const faces = levels =>
-    [...levels.querySelectorAll('.m-score-btn')].map(
-      b => b.querySelector('.m-level-fig').textContent + ' ' + b.querySelector('.m-level-word').textContent,
-    );
+  const faces = levels => [...levels.querySelectorAll('.m-score-btn')].map(b => b.textContent);
 
-  it('classic and with photos: figure and word, − Minus and + Plus, in the class’s order', () => {
+  it('classic and with photos: the code of each level, − Minus and + Plus, in the class’s order', () => {
     // History 12's case: a Letter class, highest level first.
     updateCourse(CID, { gradingSystem: 'letter' });
     saveCourseConfig(CID, { ...getCourseConfig(CID), levelOrder: 'desc' });
@@ -204,7 +202,8 @@ describe('the level control is drawn the same on both graders', () => {
     MGrade.setCriterionMod(CID, 'st3', LAB, firstCrit().id, 1);
     const classic = control();
     expect(card('st3').querySelector('.m-crit-pager')).toBeNull();
-    expect(faces(classic.levels)).toEqual(['4 Extending', '3+ Proficient', '2 Developing', '1 Emerging']);
+    expect(faces(classic.levels)).toEqual(['EXT', 'PRF +', 'DEV', 'EMG']);
+    expect(classic.levels.querySelector('.m-score-active').getAttribute('aria-label')).toBe('3+, Proficient');
     expect(classic.levels.getAttribute('aria-label')).toBe('Level for ' + firstCrit().name);
     expect(classic.fine.getAttribute('aria-label')).toBe('Fine-tune Proficient');
     expect([...classic.fine.querySelectorAll('.m-mod-btn')].map(b => b.textContent)).toEqual(['−Minus', '+Plus']);
@@ -221,7 +220,7 @@ describe('the level control is drawn the same on both graders', () => {
     // Lowest first when the class says so.
     saveCourseConfig(CID, { ...getCourseConfig(CID), levelOrder: 'asc' });
     open(LAB);
-    expect(faces(control().levels)).toEqual(['1 Emerging', '2 Developing', '3+ Proficient', '4 Extending']);
+    expect(faces(control().levels)).toEqual(['EMG', 'DEV', 'PRF +', 'EXT']);
   });
 
   it('a competency row shows its level and + or − after a tap, and none once cleared', () => {
@@ -231,11 +230,13 @@ describe('the level control is drawn the same on both graders', () => {
     const row = () => fine().closest('.m-score-group');
     tap(row().querySelector('[data-score="2"]'));
     tap(fine().querySelector('[data-mod="-1"]'));
-    expect(row().querySelector('.m-score-active .m-level-fig').textContent).toBe('2−');
+    expect(row().querySelector('.m-score-active').textContent).toBe('DEV −');
+    expect(row().getAttribute('data-level')).toBe('2');
     expect(fine().getAttribute('aria-label')).toBe('Fine-tune Developing');
     tap(row().querySelector('[data-score="2"]'));
     expect(row().querySelector('.m-score-active')).toBeNull();
-    expect([...row().querySelectorAll('.m-level-fig')].map(f => f.textContent)).toEqual(levelOrderFor(CID).map(String));
+    expect(faces(row().querySelector('.m-score-btns'))).toEqual(levelOrderFor(CID).map(lv => levelCode(lv)));
+    expect(row().getAttribute('data-level')).toBe('0');
     expect(fine().querySelectorAll('.m-mod-btn[disabled]').length).toBe(2);
   });
 });

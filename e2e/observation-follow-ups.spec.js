@@ -139,7 +139,7 @@ test.describe('Observation follow-ups on the phone', () => {
   test('the card shows them and + Follow Up opens as the sheet’s second page', async ({ page }) => {
     await enterDemo(page, true);
     await page.locator('.m-tab-item[data-tab="observe"]').click();
-    await page.locator('.m-filter-pill[data-filter="sentiment:concern"]').click();
+    await page.locator('.m-obs-track .m-seg-btn[data-filter="sentiment:concern"]').click();
     const card = page.locator('.m-obs-card[data-obid="' + SEEDED + '"]');
     await card.scrollIntoViewIfNeeded();
     await expect(card.locator('.obs-fu-toggle')).toHaveText(/^2 follow-ups · last /);

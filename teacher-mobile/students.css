@@ -1,0 +1,649 @@
+/* students.css — the Students card and a student's profile on the phone
+   (docs/plans/phone-look-plan.md, L5 and L6; the boards "Tweak Students"
+   and "Profile New"). The markup is student-card.js and student-detail.js.
+   Colours and sizes are the tokens in teacher/styles.css. */
+
+/* ═══════════════════════════════════════════════════════════════
+   THE STUDENTS CARD: the student's My Learning
+   ═══════════════════════════════════════════════════════════════ */
+.m-scard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 18px 16px;
+}
+.m-sc-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sc-who svg {
+  flex: none;
+  color: var(--text-3);
+}
+.m-sc-avatar,
+.m-sp-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 600;
+}
+.m-sc-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 21px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The level's word and four bars up to it, as on My Learning. */
+.m-sc-level {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+.m-sc-word {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.m-sc-level.l1 .m-sc-word {
+  color: var(--score-1-text);
+}
+.m-sc-level.l2 .m-sc-word {
+  color: var(--score-2-text);
+}
+.m-sc-level.l3 .m-sc-word {
+  color: var(--score-3-text);
+}
+.m-sc-level.l4 .m-sc-word {
+  color: var(--score-4-text);
+}
+.m-sc-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+}
+.m-sc-bar {
+  width: 24px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.m-sc-bar:nth-child(1) {
+  height: 16px;
+}
+.m-sc-bar:nth-child(2) {
+  height: 26px;
+}
+.m-sc-bar:nth-child(3) {
+  height: 38px;
+}
+.m-sc-bar:nth-child(4) {
+  height: 50px;
+}
+.m-sc-level.l1 .m-sc-bar.is-on {
+  background: var(--score-1-dark);
+}
+.m-sc-level.l2 .m-sc-bar.is-on {
+  background: var(--score-2-dark);
+}
+.m-sc-level.l3 .m-sc-bar.is-on {
+  background: var(--score-3-dark);
+}
+.m-sc-level.l4 .m-sc-bar.is-on {
+  background: var(--score-4-dark);
+}
+.m-sc-bar.is-now {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3.5px currentColor;
+}
+.m-sc-level.l1 .m-sc-bars {
+  color: var(--score-1-dark);
+}
+.m-sc-level.l2 .m-sc-bars {
+  color: var(--score-2-dark);
+}
+.m-sc-level.l3 .m-sc-bars {
+  color: var(--score-3-dark);
+}
+.m-sc-level.l4 .m-sc-bars {
+  color: var(--score-4-dark);
+}
+
+/* + Observe, the one strong button; Profile beside it. */
+.m-sc-acts {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.m-sc-observe,
+.m-sc-profile {
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sc-observe {
+  flex: 1;
+  background: var(--active-fill);
+  color: #fff;
+}
+.m-sc-profile {
+  padding: 0 20px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* To Grade, To Return and the work scroll inside the card. */
+.m-sc-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.m-sc-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* A fade at the foot of the list; a list that runs past it says "More Below". */
+.m-sc-scroll::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  display: block;
+  height: 8px;
+  background: linear-gradient(transparent, var(--surface));
+  pointer-events: none;
+}
+.m-sc-scroll.m-more-below::after {
+  content: 'More Below \2193';
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 34px;
+  margin-top: -34px;
+  padding-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: linear-gradient(rgba(255, 255, 255, 0), var(--surface) 60%);
+}
+.m-sc-boxes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.m-sc-work {
+  margin-top: 14px;
+}
+.m-sc-unopened {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: var(--active-light);
+  color: var(--link);
+  font-size: 14px;
+  font-weight: 600;
+}
+.m-sc-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--active);
+}
+.m-sc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  padding: 8px 0;
+  border: 0;
+  border-top: 0.5px solid var(--divider-medium);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sc-row-title {
+  flex: 1;
+  min-width: 0;
+}
+.m-sc-chev {
+  flex: none;
+  color: var(--text-3);
+}
+.m-sc-pill {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.m-sc-pill.t1,
+.m-sc-pill.tmiss {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.m-sc-pill.t2 {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.m-sc-pill.t3 {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.m-sc-pill.t4 {
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.m-sc-all {
+  color: var(--link);
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   THE PROFILE: the student's own words first
+   ═══════════════════════════════════════════════════════════════ */
+/* The bar names the student once the page has scrolled (components.js fades
+   its title in); the way back is the chevron alone. */
+.m-sp-screen .m-nav-bar-back span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.m-sp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 32px;
+}
+.m-sp-card {
+  overflow: hidden;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.06),
+    0 2px 12px rgba(0, 0, 0, 0.06);
+}
+.m-sp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.m-sp-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.m-sp-when {
+  flex: none;
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+/* Who they are. */
+.m-sp-who-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.m-sp-avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
+}
+.m-sp-who-text {
+  min-width: 0;
+}
+.m-sp-name {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.m-sp-line {
+  margin-top: 2px;
+  font-size: 16px;
+  color: var(--text-2);
+}
+.m-sp-line b {
+  color: var(--text);
+}
+.m-sp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.m-sp-chips + .m-sp-chips {
+  margin-top: 6px;
+}
+.m-sp-chip,
+.m-sp-chips .m-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.m-sp-chips .m-badge-iep,
+.m-sp-chips .m-badge-mod,
+.m-sp-chips .m-badge-ell,
+.m-sp-chips .m-badge-des {
+  margin: 0;
+}
+.m-sp-chip-alert {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.m-sp-chip-status {
+  margin: 10px 0 0;
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+/* A chip that is a button keeps a 44 px target round its 28 px face. */
+.m-sp-hit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -8px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sp-observe {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--active-fill);
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* What they said: a label, then their words in a bubble. */
+.m-sp-label {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.m-sp-head + .m-sp-label,
+.m-sp-head + .m-sp-answer {
+  margin-top: 0;
+}
+.m-sp-bubble {
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.m-sp-bubble + .m-sp-bubble,
+.m-sp-chip-status + .m-sp-answer,
+.m-sp-answer + .m-sp-answer {
+  margin-top: 10px;
+}
+/* An answer longer than five lines is cut there, with More. */
+.m-sp-clamp:not(.is-open) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+.m-sp-more {
+  display: none;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sp-answer.is-long .m-sp-more {
+  display: block;
+}
+
+/* A row that opens in place. */
+.m-sp-row > summary,
+.m-sp-flat,
+.m-sp-note > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sp-row > summary::-webkit-details-marker,
+.m-sp-note > summary::-webkit-details-marker {
+  display: none;
+}
+.m-sp-flat {
+  cursor: default;
+}
+.m-sp-row + .m-sp-row,
+.m-sp-row + .m-sp-flat,
+.m-sp-flat + .m-sp-row,
+.m-sp-flat + .m-sp-flat {
+  border-top: 0.5px solid var(--divider-medium);
+}
+.m-sp-head + .m-sp-row {
+  border-top: 0;
+}
+.m-sp-row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+.m-sp-tag {
+  flex: none;
+  font-size: 15px;
+  color: var(--text-2);
+}
+.m-sp-tag-warn,
+.m-sp-tag-row > summary .m-sp-tag {
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.m-sp-chev {
+  flex: none;
+  color: var(--text-3);
+  transition: transform 0.18s ease-out;
+}
+.m-sp-row[open] > summary .m-sp-chev,
+.m-sp-note[open] > summary .m-sp-chev {
+  transform: rotate(90deg);
+}
+.m-sp-row-body {
+  padding-bottom: 12px;
+}
+.m-sp-row-body .m-st-list {
+  margin: 0;
+}
+.m-sp-note {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.m-sp-note > summary .m-sp-row-label {
+  font-weight: 600;
+}
+.m-sp-note > summary svg:first-child {
+  flex: none;
+  color: var(--text-2);
+}
+.m-sp-rows {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.m-sp-rows > .m-sp-row:first-child {
+  border-top: 0;
+}
+
+/* An observation inside a card: the card's own width, and its
+   swipe-to-delete layer kept inside the card. */
+.m-sp-card .m-obs-card {
+  margin: 0;
+  padding-right: 0;
+  padding-left: 0;
+}
+.m-sp-card .m-obs-card + .m-obs-card {
+  margin-top: 4px;
+  border-top: 0.5px solid var(--divider-medium);
+  border-radius: 0;
+}
+.m-sp-card .m-obs-card[data-action]::after {
+  left: calc(100% + 24px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FROM THE PROFILE: the student's words over a new note, and an open
+   concern's one-tap follow-ups (the boards "Surprise Words" and
+   "Surprise Concern")
+   ═══════════════════════════════════════════════════════════════ */
+.m-sp-words {
+  margin: 0 0 12px;
+}
+.m-sp-words figcaption {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.m-sp-words blockquote {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.m-sp-concerns {
+  padding-bottom: 8px;
+}
+.m-sp-concern + .m-sp-concern {
+  margin-top: 20px;
+}
+.m-sp-concern-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.m-sp-concern-type {
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+.m-sp-open {
+  margin-left: auto;
+}
+.m-sp-concern-text {
+  margin: 10px 0 14px;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.m-sp-concern-acts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.m-sp-concern-btn {
+  min-height: 48px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sp-concern-btn.is-resolved {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+
+/* The tokens' red on its tint is 4.0:1 in the dark; a lighter red reads. */
+@media (prefers-color-scheme: dark) {
+  .m-sp-chip-alert {
+    color: #ffa8a1;
+  }
+}

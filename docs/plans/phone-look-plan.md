@@ -1,22 +1,14 @@
 # The phone's new look (2026-11-24)
 
-**Status.** L1, L2, L5, L6, Undo after a return (the first part of L3) and the Write a Bulletin sheet (the first part of L2b) are built on `main` behind the switch. Not released.
+**Status.** Built and on for everyone (Nov 25): the phone draws the new look and nothing else. Colin, Nov 25, after the first release carried it switched off and layered over the old screens: "Go back and do it all properly now… Rewrite the tests. Think big picture." So it was rebuilt natively in three PRs: the grader and the Grade list (#1756), the Students card and the profile (#1755), Observe, Bulletins and the tabs' top bar (#1754); then the switch, the `m-look` class and the unit tests' switch shim went (this PR). Not built: Remind These 8 (needs a server change), the board photo squared up (needs a new library), a student card made on the spot (needs a security review). The help pictures still show the old screens.
 
 **Why.** Colin, Nov 24: the phone's grading view is cluttered, and a teacher who is not a software user would be overwhelmed by it. The phone is a tool to be used in the moment: grade, observe, post. One strong control for each decision, the rest behind one tap, no grey lines of explanation.
 
 **Board.** "Phone Grader, Redesigned" (https://claude.ai/artifact/9183YbyUHWKjotWVWo2Guq). Rows: the grader, its stress tests, three gaps filled, the same tabs tweaked with the profile, the profile's stress tests, and Pleasant Surprises.
 
-**Switch.** `phoneLook` in `shared/build-flags.js`, off. When it is on, `<html>` carries the class `m-look`.
+**How it is built.** Each screen draws the new markup itself; the old markup, its styles and its tests are gone. Styles: `teacher-mobile/grade.css` (the grader and the Grade list), `students.css` (the card and the profile), `tabs.css` (Observe, Bulletins and the top bar), on top of `styles.css`. Code: `tab-grade.js` with `grade-look.js` (the top bar's name, the class list, ⋯, the held return) and `grade-reader.js` (Full Screen); `student-card.js` and `student-detail.js`; `tab-observe.js` and `tab-bulletins.js`; `MC.tabBar` in `components.js`. Browser tests reach a student through the class list and Competencies or Rubric through ⋯ (`e2e/phone-jump.js`). `phoneLook` stays in `shared/build-flags.js`, on, asked by nothing.
 
-## The method: write as little as the board needs
-
-The phone already does almost everything the board shows: the four levels, + and −, a criterion's checklist and comment, the Overall Comment, Return and Next, For Revision, Missing, Excused and Late, the photos full screen. The board changes how they look and where they sit, not what they do.
-
-1. **The same markup, the same actions, the same tests.** The look is one stylesheet, `teacher-mobile/look.css`, and every rule in it starts with `.m-look`. With the switch off, nothing on the phone changes: the byte-for-byte walk in `tests/phone-return.test.js` holds it.
-2. **JavaScript changes only where a style cannot do it,** and then it adds an attribute or a wrapper to what is already drawn. No second way of drawing a screen, no copy of a handler. A screen's additions live in a small file of their own (`grade-look.js` for the grader), which answers with nothing while the switch is off; the screen's own file only asks it.
-3. **Something moved behind ⋯ is the same piece of markup shown in a sheet,** with the action it already had.
-4. **Nothing changes a grade, a saved value or the database** until a slice below says so.
-5. **Old styles are deleted once,** in the last slice, when the switch turns on.
+The first version (Nov 24) was a stylesheet over the old markup behind a switch, to write less code. It left the old screens' code and tests in place and needed hacks to hide old pieces; Colin had it redone. See DECISIONS, "The phone's new look".
 
 ## Slices
 
@@ -70,13 +62,24 @@ It lives in `grade-look.js` (`hold`, `held`, `flush`, `undo`); `tab-grade.js` ha
 
 Colin, Nov 24: the Let Students React box alone at the left of its row looks wrong, and "Posts to Science 8: every student's phone." is filler. The line is gone from the sheet and from Post a Photo. Let Students React is a row like the sheet's others, its switch at the right, as Observe's sheet has it. Styles only.
 
-## The Students card and the profile (L5, L6, switch on)
+## The Students card and the profile (L5, L6)
 
-Built in `teacher-mobile/student-look.js`; `card-widgets.js` and `student-detail.js` each ask it once, when the switch is on.
+Drawn directly: the card by `teacher-mobile/student-card.js`, the profile by `student-detail.js`, their styles in `teacher-mobile/students.css`. The old widget card (its widgets, the Customize Card editor in Settings and the Teacher Comment sheet), the profile's tabs, hero, Focus Areas, "Seen in Observations" table, per-section goals and Grade Newest are deleted with their styles and tests.
 
-- **The card** is the student's My Learning: the name (a tap for every student), the overall level in words with four bars up to it (a Letter class shows its letter, no bars), + Observe and Profile, To Grade and To Return as before, then the five newest pieces with a result and All N Pieces. A piece's result is the class's own wording (`assessmentCellValue`), so a class set to show numbers shows "2.7", not "Proficient". In a class whose student page is on, a blue dot marks a piece returned and not opened since (`seen_at`), with "N Not Opened" over the list. With the switch on, the card's widget choices are set aside.
-- **The profile**: who they are (how to say their name, pronouns, IEP and the other designations, Flagged, open concerns, languages, how they learn best) and + Observe; their private note behind a tap; their goal and check-in; About Me; What You've Noticed (the newest observation, then All N); their reflections; then All Work and Competencies. Each "All" row and each reflection opens in place (`<details>`). A part with nothing in it is left out.
-- **Choices made without Colin** (he had delegated the board's details): the button reads "Profile", as on the board; All N Pieces opens the profile, where All Work is one tap; Reflections says "None Answered" rather than "No Card Yet", which needs a server read; long About Me answers are shown whole, not cut to five lines; the old profile's "Seen in Observations" table and To Grade box are not on it.
+- **The card** is the student's My Learning: the name (a tap for every student), the overall level in words with four bars up to it (a Letter class shows its letter, no bars), + Observe and Profile, To Grade and To Return as before, then the five newest pieces with a result and All N Pieces. A piece's result is the class's own wording (`assessmentCellValue`), so a class set to show numbers shows "2.7", not "Proficient". In a class whose student page is on, a blue dot marks a piece returned and not opened since (`seen_at`), with "N Not Opened" over the list. The list says More Below when it runs past the bottom.
+- **The profile**: who they are (how to say their name with the stressed syllable bold, pronouns, IEP and the other designations, Flagged, open concerns, languages, how they learn best) and + Observe; their private note behind a tap; their goal and check-in; About Me; What You've Noticed (the newest observation, then All N); Reflections; then All Work and Competencies. Each "All" row and each reflection opens in place (`<details>`). A part with nothing in it is left out. To Grade is the card's, not the profile's.
+- **Reflections** lists each reflection the class has on: the ones answered open in place with their date; one not answered says Not Answered. A student who has answered none gets one row, "None Answered" (the board's "No Card Yet" needs a server read).
+- **Long answers** in the goal and About Me are cut at five lines with More (and Less), only when they run long.
+- **Two small surprises.** + Observe on the profile opens a new note with the student's own words quoted over it (Hard Right Now, else Good At, else Outside School; the quick menu when they have said none). The "N Open Concerns" chip opens a sheet where each open concern closes in one tap: Called Home, Spoke With Student, Still Happening or Resolved, the follow-up the Observe tab already writes (`addObservationFollowUp`), with Undo. A card made on the spot (the board "Surprise Card") waits for a security review.
+- **Choices made without Colin** (he had delegated the board's details): the button reads "Profile", as on the board; All N Pieces opens the profile, where All Work is one tap; the private note has no "New" badge (the app does not keep whether the note was read); the profile's bar carries the sync dot and no ⋯.
+
+## Turned on (Nov 25)
+
+Colin asked why the release changed nothing teachers could see, and said to turn it on. Turning it on changed these, each fixed before it merged:
+
+- **Tests.** The unit tests see the switch as each test sets it (`tests/setup-mobile.js`): the old layout's code is still checked until L8 deletes it. The browser tests run the phone as it ships. They go to a student through the class list and to Competencies or Rubric through ⋯ (`e2e/phone-jump.js`), read the bar as the student's name, and send a held return at once where they need it sent. `e2e/mobile-student-tabs.spec.js` is gone with the profile's tabs.
+- **Fixed in the look:** the round − + and comment buttons and the checklist's chevron are 44 px to a finger (drawn as the same 34 px circles); the level track's segments are 44 px; Write a Bulletin is back on white (the tint was 4.0:1); the profile's bar names the student again as it scrolls; the profile shows To Grade again (S7-F4); the card's list says More Below when it runs past the bottom.
+- **What teachers lose with the old screens:** the bar's "3 of 27" count (the progress line shows where they are), the profile's tabs (All Work and Competencies open in place), Grade Newest on the profile (All Work's first row), and the card's widget choices.
 
 ## Colin's answers owed
 

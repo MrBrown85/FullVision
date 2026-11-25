@@ -54,14 +54,14 @@ describe('the feed’s model', () => {
     );
   });
 
-  it('says when: Just Now, the time today, Yesterday, the weekday, then the date', () => {
-    expect(MB.timeText(new Date(NOW.getTime() - 20000).toISOString(), NOW)).toBe('Just Now');
-    expect(MB.timeText(at(18, 9, 15), NOW)).toBe('9:15 a.m.');
-    expect(MB.timeText(at(18, 0, 5), NOW)).toBe('12:05 a.m.');
-    expect(MB.timeText(at(17, 14), NOW)).toBe('Yesterday');
-    expect(MB.timeText(at(16, 14), NOW)).toBe('Mon');
-    expect(MB.timeText(at(3, 14), NOW)).toBe('Nov 3');
-    expect(MB.timeText(null, NOW)).toBe('');
+  it('heads each day: Today, Yesterday, the weekday, then the date', () => {
+    expect(MB.dayLabel(new Date(NOW.getTime() - 20000).toISOString(), NOW)).toBe('Today');
+    expect(MB.dayLabel(at(18, 0, 5), NOW)).toBe('Today');
+    expect(MB.dayLabel(at(17, 14), NOW)).toBe('Yesterday');
+    expect(MB.dayLabel(at(16, 14), NOW)).toBe('Monday');
+    expect(MB.dayLabel(at(12, 14), NOW)).toBe('Thursday');
+    expect(MB.dayLabel(at(3, 14), NOW)).toBe('Tue, Nov 3');
+    expect(MB.dayLabel(null, NOW)).toBe('');
   });
 
   it('the Seen line: Seen by N of M with the Not Seen part, Seen by All, Not Seen Yet, Not Sent Yet', () => {
@@ -108,12 +108,11 @@ describe('the feed’s model', () => {
       waiting: true,
       key: 'k1',
       kind: 'Photo of the Board',
-      time: 'Just Now',
-      fresh: true,
+      day: 'Today',
       photo: { id: 'waiting:k1:0', ready: false },
       seen: { text: 'Not Sent Yet' },
     });
-    expect(cards[1]).toMatchObject({ kind: 'Reminder · Until Thu, Nov 19', reminder: true, time: 'Yesterday' });
+    expect(cards[1]).toMatchObject({ kind: 'Reminder · Until Thu, Nov 19', reminder: true, day: 'Yesterday' });
   });
 
   it('carries a PDF’s name and pages and a link’s site', () => {

@@ -88,10 +88,6 @@ function grading(opts) {
   return [...stack().querySelectorAll('.m-swiper-card')];
 }
 const pages = card => card.querySelectorAll('.m-work-pages img[data-fv-page]').length;
-const line = card => {
-  const el = card.querySelector('.m-work-sent span');
-  return el ? el.textContent : null;
-};
 const lab = () => getAssessments(CID).find(a => a.id === LAB);
 
 beforeEach(() => {
@@ -117,7 +113,6 @@ describe('the speed grader on a One per Group pair', () => {
     expect(cards.length).toBe(2);
     const pair = cards[0];
     expect(pages(pair)).toBe(2);
-    expect(line(pair)).toBe('Sent by Aiden A. for the group, Nov 3 · 2 photos');
     expect(pair.querySelector('.m-work-note').textContent).toContain('Page 2 has the table.');
     expect(pages(cards[1])).toBe(1);
   });
@@ -134,17 +129,16 @@ describe('the speed grader on a One per Group pair', () => {
     expect(olivia.querySelector('.m-work-notin')).toBeNull();
     expect(olivia.querySelector('.m-work-add')).toBeNull();
     expect(pages(olivia)).toBe(2);
-    expect(line(olivia)).toBe('Sent by Aiden A. for the group, Nov 3 · 2 photos');
   });
 
-  it('the full-screen sheet shows every page of the group’s work', () => {
+  it('Full Screen shows every page of the group’s work', () => {
     seed();
     Grader.gradeSeparately(CID, LAB, OLIVIA);
     grading();
     const box = stack().querySelector('.m-work[data-sid="' + OLIVIA + '"]');
     MGradePhotos.openFull(CID, box);
-    expect(document.querySelectorAll('#m-sheet-container .m-work-sheet-page').length).toBe(2);
-    MComponents.dismissSheet();
+    expect(document.querySelectorAll('#m-reader .m-reader-page').length).toBe(2);
+    MGradeReader.close();
   });
 
   it('the pictures are asked for from the group’s pages', async () => {

@@ -12,12 +12,13 @@
    'fv-build-inboxStacks' set, to '1' or '0', changes nothing: a default that
    is on wins over what the device has.
 
-   phoneLook (the phone's new look, docs/plans/phone-look-plan.md) is off
-   until its last slice. On, the phone's <html> carries the class m-look and
-   teacher-mobile/look.css restyles what is already drawn. */
+   phoneLook (the phone's new look, docs/plans/phone-look-plan.md) is on
+   since Nov 25 and nothing asks for it any more: the phone draws the new
+   look and nothing else. The name stays for the same reason as the
+   others. */
 (function () {
   /** @type {Record<string, boolean>} */
-  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true, phoneLook: false };
+  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true, phoneLook: true };
 
   /** @param {string} name */
   function on(name) {

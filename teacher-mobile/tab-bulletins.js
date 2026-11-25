@@ -65,7 +65,7 @@ window.MBulletins = (function () {
   /* The model: pure, in teacher-mobile/bulletins-model.js (loaded first). */
   var MM = W.MBulletinsModel;
   var dayText = MM.dayText;
-  var timeText = MM.timeText;
+  var dayLabel = MM.dayLabel;
   var kindLabel = MM.kindLabel;
   var seenLine = MM.seenLine;
   var pausedText = MM.pausedText;
@@ -81,12 +81,6 @@ window.MBulletins = (function () {
 
   function _isDemo() {
     return typeof W.isDemoMode === 'function' && !!W.isDemoMode();
-  }
-
-  /** @param {string} cid */
-  function _className(cid) {
-    var c = typeof COURSES !== 'undefined' && COURSES && COURSES[cid];
-    return c && c.name ? String(c.name) : 'your class';
   }
 
   /** @param {string} cid @param {string} id */
@@ -125,21 +119,11 @@ window.MBulletins = (function () {
   function render(cid) {
     _cid = cid;
     _drawnHead = _headHtml(cid);
-    var nav = MC.navBar({
-      id: 'bulletins',
-      title: 'Bulletins',
-      classId: cid,
-      rightHTML:
-        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
-        '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' +
-        MC.ICONS.settings +
-        '</button>',
-    });
+    var nav = MC.tabBar(cid, { id: 'bulletins' });
     return (
       '<div class="m-screen" id="m-screen-bulletins">' +
       nav +
       '<div class="m-screen-content m-bulletin-content">' +
-      '<div class="m-title-large">Bulletins</div>' +
       '<div id="m-bulletin-head">' +
       _drawnHead +
       '</div>' +
@@ -176,6 +160,7 @@ window.MBulletins = (function () {
    * @param {any} c @returns {Record<string, string>}
    */
   function _cardParts(c) {
+    var allSeen = !c.seen.waiting && !c.seen.rest && /^Seen by All/.test(c.seen.main);
     var seen = c.seen.waiting
       ? '<div class="m-bulletin-seen-row"><span class="m-bulletin-seen is-waiting">Not Sent Yet</span>' +
         (c.key && W.bulletinCanTakeBack(_cid, c.key)
@@ -184,26 +169,21 @@ window.MBulletins = (function () {
             '">Take It Back</button>'
           : '') +
         '</div>'
-      : '<button type="button" class="m-bulletin-seen" data-m-bulletin="seen" data-id="' +
+      : // "8 Not Seen" or "All Seen" is all the card says; the full count is read out ("Seen by 19 of 27").
+        '<button type="button" class="m-bulletin-seen' +
+        (allSeen ? ' is-all' : '') +
+        '" data-m-bulletin="seen" data-id="' +
         esc(c.id) +
+        '" aria-label="' +
+        esc(c.seen.text) +
         '">' +
-        // The phone's new look shows only "8 Not Seen"; "Seen by 19 of 27" is still read out (look.css).
-        (c.seen.rest && W.BuildFlags && W.BuildFlags.on('phoneLook')
-          ? '<span class="m-look-sr">' + esc(c.seen.main) + ' · </span>'
-          : esc(c.seen.main) + (c.seen.rest ? ' · ' : '')) +
-        (c.seen.rest ? '<span class="m-bulletin-not-seen">' + esc(c.seen.rest) + '</span>' : '') +
+        (allSeen
+          ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>All Seen'
+          : esc(c.seen.rest || c.seen.main)) +
         '</button>';
     return {
-      head:
-        '<div class="m-bulletin-card-head"><span class="m-bulletin-kind' +
-        (c.reminder ? ' is-reminder' : '') +
-        '">' +
-        esc(c.kind) +
-        '</span><span class="m-bulletin-time' +
-        (c.fresh ? ' is-fresh' : '') +
-        '">' +
-        esc(c.time) +
-        '</span></div>',
+      // The day is the heading above the card; only a reminder says what it is.
+      head: c.reminder ? '<div class="m-bulletin-reminder">' + esc(c.kind) + '</div>' : '',
       words: c.body ? '<div class="m-bulletin-words">' + esc(c.body) + '</div>' : '',
       photo: c.photo
         ? '<div class="m-bulletin-photo"><img alt="' +
@@ -219,18 +199,18 @@ window.MBulletins = (function () {
       files: c.pdfs
         .map(function (/** @type {any} */ f) {
           return (
-            '<div class="m-bulletin-file-line">PDF · ' +
+            '<div class="m-bulletin-tile"><span class="m-bulletin-tile-title">' +
             esc(f.title) +
-            ' · ' +
-            esc(f.pages + (f.pages === 1 ? ' Page' : ' Pages')) +
-            '</div>'
+            '</span><span class="m-bulletin-tile-sub">' +
+            esc('PDF · ' + f.pages + (f.pages === 1 ? ' Page' : ' Pages')) +
+            '</span></div>'
           );
         })
         .join(''),
       link: c.link
-        ? '<div class="m-bulletin-link"><span class="m-bulletin-link-title">' +
+        ? '<div class="m-bulletin-tile"><span class="m-bulletin-tile-title">' +
           esc(c.link.title) +
-          '</span><span class="m-bulletin-link-host">' +
+          '</span><span class="m-bulletin-tile-sub">' +
           esc(c.link.host) +
           '</span></div>'
         : '',
@@ -401,6 +381,7 @@ window.MBulletins = (function () {
     Object.keys(had).forEach(function (id) {
       had[id].remove();
     });
+    _drawDays(feed, cards);
     if (motion) {
       Array.prototype.forEach.call(
         feed.querySelectorAll(':scope > .m-bulletin-card'),
@@ -418,6 +399,31 @@ window.MBulletins = (function () {
       );
     }
     _watchPictures();
+  }
+
+  /**
+   * A heading ("Today", "Sunday") before the first card of each day. The
+   * headings are small: they are drawn again each time, the cards are not.
+   * @param {HTMLElement} feed @param {any[]} cards
+   */
+  function _drawDays(feed, cards) {
+    Array.prototype.forEach.call(
+      feed.querySelectorAll(':scope > .m-bulletin-day'),
+      function (/** @type {Element} */ h) {
+        h.remove();
+      },
+    );
+    var last = '';
+    cards.forEach(function (c) {
+      if (!c.day || c.day === last) return;
+      last = c.day;
+      var node = feed.querySelector(':scope > .m-bulletin-card[data-id="' + c.id.replace(/["\\]/g, '') + '"]');
+      if (!node) return;
+      var h = document.createElement('h2');
+      h.className = 'm-bulletin-day';
+      h.textContent = c.day;
+      feed.insertBefore(h, node);
+    });
   }
 
   /** Read the class again; the feed draws when it changes. @param {boolean} [force] */
@@ -586,7 +592,8 @@ window.MBulletins = (function () {
             esc('Not Seen Yet · ' + d.not_seen.length) +
             '</h3>' +
             _cellsHtml(cid, d.not_seen) +
-            '<button type="button" class="m-bulletin-btn m-bulletin-btn-wide" data-m-bulletin="again"' +
+            '<div class="m-bulletin-acts">' +
+            '<button type="button" class="m-bulletin-btn m-bulletin-btn-main" data-m-bulletin="again"' +
             (_seen.again ? ' disabled' : '') +
             '>' +
             esc(
@@ -595,7 +602,10 @@ window.MBulletins = (function () {
                 : 'Show It Again on ' +
                     (d.not_seen.length === 1 ? 'This Phone' : 'These ' + d.not_seen.length + ' Phones'),
             ) +
-            '</button>'
+            '</button>' +
+            '<button type="button" class="m-bulletin-btn m-bulletin-btn-soft" data-m-bulletin="observe-these">' +
+            esc(d.not_seen.length === 1 ? 'Observe This One' : 'Observe These ' + d.not_seen.length) +
+            '</button></div>'
           : '<p class="m-bulletin-hint">Everyone who can see it has seen it.</p>') +
         (paused ? '<p class="m-bulletin-hint">' + esc(paused) + '</p>' : '') +
         (d.no_card.length ? '<p class="m-bulletin-hint">' + esc(noCardText(d.no_card.length)) + '</p>' : '') +
@@ -617,6 +627,16 @@ window.MBulletins = (function () {
     box.setAttribute('aria-labelledby', 'm-bulletin-seen-title');
     // html-safe: head and body escape every word and name with esc; the rest is fixed markup.
     box.innerHTML = head + body;
+  }
+
+  /** An observation started on the students who have not seen it. */
+  function _observeThese() {
+    var d = _seen && _seen.data;
+    if (!d || !d.ok || !d.not_seen.length || !W.MObserve) return;
+    var cid = _seen.cid;
+    var ids = d.not_seen.slice();
+    _seen = null;
+    W.MObserve.presentNewObsSheet(cid, ids);
   }
 
   function _showAgain() {
@@ -659,8 +679,6 @@ window.MBulletins = (function () {
   function _drawCamera() {
     var root = document.getElementById('m-bulletin-camera');
     if (!root || !_cam) return;
-    var where =
-      '<p class="m-bulletin-where">' + esc('Posts to ' + _className(_cam.cid) + ': every student’s phone.') + '</p>';
     var top =
       '<div class="m-addwork-top"><button type="button" class="m-addwork-close" data-m-bulletin-cam="close">Done</button>' +
       '<div class="m-addwork-title" id="m-bulletin-camera-title">Post a Photo</div></div>';
@@ -674,8 +692,7 @@ window.MBulletins = (function () {
         '</div>' +
         W.MAddWork.shutterHtml({ label: 'Take a photo', accept: 'image/*', multiple: false, busy: _cam.busy }) +
         '</div>' +
-        msg +
-        where;
+        msg;
       return;
     }
     // html-safe: the caption, the class name and the messages go through esc; the picture is a blob: address made here.
@@ -691,7 +708,6 @@ window.MBulletins = (function () {
       esc(_cam.caption) +
       '">' +
       '<p class="m-bulletin-faces">Check the photo for students’ faces before you post.</p>' +
-      where +
       msg +
       '<div class="m-bulletin-two">' +
       '<label class="m-addwork-choice m-bulletin-retake" tabindex="0">Retake' +
@@ -1008,9 +1024,6 @@ window.MBulletins = (function () {
     box.innerHTML =
       '<div class="m-bulletin-sheet-head"><button type="button" class="m-bulletin-head-btn" data-m-bulletin="close">Cancel</button>' +
       '<h2 class="m-bulletin-sheet-title" id="m-bulletin-write-title">Write a Bulletin</h2><span class="m-bulletin-head-gap"></span></div>' +
-      '<p class="m-bulletin-hint m-bulletin-to">' +
-      esc('Posts to ' + _className(cid) + ': every student’s phone.') +
-      '</p>' +
       _returnedHtml(cid) +
       '<div class="m-segmented m-bulletin-kinds" role="group" aria-label="Kind of bulletin">' +
       seg('announcement', 'Announcement') +
@@ -1063,9 +1076,10 @@ window.MBulletins = (function () {
       '<input type="file" class="m-bulletin-file-input" accept="image/*,application/pdf"' +
       (d.busy ? ' disabled' : '') +
       '></label></div>' +
-      '<label class="m-bulletin-switch" for="m-bulletin-react"><input type="checkbox" role="switch" id="m-bulletin-react"' +
+      '<label class="m-bulletin-switch" for="m-bulletin-react"><span>Let Students React</span>' +
+      '<input type="checkbox" role="switch" id="m-bulletin-react"' +
       (d.reactions ? ' checked' : '') +
-      '><span>Let Students React</span></label>' +
+      '></label>' +
       '<p class="m-bulletin-msg" role="status">' +
       esc(d.msg) +
       '</p>' +
@@ -1374,6 +1388,7 @@ window.MBulletins = (function () {
     if (what === 'seen') return openSeen(el.getAttribute('data-id') || '');
     if (what === 'close') return MC.dismissSheet();
     if (what === 'again') return _showAgain();
+    if (what === 'observe-these') return _observeThese();
     if (what === 'show-seen') {
       if (_seen) _seen.open = !_seen.open;
       return _drawSeen();
@@ -1453,7 +1468,7 @@ window.MBulletins = (function () {
     feedModel: feedModel,
     kindLabel: kindLabel,
     seenLine: seenLine,
-    timeText: timeText,
+    dayLabel: dayLabel,
     dayText: dayText,
     pausedText: pausedText,
     noCardText: noCardText,

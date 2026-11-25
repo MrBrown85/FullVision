@@ -9,6 +9,7 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
 import { gotoApp, clickAction, getText } from './helpers.js';
+import { jumpTo } from './phone-jump.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -33,7 +34,7 @@ async function openWork(page, aid) {
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await expect(page.locator('#m-screen-grade-picker')).toBeVisible();
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + aid + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + aid + '"]').click();
   await expect(page.locator('#m-swiper')).toBeVisible();
   return page.locator('.m-swiper-card').first();
 }
@@ -54,10 +55,10 @@ test('a level, then +, then the same level again clears it', async ({ page }) =>
   const card = await openWork(page, LAB_SKILLS);
   const sid = await card.getAttribute('data-sid');
   const pc3 = row(card, 'PC3');
-  await expect(pc3.locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('3');
+  await expect(pc3.locator('.m-score-btn.m-score-active')).toHaveText('PRF');
 
   await pc3.locator('.m-score-btn[data-score="2"]').click();
-  await expect(pc3.locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
+  await expect(pc3.locator('.m-score-btn.m-score-active')).toHaveText('DEV');
   expect((await entries(page, sid, LAB_SKILLS)).find(e => e.tagId === 'PC3')).toMatchObject({ score: 2, mod: 0 });
 
   const plus = pc3.locator('.m-mod-btn[data-mod="1"]');
@@ -72,62 +73,83 @@ test('a level, then +, then the same level again clears it', async ({ page }) =>
   const pc3After = (await entries(page, sid, LAB_SKILLS)).filter(e => e.tagId === 'PC3');
   expect(pc3After.every(e => !(e.score > 0))).toBe(true);
   // The other competency keeps its level.
-  await expect(row(card, 'PC4').locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('3');
+  await expect(row(card, 'PC4').locator('.m-score-btn.m-score-active')).toHaveText('PRF');
 });
 
 test('Missing, Excused and Late on one student, and when Missing and Excused are greyed out', async ({ page }) => {
   await enterDemo(page);
   const card = await openWork(page, LAB_SKILLS);
   const sid = await card.getAttribute('data-sid');
-  const pill = val => card.locator('.m-status-pill[data-val="' + val + '"]');
-  const hint = card.locator('.m-status-hint');
+  // The status control is under ⋯; on the card a status that is set is one chip.
+  const chip = card.locator('.m-grade-chip');
   const surface = card.locator('.m-grade-card-surface');
+  const more = page.locator('#m-sheet-container .m-more-sheet');
+  const pill = val => more.locator('.m-status-pill[data-val="' + val + '"]');
+  const openMore = async () => {
+    await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+    await expect(more).toBeVisible();
+  };
+  const closeMore = async () => {
+    await page.locator('#m-sheet-backdrop').click({ position: { x: 10, y: 10 } });
+    await expect(more).toHaveCount(0);
+  };
+  // A tap in ⋯, which closes it.
+  const tapStatus = async val => {
+    await openMore();
+    await pill(val).click();
+    await expect(more).toHaveCount(0);
+  };
 
   // Scored work: Missing and Excused are greyed out and the hint says why.
+  await openMore();
   await expect(pill('NS')).toBeDisabled();
   await expect(pill('EXC')).toBeDisabled();
   await expect(pill('LATE')).toBeEnabled();
-  await expect(hint).toBeVisible();
-  await expect(hint).toHaveText('Clear the score and comment to mark Missing or Excused.');
+  await expect(more.locator('.m-more-hint')).toHaveText('Clear the score and comment to mark Missing or Excused.');
+  await closeMore();
+  await expect(chip).toHaveCount(0);
 
   // Late goes on scored work and leaves the levels live.
-  await pill('LATE').click();
-  await expect(pill('LATE')).toHaveClass(/m-status-active/);
+  await tapStatus('LATE');
+  await expect(chip).toHaveText('Late');
   await expect(surface).not.toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('LATE');
-  await pill('LATE').click();
-  await expect(pill('LATE')).not.toHaveClass(/m-status-active/);
+  await tapStatus('LATE');
+  await expect(chip).toHaveCount(0);
   expect(await status(page, sid, LAB_SKILLS)).toBe(null);
 
   // Clearing both levels frees Missing and Excused.
   await row(card, 'PC3').locator('.m-score-btn.m-score-active').click();
+  await openMore();
   await expect(pill('NS')).toBeDisabled();
+  await closeMore();
   await row(card, 'PC4').locator('.m-score-btn.m-score-active').click();
+  await openMore();
   await expect(pill('NS')).toBeEnabled();
   await expect(pill('EXC')).toBeEnabled();
-  await expect(hint).toBeHidden();
+  await expect(more.locator('.m-more-hint')).toHaveCount(0);
+  await closeMore();
 
-  await pill('NS').click();
-  await expect(pill('NS')).toHaveClass(/m-status-active/);
+  await tapStatus('NS');
+  await expect(chip).toHaveText('Missing');
   await expect(surface).toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('NS');
 
   // Excused replaces Missing.
-  await pill('EXC').click();
-  await expect(pill('EXC')).toHaveClass(/m-status-active/);
-  await expect(pill('NS')).not.toHaveClass(/m-status-active/);
+  await tapStatus('EXC');
+  await expect(chip).toHaveText('Excused');
   await expect(surface).toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('EXC');
 
   // Late replaces Excused and the card is live again.
-  await pill('LATE').click();
-  await expect(card.locator('.m-status-pill.m-status-active')).toHaveText('Late');
+  await tapStatus('LATE');
+  await expect(chip).toHaveText('Late');
   await expect(surface).not.toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('LATE');
 
   // Tapping the chosen status again takes it off.
-  await pill('LATE').click();
-  await expect(card.locator('.m-status-pill.m-status-active')).toHaveCount(0);
+  await tapStatus('LATE');
+  await expect(chip).toHaveCount(0);
   expect(await status(page, sid, LAB_SKILLS)).toBe(null);
 });
 
@@ -185,7 +207,7 @@ test('Set To on a not-in card, then the toast Undo takes the levels back off', a
   await page.reload();
   await expect(page.locator('#m-loading')).toBeHidden();
   await openWork(page, CELL_LAB);
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  await jumpTo(page, sid);
   const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
   const first = await page.evaluate(sid => displayNameFirst(getStudents('sci8').find(s => s.id === sid)), sid);
   const levels = () =>
@@ -207,7 +229,7 @@ test('Set To on a not-in card, then the toast Undo takes the levels back off', a
   expect(set.every(l => l === 3)).toBe(true);
 
   // Once the paper mark is kept, the card says so and shows the levels.
-  await expect(card.locator('.m-work-sent')).toHaveText('Handed in on paper');
+  await expect(card.locator('.m-work-onpaper')).toHaveText('Handed in on paper');
   await expect(card.locator('.m-score-btn.m-score-active').first()).toBeVisible();
 
   await clickAction(page, 'm-toast-undo');
@@ -259,8 +281,9 @@ test('a level and Late set on the phone show in the desktop gradebook', async ({
   const sid = await card.getAttribute('data-sid');
   await row(card, 'PC3').locator('.m-score-btn[data-score="1"]').click();
   await row(card, 'PC4').locator('.m-score-btn[data-score="1"]').click();
-  await card.locator('.m-status-pill[data-val="LATE"]').click();
-  await expect(card.locator('.m-status-pill[data-val="LATE"]')).toHaveClass(/m-status-active/);
+  await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+  await page.locator('#m-sheet-container .m-more-sheet .m-status-pill[data-val="LATE"]').click();
+  await expect(card.locator('.m-grade-chip')).toHaveText('Late');
 
   const desktop = await page.context().newPage();
   await desktop.setViewportSize({ width: 1400, height: 900 });

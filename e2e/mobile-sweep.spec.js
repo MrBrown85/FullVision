@@ -10,7 +10,7 @@ async function enterDemoOnPhone(page, viewport) {
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="observe"]').click();
-  await page.getByRole('button', { name: 'Start a sweep' }).click();
+  await page.getByRole('button', { name: 'Sweep' }).click();
   await expect(page.locator('#m-screen-obs-sweep')).toBeVisible();
 }
 

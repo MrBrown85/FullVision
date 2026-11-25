@@ -50,7 +50,7 @@ for (const viewport of [
       const box = s => document.querySelector(s).getBoundingClientRect();
       const content = document.querySelector('#m-screen-students-list .m-screen-content');
       return {
-        actionsBottom: box('.m-card-stack-item[data-depth="0"] .m-scard-actions').bottom,
+        actionsBottom: box('.m-card-stack-item[data-depth="0"] .m-scard').bottom,
         counterBottom: box('.m-card-foot').bottom,
         tabTop: box('#m-tab-bar').top,
         pageScrolls: content.scrollHeight > content.clientHeight,

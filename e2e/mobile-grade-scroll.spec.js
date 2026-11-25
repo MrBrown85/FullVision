@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { scoreBy } from './phone-jump.js';
 
 /* Phone grading keeps its place. A score, ± or clear tapped low on a long
    rubric (or on a competency in Competencies view) used to scroll the student's
@@ -65,7 +66,7 @@ test.describe('Phone grading card', () => {
     const group = () => card(page).locator('.m-crit-group').last();
 
     await group().locator('.m-score-btn[data-score="3"]').click();
-    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('3');
+    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('PRF');
     expect(await cardTop(page)).toBe(top);
 
     await group().locator('.m-mod-btn').last().click();
@@ -80,7 +81,7 @@ test.describe('Phone grading card', () => {
 
   test('competency scores in Competencies view', async ({ page }) => {
     await openLongRubric(page);
-    await page.getByRole('button', { name: 'Competencies', exact: true }).click();
+    await scoreBy(page, 'Competencies');
     await expect(card(page).locator('.m-score-group').first()).toBeVisible();
     // Short competency lists don't scroll; give the card room to scroll. A
     // style rule, because a competency on rubric work redraws the card (its
@@ -89,7 +90,7 @@ test.describe('Phone grading card', () => {
     const top = await scrollCardToBottom(page);
     const group = () => card(page).locator('.m-score-group').last();
     await group().locator('.m-score-btn[data-score="2"]').click();
-    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('DEV');
     expect(await cardTop(page)).toBe(top);
   });
 
@@ -99,9 +100,7 @@ test.describe('Phone grading card', () => {
     await card(page).locator('.m-crit-group').last().locator('.m-score-btn[data-score="4"]').click();
     // What a server echo or an id re-key does once the save lands.
     await page.evaluate(() => _invalidateAndRerender());
-    await expect(
-      card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active .m-level-fig'),
-    ).toHaveText('4');
+    await expect(card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active')).toHaveText('EXT');
     expect(await cardTop(page)).toBe(top);
   });
 

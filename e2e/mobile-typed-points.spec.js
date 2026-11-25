@@ -16,7 +16,7 @@ async function openExam(page) {
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell', { hasText: 'Mid-Year Comprehensive Exam' }).click();
+  await page.locator('#m-grade-list .m-tg-row', { hasText: 'Mid-Year Comprehensive Exam' }).click();
   // The field's handlers are bound once the screen has slid in.
   await expect(page.locator('#m-swiper')).toBeVisible();
   await page.waitForTimeout(500);
@@ -54,11 +54,11 @@ test('typed points replace the score, clamp like the desktop, and reach the grad
   // Out of range clamps to 0 and to twice the maximum, as on the desktop.
   await field.tap();
   await page.keyboard.type('999');
-  await card.locator('.m-grade-student-name').click();
+  await card.locator('.m-overall-label').click();
   await expect(field).toHaveValue('160');
   await field.tap();
   await page.keyboard.type('-5');
-  await card.locator('.m-grade-student-name').click();
+  await card.locator('.m-overall-label').click();
   await expect(field).toHaveValue('0');
   expect(await stored(page, sid)).toBe(0);
 
@@ -100,10 +100,10 @@ test('+ and − step within the bonus limit, and the % shows beside the field', 
   await page.keyboard.type('95');
   await expect(pct).toHaveText('119%bonus');
   await page.keyboard.press('Enter');
-  // "bonus" is in the same --text colour as the student's name.
+  // "bonus" is in the same --text colour as the card's headings.
   await expect(pct.locator('.gb-pts-bonus')).toHaveCSS(
     'color',
-    await card.locator('.m-grade-student-name').evaluate(el => getComputedStyle(el).color),
+    await card.locator('.m-overall-label').evaluate(el => getComputedStyle(el).color),
   );
 
   // − from a bonus score steps down by one, not to the maximum.
@@ -143,7 +143,7 @@ test('+ and − use a decimal maximum for the % and the bonus limit', async ({ p
   });
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell', { hasText: 'Mid-Year Comprehensive Exam' }).click();
+  await page.locator('#m-grade-list .m-tg-row', { hasText: 'Mid-Year Comprehensive Exam' }).click();
   await expect(page.locator('#m-swiper')).toBeVisible();
   await page.waitForTimeout(500);
   const card = page.locator('.m-swiper-card').first();

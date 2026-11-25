@@ -81,7 +81,7 @@ test('the row menu’s Work Wall, then Grade in This Order on the phone', async 
     [...document.querySelectorAll('#m-swiper .m-swiper-card')].map(c => c.getAttribute('data-sid')),
   );
   expect(cards).toEqual(shown);
-  await expect(swiper.locator('.m-nav-bar')).toContainText('1 of ' + shown.length);
+  await expect(swiper.locator('#m-grade-progress .m-prog-seg')).toHaveCount(shown.length);
   await expect(swiper.locator('.m-nav-bar')).not.toContainText('to grade');
   await shot(page, 'S14-phone-grade-in-order');
 });

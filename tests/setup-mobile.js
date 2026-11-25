@@ -111,7 +111,7 @@ function _mobileStubElement(id) {
   'm-tab-bar',
   'm-offline-banner',
   'm-swiper',
-  'm-thumb-strip',
+  'm-grade-progress',
   'm-student-card-stack',
   'm-quick-bar',
 ].forEach(id => {
@@ -126,8 +126,7 @@ load('shared/photo-queue.js');
 load('shared/photo-readers.js');
 load('teacher-mobile/components.js');
 load('teacher-mobile/card-stack.js');
-load('teacher-mobile/card-widgets.js');
-load('teacher-mobile/card-widget-editor.js');
+load('teacher-mobile/student-card.js');
 load('teacher-mobile/students-list.js');
 load('teacher-mobile/student-detail.js');
 load('teacher-mobile/tab-students.js');
@@ -137,7 +136,7 @@ load('teacher-mobile/add-work.js');
 load('teacher-mobile/markup.js');
 load('teacher-mobile/crit-own.js');
 load('teacher-mobile/grade-look.js');
-load('teacher-mobile/student-look.js');
+load('teacher-mobile/grade-reader.js');
 load('teacher-mobile/tab-grade.js');
 load('teacher-mobile/level-sheet.js');
 // Bulletins (B1f): the fourth tab, shown only with the build flag on.
