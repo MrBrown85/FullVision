@@ -1,11 +1,12 @@
 /**
- * The phone's new look, L1 and L2 (docs/plans/phone-look-plan.md).
+ * The phone's new look, L1 to L3 (docs/plans/phone-look-plan.md).
  * Demo Mode, Science 8, Light Refraction Lab, with the build switch on:
  * the bar names the card on screen and its name opens the class list; a
  * level on the track, + beside the name; Late from ⋯ shown as one chip on
  * the card; the fit of a criterion's line and the bottom bar on a 375 and
  * a 320 px phone, in the page's font and a wide one. L2: the Grade list
- * and Bulletins.
+ * and Bulletins. L2b: the Write a Bulletin sheet. L3: Return and Next held
+ * seven seconds for Undo.
  */
 import { test, expect } from '@playwright/test';
 import { FONTS, useFont } from './wide-font.js';
@@ -107,6 +108,103 @@ test('a level on the track, + beside the name, and Late from ⋯', async ({ page
   await expect(pills.filter({ hasText: 'Missing' })).toBeHidden();
   await expect(pills.filter({ hasText: 'Excused' })).toBeHidden();
   expect(errors).toEqual([]);
+});
+
+test('L3: Return and Next is held seven seconds, with Undo over the tab bar', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const aid = await openLab(page);
+  const drafts = sid =>
+    page.evaluate(([cid, aid, sid]) => GraderWork.draftsIn(cid, aid, [sid]).length, [CID, aid, sid]);
+  const score = async card => {
+    for (const i of [0, 1, 2])
+      await card.locator('.m-crit-group').nth(i).locator('.m-level-btn[data-score="3"]').click();
+  };
+  const ines = await goTo(page, 'Ines Larsen');
+  const inesId = await ines.getAttribute('data-sid');
+  await score(ines);
+  const next = page.locator('[data-action="m-grade-return-next"]');
+  await next.click();
+  await expect(title(page)).toHaveText('Marcus Lee');
+
+  // The toast: over the tab bar, clear of the bottom bar and the card.
+  const toast = page.locator('#m-toast .m-toast-item');
+  await expect(toast).toContainText('Returned to Ines');
+  const over = () =>
+    page.evaluate(() => {
+      const r = s => document.querySelector(s).getBoundingClientRect();
+      const t = r('#m-toast .m-toast-item');
+      const tabs = r('#m-tab-bar');
+      return t.top >= tabs.top && t.bottom <= tabs.bottom && t.top >= r('#m-grade-return-act').bottom;
+    });
+  // (Polled: with reduced motion the page's styles settle a moment after the toast is drawn.)
+  await expect.poll(over).toBe(true);
+  // Nothing is sent yet, and Ines's card already reads Returned.
+  expect(await drafts(inesId)).toBeGreaterThan(0);
+  // (Once the slide to the next card is over, back to hers from the class list.)
+  await page.waitForTimeout(700);
+  await goTo(page, 'Ines Larsen');
+  await expect(page.locator('#m-grade-return .m-returned-mark')).toHaveText('Returned');
+
+  // Undo: back on Ines, the grade still a draft, Return and Next there again.
+  await toast.locator('.m-toast-undo').click();
+  await expect(title(page)).toHaveText('Ines Larsen');
+  await expect(next).toBeEnabled();
+  expect(await drafts(inesId)).toBeGreaterThan(0);
+
+  // Left alone, it is sent when the seven seconds are up.
+  await next.click();
+  expect(await drafts(inesId)).toBeGreaterThan(0);
+  await expect.poll(() => drafts(inesId), { timeout: 9000 }).toBe(0);
+  await expect(toast).toHaveCount(0);
+
+  // Leaving the grading screen sends a held return at once.
+  await expect(title(page)).toHaveText('Marcus Lee');
+  const marcus = page.locator('#m-swiper .m-swiper-card').nth(await page.evaluate(() => MGrade.getCurrentIndex()));
+  const marcusId = await marcus.getAttribute('data-sid');
+  await score(marcus);
+  await next.click();
+  expect(await drafts(marcusId)).toBeGreaterThan(0);
+  await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').click();
+  expect(await drafts(marcusId)).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('L2b: Write a Bulletin has no Posts To line, and Let Students React is a row with its switch at the right', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('fv-build-phoneLook', '1'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/teacher-mobile\//);
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.locator('.m-tab-item[data-tab="bulletins"]').click();
+  await page.locator('[data-m-bulletin="write"]').click();
+  const row = page.locator('.m-bulletin-switch');
+  await expect(row).toBeVisible();
+  await expect(page.locator('.m-bulletin-to')).toBeHidden();
+  for (const font of FONTS) {
+    await useFont(page, font);
+    const at = await row.evaluate(el => {
+      const r = e => e.getBoundingClientRect();
+      const box = r(el);
+      const words = r(el.querySelector('span'));
+      const sw = r(el.querySelector('input'));
+      return {
+        gap: sw.left - words.right,
+        right: box.right - sw.right,
+        mid: Math.abs((sw.top + sw.bottom) / 2 - (words.top + words.bottom) / 2),
+      };
+    });
+    expect(at.gap, font).toBeGreaterThan(8);
+    expect(at.right, font).toBeLessThanOrEqual(14);
+    expect(at.mid, font).toBeLessThanOrEqual(2);
+  }
+  const box = row.locator('input');
+  const was = await box.isChecked();
+  await box.click();
+  expect(await box.isChecked()).toBe(!was);
 });
 
 test('L2: the Grade list and Bulletins', async ({ page }) => {

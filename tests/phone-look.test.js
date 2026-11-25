@@ -6,10 +6,11 @@
  * byte-for-byte walk in tests/phone-return.test.js holds that too). On, the
  * bar names the card on screen, the marks sit in a box of their own, the
  * Overall Comment is named for the student, and each level button carries
- * its code for the track.
+ * its code for the track. L3: Return and Next is held seven seconds for Undo.
  */
 import './setup-mobile.js';
 import { parseHTML } from 'linkedom';
+import { vi } from 'vitest';
 
 const CID = 'test';
 const originals = {};
@@ -130,5 +131,84 @@ describe('with the switch on', () => {
     expect(MGradeLook.unitName(CID, three)).toBe('Group 2');
     expect(MGradeLook.unitName(CID, { st, label: 'Cece Adams' })).toBe('Cece Adams');
     expect(MGradeLook.commentLabel(CID, st, pair)).toBe('Comment for Cece and Noor');
+  });
+});
+
+describe('Return and Next, held for Undo (L3)', () => {
+  const unit = () => ({ st: getStudents(CID)[0], label: 'Cece Adams' });
+  let toast;
+  let refresh;
+  let jump;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    toast = vi.spyOn(MComponents, 'showToast').mockImplementation(() => {});
+    vi.spyOn(MComponents, 'hideToast').mockImplementation(() => {});
+    refresh = vi.spyOn(MGrade, 'refreshToReturn').mockImplementation(() => {});
+    jump = vi.spyOn(MGrade, 'jumpToStudent').mockImplementation(() => {});
+    vi.spyOn(MGrade, 'studentCardIndex').mockImplementation(() => 2);
+  });
+  afterEach(() => {
+    MGradeLook.flush();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('with the switch off the return is sent at once, with no toast', () => {
+    const send = vi.fn();
+    MGradeLook.hold(CID, 'a1', unit(), send);
+    expect(send).toHaveBeenCalledWith(false);
+    expect(toast).not.toHaveBeenCalled();
+    expect(MGradeLook.held(CID, 'a1', 'stu1')).toBe(false);
+  });
+
+  it('with the switch on it waits seven seconds, then is sent', () => {
+    look(true);
+    const send = vi.fn();
+    MGradeLook.hold(CID, 'a1', unit(), send);
+    expect(send).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('Returned to Cece', expect.objectContaining({ duration: 7000, low: true }));
+    expect(MGradeLook.held(CID, 'a1', 'stu1')).toBe(true);
+    expect(MGradeLook.held(CID, 'a1', 'stu2')).toBe(false);
+    vi.advanceTimersByTime(6999);
+    expect(send).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(true);
+    expect(MGradeLook.held(CID, 'a1', 'stu1')).toBe(false);
+    expect(refresh).toHaveBeenCalledWith(CID);
+  });
+
+  it('Undo sends nothing and goes back to the card', () => {
+    look(true);
+    const send = vi.fn();
+    MGradeLook.hold(CID, 'a1', unit(), send);
+    toast.mock.calls[0][1].onUndo();
+    expect(MGradeLook.held(CID, 'a1', 'stu1')).toBe(false);
+    expect(jump).toHaveBeenCalledWith(2);
+    vi.advanceTimersByTime(20000);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('the next return sends the one held, and is held in its place', () => {
+    look(true);
+    const first = vi.fn();
+    const second = vi.fn();
+    MGradeLook.hold(CID, 'a1', unit(), first);
+    const pair = { st: getStudents(CID)[1], label: 'Pair 1', view: { members: ['stu2', 'stu3'] } };
+    MGradeLook.hold(CID, 'a1', pair, second);
+    expect(first).toHaveBeenCalledWith(true);
+    expect(second).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenLastCalledWith('Returned to Noor and Liam', expect.anything());
+    expect(MGradeLook.held(CID, 'a1', 'stu2')).toBe(true);
+    vi.advanceTimersByTime(7000);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledWith(true);
+  });
+
+  it('sending now, with nothing held, does nothing', () => {
+    look(true);
+    MGradeLook.flush();
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
