@@ -140,6 +140,8 @@
       return;
     }
     _open = why;
+    // Another Assessment cannot take files, so it is not offered to a drag.
+    if (_panel) _panel.classList.toggle('is-drag', why === 'drag');
     if (_rest) return;
     if (_panel) {
       // html-safe: panelHtml escapes every title and note
@@ -165,6 +167,7 @@
     _note = '';
     var was = _open;
     _open = null;
+    if (_panel) _panel.classList.remove('is-drag');
     if (!was || _rest) return;
     var tile = _tile;
     if (_panel) _panel.hidden = true;

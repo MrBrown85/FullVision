@@ -177,6 +177,8 @@ test('files held over the line open the targets; a drop on one opens Add Work fo
   expect(await drag(page, '#dash-inbox', 'dragover')).toBe(true);
   const targets = page.locator('#dash-inbox .dash-inbox-target');
   await expect(targets).toHaveCount(list.length + 1);
+  // Another Assessment cannot take files: it is not shown to a drag.
+  await expect(page.locator('#dash-inbox [data-dash-inbox="target-other"]')).toBeHidden();
   // The tile has opened to its usual share of the column.
   await expect.poll(() => tileHeight(page)).toBeGreaterThan(200);
   // The pieces Add Work For lists, in its order, then Another Assessment.
