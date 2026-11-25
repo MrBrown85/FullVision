@@ -32,7 +32,6 @@ function opts(extra) {
       obs: {},
       classChange: null,
       helpRule: null,
-      naComp: null,
     },
     extra || {},
   );

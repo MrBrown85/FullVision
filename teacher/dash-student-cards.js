@@ -160,16 +160,11 @@ window.DashStudentCards = (function () {
 
   /* The strip: one segment per column of DashInsights.columns, tinted by the
      student's level on it. Up to CHIP_MAX columns each is a chip with its
-     code; more are thin bars. `focusKey` outlines one column and dims the
-     rest. data-student-tab: the student page tab a click here opens.
+     code; more are thin bars. data-student-tab: the student page tab a click here opens.
      `codes`: DashInsights.columnCodes for the class, worked out once a draw. */
-  function stripHtml(cid, sid, cols, focusKey, secById, codes) {
+  function stripHtml(cid, sid, cols, secById, codes) {
     var chips = cols.length <= CHIP_MAX;
-    var html =
-      '<div class="dash-card-strip' +
-      (chips ? ' is-chips' : '') +
-      (focusKey ? ' has-focus' : '') +
-      '" data-student-tab="comps">';
+    var html = '<div class="dash-card-strip' + (chips ? ' is-chips' : '') + '" data-student-tab="comps">';
     cols.forEach(function (col) {
       var value = _colValue(cid, sid, col);
       var r = value > 0 ? Math.max(1, Math.min(4, roundLevel(value))) : 0;
@@ -177,7 +172,7 @@ window.DashStudentCards = (function () {
       var label = lines[0] + ': ' + lines.slice(1).join('. ');
       // The level's colours (and a text colour that reads on it in each
       // theme) come from .dash-card-seg.lv-N in dashboard.css.
-      var cls = 'dash-card-seg' + (r ? ' lv-' + r : ' is-none') + (focusKey === col.key ? ' is-focus' : '');
+      var cls = 'dash-card-seg' + (r ? ' lv-' + r : ' is-none');
       if (chips) {
         html +=
           '<button type="button" class="' +
@@ -216,20 +211,8 @@ window.DashStudentCards = (function () {
     }).length;
   }
 
-  /* The footer's right side: with a column in focus, the student's level on
-     it; otherwise "N not assessed" when some competency has no scored work. */
-  function footerRightHtml(cid, sid, focusCol) {
-    if (focusCol) {
-      var value = _colValue(cid, sid, focusCol);
-      var r = value > 0 ? Math.max(1, Math.min(4, roundLevel(value))) : 0;
-      return (
-        '<span class="dash-card-focus"' +
-        (r ? ' style="color:var(--score-' + r + '-text)"' : '') +
-        '>' +
-        esc(focusCol.label + ': ' + levelText(cid, value, 'Not assessed yet')) +
-        '</span>'
-      );
-    }
+  /* The footer's right side: "N not assessed" when some competency has no scored work. */
+  function footerRightHtml(cid, sid) {
     var n = unassessedCount(cid, sid);
     if (!n) return '';
     return (
@@ -241,24 +224,13 @@ window.DashStudentCards = (function () {
     );
   }
 
-  /* opts.focusKey: a column key (DashInsights.columns) the page is focused
-     on; opts.rule: the saved Who Needs Help rule, for the focus border. */
-  function renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags, opts) {
-    opts = opts || {};
+  function renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags) {
     var cols = DashInsights.columns(cid);
     var codes = DashInsights.columnCodes(cid, cols);
     var secById = {};
     getSections(cid).forEach(function (sec) {
       secById[sec.id] = sec;
     });
-    var focusCol =
-      (opts.focusKey &&
-        cols.filter(function (c) {
-          return c.key === opts.focusKey;
-        })[0]) ||
-      null;
-    var focusKey = focusCol ? focusCol.key : '';
-    var rule = DashInsights.readRule(opts.rule);
     var html = '<div class="dash-section">';
     if (students.length === 0 && allStudents.length === 0) {
       html +=
@@ -319,12 +291,9 @@ window.DashStudentCards = (function () {
 
         var obsText = obsLineHtml(obsSummary(getStudentQuickObs(cid, st.id), getTodayStr(), getActiveTerm(cid)));
 
-        var focusBelow =
-          focusCol && DashInsights.isBelowRule(cid, focusCol, st.id, _colValue(cid, st.id, focusCol), rule);
         html +=
           '<div class="dash-card' +
           (flagged ? ' flagged' : '') +
-          (focusBelow ? ' is-focus-below' : '') +
           '" data-action="goToStudent" data-sid="' +
           st.id +
           '" data-course="' +
@@ -398,7 +367,7 @@ window.DashStudentCards = (function () {
           trendHtml(trend) +
           '</div>';
 
-        html += stripHtml(cid, st.id, cols, focusKey, secById, codes);
+        html += stripHtml(cid, st.id, cols, secById, codes);
 
         // The footer: the flag at the bottom left (plan F.6), the
         // observation line, then Missing and the right-hand note.
@@ -430,7 +399,7 @@ window.DashStudentCards = (function () {
               missingCount +
               '</span>'
             : '') +
-          footerRightHtml(cid, st.id, focusCol) +
+          footerRightHtml(cid, st.id) +
           '</div>';
 
         html += '</div>';
@@ -446,25 +415,20 @@ window.DashStudentCards = (function () {
   }
 
   /* ── Sliding to new places (plan B.5) ───────────────────── */
-  /* Before a re-render that may move the student cards: where each card is,
-     which competency the chips were focused on, and which cards had the
-     amber border. The page asks only when motion is not reduced. */
+  /* Before a re-render that may move the student cards (a sort, a search):
+     where each card is. The page asks only when motion is not reduced. */
   function cardsBefore() {
     var cards = _cardEls();
     if (!cards.length || typeof cards[0].getBoundingClientRect !== 'function') return null;
-    var seg = document.querySelector('#main .dash-card-strip.has-focus .dash-card-seg.is-focus');
-    var out = { rects: {}, below: {}, focus: seg ? seg.getAttribute('data-key') : null };
+    var out = { rects: {} };
     cards.forEach(function (el) {
-      var sid = el.getAttribute('data-sid');
-      out.rects[sid] = el.getBoundingClientRect();
-      if (el.classList.contains('is-focus-below')) out.below[sid] = true;
+      out.rects[el.getAttribute('data-sid')] = el.getBoundingClientRect();
     });
     return out;
   }
 
-  /* FLIP: each card that was on screen starts where it was, in the look it
-     had (chips, border), then slides to its new place as the chips and the
-     border change (dashboard.css .is-sliding). New cards just appear. */
+  /* FLIP: each card that was on screen starts where it was, then slides to
+     its new place (dashboard.css .is-sliding). New cards just appear. */
   function slideFrom(before) {
     var placed = [];
     // Every new place is read before any card is moved: a read after a
@@ -476,49 +440,26 @@ window.DashStudentCards = (function () {
       return el.getBoundingClientRect();
     });
     cards.forEach(function (el, n) {
-      var sid = el.getAttribute('data-sid');
-      var a = before.rects[sid];
+      var a = before.rects[el.getAttribute('data-sid')];
       var b = rects[n];
-      var strip = el.querySelector('.dash-card-strip');
-      var segs = strip ? Array.prototype.slice.call(strip.querySelectorAll('.dash-card-seg')) : [];
-      var now = {
-        el: el,
-        below: el.classList.contains('is-focus-below'),
-        strip: strip,
-        stripFocus: strip ? strip.classList.contains('has-focus') : false,
-        segs: segs.map(function (g) {
-          return g.classList.contains('is-focus');
-        }),
-        dx: a.left - b.left,
-        dy: a.top - b.top,
-      };
+      var dx = a.left - b.left;
+      var dy = a.top - b.top;
+      if (!dx && !dy) return;
       el.classList.add('is-placing');
-      el.classList.toggle('is-focus-below', !!before.below[sid]);
-      if (strip) strip.classList.toggle('has-focus', !!before.focus);
-      segs.forEach(function (g) {
-        g.classList.toggle('is-focus', !!before.focus && g.getAttribute('data-key') === before.focus);
-      });
-      if (now.dx || now.dy) el.style.transform = 'translate(' + now.dx + 'px, ' + now.dy + 'px)';
-      now.segEls = segs;
-      placed.push(now);
+      el.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+      placed.push(el);
     });
     if (!placed.length) return;
-    // One layout read, so the old places and looks take before the change.
+    // One layout read, so the old places take before the change.
     void document.body.offsetHeight;
-    placed.forEach(function (p) {
-      var el = p.el;
+    placed.forEach(function (el) {
       el.classList.remove('is-placing');
       el.classList.add('is-sliding');
-      el.classList.toggle('is-focus-below', p.below);
-      if (p.strip) p.strip.classList.toggle('has-focus', p.stripFocus);
-      p.segEls.forEach(function (g, i) {
-        g.classList.toggle('is-focus', p.segs[i]);
-      });
       el.style.transform = '';
     });
     setTimeout(function () {
-      placed.forEach(function (p) {
-        p.el.classList.remove('is-sliding');
+      placed.forEach(function (el) {
+        el.classList.remove('is-sliding');
       });
     }, 300);
   }
