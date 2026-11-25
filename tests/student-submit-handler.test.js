@@ -127,6 +127,8 @@ describe('student-submit handler', () => {
       { route: 'delete' },
       { route: 'card' },
       { route: 'card', code: 'x'.repeat(33) },
+      { route: 'open', code: 'K7M-4QX' },
+      { route: 'check', token: 'a'.repeat(64), birthday: '2012-05-15' },
       { route: 'submit', token: 'a'.repeat(64), answers: {} },
       { route: 'verify', token: 'a'.repeat(64), student_number: '0123456' },
     ];
@@ -138,19 +140,6 @@ describe('student-submit handler', () => {
     expect(big.status).toBe(413);
     const get = await handle(new Request('https://x.supabase.co/functions/v1/student-submit'));
     expect(get.status).toBe(405);
-    expect(calls).toHaveLength(0);
-  });
-
-  it('the old slip routes open and check answer not_found, without the database, until the release', async () => {
-    const { handle, calls } = setup();
-    for (const body of [
-      { route: 'open', code: 'K7M-4QX' },
-      { route: 'check', token: 'a'.repeat(64), birthday: '2012-05-15' },
-    ]) {
-      const res = await handle(post(body));
-      expect(res.status, JSON.stringify(body)).toBe(200);
-      expect(await res.json()).toEqual({ ok: false, error: 'not_found' });
-    }
     expect(calls).toHaveLength(0);
   });
 
