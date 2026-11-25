@@ -2564,10 +2564,6 @@ body.fv-switching-course::after {
   gap: 6px 8px;
   margin-top: 6px;
 }
-.m-st-toward {
-  font-size: 12px;
-  color: var(--text-3);
-}
 
 /* ── Touch targets (Step 4 sweep, Nov 3) ───────────────────────
    Every control the teacher taps is at least 44 px high: All Students,

@@ -650,7 +650,7 @@ describe('Student detail recent assessments', () => {
 
 /* ── Detail screen: score chips on assessments ──────────────── */
 describe('Assessment score chips', () => {
-  it('shows the assessment score as the gradebook does, and what it counts toward', () => {
+  it('shows the assessment score as the gradebook does, and no competency list', () => {
     mockDataLayer({
       getAssessments: () => [{ id: 'a1', title: 'Test', type: 'summative', date: '2025-03-01', tagIds: ['t1'] }],
       getScores: () => ({
@@ -661,7 +661,7 @@ describe('Assessment score chips', () => {
     const html = MStudents.renderDetail(CID, 'stu1');
     expect(html).toContain('m-st-score');
     expect(html).toContain('3.5');
-    expect(html).toContain('m-st-toward">Questioning<');
+    expect(html).not.toContain('Questioning');
   });
 
   it('shows dash for unscored tags', () => {
