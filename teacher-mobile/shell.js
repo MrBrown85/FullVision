@@ -470,9 +470,8 @@
     var stack = document.getElementById('m-nav-stack');
     var screens = stack ? stack.querySelectorAll('.m-screen') : [];
     if (!screens.length) return null;
-    var content = screens[0].querySelector('.m-screen-content');
     var state = {
-      scrollTop: content ? content.scrollTop : 0,
+      keep: MScreenKeep.capture(screens[0]),
       cardIndex: _activeTab === 'students' && MStudents.getCardIndex ? MStudents.getCardIndex() : 0,
       gradeReturnSid: _gradeReturnSid,
       pushed: [],
@@ -480,13 +479,7 @@
     for (var i = 1; i < screens.length; i++) {
       var raw = screens[i].getAttribute('data-restore');
       if (!raw) continue;
-      var c = screens[i].querySelector('.m-screen-content');
-      state.pushed.push({
-        desc: JSON.parse(raw),
-        scrollTop: c ? c.scrollTop : 0,
-        gradeIndex: MGrade.getCurrentIndex ? MGrade.getCurrentIndex() : 0,
-        cardScrolls: MGrade.getCardScrolls ? MGrade.getCardScrolls() : null,
-      });
+      state.pushed.push({ desc: JSON.parse(raw), keep: MScreenKeep.capture(screens[i]) });
     }
     return state;
   }
@@ -497,8 +490,7 @@
     var root = stack.querySelector('.m-screen');
     if (!root) return;
     if (state.cardIndex && MStudents.goToCard) MStudents.goToCard(state.cardIndex);
-    var content = root.querySelector('.m-screen-content');
-    if (content) content.scrollTop = state.scrollTop;
+    MScreenKeep.restore(root, state.keep);
     state.pushed.forEach(_restorePushed);
     _gradeReturnSid = state.gradeReturnSid;
   }
@@ -511,6 +503,7 @@
     else if (desc.kind === 'swiper')
       html = MGrade.renderSwiper(_cid, desc.aid, {
         only: desc.only,
+        pinned: p.keep && p.keep.grade ? p.keep.grade.ids : null, // the students it had (screen-keep.js)
         ids: desc.ids,
         student: desc.student,
         aids: desc.aids,
@@ -531,13 +524,8 @@
     _navStacks[_activeTab].push('detail');
     var navBar = screen.querySelector('.m-nav-bar');
     if (navBar) MC.setupScrollTitle(screen, navBar.id);
-    if (desc.kind === 'swiper') {
-      MGrade.setupSwiper(_cid, desc.aid);
-      MGrade.jumpToStudent(p.gradeIndex, true);
-      if (MGrade.setCardScrolls) MGrade.setCardScrolls(p.cardScrolls);
-    }
-    var content = screen.querySelector('.m-screen-content');
-    if (content) content.scrollTop = p.scrollTop;
+    if (desc.kind === 'swiper') MGrade.setupSwiper(_cid, desc.aid);
+    MScreenKeep.restore(screen, p.keep);
   }
 
   /* ── Demo Mode pill ─────────────────────────────────────────
