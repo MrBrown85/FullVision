@@ -1,7 +1,8 @@
 // @ts-check
-/* obs-roster.js — the Observations page's roster and its Open Concerns
-   button (docs/DECISIONS.md, "Observations off the Dashboard"). They
-   replace the Dashboard's Observations grid.
+/* obs-roster.js — the Observations page's roster (docs/DECISIONS.md,
+   "Observations off the Dashboard"), which replaces the Dashboard's
+   Observations grid. (Open Concerns is an option in the bar's Show:
+   obs-toolbar.js.)
 
    The roster (ui.js setSidebarAnnotator): beside each name, the days since
    the student was last observed, amber from 3 weeks
@@ -10,8 +11,8 @@
    in the list until another is picked, so writing to one doesn't pull
    their row away mid-note.
 
-   The page (page-observations.js) owns the students, the picked students
-   and the Open Concerns filter; this file owns the switch. */
+   The page (page-observations.js) owns the students and the picked
+   students; this file owns the switch. */
 /** @type {any} */ (window).ObsRoster = (function () {
   'use strict';
 
@@ -68,6 +69,7 @@
     };
     W.setSidebarAnnotator(annotate);
     document.body.classList.add('obs-roster');
+    mark(ctx.picked);
   }
 
   function toggle() {
@@ -83,6 +85,12 @@
   function _sidOf(row) {
     return new URLSearchParams((row.getAttribute('data-href') || '').split('?')[1] || '').get('id');
   }
+  // The rows of the students picked show selected, whoever picked them.
+  function mark(picked) {
+    document.querySelectorAll('.student-row').forEach(function (r) {
+      r.classList.toggle('selected', picked.indexOf(_sidOf(r)) >= 0);
+    });
+  }
   function wireRows(onPick) {
     requestAnimationFrame(function () {
       document.querySelectorAll('#gb-roster-list .student-row').forEach(function (a) {
@@ -90,10 +98,7 @@
           e.preventDefault();
           var sid = _sidOf(a);
           var picked = sid ? onPick(sid, /** @type {MouseEvent} */ (e).shiftKey) : null;
-          if (!picked) return;
-          document.querySelectorAll('.student-row').forEach(function (r) {
-            r.classList.toggle('selected', picked.indexOf(_sidOf(r)) >= 0);
-          });
+          if (picked) mark(picked);
         });
       });
     });
@@ -111,38 +116,6 @@
     document.body.classList.remove('obs-roster');
   }
 
-  /* The Open Concerns button at the head of the filters, while the class
-     has a Concern with no Resolved follow-up (or the filter is on). */
-  function concernsBtnHtml(cid, pressed) {
-    var n = typeof getOpenConcerns === 'function' ? getOpenConcerns(cid).length : 0;
-    if (!n && !pressed) return '';
-    return (
-      '<button type="button" class="obs-concern-btn' +
-      (pressed ? ' active' : '') +
-      '" data-action="toggleOpenConcerns" aria-pressed="' +
-      !!pressed +
-      '">' +
-      n +
-      ' Open ' +
-      (n === 1 ? 'Concern' : 'Concerns') +
-      '</button>'
-    );
-  }
-
-  // The button's place in the filter row, redrawn by syncConcerns.
-  function concernsSlotHtml(cid, pressed) {
-    return '<span class="obs-concern-slot" id="obs-concern-slot">' + concernsBtnHtml(cid, pressed) + '</span>';
-  }
-  function syncConcerns(cid, pressed) {
-    var slot = document.getElementById('obs-concern-slot');
-    // html-safe: concernsBtnHtml is fixed words and a count.
-    if (slot) slot.innerHTML = concernsBtnHtml(cid, pressed);
-  }
-  function focusConcerns() {
-    var btn = /** @type {HTMLElement|null} */ (document.querySelector('#obs-concern-slot .obs-concern-btn'));
-    if (btn) btn.focus();
-  }
-
   return {
     sync: sync,
     toggle: toggle,
@@ -150,9 +123,5 @@
     wireRows: wireRows,
     reset: reset,
     stop: stop,
-    concernsBtnHtml: concernsBtnHtml,
-    concernsSlotHtml: concernsSlotHtml,
-    syncConcerns: syncConcerns,
-    focusConcerns: focusConcerns,
   };
 })();

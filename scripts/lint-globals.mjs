@@ -32,6 +32,7 @@ const LAZY = {
     'teacher/report-one-panel.js',
     'teacher/report-one-page.js',
     'teacher/report-one-comment.js',
+    'teacher/report-one-word-ops.js',
     'teacher/report-one-words.js',
     'teacher/report-one-copy.js',
     'teacher/report-one-undo.js',

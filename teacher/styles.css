@@ -1306,6 +1306,33 @@ body.offline-active #app-dock {
   box-shadow: none;
   background: var(--overlay-hover);
 }
+/* The look the Assignments, Gradebook and Bulletins bars share (Colin, Nov 25):
+   buttons 32px tall with 12px sides and small type, the secondary one a tint
+   of the blue, the quiet one grey. Each page's own class opens the rule
+   (.assess-toolbar here, .report-toolbar for Reporting's primary buttons,
+   .bulletin-page for the write bar). */
+:is(.assess-toolbar, .report-toolbar, .bulletin-page) .tb-action-btn {
+  padding: 0 12px;
+  font-size: var(--text-sm);
+}
+:is(.assess-toolbar, .bulletin-page) .tb-action-btn.tb-action-secondary {
+  border: none;
+  background: var(--active-light);
+  color: var(--link);
+}
+:is(.assess-toolbar, .bulletin-page) .tb-action-btn.tb-action-secondary:hover {
+  background: var(--active-light);
+  filter: brightness(0.95);
+}
+:is(.assess-toolbar, .bulletin-page) .tb-action-btn.tb-action-grey {
+  border: none;
+  background: var(--seg-track);
+  color: var(--text);
+}
+:is(.assess-toolbar, .bulletin-page) .tb-action-btn.tb-action-grey:hover {
+  filter: brightness(0.92);
+  box-shadow: none;
+}
 /* Toolbar toggle button — macOS-style pill toggle */
 .tb-toggle-btn {
   padding: 4px 12px;
@@ -1707,6 +1734,14 @@ body.offline-active #app-dock {
   height: 1px;
   margin: 4px 6px;
   background: var(--divider-medium);
+}
+/* A one-at-a-time list (the Observations panel's Type, Date, Context): the
+   mark is round, with a dot when chosen. */
+.assess-filter-item.is-radio .assess-filter-box {
+  border-radius: 50%;
+}
+.assess-filter-item.is-radio.is-on .assess-filter-box {
+  background: radial-gradient(circle, #fff 0 3px, transparent 3.5px), var(--active);
 }
 
 /* ── Layout ─────────────────────────────────────────────────── */

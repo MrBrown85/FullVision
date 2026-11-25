@@ -43,7 +43,8 @@ test('the Bulletins tab is after Assignments, and the page has the sample bullet
   const tabs = await page.locator('.tb-seg-link').allTextContents();
   expect(tabs.slice(0, 3)).toEqual(['Dashboard', 'Assignments', 'Bulletins']);
   await expect(page.locator('.bulletin-title')).toHaveText('Bulletins');
-  await expect(page.locator('.bulletin-sub')).toHaveText('27 students can see it');
+  // No count beside the title: the line says only what needs the teacher's eye, and here there is nothing.
+  await expect(page.locator('.bulletin-sub')).toHaveCount(0);
   await expect(cards(page)).toHaveCount(3);
   // The samples are 2 days back at 8:42 (Monday) and 20 and 37 minutes before now, on Today.
   await expect(feed(page).locator('.bulletin-day')).toHaveText(['Pinned', 'Today']);
@@ -74,7 +75,10 @@ test('write an announcement: Post waits for words, then the bulletin is first un
   await page.locator('.bulletin-bar-open').click();
   const post = page.locator('#bulletin-post');
   await expect(post).toBeDisabled();
-  await expect(page.locator('#bulletin-compose .btn-primary')).toHaveCount(1); // Post is the only blue button
+  // Post is the only blue button.
+  await expect(page.locator('#bulletin-compose .tb-action-btn:not(.tb-action-secondary, .tb-action-grey)')).toHaveCount(
+    1,
+  );
   await page.locator('#bulletin-words').fill('Bring a calculator tomorrow.');
   await expect(post).toBeEnabled();
   await post.click();

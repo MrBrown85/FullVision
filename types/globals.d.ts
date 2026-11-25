@@ -428,6 +428,7 @@ interface Window {
 
 // One Report's page (report-one-words.js, report-one-copy.js, report-one-undo.js).
 interface Window {
+  ReportOneWordOps: any;
   ReportOneWords: any;
   ReportOneCopy: {
     classes(cid: string, key: string): { cid: string; name: string; own: boolean }[];
