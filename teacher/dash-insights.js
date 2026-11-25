@@ -659,11 +659,14 @@ window.DashInsights = (function () {
       '>' +
       _sortHead('obs', 'Last Observed', current) +
       '</th></tr></thead><tbody>';
+    var flags = getFlags(cid);
     students.forEach(function (st) {
       var grade = studentGradeSummary(cid, st.id);
       var sum = DashStudentCards.obsSummary(getStudentQuickObs(cid, st.id), today, term);
       html +=
-        '<tr><th scope="row" class="dash-sg-name"><a class="dash-ins-name" role="link" tabindex="0" data-href="' +
+        '<tr' +
+        (flags[st.id] ? ' class="is-flagged"' : '') +
+        '><th scope="row" class="dash-sg-name"><a class="dash-ins-name" role="link" tabindex="0" data-href="' +
         _studentHref(cid, st.id) +
         '">' +
         esc(DashObservations.rowName(st)) +

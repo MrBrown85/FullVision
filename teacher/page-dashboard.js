@@ -185,7 +185,7 @@ window.PageDashboard = (function () {
         : 0;
     var classR = roundLevel(classAvg);
 
-    _toolbar(list.students);
+    _toolbar();
 
     /* -- Overview Panel -- */
     // Photos in a class about to go a year unopened (shared/photo-expiry.js): rarely anything.
@@ -268,16 +268,15 @@ window.PageDashboard = (function () {
     );
   }
 
-  function _toolbar(students) {
-    // html-safe: DashOverview.renderDashToolbar escapes class names; the rest is a count.
+  function _toolbar() {
+    // html-safe: DashOverview.renderDashToolbar escapes class names.
     document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
       activeCourse: activeCourse,
-      students: students,
     });
   }
 
-  /* A search, a sort, Flagged, a flag or Cards | Grid changes only the
-     students: they are drawn again alone, with the toolbar's count. The
+  /* A search, a sort, Show, a flag or Cards | Grid changes only the
+     students: they are drawn again alone. The
      rest of the page stays as it is. */
   function renderStudents() {
     var host = document.getElementById('dash-students');
@@ -286,7 +285,6 @@ window.PageDashboard = (function () {
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var flags = getFlags(cid);
     var list = _shownStudents(cid, flags);
-    _toolbar(list.students);
     var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
     _slideCards = false;
     // html-safe: dash-overview, dash-insights and dash-student-cards escape every name, title and label.
@@ -416,8 +414,10 @@ window.PageDashboard = (function () {
         toggleFlag(el.dataset.cid, el.dataset.sid);
         renderStudents();
       },
-      toggleFlaggedFilter: function () {
-        showFlaggedOnly = !showFlaggedOnly;
+      // Show: All lets everyone through; Flagged keeps the flagged, and a second
+      // click on it lets go.
+      dashShow: function () {
+        showFlaggedOnly = el.dataset.show === 'flagged' && !showFlaggedOnly;
         renderStudents();
       },
       compPage: function () {
