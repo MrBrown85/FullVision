@@ -134,7 +134,10 @@ button.dash-comp-it-name:focus-visible {
   color: var(--score-2-text);
 }
 
-/* One tick for each student, in their level's colour; hollow with no mark. */
+/* One tick for each student, in their level's colour; hollow with no mark.
+   The ticks share the row's whole width, under the name and the count:
+   a class of 20 has wider ticks than a class of 30 (Colin, 2026-11-25:
+   "the number of students by the width of the space they have"). */
 .dash-comp-ticks {
   grid-column: 1 / -1;
   display: flex;
@@ -145,7 +148,6 @@ button.dash-comp-it-name:focus-visible {
   position: relative;
   flex: 1 1 0;
   min-width: 0;
-  max-width: 13px;
   padding: 0;
   border: 0;
   border-radius: 2.5px;
