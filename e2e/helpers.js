@@ -1599,3 +1599,33 @@ export async function chipsWhole(page, rowSelector) {
     });
   }, rowSelector);
 }
+
+/* Print Reports' pages move by themselves for a moment after most steps: the
+   page scrolls smoothly to a part, a statement or a change, and rows glide
+   to their new places. A test that reads where a row is during that motion
+   aims at the row beside it, which happened under load on GitHub (Nov 25,
+   2026). Resolves once #rb-preview's scroll and every row's place have stood
+   still for ten frames, and no row is gliding. `place` (optional) is run on
+   every frame first, to scroll the pages where the test wants them. */
+export async function reportPagesStill(page, place) {
+  await page.evaluate(
+    placeSrc =>
+      new Promise(done => {
+        const pane = document.getElementById('rb-preview');
+        const placeFn = placeSrc ? new Function('pane', placeSrc) : null;
+        let still = 0;
+        let last = null;
+        const step = () => {
+          if (placeFn) placeFn(pane);
+          const rows = [...pane.querySelectorAll('tr[data-wrow], tr[data-whead]')];
+          const now = pane.scrollTop + ':' + rows.map(r => Math.round(r.getBoundingClientRect().top)).join(',');
+          still = now === last && !rows.some(r => r.style.transform) ? still + 1 : 0;
+          last = now;
+          if (still >= 10) done();
+          else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }),
+    place || null,
+  );
+}

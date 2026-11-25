@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { reportPagesStill } from './helpers.js';
 
 /* A reflection's questions edited where they print (teacher/report-one-words.js),
    in Demo Mode's Science 8, One Student view: Edit Questions puts the
@@ -97,15 +98,34 @@ test('the questions are edited on the page, moved, undone, dragged and added to'
   await expect(part(page).locator('[data-wt="items.0.label"]')).toHaveText('Engagement');
   expect(await saved(page)).toBeNull();
 
-  // The grip drags Respect up to the top of Learning Dispositions.
+  // The grip drags Respect up to the top of Learning Dispositions. Under load the test read Respect's place
+  // while the rows were still gliding after the undo and pressed the row above, and with the top row above
+  // the pane the drop scrolled the pages (Nov 25, 2026). Now it waits for the pages and rows to stop, and the pointer
+  // goes from Respect's words to its ⠿ as a hand does, pressing once the ⠿ shows.
+  const mid = r => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
   const respect = part(page).locator('tr[data-wrow="items.7"]');
-  await respect.hover();
+  const firstRow = part(page).locator('tr[data-wrow="items.0"]');
+  // Both rows on screen, the top one clear of the pane's edge, where holding the pointer scrolls the pages.
+  // The undo scrolls the pages smoothly to the row it changed, so the place is set again until the pages and
+  // the rows have stood still for a few frames.
+  await reportPagesStill(
+    page,
+    `const tr = pane.querySelector('[data-part="${KEY}"] tr[data-wrow="items.0"]');
+     const want = tr.getBoundingClientRect().top - (pane.getBoundingClientRect().top + 80);
+     if (Math.abs(want) > 1) pane.scrollTop += want;`,
+  );
+  const pane = await page.locator('#rb-preview').boundingBox();
+  const top = await firstRow.boundingBox();
+  const words = mid(await respect.locator('.report-habit-name').boundingBox());
+  expect(top.y).toBeGreaterThan(pane.y + 60);
+  expect(words.y).toBeLessThan(pane.y + pane.height - 60);
   const grip = page.locator('#rb-preview [data-wgrip="items.7"]');
-  const g = await grip.boundingBox();
-  const top = await part(page).locator('tr[data-wrow="items.0"]').boundingBox();
-  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.move(words.x, words.y);
+  const g = mid(await grip.boundingBox());
+  await page.mouse.move(g.x, g.y, { steps: 20 });
+  await expect(grip).toHaveClass(/one-w-on/);
   await page.mouse.down();
-  await page.mouse.move(g.x + g.width / 2, top.y + 4, { steps: 12 });
+  await page.mouse.move(g.x, top.y + 4, { steps: 12 });
   await page.mouse.up();
   await expect
     .poll(async () => (await rows(page)).slice(0, 3))
