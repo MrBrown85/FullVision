@@ -61,6 +61,7 @@
     "teacher/report-qn-voice-observations.js",
     "teacher/cm-std-help.js",
     "teacher/cm-keep-menu.js",
+    "teacher/focus-back.js",
     "teacher/cm-terms.js",
     "teacher/cm-grading-bars.js",
     "teacher/dash-competencies.js",
