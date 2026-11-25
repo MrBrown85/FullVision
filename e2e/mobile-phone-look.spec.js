@@ -31,14 +31,28 @@ async function openLab(page) {
 
 const title = page => page.locator('#m-nav-bar-grade-swiper .m-nav-title-text');
 
+/* Once the cards have stopped sliding, the index of the card on screen. A
+   jump slides the cards over several frames; the test waits for that rather
+   than reading straight after a tap (CI is slower than the Mac). */
+async function settled(page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const s = document.getElementById('m-swiper');
+        return Math.abs(s.scrollLeft - MGrade.getCurrentIndex() * s.clientWidth) < 1;
+      }),
+    )
+    .toBe(true);
+  return page.evaluate(() => MGrade.getCurrentIndex());
+}
+
 // The class list, then one name on it. Returns that student's card.
 async function goTo(page, name) {
   await title(page).click();
   await page.locator('#m-sheet-container .m-roster-row', { hasText: name }).click();
   await expect(title(page)).toHaveText(name);
   await expect(page.locator('#m-sheet-container .m-roster')).toHaveCount(0);
-  const idx = await page.evaluate(() => MGrade.getCurrentIndex());
-  return page.locator('#m-swiper .m-swiper-card').nth(idx);
+  return page.locator('#m-swiper .m-swiper-card').nth(await settled(page));
 }
 
 test('the bar names the card on screen, and its name opens the class list', async ({ page }) => {
@@ -62,9 +76,31 @@ test('the bar names the card on screen, and its name opens the class list', asyn
   const rows = page.locator('#m-sheet-container .m-roster-row');
   await expect(rows).toHaveText(['Aiden and Olivia', 'Ines Larsen', 'Marcus Lee', 'Sofia Petrov']);
   await expect(rows.nth(0)).toHaveAttribute('aria-current', 'true');
+  // Every frame of the slide, from the moment Marcus is chosen: the index
+  // and the name in the bar are his, never a card the slide passes.
+  await page.evaluate(() => {
+    const w = /** @type {any} */ (window);
+    w.__frames = [];
+    const t0 = performance.now();
+    const tick = () => {
+      w.__frames.push([
+        MGrade.getCurrentIndex(),
+        document.querySelector('#m-nav-bar-grade-swiper .m-nav-title-text').textContent,
+      ]);
+      if (performance.now() - t0 < 2500) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   await rows.nth(2).click();
   await expect(title(page)).toHaveText('Marcus Lee');
-  expect(await page.evaluate(() => MGrade.getCurrentIndex())).toBe(2);
+  expect(await settled(page)).toBe(2);
+  await expect
+    .poll(() => page.evaluate(() => /** @type {any} */ (window).__frames.length), { timeout: 5000 })
+    .toBeGreaterThan(20);
+  const frames = await page.evaluate(() => /** @type {any} */ (window).__frames);
+  const from = frames.findIndex(f => f[0] === 2);
+  expect(from).toBeGreaterThanOrEqual(0);
+  expect(frames.slice(from).filter(f => f[0] !== 2 || f[1] !== 'Marcus Lee')).toEqual([]);
   // Last, since Tab can move to another card: drawn as a line, the circles are out of the tab order and the screen reader's way.
   await expect(page.locator('#m-thumb-strip')).toHaveAttribute('inert', '');
   await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').focus();
@@ -150,14 +186,7 @@ test('L3: Return and Next is held seven seconds, with Undo over the tab bar', as
   // Nothing is sent yet, and Ines's card already reads Returned.
   expect(await drafts(inesId)).toBeGreaterThan(0);
   // Once the slide to the next card is over, back to hers from the class list.
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const s = document.getElementById('m-swiper');
-        return Math.abs(s.scrollLeft - MGrade.getCurrentIndex() * s.clientWidth) < 1;
-      }),
-    )
-    .toBe(true);
+  await settled(page);
   await goTo(page, 'Ines Larsen');
   await expect(page.locator('#m-grade-return .m-returned-mark')).toHaveText('Returned');
 
@@ -175,7 +204,7 @@ test('L3: Return and Next is held seven seconds, with Undo over the tab bar', as
 
   // Leaving the grading screen sends a held return at once.
   await expect(title(page)).toHaveText('Marcus Lee');
-  const marcus = page.locator('#m-swiper .m-swiper-card').nth(await page.evaluate(() => MGrade.getCurrentIndex()));
+  const marcus = page.locator('#m-swiper .m-swiper-card').nth(await settled(page));
   const marcusId = await marcus.getAttribute('data-sid');
   await score(marcus);
   await next.click();

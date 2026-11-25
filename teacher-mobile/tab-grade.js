@@ -1050,6 +1050,11 @@ window.MGrade = (function () {
     var _currentIdx = 0;
     var _undoStack = [];
     var _scrollRAF = null;
+    // The card a jump is sliding to: the cards it passes on the way never
+    // become the one on screen. A second after the jump the cards rule again,
+    // so a finger that stops the slide is followed.
+    var _jumpTo = null;
+    var _jumpTimer = null;
     // Rubric view per assessment (true unless Tags is chosen) and the
     // Advanced Rubric checklists open, keyed sid:aid:critId.
     var _rubricView = {};
@@ -3333,18 +3338,27 @@ window.MGrade = (function () {
           if (_scrollRAF) return;
           _scrollRAF = requestAnimationFrame(function () {
             _scrollRAF = null;
-            var idx = Math.round(swiper.scrollLeft / swiper.clientWidth);
-            var total = document.querySelectorAll('#m-thumb-strip .m-thumb').length;
-            if (idx !== _currentIdx && idx >= 0 && idx < total) {
-              _currentIdx = idx;
-              _updateCurrentThumb(idx);
-              _updateSubtitle(idx, total);
-              _syncReturnBar(true);
-            }
+            _noteScroll(swiper);
           });
         },
         { passive: true },
       );
+    }
+
+    // The card the cards have scrolled to becomes the one on screen.
+    function _noteScroll(swiper) {
+      var idx = Math.round(swiper.scrollLeft / swiper.clientWidth);
+      if (_jumpTo !== null) {
+        if (idx === _jumpTo) _jumpTo = null;
+        return;
+      }
+      var total = document.querySelectorAll('#m-thumb-strip .m-thumb').length;
+      if (idx !== _currentIdx && idx >= 0 && idx < total) {
+        _currentIdx = idx;
+        _updateCurrentThumb(idx);
+        _updateSubtitle(idx, total);
+        _syncReturnBar(true);
+      }
     }
 
     // ← and → move between students on the grading screen, unless the
@@ -3401,6 +3415,13 @@ window.MGrade = (function () {
     function jumpToStudent(idx, instant) {
       var swiper = document.getElementById('m-swiper');
       if (!swiper) return;
+      clearTimeout(_jumpTimer);
+      _jumpTo = instant ? null : idx;
+      if (!instant)
+        _jumpTimer = setTimeout(function () {
+          _jumpTo = null;
+          _noteScroll(swiper);
+        }, 1000);
       swiper.scrollTo({ left: idx * swiper.clientWidth, behavior: instant ? 'auto' : 'smooth' });
       _currentIdx = idx;
       _updateCurrentThumb(idx);
