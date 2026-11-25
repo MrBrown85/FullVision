@@ -61,6 +61,7 @@ export const LISTED = [
   'migrations/local-test/phone-report-expiry-live-precheck.sql',
   'migrations/local-test/phone-report-expiry-live-postcheck.sql',
   'migrations/local-test/phone-report-expiry-undo.sql',
+  'migrations/local-test/slip-expiry-undo.sql',
 ];
 
 const BS = String.fromCharCode(92);
