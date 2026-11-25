@@ -15,7 +15,12 @@
    by N of M is what shared/data-bulletins.js answers. The tile keeps no
    state in the page: the Dashboard draws it again with the rest, and the
    one listener below draws only the tile when the class's bulletins change.
-   How many rows fit is a container query in dash-bulletins.css. */
+   How many rows fit is a container query in dash-bulletins.css.
+
+   Where the tile is wide enough for cards it is notes (.is-notes, set by
+   _order from what the stylesheet says): the paper fits its words, a blank
+   note is Write a Bulletin, and a bulletin that is a photo and no words
+   shows the photo. */
 /** @type {any} */ (window).DashBulletins = (function () {
   'use strict';
 
@@ -27,15 +32,16 @@
   var PIN_ICON =
     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg>';
 
+  var PLUS_ICON =
+    '<svg viewBox="0 0 26 26" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M13 5v16M5 13h16"/></svg>';
+
   var _cid = '';
   var _listening = false;
   var _drawing = false;
   var _lastHtml = '';
   var _timer = 0;
-  /** Watches the drawn tile's size so the buttons' place in the page follows the form it is in. @type {any} */
+  /** Watches the drawn tile's size so it becomes notes, or rows again, as its form changes. @type {any} */
   var _ro = null;
-  /** A move of the buttons was put off because one had focus: it is made when focus leaves. */
-  var _again = false;
   /** The tile has become available while there is no slot for it: the row is drawn once more when nothing is open. */
   var _wantRow = false;
   var _retry = 0;
@@ -165,6 +171,9 @@
       seenNot: split < 0 ? '' : label.slice(split + 3),
       seenFull: split < 0 ? label : label.slice(0, split) + ', ' + label.slice(split + 3),
       reminder: b.kind === 'reminder',
+      // A bulletin that is a photo and no words: the note shows the photo (the wide tile only).
+      pic:
+        !String(b.body || '').trim() && (b.files || [])[0] && b.files[0].kind === 'photo' ? String(b.files[0].id) : '',
       until: untilText(b),
       href: q + '&open=' + encodeURIComponent(b.id),
       seenHref: q + '&seen=' + encodeURIComponent(b.id),
@@ -221,7 +230,7 @@
       '<li class="dash-bulletins-row' +
       (r.fresh ? ' dash-bulletins-fresh' : '') +
       '"><span class="dash-bulletins-kind' +
-      (r.reminder ? ' dash-bulletins-rem' : '') +
+      (r.reminder ? ' dash-bulletins-rem' : r.kind === 'Announcement' ? ' dash-bulletins-plain' : '') +
       '"' +
       (r.until ? ' data-until="' + esc(r.until) + '"' : '') +
       '>' +
@@ -232,6 +241,9 @@
       '" aria-label="' +
       esc(aria) +
       '">' +
+      (r.pic
+        ? '<img class="dash-bulletins-pic" alt="" data-bulletin-id="' + esc(r.id) + '" data-file="' + esc(r.pic) + '">'
+        : '') +
       esc(r.allWords || r.words) +
       '</a><span class="dash-bulletins-time">' +
       esc(r.time) +
@@ -262,7 +274,10 @@
     var h =
       '<section class="dash-bulletins-tile" aria-labelledby="dash-bulletins-title"><div class="dash-bulletins-head"><h2 class="dash-bulletins-title" id="dash-bulletins-title">Bulletins</h2>' +
       (sub
-        ? '<span class="dash-bulletins-sub">' +
+        ? '<span class="dash-bulletins-sub' +
+          // The notes show this line only when it has something to act on.
+          (meta.can_see > 0 && !(meta.paused > 0) ? '' : ' is-alert') +
+          '">' +
           (cls ? '<span class="dash-bulletins-cls">' + esc(cls) + ' &middot; </span>' : '') +
           esc(sub) +
           '</span>'
@@ -270,7 +285,15 @@
       '</div>' +
       actions;
     if (m.mode === 'rows') {
-      h += '<ol class="dash-bulletins-rows">' + m.rows.map(_rowHtml).join('') + '</ol>';
+      // The notes' next free place is a blank one to write on (drawn only where the tile is notes).
+      var blank = m.offered
+        ? '<li class="dash-bulletins-blank"><button type="button" class="dash-bulletins-blank-btn" data-dash-bulletins-go="' +
+          esc(_link(cid, '&write=1')) +
+          '">' +
+          PLUS_ICON +
+          'Write a Bulletin</button></li>'
+        : '';
+      h += '<ol class="dash-bulletins-rows">' + m.rows.map(_rowHtml).join('') + blank + '</ol>';
     } else if (m.mode === 'empty') {
       h += '<div class="dash-bulletins-none"><b>Nothing Posted Yet</b><span>' + esc(EMPTY_LINE) + '</span></div>';
     } else if (m.mode === 'pageoff') {
@@ -358,34 +381,43 @@
     _watch();
   }
 
-  /** Keeps the keyboard and screen-reader order the same as the screen: in the wide form the two buttons sit in a foot under the cards, so they follow the cards in the page; in rows they sit in the header, so they come first. The CSS says which (the foot is grid row 3). Nothing moves while a button has focus: the move is made when focus leaves. */
+  /** Where the stylesheet draws cards (it says so on the header) the tile is notes: the paper fits its words, the blank note is Write a Bulletin, and a photo bulletin shows its photo. The two header links stay first in the page in both forms, as on screen. */
   function _order() {
     var t = document.querySelector('.dash-bulletins-tile');
     if (!t) return;
-    var a = t.querySelector('.dash-bulletins-actions');
-    var l = t.querySelector('.dash-bulletins-rows, .dash-bulletins-none');
-    if (!a || !l) return;
-    var foot = getComputedStyle(a).gridRowStart === '3';
-    var placed = foot ? a.previousElementSibling === l : l.previousElementSibling === a;
-    if (placed) {
-      _again = false;
-      return;
-    }
-    if (a.contains(document.activeElement)) {
-      _again = true;
-      return;
-    }
-    _again = false;
-    if (foot) t.appendChild(a);
-    else t.insertBefore(a, l);
+    var head = t.querySelector('.dash-bulletins-head');
+    var cs = /** @type {any} */ (head ? getComputedStyle(head) : null);
+    var notes =
+      !!cs && typeof cs.getPropertyValue === 'function' && cs.getPropertyValue('--dash-bulletins-cards').trim() === '1';
+    t.classList.toggle('is-notes', notes);
+    if (notes) _pics(t);
   }
 
-  /** Focus left something: a move that was put off is made. */
-  function _onFocusOut() {
-    if (_again) window.setTimeout(_order, 0);
+  /** A photo note's picture, asked for once the tile is notes: the first page of the bulletin's photo. @param {Element} t */
+  function _pics(t) {
+    var cid = _cid;
+    if (!cid || typeof getBulletinPage !== 'function') return;
+    var list = getBulletins(cid);
+    t.querySelectorAll('img.dash-bulletins-pic:not([data-asked])').forEach(function (/** @type {any} */ img) {
+      img.setAttribute('data-asked', '1');
+      var b = list.filter(function (/** @type {any} */ x) {
+        return String(x.id) === img.getAttribute('data-bulletin-id');
+      })[0];
+      var f =
+        b &&
+        (b.files || []).filter(function (/** @type {any} */ x) {
+          return String(x.id) === img.getAttribute('data-file');
+        })[0];
+      if (!f) return;
+      getBulletinPage(cid, f, 0).then(function (/** @type {any} */ pic) {
+        if (!pic || cid !== _cid || !img.isConnected) return;
+        img.src = pic.url;
+        if (img.parentElement) img.parentElement.classList.add('has-pic');
+      });
+    });
   }
 
-  /** Watches the tile now on the page (the one just drawn), and only that one: the last tile's watch is dropped first. Sets the order once. */
+  /** Watches the tile now on the page (the one just drawn), and only that one: the last tile's watch is dropped first. Sets its form once. */
   function _watch() {
     if (_ro) _ro.disconnect();
     _ro = null;
@@ -439,7 +471,6 @@
     if (!_listening) {
       document.addEventListener('fv:bulletins-changed', _onChanged);
       document.addEventListener('click', _onClick);
-      document.addEventListener('focusout', _onFocusOut);
       _listening = true;
       // Every 30 seconds while the page is showing; the data layer throttles it.
       _timer = window.setInterval(function () {
@@ -467,7 +498,6 @@
     if (_listening) {
       document.removeEventListener('fv:bulletins-changed', _onChanged);
       document.removeEventListener('click', _onClick);
-      document.removeEventListener('focusout', _onFocusOut);
     }
     if (_timer) window.clearInterval(_timer);
     if (_retry) window.clearTimeout(_retry);
@@ -476,7 +506,6 @@
     _wantRow = false;
     if (_ro) _ro.disconnect();
     _ro = null;
-    _again = false;
     _failing = {};
     _listening = false;
     _cid = '';

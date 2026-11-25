@@ -345,3 +345,23 @@ describe('the tile', () => {
     expect(old).toContain('Sunday 10:15 a.m."');
   });
 });
+
+describe('what the notes need (the wide tile, Nov 25)', () => {
+  it('a plain announcement is marked so the notes can leave its label off; a reminder and a photo are not', () => {
+    expect(H.rowHtml(H.rowModel(b('a'), 'sci8', now))).toContain('dash-bulletins-kind dash-bulletins-plain"');
+    const rem = H.rowHtml(H.rowModel(b('r', { kind: 'reminder', pinned: true }), 'sci8', now));
+    expect(rem).not.toContain('dash-bulletins-plain');
+  });
+
+  it('a bulletin that is a photo and no words carries its picture in the words link; one with words does not', () => {
+    const photo = { id: 'f1', kind: 'photo', paths: ['/assets/sample-bulletins/x.jpg'], page_count: 1 };
+    const only = H.rowHtml(H.rowModel(b('p', { body: '', files: [photo] }), 'sci8', now));
+    expect(only).toContain('<img class="dash-bulletins-pic" alt="" data-bulletin-id="p" data-file="f1">A photo</a>');
+    const both = H.rowHtml(H.rowModel(b('q', { body: 'Notes from today.', files: [photo] }), 'sci8', now));
+    expect(both).not.toContain('dash-bulletins-pic');
+    const pdf = H.rowHtml(
+      H.rowModel(b('d', { body: '', files: [{ id: 'f2', kind: 'pdf', title: 'Handout' }] }), 'sci8', now),
+    );
+    expect(pdf).not.toContain('dash-bulletins-pic');
+  });
+});

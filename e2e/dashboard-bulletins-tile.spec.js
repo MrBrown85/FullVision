@@ -337,7 +337,7 @@ test('more bulletins than fit: as many whole rows as the height holds, at four h
   }
 });
 
-/** The wide form: three cards side by side, the buttons in a foot. */
+/** The wide form: notes side by side, a blank one to write on, Open Bulletins beside the title. */
 async function cards(page) {
   return page.evaluate(() => {
     const q = s => document.querySelector(s);
@@ -346,28 +346,51 @@ async function cards(page) {
       r => getComputedStyle(r).display !== 'none',
     );
     const rect = e => e.getBoundingClientRect();
-    const foot = q('.dash-bulletins-actions');
+    const vis = e => !!e && getComputedStyle(e).display !== 'none' && !!e.offsetParent;
+    const blank = q('.dash-bulletins-blank-btn');
     return {
       width: tile.width,
+      notes: q('.dash-bulletins-tile').classList.contains('is-notes'),
       count: shown.length,
       // offsetTop: the notes are tilted a degree or so (posted notes, #1630), which moves their drawn tops a few pixels.
       tops: shown.map(r => r.offsetTop),
       widths: shown.map(r => Math.round(rect(r).width)),
+      heights: shown.map(r => r.offsetHeight),
       inside: shown.every(r => rect(r).bottom <= tile.bottom && rect(r).right <= tile.right),
       uncut: shown.map(r => r.scrollHeight <= r.clientHeight + 1 && r.scrollWidth <= r.clientWidth + 1),
-      timeRight: shown.map(
-        r => rect(r.querySelector('.dash-bulletins-time')).left > rect(r.querySelector('.dash-bulletins-kind')).right,
-      ),
+      // The day sits in the note's foot, right of Seen by, on its line.
+      timeInFoot: shown.map(r => {
+        const t = rect(r.querySelector('.dash-bulletins-time'));
+        const s = rect(r.querySelector('.dash-bulletins-seen'));
+        return t.left > s.right - 1 && Math.abs((t.top + t.bottom) / 2 - (s.top + s.bottom) / 2) < 8;
+      }),
       // Layout offsets, not drawn rectangles: a tilted note's rectangles grow by a few pixels each way.
       wordsOver: shown.map(r => {
         const words = r.querySelector('.dash-bulletins-words');
         return r.querySelector('.dash-bulletins-seen').offsetTop >= words.offsetTop + words.offsetHeight - 1;
       }),
-      seenLeft: shown.map(r => Math.abs(rect(r.querySelector('.dash-bulletins-seen')).left - rect(r).left) < 20),
-      footBelow: rect(foot).top >= Math.max(...shown.map(r => rect(r).bottom)) - 1,
-      writeLeft: rect(q('.dash-bulletins-write')).left < rect(q('.dash-bulletins-open')).left,
-      writeSameLine: Math.abs(rect(q('.dash-bulletins-write')).top - rect(q('.dash-bulletins-open')).top) < 20,
-      sub: q('.dash-bulletins-sub') ? q('.dash-bulletins-sub').innerText : '',
+      // The words sit in the middle of the paper, not squeezed to its top: the room over them (under the label, or
+      // under the paper's top padding) and the room under them, down to Seen by, are the same.
+      centred: shown.map(r => {
+        const words = r.querySelector('.dash-bulletins-words');
+        const kind = r.querySelector('.dash-bulletins-kind');
+        const from = vis(kind) ? kind.offsetTop + kind.offsetHeight : parseFloat(getComputedStyle(r).paddingTop);
+        const over = words.offsetTop - from;
+        const under = r.querySelector('.dash-bulletins-seen').offsetTop - (words.offsetTop + words.offsetHeight);
+        return Math.abs(over - under) <= 3;
+      }),
+      seenLeft: shown.map(r => Math.abs(rect(r.querySelector('.dash-bulletins-seen')).left - rect(r).left) < 24),
+      plainLabels: shown.filter(r => vis(r.querySelector('.dash-bulletins-plain'))).length,
+      writeButton: vis(q('.dash-bulletins-write')),
+      blank: vis(blank),
+      blankText: blank ? blank.textContent.trim() : '',
+      blankInside: !!blank && rect(blank).bottom <= tile.bottom && rect(blank).right <= tile.right,
+      blankAfter: !!blank && shown.length > 0 && rect(blank).left > rect(shown[shown.length - 1]).left,
+      openInHead: Math.abs(rect(q('.dash-bulletins-open')).top - rect(q('.dash-bulletins-title')).top) < 16,
+      openAboveNotes: shown.length
+        ? rect(q('.dash-bulletins-open')).bottom <= Math.min(...shown.map(r => rect(r).top)) + 6
+        : true,
+      sub: vis(q('.dash-bulletins-sub')) ? q('.dash-bulletins-sub').innerText : '',
       tileScroll: [
         q('.dash-bulletins-tile').scrollHeight - q('.dash-bulletins-tile').clientHeight,
         q('.dash-bulletins-tile').scrollWidth - q('.dash-bulletins-tile').clientWidth,
@@ -377,27 +400,35 @@ async function cards(page) {
 }
 
 for (const wide of [false, true]) {
-  test(`at 1680 x 1050 the tile is three cards and a foot${wide ? ' in a wide font' : ''}`, async ({ page }) => {
+  test(`at 1680 x 1050 the tile is three notes and a blank one${wide ? ' in a wide font' : ''}`, async ({ page }) => {
     await page.setViewportSize({ width: 1680, height: 1050 });
     await open(page);
     if (wide) await page.addStyleTag({ content: WIDE });
+    await expect(page.locator('.dash-bulletins-tile')).toHaveClass(/is-notes/);
     const c = await cards(page);
     expect(c.width).toBeGreaterThanOrEqual(900);
     expect(c.count).toBe(3);
     expect(new Set(c.tops).size).toBe(1);
-    expect(c.widths.every(w => w >= 270)).toBe(true);
+    expect(c.widths.every(w => w >= 230)).toBe(true);
     expect(c.inside).toBe(true);
     expect(c.uncut.every(Boolean)).toBe(true);
-    expect(c.timeRight.every(Boolean)).toBe(true);
+    expect(c.timeInFoot.every(Boolean)).toBe(true);
     expect(c.wordsOver.every(Boolean)).toBe(true);
+    expect(c.centred.every(Boolean), JSON.stringify(c.centred)).toBe(true);
     expect(c.seenLeft.every(Boolean)).toBe(true);
-    expect(c.footBelow).toBe(true);
-    expect(c.writeLeft).toBe(true);
-    expect(c.writeSameLine).toBe(true);
-    expect(c.sub).toMatch(/^Science 8 · \d+ can see it/);
+    // A plain announcement has no label; Write a Bulletin is the blank note after the last one; there is no foot.
+    expect(c.plainLabels).toBe(0);
+    expect(c.writeButton).toBe(false);
+    expect(c.blank).toBe(true);
+    expect(c.blankText).toBe('Write a Bulletin');
+    expect(c.blankInside).toBe(true);
+    expect(c.blankAfter).toBe(true);
+    expect(c.openInHead).toBe(true);
+    expect(c.openAboveNotes).toBe(true);
+    // The subtitle shows only when it has something to act on.
+    expect(c.sub).toBe('');
     expect(c.tileScroll).toEqual([0, 0]);
-    await expect(page.locator('.dash-bulletins-write')).toHaveText('Write a Bulletin');
-    // The reminder's card says how long it stays.
+    // The reminder's note says how long it stays.
     const until = await page
       .locator('.dash-bulletins-rem')
       .first()
@@ -406,22 +437,62 @@ for (const wide of [false, true]) {
   });
 }
 
+test('a note is as tall as its words need: on a tall tile it is not a strip of empty paper', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await open(page);
+  // One short bulletin on a tile made tall.
+  await page.evaluate(() => {
+    const real = window.getBulletins;
+    window.getBulletins = cid =>
+      real(cid)
+        .slice(0, 1)
+        .map(b => Object.assign({}, b, { kind: 'announcement', files: [], body: 'Bring your lab notebook.' }));
+    document.querySelector('.dash-row-bulletins').style.height = '520px';
+    PageDashboard.render();
+    document.querySelector('.dash-row-bulletins').style.height = '520px';
+  });
+  await expect(page.locator('.dash-bulletins-tile')).toHaveClass(/is-notes/);
+  const c = await cards(page);
+  expect(c.count).toBe(1);
+  // A sticky note's shape, with the tile's height left to the board.
+  expect(c.heights[0]).toBeLessThanOrEqual(c.widths[0]);
+  expect(c.heights[0]).toBeGreaterThanOrEqual(150);
+  expect(c.centred).toEqual([true]);
+  expect(c.blank).toBe(true);
+  expect(c.blankInside).toBe(true);
+});
+
+test('a bulletin that is a photo and no words shows the photo on its note', async ({ page }) => {
+  await page.setViewportSize({ width: 1680, height: 1050 });
+  await open(page);
+  const pic = page.locator('.dash-bulletins-tile.is-notes .dash-bulletins-words.has-pic img.dash-bulletins-pic');
+  await expect(pic).toHaveCount(1);
+  await expect(pic).toBeVisible();
+  expect(await pic.evaluate(i => i.complete && i.naturalWidth > 0)).toBe(true);
+  // The note still opens its bulletin, and still says what it is to a screen reader.
+  await expect(page.locator('.dash-bulletins-words.has-pic')).toHaveAttribute('aria-label', /A photo/);
+});
+
 test('at 1280 x 800 the tile is rows, with no class name in the subtitle', async ({ page }) => {
   await open(page);
   const c = await cards(page);
   expect(c.width).toBeLessThan(900);
+  expect(c.notes).toBe(false);
   expect(c.sub).toMatch(/^\d+ can see it/);
+  // Rows keep Write a Bulletin as a button in the header; the blank note is the notes' own.
+  expect(c.writeButton).toBe(true);
+  expect(c.blank).toBe(false);
 });
 
-/** What Tab reaches, in order, starting from the first row's words. */
-async function tabOrder(page, count) {
-  await page.locator('.dash-bulletins-words').first().focus();
+/** What Tab reaches, in order, starting from `from`. */
+async function tabOrder(page, count, from) {
+  await page.locator(from).first().focus();
   const order = [];
   for (let i = 0; i < count; i++) {
     order.push(
       await page.evaluate(() => {
         const a = document.activeElement;
-        const k = a.className.match(/dash-bulletins-(words|seen|write|open)/);
+        const k = a.className.match(/dash-bulletins-(words|seen|write|open|blank)/);
         return k ? k[1] : a.className || a.tagName;
       }),
     );
@@ -430,73 +501,58 @@ async function tabOrder(page, count) {
   return order;
 }
 
-test('wide: Tab goes through the cards, then Write a Bulletin, then Open Bulletins', async ({ page }) => {
+test('wide: Tab goes Open Bulletins, the notes, then the blank note, as on screen', async ({ page }) => {
   await page.setViewportSize({ width: 1680, height: 1050 });
   await open(page);
-  // The foot follows the cards in the page, which is where it is on screen.
-  await expect
-    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-actions').previousElementSibling.className))
-    .toContain('dash-bulletins-rows');
-  expect(await tabOrder(page, 8)).toEqual(['words', 'seen', 'words', 'seen', 'words', 'seen', 'write', 'open']);
+  await expect(page.locator('.dash-bulletins-tile')).toHaveClass(/is-notes/);
+  expect(await tabOrder(page, 8, '.dash-bulletins-open')).toEqual([
+    'open',
+    'words',
+    'seen',
+    'words',
+    'seen',
+    'words',
+    'seen',
+    'blank',
+  ]);
   // Reading order: the same.
   const dom = await page.evaluate(() =>
     [...document.querySelectorAll('.dash-bulletins-tile > *')].map(e => e.className.replace('dash-bulletins-', '')),
   );
-  expect(dom).toEqual(['head', 'rows', 'actions']);
+  expect(dom).toEqual(['head', 'actions', 'rows']);
 });
 
-test('rows: the buttons in the header come first, as on screen, and the order follows a resize', async ({ page }) => {
-  await open(page);
-  await expect
-    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-rows').previousElementSibling.className))
-    .toContain('dash-bulletins-actions');
-  await page.setViewportSize({ width: 1680, height: 1050 });
-  await expect
-    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-actions').previousElementSibling.className))
-    .toContain('dash-bulletins-rows');
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await expect
-    .poll(() => page.evaluate(() => document.querySelector('.dash-bulletins-rows').previousElementSibling.className))
-    .toContain('dash-bulletins-actions');
-});
-
-test('the tile crossing 860 px without a window resize reorders the buttons; a move put off by focus is made on blur', async ({
+test('rows: Write a Bulletin and Open Bulletins come first, as on screen; the form follows a resize', async ({
   page,
 }) => {
+  await open(page);
+  const tile = page.locator('.dash-bulletins-tile');
+  await expect(tile).not.toHaveClass(/is-notes/);
+  expect(await tabOrder(page, 4, '.dash-bulletins-write')).toEqual(['write', 'open', 'words', 'seen']);
+  await page.setViewportSize({ width: 1680, height: 1050 });
+  await expect(tile).toHaveClass(/is-notes/);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(tile).not.toHaveClass(/is-notes/);
+});
+
+test('the tile crossing 860 px without a window resize changes its form, and back', async ({ page }) => {
   await page.setViewportSize({ width: 1680, height: 1050 });
   await open(page);
-  const before = () =>
-    page.evaluate(() => {
-      const t = document.querySelector('.dash-bulletins-tile');
-      return [...t.children].map(e => e.className.replace('dash-bulletins-', ''));
-    });
-  await expect.poll(before).toEqual(['head', 'rows', 'actions']);
+  const tile = page.locator('.dash-bulletins-tile');
+  await expect(tile).toHaveClass(/is-notes/);
   // The tile's parent shrinks to 700 px: the window does not change.
   await page.evaluate(() => {
     document.querySelector('.dash-row-bulletins').style.width = '700px';
   });
-  await expect.poll(before).toEqual(['head', 'actions', 'rows']);
-  await page.locator('.dash-bulletins-write').focus();
-  const order = [];
-  for (let i = 0; i < 8; i++) {
-    order.push(
-      await page.evaluate(
-        () => (document.activeElement.className.match(/dash-bulletins-(words|seen|write|open)/) || [])[1],
-      ),
-    );
-    await page.keyboard.press('Tab');
-  }
-  expect(order).toEqual(['write', 'open', 'words', 'seen', 'words', 'seen', 'words', 'seen']);
-  // Back to wide while Write a Bulletin has focus: nothing moves under the keyboard, then it moves when focus leaves.
-  await page.locator('.dash-bulletins-write').focus();
+  await expect(tile).not.toHaveClass(/is-notes/);
+  await expect(page.locator('.dash-bulletins-write')).toBeVisible();
+  await expect(page.locator('.dash-bulletins-blank-btn')).toBeHidden();
   await page.evaluate(() => {
     document.querySelector('.dash-row-bulletins').style.width = '';
   });
-  await page.waitForTimeout(300);
-  expect(await before()).toEqual(['head', 'actions', 'rows']);
-  await page.keyboard.press('Tab'); // Open Bulletins: still in the foot
-  await page.keyboard.press('Tab'); // out of the buttons
-  await expect.poll(before).toEqual(['head', 'rows', 'actions']);
+  await expect(tile).toHaveClass(/is-notes/);
+  await expect(page.locator('.dash-bulletins-write')).toBeHidden();
+  await expect(page.locator('.dash-bulletins-blank-btn')).toBeVisible();
 });
 
 test('the Reminder card names its end day in the words link, not only in generated text', async ({ page }) => {
