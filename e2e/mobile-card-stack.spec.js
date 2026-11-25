@@ -75,7 +75,7 @@ test('a swipe moves the next card up in place and keeps the stack', async ({ pag
   });
 
   await swipeTopCard(page);
-  await expect(page.locator('.m-card-stack-item[data-depth="0"] .m-sc-place')).toHaveText('2 of 27');
+  await expect(page.locator('.m-card-stack-item[data-depth="0"]')).toHaveAttribute('data-idx', '1');
   // The card that was behind is now on top: the same element, not a rebuild.
   const top = page.locator('.m-card-stack-item[data-depth="0"]');
   await expect(top).toHaveAttribute('data-test-next', '1');

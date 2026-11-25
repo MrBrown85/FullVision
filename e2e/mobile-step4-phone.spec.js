@@ -312,15 +312,16 @@ test('grading screen works as soon as it opens', async ({ page }) => {
 // buttons; each points box names its student.
 test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
   await openPhone(page);
-  const count = page.locator('.m-card-stack-item[data-depth="0"] .m-sc-place');
-  await expect(count).toContainText('1 of');
+  // The card on top, by its place in the class (the stack keeps it on the card).
+  const top = page.locator('.m-card-stack-item[data-depth="0"]');
+  await expect(top).toHaveAttribute('data-idx', '0');
   const first = await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-name').innerText();
   await page.locator('.m-card-stack').focus();
   await page.keyboard.press('ArrowRight');
-  await expect(count).toContainText('2 of');
+  await expect(top).toHaveAttribute('data-idx', '1');
   await page.waitForTimeout(400); // the card's exit animation
   await page.keyboard.press('ArrowLeft');
-  await expect(count).toContainText('1 of');
+  await expect(top).toHaveAttribute('data-idx', '0');
   // And it is the first student's card again, not the third's.
   await expect(page.locator('.m-card-stack-item[data-depth="0"] .m-sc-name')).toHaveText(first);
   await page.waitForTimeout(400);
@@ -333,7 +334,7 @@ test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
   await page.mouse.down();
   for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width - 40 - i * 25, y);
   await page.mouse.up();
-  await expect(count).toContainText('2 of');
+  await expect(top).toHaveAttribute('data-idx', '1');
   await page.waitForTimeout(400);
 
   await page.locator('.m-tab-item[data-tab="grade"]').click();

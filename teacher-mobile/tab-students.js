@@ -47,9 +47,9 @@ window.MStudents = (function () {
     if (!students.length) return;
 
     _stackInstance = MCardStack.create(container, students, {
-      counter: false, // each card says its own place, in its name row
-      renderCard: function (st, idx) {
-        return MStudentCard.render(st, cid, idx + 1 + ' of ' + students.length);
+      counter: false, // no "6 of 30": Colin, Nov 25, "It's unnecessary"
+      renderCard: function (st) {
+        return MStudentCard.render(st, cid);
       },
       onTap: function () {
         /* taps handled by data-action delegation */
