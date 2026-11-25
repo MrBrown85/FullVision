@@ -612,7 +612,7 @@ test('New Codes for This Class: a part-failed run names who still has their old 
   // Print New Card for Bob: asked first (his card was printed), then printed.
   // Print New Card is in the panel the student's name opens.
   await card.getByRole('button', { name: 'Bob Baker', exact: true }).click();
-  await card.getByRole('button', { name: 'Replace Bob Baker’s Card' }).click();
+  await card.getByRole('button', { name: 'Replace Bob Baker’s Card and Print' }).click();
   const one = page.getByRole('dialog', { name: 'Replace Bob’s Card?' });
   await expect(one.locator('.confirm-message')).toHaveText(
     'Bob’s card stops working as soon as the new one is made. Everything Bob has sent stays.',
@@ -671,7 +671,7 @@ test('Print New Card: an old card stopped and the new one not printed is said, a
   const bobs = cards.fake.live(BOB).id;
   // Print New Card is in the panel the student's name opens.
   await card.getByRole('button', { name: 'Bob Baker', exact: true }).click();
-  await card.getByRole('button', { name: 'Replace Bob Baker’s Card' }).click();
+  await card.getByRole('button', { name: 'Replace Bob Baker’s Card and Print' }).click();
   await page
     .getByRole('dialog', { name: 'Replace Bob’s Card?' })
     .getByRole('button', { name: 'Replace and Print' })
