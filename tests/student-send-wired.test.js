@@ -453,7 +453,10 @@ describe('a send survives a reload, within its two hours', () => {
     dev.answer = null;
     const again = await dev.open('');
     // The send carries on beside `feedback`; the group's counts are asked once `feedback` has answered.
-    expect(routes(again)).toEqual([
+    // Those are two chains running at once, so `group-work` may land anywhere after `feedback`: each
+    // chain's own order is held, never how the two interleave (it flipped in CI, Nov 25 2026).
+    const seen = routes(again);
+    expect(seen.filter(r => r !== 'group-work')).toEqual([
       'page',
       'bulletins',
       'quiz-list',
@@ -461,11 +464,12 @@ describe('a send survives a reload, within its two hours', () => {
       'forms',
       'feedback',
       'send-start',
-      'group-work',
       'send-finish',
       'work',
       'file-links',
     ]);
+    expect(seen.filter(r => r === 'group-work')).toHaveLength(1);
+    expect(seen.indexOf('group-work')).toBeGreaterThan(seen.indexOf('feedback'));
     expect(text(again, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(again, 'send-start')[0]).toMatchObject({ request_id: request, note: 'For Thursday.' });
     expect([...dev.fn.world.subs.values()].map(s => [s.state, s.files.length, s.note])).toEqual([
