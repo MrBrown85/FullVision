@@ -7368,30 +7368,38 @@ label.cm-cr-row {
   font-size: var(--text-sm);
   text-align: left;
 }
-/* The bar the ticked rows get. */
+/* The bar the ticked rows get: FullVision's selection colours (the Assignments
+   list's bar), white buttons in named groups. */
 .sps-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--divider-medium);
   border-radius: var(--radius);
-  background: var(--text);
-  color: var(--surface);
+  background: var(--active-light);
+  color: var(--text);
   font-family: var(--font-base);
   font-size: var(--text-sm);
 }
 .sps-bar-count {
+  font-weight: 700;
+  color: var(--active);
+}
+.sps-bar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sps-bar-label {
   font-weight: 600;
-  margin-right: 4px;
+  color: var(--text-2);
+  margin-right: 2px;
 }
 .sps-bar .sps-bar-btn {
-  background: transparent;
-  color: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--surface) 40%, transparent);
-}
-.sps-bar .sps-bar-btn:hover {
-  background: color-mix(in srgb, var(--surface) 14%, transparent);
+  background: var(--surface);
 }
 .sps-bar .sps-bar-btn:disabled {
   opacity: 0.5;
@@ -7399,6 +7407,9 @@ label.cm-cr-row {
 }
 .sps-bar .sps-bar-clear {
   margin-left: auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--link);
 }
 /* The side panel: from the right, over Class Settings, under any question. */
 .sps-panel {
