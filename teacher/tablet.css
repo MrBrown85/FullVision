@@ -341,13 +341,14 @@
   html.fv-tablet .dash-row-comp {
     height: 520px;
   }
-  /* Every control in the row is a finger's size, 44 px (board F): the view
+  /* Every control in the row is a finger's size, 44 px (board F): the period
      pills, Curricular | Core, the piece switch, the buttons, and the links
      in the tiles' heads. A link keeps its look; only the place it answers a
      tap grows. */
-  html.fv-tablet .dash-row .dash-view-btn,
   html.fv-tablet .dash-row .dash-comp-seg .seg-btn,
-  html.fv-tablet .dash-row .dash-comp-ln.is-split,
+  html.fv-tablet .dash-row .dash-comp-span .seg-btn,
+  html.fv-tablet .dash-row button.dash-comp-it-name,
+  html.fv-tablet .dash-row .dash-comp-quiet,
   html.fv-tablet .dash-row .dash-inbox-switch .seg-btn,
   html.fv-tablet .dash-row .dash-inbox-action,
   html.fv-tablet .dash-row .dash-inbox-stack-title,
@@ -365,14 +366,7 @@
   html.fv-tablet .dash-row .dash-inbox-rc-grid {
     grid-template-rows: repeat(var(--dash-inbox-rc-rows, 7), 44px);
   }
-  /* A Level Mix row on the iPad's full-width tile is board F's one line
-     (name, bar, number; dash-competencies.css), its button 44 px: six rows
-     fit the 520 px tile and none is hidden under its foot. */
-  html.fv-tablet .dash-row .dash-comp-lnbox {
-    flex-basis: 48px;
-  }
-  html.fv-tablet .dash-row .dash-comp-head > a,
-  html.fv-tablet .dash-row .dash-core-head > a,
+  html.fv-tablet .dash-row .dash-comp-sub-link,
   html.fv-tablet .dash-row .dash-inbox-head a,
   html.fv-tablet .dash-row .dash-recent-head a {
     display: inline-flex;

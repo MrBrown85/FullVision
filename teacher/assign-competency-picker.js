@@ -313,6 +313,12 @@ window.AssignCompPicker = (function () {
     _syncCodes();
   }
 
+  // Opens the New Assessment form, with these competencies ticked when a list is given.
+  function openNew(show, tagIds) {
+    show();
+    if (tagIds) _tickExactly(tagIds);
+  }
+
   // The focus box: the competency pointed at or focused, in full.
   function _showCodeFocus(chip) {
     var box = document.getElementById('af-codes-focus');
@@ -434,6 +440,7 @@ window.AssignCompPicker = (function () {
     _syncCodes: _syncCodes,
     toggleCode: toggleCode,
     _tickExactly: _tickExactly,
+    openNew: openNew,
     _codeHover: _codeHover,
     _compKeydown: _compKeydown,
     _compInput: _compInput,

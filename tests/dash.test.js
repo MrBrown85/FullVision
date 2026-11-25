@@ -1257,14 +1257,6 @@ describe('dash-comp-views', () => {
     clearProfCache();
   }
 
-  function card(extra) {
-    return DashOverview.competenciesCardHtml(
-      Object.assign(
-        { cid: CID, allStudents: STUDENTS, assessments: [], tagsWithEvidence: 2, allTags: [1, 2], todayStr: TODAY },
-        extra || {},
-      ),
-    );
-  }
   function dom(html) {
     return parseHTML(
       '<!doctype html><html><body><div id="root">' + html + '</div></body></html>',
@@ -1274,214 +1266,6 @@ describe('dash-comp-views', () => {
 
   afterEach(() => {
     delete COURSES[CID];
-  });
-
-  describe('the default view', () => {
-    // Colin, Nov 18 2026: "Yes, Level Mix", in every grading style.
-    it('is Level Mix in a Letter, a Proficiency and a Both class', () => {
-      setClass('letter');
-      expect(DashOverview.compView(CID, null)).toBe('mix');
-      setClass('proficiency');
-      expect(DashOverview.compView(CID, null)).toBe('mix');
-      setClass('both');
-      expect(DashOverview.compView(CID, undefined)).toBe('mix');
-    });
-
-    it('a saved view wins; anything else falls back', () => {
-      setClass('letter');
-      expect(DashOverview.compView(CID, 'trend')).toBe('trend');
-      expect(DashOverview.compView(CID, 'avg')).toBe('avg');
-      expect(DashOverview.compView(CID, 'nope')).toBe('mix');
-    });
-  });
-
-  describe('the views', () => {
-    for (const mode of ['letter', 'proficiency']) {
-      describe(mode + ' class', () => {
-        beforeEach(() => setClass(mode));
-
-        it('draws the view menu with four views and the one in use', () => {
-          const el = dom(card({ compView: 'below' }));
-          expect(el.querySelector('#dash-view-btn-comp').textContent).toBe('Needs Support');
-          // Level Mix first, as board D has it (Colin, Nov 18 2026).
-          expect(texts(el, '#dash-view-menu-comp .dash-view-name')).toEqual([
-            'Level Mix',
-            'Class Average',
-            'Needs Support',
-            'Change',
-          ]);
-          expect(el.querySelector('.dash-comp-card').getAttribute('data-view')).toBe('below');
-        });
-
-        it('Class Average: a bar and the average as the class shows it', () => {
-          const el = dom(card({ compView: 'avg' }));
-          expect(texts(el, '.dash-comp-labels span')).toEqual(['Competency', '', 'Average']);
-          const vals = texts(el, '.dash-comp-row .dash-comp-val');
-          expect(vals).toEqual([formatLevel(CID, 3), formatLevel(CID, 1.5)]);
-          expect(vals[0]).toBe(mode === 'letter' ? '75%' : '3.0');
-          const row = el.querySelector('.dash-comp-row');
-          expect(row.tagName).toBe('BUTTON');
-          expect(row.getAttribute('data-action')).toBe('naComp');
-          expect(row.getAttribute('data-key')).toBe('s:IN');
-          expect(row.getAttribute('aria-pressed')).toBe('false');
-        });
-
-        it('Level Mix: the card gives only its head; the Competencies tile draws the rows', () => {
-          // One bar a row, "k of n" under Proficient or Above: tests/dash-competencies-pages.test.js.
-          const el = dom(card({ compView: 'mix' }));
-          expect(el.querySelector('.dash-comp-card').getAttribute('data-view')).toBe('mix');
-          expect(el.querySelector('#dash-view-btn-comp').textContent).toBe('Level Mix');
-          expect(el.querySelector('.dash-comp-body').children).toHaveLength(0);
-          expect(el.querySelector('[data-action="mixSeg"]')).toBeNull();
-        });
-
-        it('Needs Support: the students below on the most competencies first, a cell per column', () => {
-          const el = dom(card({ compView: 'below' }));
-          expect(texts(el, '.dash-comp-code')).toEqual(['IN', 'EV']);
-          expect(el.querySelector('.dash-comp-code').getAttribute('data-action')).toBe('naComp');
-          const rows = el.querySelectorAll('.dash-comp-row.is-student');
-          expect(texts(el, '.dash-comp-row.is-student .dash-comp-name')).toEqual(['Ava C.', 'Ben D.']);
-          expect(texts(el, '.dash-comp-row.is-student .dash-comp-val')).toEqual(['2 of 2', '1 of 2']);
-          expect(rows[0].getAttribute('data-href')).toBe('/student?id=s1&course=' + CID + '&tab=comps');
-          expect(rows[0].querySelector('.dash-comp-tip-line').textContent).toBe('Below on Inquiry, Evidence');
-          const cells = rows[1].querySelectorAll('.dash-comp-sq');
-          expect(cells[0].getAttribute('style')).toBe('background:var(--score-3)');
-          expect(cells[1].getAttribute('style')).toBe('background:var(--score-2)');
-        });
-
-        it('Needs Support: past seven students, "+N more" opens the grid', () => {
-          const many = Array.from({ length: 9 }, (_, i) => ({ id: 'm' + i, firstName: 'M' + i, lastName: 'Z' }));
-          const lists = [{ col: DashInsights.columns(CID)[0], ids: many.map(s => s.id), values: {} }];
-          const el = dom(card({ compView: 'below', allStudents: many, belowLists: lists }));
-          // Every student is drawn; seven show until the tile fits as many as it has room for.
-          expect(el.querySelectorAll('.dash-comp-row.is-student')).toHaveLength(9);
-          expect(el.querySelectorAll('.dash-comp-row.is-student:not(.is-extra)')).toHaveLength(7);
-          const more = el.querySelector('.dash-comp-more');
-          expect(more.textContent).toBe('+2 more');
-          expect(more.getAttribute('data-action')).toBe('studentView');
-          expect(more.getAttribute('data-view')).toBe('grid');
-          // A view sizes to its own rows (plan F.1): no room kept for another's.
-          expect(card({ compView: 'avg', allStudents: many, belowLists: lists })).not.toContain('--comp-rows');
-        });
-
-        it('Change: a line per competency, the change, the months in the tip and the label row', () => {
-          const el = dom(card({ compView: 'trend' }));
-          expect(texts(el, '.dash-comp-lab-mid span')).toEqual(['Sept', 'Nov']);
-          const rows = el.querySelectorAll('.dash-comp-row');
-          expect(rows[0].querySelector('polyline')).toBeTruthy();
-          expect(rows[0].querySelector('polyline').getAttribute('vector-effect')).toBe('non-scaling-stroke');
-          // Inquiry: Sept (2 + 3 + 4) / 3 = 3, Nov (2 + 3 + 4) / 3 = 3. Evidence:
-          // Sept (1 + 2) / 2 = 1.5, Oct 1, Nov 1.
-          const val = texts(el, '.dash-comp-row > .dash-comp-val');
-          if (mode === 'letter') {
-            expect(val).toEqual(['→ 0', '↓ 13']);
-            expect(rows[1].querySelector('.dash-comp-tip-line').textContent).toBe('Sept 38% · Oct 25% · Nov 25%');
-          } else {
-            expect(val).toEqual(['→ 0.0', '↓ 0.5']);
-            expect(rows[1].querySelector('.dash-comp-tip-line').textContent).toBe('Sept 1.5 · Oct 1.0 · Nov 1.0');
-          }
-          expect(rows[1].querySelector('polyline').getAttribute('stroke')).toBe('var(--score-1)');
-          expect(rows[0].querySelector('polyline').getAttribute('stroke')).toBe('var(--score-3)');
-        });
-
-        it('Change: fewer than two months shows "—" and says why', () => {
-          const el = dom(card({ compView: 'trend', todayStr: '2026-09-30' }));
-          const row = el.querySelector('.dash-comp-row');
-          expect(row.querySelector('.dash-comp-val').textContent).toBe('—');
-          expect(row.querySelector('polyline')).toBeNull();
-          expect(row.querySelector('.dash-comp-tip-line').textContent).toBe('Not enough months yet');
-        });
-
-        it('marks the picked competency in every view', () => {
-          for (const view of ['avg', 'trend']) {
-            const el = dom(card({ compView: view, naComp: 's:EV' }));
-            const picked = el.querySelectorAll('[data-key="s:EV"][aria-pressed="true"]');
-            expect(picked.length).toBe(1);
-          }
-          const el = dom(card({ compView: 'below', naComp: 's:EV' }));
-          expect(el.querySelector('.dash-comp-code.is-picked').textContent).toBe('EV');
-        });
-      });
-    }
-
-    it('escapes names', () => {
-      setClass('proficiency');
-      _cache.learningMaps[CID].sections[0].shortName = '<b>Inquiry</b>';
-      clearProfCache();
-      for (const view of ['avg', 'mix', 'below', 'trend']) expect(card({ compView: view })).not.toContain('<b>');
-    });
-  });
-
-  describe("the card's shape (plan F)", () => {
-    beforeEach(() => setClass('proficiency'));
-
-    // A class of n competencies, no scores needed for the shape.
-    function setCols(nCols) {
-      _cache.learningMaps[CID].sections = Array.from({ length: nCols }, (_, i) =>
-        sec('c' + i, 'Area ' + String.fromCharCode(65 + i), 'C' + (i + 1)),
-      );
-      clearProfCache();
-    }
-
-    it('sizes to the rows the view draws: roomy with four or fewer, no reserved room', () => {
-      let el = dom(card({ compView: 'avg' }));
-      const sect = el.querySelector('.dash-comp-card');
-      expect(sect.classList.contains('is-roomy')).toBe(true);
-      expect(sect.querySelector('.dash-comp-body').getAttribute('style')).toBeNull();
-      setCols(5);
-      el = dom(card({ compView: 'avg' }));
-      expect(el.querySelector('.dash-comp-card').classList.contains('is-roomy')).toBe(false);
-    });
-
-    it('past 12 rows the list scrolls inside the card, with "+N more" under it', () => {
-      setCols(12);
-      let el = dom(card({ compView: 'avg' }));
-      expect(el.querySelector('.dash-comp-rows.is-scroll')).toBeNull();
-      expect(el.querySelector('.dash-comp-moreline')).toBeNull();
-      setCols(13);
-      for (const view of ['avg', 'trend']) {
-        el = dom(card({ compView: view }));
-        const list = el.querySelector('.dash-comp-scroll > .dash-comp-rows.is-scroll');
-        expect(list.querySelectorAll('.dash-comp-row')).toHaveLength(13);
-        expect(list.getAttribute('tabindex')).toBe('0');
-        const more = el.querySelector('.dash-comp-moreline');
-        expect(more.textContent).toBe('+1 more');
-        expect(more.getAttribute('data-action')).toBe('compMore');
-      }
-    });
-
-    it('Needs Support: a cell per column up to 8, which the card swaps for codes when narrow', () => {
-      const el = dom(card({ compView: 'below' }));
-      const sect = el.querySelector('.dash-comp-card');
-      expect(sect.classList.contains('ns-cols-2')).toBe(true);
-      expect(el.querySelectorAll('.dash-comp-labels.is-cells-form')).toHaveLength(1);
-      const chipsLabel = el.querySelector('.dash-comp-labels.is-chips-form');
-      expect(texts(chipsLabel, ':scope > span')).toEqual(['Student', 'Below on', 'Count']);
-      const ava = el.querySelector('.dash-comp-row.is-student');
-      expect(ava.querySelectorAll('.dash-comp-sq')).toHaveLength(2);
-      // Weakest first: Evidence (1) before Inquiry (2).
-      expect(texts(ava, '.dash-comp-bchip')).toEqual(['EV', 'IN']);
-      expect(ava.querySelector('.dash-comp-bchip').getAttribute('style')).toBe(
-        'background:var(--score-1-bg);color:var(--score-1-text)',
-      );
-      expect(ava.querySelector('.dash-comp-name').getAttribute('title')).toBe('Ava Chan');
-    });
-
-    it('Needs Support past 8 columns: only the codes, weakest first, four then "+N"', () => {
-      setCols(9);
-      const cols = DashInsights.columns(CID);
-      const lists = cols.map((col, i) => ({ col, ids: i < 6 ? ['s1'] : [], values: { s1: 1 + i / 10 } }));
-      const el = dom(card({ compView: 'below', belowLists: lists }));
-      expect(el.querySelector('.dash-comp-card').classList.contains('is-chipform')).toBe(true);
-      expect(el.querySelector('.dash-comp-labels.is-cells-form')).toBeNull();
-      expect(el.querySelector('.dash-comp-sq')).toBeNull();
-      const row = el.querySelector('.dash-comp-row.is-student');
-      const codes = DashInsights.columnCodes(CID);
-      expect(texts(row, '.dash-comp-bchip')).toEqual(cols.slice(0, 4).map(c => codes[c.key]));
-      expect(row.querySelectorAll('.dash-comp-bchip.is-extra')).toHaveLength(2);
-      expect(row.querySelector('.dash-comp-bmore.is-wide').textContent).toBe('+2');
-      expect(row.querySelector('.dash-comp-bmore.is-narrow').textContent).toBe('+4');
-    });
   });
 
   describe('competencyMonthlyAverages', () => {
@@ -1595,25 +1379,14 @@ describe('dash-comp-views', () => {
     }
     const cardOrder = () =>
       Array.from(doc.querySelectorAll('.dash-grid > .dash-card')).map(c => c.getAttribute('data-sid'));
-    // A Class Average row: the card's one-click filter (Level Mix's rows open
-    // a list first, in the Competencies tile).
+    // The filter is set by an element with data-action="naComp" and a column's key.
     const pick = k => {
-      if (doc.querySelector('.dash-comp-card').getAttribute('data-view') !== 'avg') {
-        localStorage.setItem('fv-dash-comp-view:' + CID, 'avg');
-        PageDashboard.render();
-      }
-      return doc.querySelector('.dash-comp-card .dash-comp-row[data-key="' + k + '"]');
+      const b = doc.createElement('button');
+      b.setAttribute('data-action', 'naComp');
+      b.setAttribute('data-key', k);
+      doc.getElementById('main').appendChild(b);
+      return b;
     };
-
-    it('remembers the view per class on this device', () => {
-      expect(doc.getElementById('dash-view-btn-comp').textContent).toBe('Level Mix');
-      click(doc.getElementById('dash-view-btn-comp'));
-      click(doc.querySelector('#dash-view-menu-comp [data-view="trend"]'));
-      expect(localStorage.getItem('fv-dash-comp-view:' + CID)).toBe('trend');
-      PageDashboard.render();
-      expect(doc.getElementById('dash-view-btn-comp').textContent).toBe('Change');
-      expect(doc.querySelector('.dash-comp-card').getAttribute('data-view')).toBe('trend');
-    });
 
     it('a row sorts the cards weakest first, focuses their chips and shows the bar; the chip clears it', () => {
       expect(cardOrder()).toEqual(['s1', 's2', 's3']);
@@ -1629,8 +1402,6 @@ describe('dash-comp-views', () => {
       expect(cardOrder()).toEqual(['s3', 's2', 's1']);
       click(pick('s:IN'));
       expect(cardOrder()).toEqual(['s1', 's2', 's3']);
-      expect(pick('s:IN').getAttribute('aria-pressed')).toBe('true');
-      expect(doc.activeElement).toBe(pick('s:IN'));
 
       const bar = doc.querySelector('.dash-comp-filter');
       const chip = bar.querySelector('.dash-comp-chip');
@@ -1650,7 +1421,6 @@ describe('dash-comp-views', () => {
       expect(doc.querySelector('.dash-comp-filter')).toBeNull();
       expect(cardOrder()).toEqual(['s3', 's2', 's1']);
       expect(doc.querySelectorAll('.dash-card-seg.is-focus')).toHaveLength(0);
-      expect(doc.activeElement).toBe(pick('s:IN'));
     });
 
     it('the grid sorts the same way', () => {
@@ -1664,9 +1434,10 @@ describe('dash-comp-views', () => {
     it('Escape clears the filter when nothing else is open', () => {
       click(pick('s:IN'));
       expect(doc.querySelector('.dash-comp-filter')).toBeTruthy();
+      // Focus is on the page (the chip), as it is after the filter is set.
+      doc.querySelector('.dash-comp-chip').focus();
       key('Escape');
       expect(doc.querySelector('.dash-comp-filter')).toBeNull();
-      expect(doc.activeElement).toBe(pick('s:IN'));
     });
 
     it('Escape leaves the filter when the account menu took it', () => {

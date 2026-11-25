@@ -40,33 +40,9 @@ window.PageDashboard = (function () {
   // is on its Curricular Competencies row (plan F.7a).
   var _litKey = null;
 
-  /* The cards' view menus (DashOverview.viewMenuHtml): the one open, by its
-     id, and each menu's setter, which records the pick before the page
-     re-renders. Core Competencies registers 'core'; Curricular Competencies
-     registers 'comp'. */
-  var openMenu = null;
-  var _viewSetters = {};
-  // Core Competencies: Self-Assessment or Evidence, per class on this device.
-  var CORE_VIEW_KEY = 'fv-dash-core-view:';
-  _viewSetters.core = function (key) {
-    _writePref(CORE_VIEW_KEY + activeCourse, key === 'evidence' ? 'evidence' : 'self');
-  };
-  // Curricular Competencies: Class Average, Level Mix, Needs Support or
-  // Change, per class on this device (DashOverview.compView has the
-  // default). A new view's rows fade in.
-  var COMP_VIEW_KEY = 'fv-dash-comp-view:';
-  var _compFade = false;
-  _viewSetters.comp = function (key) {
-    var view = DashOverview.compView(activeCourse, key);
-    if (view !== DashOverview.compView(activeCourse, _readPref(COMP_VIEW_KEY + activeCourse))) _compFade = true;
-    _writePref(COMP_VIEW_KEY + activeCourse, view);
-  };
   // The next render slides the student cards to their new places (the
   // filter was set or cleared, or the sort changed).
   var _slideCards = false;
-  // Classes whose questionnaire answers have been asked for (StudentVoice),
-  // so the card asks once and re-renders once when they arrive.
-  var _voiceAsked = {};
 
   function _readPref(key) {
     try {
@@ -226,40 +202,6 @@ window.PageDashboard = (function () {
         : 0;
     var classR = roundLevel(classAvg);
 
-    var ccCounts = {};
-    var ccAssessments = {};
-    assessments.forEach(function (a) {
-      (a.coreCompetencyIds || []).forEach(function (ccId) {
-        ccCounts[ccId] = (ccCounts[ccId] || 0) + 1;
-        if (!ccAssessments[ccId]) ccAssessments[ccId] = [];
-        ccAssessments[ccId].push(a.title || 'Untitled');
-      });
-    });
-
-    var ccObs = _ccObs(cid, allStudents);
-    _ccObsSeen = JSON.stringify(ccObs);
-
-    // Core Competency self-assessments this term (shared/core-self.js). The
-    // students' own come with the questionnaire answers: ask for them once
-    // and draw again when they arrive.
-    if (typeof StudentVoice !== 'undefined' && StudentVoice.load && !StudentVoice.loaded(cid) && !_voiceAsked[cid]) {
-      _voiceAsked[cid] = true;
-      StudentVoice.load(cid).then(
-        function () {
-          if (activeCourse === cid && document.querySelector('.dash-core-card')) render();
-        },
-        function () {
-          /* no answers: the teacher-entered steps still show */
-        },
-      );
-    }
-    var coreSelf = coreSelfRatings(
-      cid,
-      allStudents.map(function (s) {
-        return s.id;
-      }),
-    );
-
     _toolbar(list.students);
 
     /* -- Overview Panel -- */
@@ -272,14 +214,10 @@ window.PageDashboard = (function () {
       assessments: assessments,
       classAvg: classAvg,
       classR: classR,
-      ccCounts: ccCounts,
-      ccAssessments: ccAssessments,
-      ccObs: ccObs,
-      coreSelf: coreSelf,
-      coreView: _readPref(CORE_VIEW_KEY + cid) === 'evidence' ? 'evidence' : 'self',
-      compView: DashOverview.compView(cid, _readPref(COMP_VIEW_KEY + cid)),
       // The Competencies tile's open page, per class on this device.
       compPage: DashCompetencies.pageOf(_readPref(DashCompetencies.PREF_KEY + cid)),
+      // What the tile counts over (this term or the year), per class on this device.
+      compSpan: DashCompetencies.spanOf(_readPref(DashCompetencies.SPAN_KEY + cid)),
       obs: _obsState(),
       classChange: classGradeChange(
         cid,
@@ -305,7 +243,6 @@ window.PageDashboard = (function () {
     html += Overview.obsCardHtml({ cid: cid, allStudents: allStudents, obs: _lastObsState });
 
     _hidePop();
-    openMenu = null;
     var before = _slideCards && !_reducedMotion() ? StudentCards.cardsBefore() : null;
     _slideCards = false;
     // html-safe: checked builders in dash-overview, dash-insights, dash-student-cards and dash-observations escape every name, title and label; colours are fixed score variables.
@@ -313,12 +250,9 @@ window.PageDashboard = (function () {
     document.getElementById('main').innerHTML = html;
     if (before) StudentCards.slideFrom(before);
     if (window.DashInbox) DashInbox.afterRender(cid);
-    if (_compFade) _fadeCompRows();
-    _compFade = false;
     _afterObsRender(null);
     DashOverview.sizeRow();
     _watchAboveRow();
-    _syncCompScroll();
     // A re-render drew the cards anew: light them again if the pointer is
     // still on a competency.
     if (_litKey && !naComp) _setLit(_litKey);
@@ -383,20 +317,6 @@ window.PageDashboard = (function () {
     });
   }
 
-  // Observations tagged with each Core Competency (dims hold 'cc:<id>').
-  var _ccObsSeen = '';
-  function _ccObs(cid, allStudents) {
-    var ccObs = {};
-    allStudents.forEach(function (s) {
-      getStudentQuickObs(cid, s.id).forEach(function (o) {
-        (o.dims || []).forEach(function (d) {
-          if (typeof d === 'string' && d.indexOf('cc:') === 0) ccObs[d.slice(3)] = (ccObs[d.slice(3)] || 0) + 1;
-        });
-      });
-    });
-    return ccObs;
-  }
-
   /* A search, a sort, Flagged, a flag or Cards | Grid changes only the
      students: they are drawn again alone, with the toolbar's count. The
      rest of the page stays as it is. */
@@ -434,7 +354,6 @@ window.PageDashboard = (function () {
   function _afterObsAdded(sids, flagged) {
     var cid = activeCourse;
     var allStudents = getStudents(cid);
-    if (JSON.stringify(_ccObs(cid, allStudents)) !== _ccObsSeen) return render();
     renderObsCard(null);
     var sort = DashInsights.gridSortOf(sortMode);
     if (flagged || studentView === 'grid' || (sort && sort.key === 'obs')) return renderStudents();
@@ -714,8 +633,6 @@ window.PageDashboard = (function () {
     var seg = e.target.closest && e.target.closest('.dash-glance-dist .dist-seg');
     if (seg) _keepTipInside(seg);
     _litFrom(e.target);
-    var row = e.target.closest && e.target.closest('.dash-comp-rows.is-scroll .dash-comp-row');
-    if (row) _placeScrollTip(row);
   }
 
   /* ── Pointing at a competency (plan F.7a) ───────────────── */
@@ -750,48 +667,6 @@ window.PageDashboard = (function () {
     );
   }
 
-  /* ── The scrolling competency list (plan F.1) ────────────── */
-  /* Past 12 rows the Curricular Competencies list scrolls inside the card:
-     the fade at its foot goes at the end, and "+N more" counts the rows
-     still below. A row's pop-up hangs from the card, not the list, so the
-     list doesn't cut it off. */
-  function _syncCompScroll(list) {
-    list = list || document.querySelector('.dash-comp-rows.is-scroll');
-    if (!list) return;
-    var wrap = list.parentNode;
-    var more = document.querySelector('.dash-comp-moreline');
-    var bottom = list.scrollTop + list.clientHeight;
-    var below = 0;
-    Array.prototype.forEach.call(list.children, function (row) {
-      if (row.offsetTop + row.offsetHeight / 2 > bottom) below++;
-    });
-    var atEnd = bottom >= list.scrollHeight - 1;
-    if (wrap && wrap.classList) wrap.classList.toggle('is-end', atEnd);
-    if (more) {
-      more.hidden = below === 0;
-      more.textContent = '+' + below + ' more';
-      more.setAttribute('aria-label', 'Scroll to the other ' + below + ' competencies');
-    }
-  }
-  function _placeScrollTip(row) {
-    var tip = row.querySelector('.dash-comp-tip');
-    // The tip hangs from the list's wrapper, outside the part that scrolls.
-    var box = row.closest('.dash-comp-scroll');
-    if (!tip || !box) return;
-    var r = row.getBoundingClientRect();
-    var c = box.getBoundingClientRect();
-    var name = row.querySelector('.dash-comp-name');
-    var left = name ? name.getBoundingClientRect().right + 8 : r.left;
-    tip.style.left = Math.round(left - c.left) + 'px';
-    tip.style.top = Math.round(r.bottom - c.top + 2) + 'px';
-  }
-  function _compMore() {
-    var list = document.querySelector('.dash-comp-rows.is-scroll');
-    if (!list) return;
-    var by = Math.max(22, list.clientHeight - 22);
-    if (typeof list.scrollBy === 'function') list.scrollBy({ top: by, behavior: _reducedMotion() ? 'auto' : 'smooth' });
-    else list.scrollTop += by;
-  }
   /* A proficiency segment's list sits centred under it; near either end of
      the bar that runs past the card (and under the sidebar or off the page),
      so it moves sideways to stay inside the Class at a Glance card. */
@@ -824,11 +699,6 @@ window.PageDashboard = (function () {
   }
   function _onFocusout(e) {
     if (_popFor && e.target === _popFor) _hidePop();
-  }
-
-  // A scroll inside a long competency list keeps its "+N more" line true.
-  function _onScrollClose(e) {
-    if (e.target && e.target.classList && e.target.classList.contains('dash-comp-rows')) _syncCompScroll(e.target);
   }
 
   /* The middle row is as tall as the window leaves below where it starts, so
@@ -963,13 +833,6 @@ window.PageDashboard = (function () {
     }
   }
 
-  // A new view on the Curricular Competencies card: its rows fade in.
-  function _fadeCompRows() {
-    if (_reducedMotion()) return;
-    var body = document.querySelector('.dash-comp-card .dash-comp-body');
-    if (body) body.classList.add('is-fade-in');
-  }
-
   /* ── Student Management ─────────────────────────────────── */
 
   // Focus back on the control used, when it is drawn again.
@@ -993,8 +856,6 @@ window.PageDashboard = (function () {
   }
 
   function _handleClick(e) {
-    // A click outside the open view menu (and not on its pill) closes it.
-    if (openMenu && !e.target.closest('.dash-view-menu, .dash-view-btn')) _closeViewMenu();
     if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: render })) return;
     var el = e.target.closest('[data-action]');
     if (!el) return;
@@ -1050,13 +911,9 @@ window.PageDashboard = (function () {
       compPage: function () {
         _setCompPage(el.dataset.page, false);
       },
-      viewMenu: function () {
-        var id = el.dataset.menu;
-        if (openMenu === id) _closeViewMenu();
-        else _openViewMenu(id);
-      },
-      viewPick: function () {
-        _pickView(el.dataset.menu, el.dataset.view);
+      // This term | Year on the Competencies tile: kept per class on this device.
+      compSpan: function () {
+        _setCompSpan(el.dataset.span, el.id);
       },
       // A competency picked on Curricular Competencies (a row, or a Needs
       // Support column code), or cleared there or by the filter chip. Focus
@@ -1076,9 +933,6 @@ window.PageDashboard = (function () {
       },
       compRecord: function () {
         openCompObsDialog(el.dataset.key);
-      },
-      compMore: function () {
-        _compMore();
       },
       // A grid heading: its column, or the other way round if it is already
       // the sort. Names start A→Z, Last Observed with the longest ago, the
@@ -1169,14 +1023,19 @@ window.PageDashboard = (function () {
   }
   function _setCompPage(page, focus) {
     var key = DashCompetencies.pageOf(page);
-    _closeViewMenu();
     _writePref(DashCompetencies.PREF_KEY + activeCourse, key);
     var tab = DashCompetencies.show(document, key);
     if (tab && focus) tab.focus();
   }
+  /* This term | Year: the Dashboard draws again with the new count, and focus
+     stays on the control that was used. */
+  function _setCompSpan(span, id) {
+    _writePref(DashCompetencies.SPAN_KEY + activeCourse, DashCompetencies.spanOf(span));
+    render();
+    _focusSel(id ? '#' + id : '');
+  }
 
   function _handleKeydown(e) {
-    if (_viewMenuKeydown(e)) return;
     if (_compTabKeydown(e)) return;
     var popOpen = !!_popFor;
     if (_obsKeydown(e)) return;
@@ -1208,105 +1067,12 @@ window.PageDashboard = (function () {
     return !document.querySelector('#page-toolbar-mount [aria-expanded="true"], .tb-right [aria-expanded="true"]');
   }
 
-  // Focus on a competency's control on the Curricular Competencies card,
-  // else on the card's view menu.
+  // Focus on the filtered competency's control, else on the tile's tab.
   function _focusComp(key) {
     var el =
       document.querySelector('.dash-comp-card [data-key="' + _cssKey(key) + '"][aria-pressed]') ||
-      document.getElementById('dash-view-btn-comp');
+      document.querySelector('.dash-comp-seg [aria-selected="true"]');
     if (el) el.focus();
-  }
-
-  /* ── View menus (DashOverview.viewMenuHtml) ─────────────── */
-  function _menuEl(id) {
-    return document.getElementById('dash-view-menu-' + id);
-  }
-  function _menuBtn(id) {
-    return document.getElementById('dash-view-btn-' + id);
-  }
-  function _menuItems(id) {
-    var menu = _menuEl(id);
-    return menu ? Array.prototype.slice.call(menu.querySelectorAll('[role="menuitemradio"]')) : [];
-  }
-
-  // Opens a menu (closing any other) with focus on the view in use.
-  function _openViewMenu(id) {
-    if (openMenu && openMenu !== id) _closeViewMenu();
-    var menu = _menuEl(id);
-    var btn = _menuBtn(id);
-    if (!menu || !btn) return;
-    menu.hidden = false;
-    btn.setAttribute('aria-expanded', 'true');
-    openMenu = id;
-    var items = _menuItems(id);
-    var on = items.filter(function (it) {
-      return it.getAttribute('aria-checked') === 'true';
-    })[0];
-    if (on || items[0]) (on || items[0]).focus();
-  }
-
-  // Closes the open menu; with refocus, focus goes back to its pill.
-  function _closeViewMenu(refocus) {
-    var id = openMenu;
-    openMenu = null;
-    if (!id) return;
-    var menu = _menuEl(id);
-    var btn = _menuBtn(id);
-    if (menu) menu.hidden = true;
-    if (btn) {
-      btn.setAttribute('aria-expanded', 'false');
-      if (refocus) btn.focus();
-    }
-  }
-
-  // A pick: the menu's setter records it, the page draws it, focus returns
-  // to the pill (drawn anew, now naming the view).
-  function _pickView(id, key) {
-    openMenu = null;
-    if (_viewSetters[id]) _viewSetters[id](key);
-    render();
-    var btn = _menuBtn(id);
-    if (btn) btn.focus();
-  }
-
-  /* Escape closes the open menu; arrow keys, Home and End move between its
-     items; Enter picks. Down or Up on a closed pill opens it. */
-  function _viewMenuKeydown(e) {
-    var t = e.target;
-    if (!openMenu) {
-      var pill = t && t.closest && t.closest('.dash-view-btn');
-      if (pill && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-        e.preventDefault();
-        _openViewMenu(pill.dataset.menu);
-        return true;
-      }
-      return false;
-    }
-    var id = openMenu;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      _closeViewMenu(true);
-      return true;
-    }
-    if (e.key === 'Tab') {
-      _closeViewMenu();
-      return false;
-    }
-    var items = _menuItems(id);
-    var i = items.indexOf(document.activeElement);
-    var next = null;
-    if (e.key === 'ArrowDown') next = items[i < 0 ? 0 : (i + 1) % items.length];
-    else if (e.key === 'ArrowUp') next = items[i < 0 ? items.length - 1 : (i - 1 + items.length) % items.length];
-    else if (e.key === 'Home') next = items[0];
-    else if (e.key === 'End') next = items[items.length - 1];
-    else if ((e.key === 'Enter' || e.key === ' ') && i >= 0) {
-      e.preventDefault();
-      _pickView(id, items[i].dataset.view);
-      return true;
-    } else return false;
-    e.preventDefault();
-    if (next) next.focus();
-    return true;
   }
 
   /* ── init / destroy ─────────────────────────────────────── */
@@ -1325,7 +1091,6 @@ window.PageDashboard = (function () {
     helpRule = DashInsights.readRule(dashPrefs.helpRule);
     naComp = null;
     _litKey = null;
-    openMenu = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
     if (window.DashInbox) DashInbox.configure({ read: _readPref, write: _writePref });
@@ -1355,8 +1120,6 @@ window.PageDashboard = (function () {
     _addDocListener('mouseout', _onMouseout);
     _addDocListener('focusin', _onFocusin);
     _addDocListener('focusout', _onFocusout);
-    // Scrolling moves the segment the open list belongs to: close it.
-    _addDocListener('scroll', _onScrollClose, true);
     window.addEventListener('resize', _onResize);
     CM.initDrag();
 

@@ -275,9 +275,9 @@ for (const [width, height, ipad] of [
               ),
             ]
               .filter(e => {
-                // A Level Mix level's segment is as wide as its count, as today's count
-                // cells were; on a finger the row itself (44 px and more) opens its list.
-                if (e.matches('.dash-comp-ln-seg')) return false;
+                // A student's tick is 13 px wide, 12 tall: one of a row of them (28 across the tile).
+                // Its row's name and the tile's other controls are the finger's size.
+                if (e.matches('.dash-comp-tick')) return false;
                 const r = e.getBoundingClientRect();
                 const cs = getComputedStyle(e);
                 return r.width && r.height && cs.visibility !== 'hidden' && Math.min(r.width, r.height) < 44 - 0.5;

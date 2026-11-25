@@ -118,18 +118,17 @@ export async function makeRealClass(page) {
   }, REAL_TITLES);
 }
 
-/** Demo Mode, the Inbox on `view` (and the Curricular view on `comp`), then the real class. */
-export async function openRealClass(page, { view = 'stacks', comp = null } = {}) {
+/** Demo Mode, the Inbox on `view`, then the real class. */
+export async function openRealClass(page, { view = 'stacks' } = {}) {
   await page.addInitScript(
-    ([v, c]) => {
+    ([v]) => {
       try {
         localStorage.setItem('fv-dash-inbox-view:sci8', v);
-        if (c) localStorage.setItem('fv-dash-comp-view:sci8', c);
       } catch (e) {
         /* storage blocked */
       }
     },
-    [view, comp],
+    [view],
   );
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });

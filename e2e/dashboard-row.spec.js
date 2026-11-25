@@ -114,9 +114,9 @@ test("the old two-card row is gone, whatever an old 'fv-build-dashRow' says", as
   for (const sel of ['.dash-row', '.dash-comp-tile', '.dash-recent', '.dash-row-left'])
     await expect(page.locator(sel)).toHaveCount(1);
   await expect(page.locator('.dash-overview-cards')).toHaveCount(0);
-  // Each card is a page of the one tile, never a box of its own in the row.
-  expect(await page.locator('.dash-comp-card').evaluate(el => !!el.closest('.dash-comp-tile'))).toBe(true);
-  expect(await page.locator('.dash-core-card').evaluate(el => !!el.closest('.dash-comp-tile'))).toBe(true);
+  // Each list is a page of the one tile, never a box of its own in the row.
+  for (const pg of ['curricular', 'core'])
+    expect(await page.locator('#dash-comp-page-' + pg).evaluate(el => !!el.closest('.dash-comp-tile'))).toBe(true);
 });
 
 test('at 800 wide the tiles stack and nothing scrolls sideways', async ({ page }) => {
@@ -221,7 +221,7 @@ test('Curricular and Core switch by click and by arrow key, and the choice survi
   await expect(core).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#dash-comp-page-core')).toBeVisible();
   await expect(page.locator('#dash-comp-page-curricular')).toBeHidden();
-  await expect(page.locator('.dash-core-card')).toBeVisible();
+  await expect(page.locator('#dash-comp-page-core .dash-comp-list')).toBeVisible();
   await page.waitForTimeout(300);
   const at = await box(page, '#dash-comp-page-core');
   const tile = await box(page, '.dash-comp-pages');
@@ -242,52 +242,6 @@ test('Curricular and Core switch by click and by arrow key, and the choice survi
   await expect(core).toHaveAttribute('aria-selected', 'true');
   await expect(core).toBeFocused();
   expect(await page.evaluate(() => localStorage.getItem('fv-dash-comp-page:sci8'))).toBe('core');
-});
-
-test('the view menu inside the tile opens, picks, and is hidden at rest', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await openDashboard(page);
-  const menu = page.locator('#dash-view-menu-comp');
-  await expect(menu).toBeHidden();
-  expect(await menu.evaluate(el => getComputedStyle(el).display)).toBe('none');
-  await page.locator('#dash-view-btn-comp').click();
-  await expect(menu).toBeVisible();
-  const m = await box(page, '#dash-view-menu-comp');
-  const t = await box(page, '.dash-comp-tile');
-  expect(m.bottom).toBeLessThanOrEqual(t.bottom + 1);
-  await page.locator('#dash-view-menu-comp [data-view="avg"]').click();
-  await expect(page.locator('#dash-view-btn-comp')).toHaveText('Class Average');
-  await expect(page.locator('#dash-view-menu-comp')).toBeHidden();
-  // The tile is still on the Curricular page after the redraw.
-  await expect(page.locator('#dash-comp-tab-curricular')).toHaveAttribute('aria-selected', 'true');
-  // Core's menu, after the tile has been turned to Core.
-  await page.locator('#dash-comp-tab-core').click();
-  const core = page.locator('#dash-view-menu-core');
-  if (await core.count()) {
-    await expect(core).toBeHidden();
-    await page.locator('#dash-view-btn-core').click();
-    await expect(core).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(core).toBeHidden();
-  }
-});
-
-test('clicking a competency in the tile still filters the student cards', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await openDashboard(page);
-  const before = await page.locator('.dash-grid > .dash-card').count();
-  expect(before).toBeGreaterThan(0);
-  // The tile opens on Level Mix (D3), where a row opens its list first; Class
-  // Average keeps today's one-click filter.
-  await page.locator('#dash-view-btn-comp').click();
-  await page.locator('#dash-view-menu-comp [data-view="avg"]').click();
-  await page.locator('.dash-comp-tile .dash-comp-row').first().click();
-  await expect(page.locator('.dash-comp-filter')).toBeVisible();
-  await expect(
-    page.locator('.dash-comp-tile .dash-comp-row.is-picked, .dash-comp-tile [aria-pressed="true"]').first(),
-  ).toBeVisible();
-  // Still the Curricular page of the tile after the redraw.
-  await expect(page.locator('#dash-comp-page-curricular')).toBeVisible();
 });
 
 test('with Bulletins built the left column splits 60 / 40', async ({ page }) => {
@@ -317,15 +271,17 @@ test('with no Bulletins tile the Inbox slot has the whole column', async ({ page
   expect(Math.round(inbox.height)).toBe(Math.round(left.height));
 });
 
-/* "View Gradebook →" and "Questionnaires →" sit beside the view pill, on one
-   line, inside the tile at its narrowest (329 px at 1024 wide, 335 at 1280),
-   in the page's font and in the wide stand-in for CI's fonts. */
+/* The period switch, the page's link and its column heading sit on one line
+   inside the tile at its narrowest (329 px at 1024 wide, 335 at 1280), in the
+   page's font and in the wide stand-in for CI's fonts. */
 for (const [w, h] of [
   [1024, 768],
   [1280, 800],
   [1440, 900],
 ]) {
-  test(`at ${w} wide each page's link sits beside its pill, inside the tile, in both fonts`, async ({ page }) => {
+  test(`at ${w} wide each page's switch, link and heading share one line inside the tile, in both fonts`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: w, height: h });
     await openDashboard(page);
     for (const font of FONTS) {
@@ -335,18 +291,19 @@ for (const [w, h] of [
         await page.waitForTimeout(300);
         const m = await page.evaluate(pg => {
           const tile = document.querySelector('.dash-comp-tile').getBoundingClientRect();
-          const head = document.querySelector('#dash-comp-page-' + pg + ' .dash-section-title');
-          const a = head.querySelector(':scope > a');
-          const link = a.getBoundingClientRect();
-          const pill = head.querySelector('.dash-view-btn, .dash-core-sub').getBoundingClientRect();
-          const lh = parseFloat(getComputedStyle(a).lineHeight) || 20;
+          const sub = document.querySelector('#dash-comp-page-' + pg + ' .dash-comp-sub');
+          const parts = ['.dash-comp-span', '.dash-comp-sub-link', '.dash-comp-colhead'].map(s =>
+            sub.querySelector(s).getBoundingClientRect(),
+          );
+          const lh = parseFloat(getComputedStyle(sub.querySelector('.dash-comp-sub-link')).lineHeight) || 20;
           return {
-            inside: link.right <= tile.right + 0.5 && link.left >= tile.left - 0.5,
-            beside: link.left >= pill.right && Math.abs(link.top + link.height / 2 - (pill.top + pill.height / 2)) < 8,
-            oneLine: link.height <= lh + 1,
+            inside: parts.every(r => r.right <= tile.right + 0.5 && r.left >= tile.left - 0.5),
+            oneLine: parts.every(r => Math.abs(r.top + r.height / 2 - (parts[0].top + parts[0].height / 2)) < 8),
+            linkOneLine: parts[1].height <= lh + 1,
+            noOverlap: parts[0].right <= parts[1].left && parts[1].right <= parts[2].left,
           };
         }, pg);
-        expect(m, `${w} ${font} ${pg}`).toEqual({ inside: true, beside: true, oneLine: true });
+        expect(m, `${w} ${font} ${pg}`).toEqual({ inside: true, oneLine: true, linkOneLine: true, noOverlap: true });
       }
     }
   });
