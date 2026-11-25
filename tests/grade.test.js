@@ -182,7 +182,6 @@ describe('grade-format-guard', () => {
     'teacher/page-gradebook.js': 1,
   };
   const PROF_LABELS_USES = {
-    'teacher-mobile/card-widgets.js': 1,
     'teacher-mobile/student-detail.js': 7,
     'teacher-mobile/tab-grade.js': 4, // the checklist's level names; the level buttons' words are scoreLevelText's (MComponents.levelButtonsHTML)
     'teacher/comment-bank.js': 1,
@@ -310,8 +309,6 @@ describe('grade-format-guard', () => {
     'teacher/report-one-zoom.js round _st(_view).z * 100': 'the preview’s zoom as a percent',
     'teacher/report-questionnaire.js round (nx.min - Number(g.pct)) * 10':
       'the gap to the next letter from the shown course %',
-    'teacher-mobile/card-widgets.js round levelBarPercent(cid, value)': 'a bar’s width',
-    'teacher-mobile/card-widgets.js round pct': 'evidence coverage, a share',
     'teacher-mobile/tab-grade.js round (gradedCount / total) * 100': 'a share graded',
     's/page-view.js round Number(level)': 'a level the student view gives, already whole (calc.js’s)',
     's/page-view.js round v * 10000': 'a share',
@@ -328,7 +325,6 @@ describe('grade-format-guard', () => {
     'teacher/page-student.js': 12, // chart coordinates
     'teacher/rubric-bank.js': 2, // gradient stops
     'teacher/student-evidence.js': 1, // positions
-    'teacher-mobile/card-widgets.js': 4, // chart coordinates
   };
 
   /* Comments blanked, so a comment can name Math.round. */

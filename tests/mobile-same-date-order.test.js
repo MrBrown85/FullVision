@@ -66,9 +66,19 @@ const detail = () => MStudentDetail.renderDetail({ cid: CID, sid: SID, renderBad
 describe('the phone student page: same-date pieces in the order they were made', () => {
   afterEach(() => delete COURSES[CID]);
 
-  it('Grade Newest names the piece made later', () => {
+  it('All Work lists the piece made later first', () => {
     seed();
-    expect(detail()).toContain('Grade Newest: Piece later');
+    const html = detail();
+    expect(html.indexOf('aria-label="Grade Piece later"')).toBeGreaterThan(0);
+    expect(html.indexOf('aria-label="Grade Piece later"')).toBeLessThan(html.indexOf('aria-label="Grade Piece first"'));
+  });
+
+  it('the Students card lists the piece made later first', () => {
+    seed();
+    const st = getStudents(CID).find(s => s.id === SID);
+    const html = MStudentCard.render(st, CID);
+    expect(html.indexOf('Piece later')).toBeGreaterThan(0);
+    expect(html.indexOf('Piece later')).toBeLessThan(html.indexOf('Piece first'));
   });
 
   it('the last-five timeline lists the piece made first before the piece made later', () => {

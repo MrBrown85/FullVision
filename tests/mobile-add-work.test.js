@@ -473,28 +473,17 @@ describe('with work waiting', () => {
     expect(MGradePhotos.classToGrade(CID)).toBeGreaterThan(0);
   });
 
-  it('on the student card the To Grade list is a widget: on by default, under the name, and the editor turns it off', () => {
-    const card = () => {
-      const data = {
-        sections: [],
-        assessments: [],
-        statuses: {},
-        termId: 'term-1',
-        widgetConfig: getCardWidgetConfig(),
-      };
-      const holder = document.createElement('div');
-      // html-safe: assembleCard escapes every widget's text; a test page
-      holder.innerHTML = MCardWidgets.assembleCard(name('st2'), CID, data);
-      return holder;
-    };
-    const on = card();
-    const list = on.querySelector('.m-scard-widgets > .m-scard-tograde');
+  it('on the student card the To Grade list sits under the name, Observe and Profile', () => {
+    const holder = document.createElement('div');
+    // html-safe: MStudentCard.render escapes its text; a test page
+    holder.innerHTML = MStudentCard.render(name('st2'), CID);
+    const list = holder.querySelector('.m-sc-scroll > .m-sc-boxes > .m-scard-tograde');
     expect(list).not.toBeNull();
-    expect(on.querySelector('.m-scard-widgets').firstElementChild).toBe(list);
-    MCardWidgetEditor.toggleWidget('toGrade');
-    expect(card().querySelector('.m-scard-tograde')).toBeNull();
-    MCardWidgetEditor.toggleWidget('toGrade');
-    expect(card().querySelector('.m-scard-tograde')).not.toBeNull();
+    expect(list.previousElementSibling).toBeNull();
+    // The card is the one place To Grade is: the profile does not carry it.
+    expect(MStudentDetail.renderDetail({ cid: CID, sid: 'st2', renderBadges: () => '' })).not.toContain(
+      'm-scard-tograde',
+    );
   });
 });
 

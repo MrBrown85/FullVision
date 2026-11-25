@@ -197,19 +197,10 @@ function openGrading(aid) {
   stack().innerHTML = MGrade.renderSwiper(CID, aid);
   MGrade.setupSwiper(CID, aid);
 }
-// What the Students tab hands each card (teacher-mobile/tab-students.js).
-const cardData = () => ({
-  sections: getSections(CID),
-  statuses: getAssignmentStatuses(CID),
-  assessments: getAssessments(CID),
-  termId: 'term-1',
-  widgetConfig: getCardWidgetConfig(),
-});
 const cardHtml = sid =>
-  MCardWidgets.assembleCard(
+  MStudentCard.render(
     getStudents(CID).find(s => s.id === sid),
     CID,
-    cardData(),
   );
 
 beforeEach(() => {
@@ -385,7 +376,7 @@ const sheetClosed = () => vi.advanceTimersByTime(400);
 
 // A student's card, on a page of its own.
 function card(sid) {
-  // html-safe: MCardWidgets.assembleCard escapes names and text; a test page
+  // html-safe: MStudentCard.render escapes names and text; a test page
   stack().innerHTML = cardHtml(sid);
   return stack().querySelector('.m-scard-return');
 }
@@ -1030,13 +1021,19 @@ describe('with the switch on and When I Return Them', () => {
       };
       held();
       grading();
-      const withDrafts = cardHtml(BEN);
-      const box = card(BEN).outerHTML;
+      // The level and each piece's title and result; not the Not Opened dots, which follow a return.
+      const numbers = html => [
+        html.match(/<div class="m-sc-level.*?<\/div>/s)[0],
+        [...html.matchAll(/m-sc-row-title">([^<]*)<\/span><span class="m-sc-pill[^>]*>([^<]*)</g)].map(
+          m => m[1] + ' ' + m[2],
+        ),
+      ];
+      const withDrafts = numbers(cardHtml(BEN));
       clearClass(CID);
       localStorage.clear();
       seed({ config: { student_page_enabled: true, return_grades: 'on_save' } });
       grading();
-      expect(withDrafts.replace(box, '') === cardHtml(BEN)).toBe(true);
+      expect(withDrafts).toEqual(numbers(cardHtml(BEN)));
     });
   });
 
