@@ -71,9 +71,11 @@ function seed({ sendWork = true, unit = false } = {}) {
   Grader.returnGrades(CID, LAB, [IDS[4]]);
 }
 
-const bar = show => document.querySelector('.assess-tograde-seg [data-show="' + show + '"]');
+const bar = show => document.querySelector('.atb-show [data-show="' + show + '"]');
+const options = () => Array.from(document.querySelectorAll('.atb-show .seg-btn')).map(b => b.dataset.show);
+const badge = show => bar(show).querySelector('.atb-badge');
 const pressed = () =>
-  Array.from(document.querySelectorAll('.assess-tograde-seg .seg-btn'))
+  Array.from(document.querySelectorAll('.atb-show .seg-btn'))
     .filter(b => b.getAttribute('aria-pressed') === 'true')
     .map(b => b.dataset.show);
 const cards = () => Array.from(document.querySelectorAll('#main .assess-card')).map(c => c.id.slice(3));
@@ -116,7 +118,9 @@ describe('Show: Submitted', () => {
   it('lists only the work sent in, and a card opened shows only the students who sent it', () => {
     openAssignments(() => seed(), CID, {});
     expect(pressed()).toEqual(['all']);
-    expect(bar('submitted').textContent).toBe('Submitted 9');
+    // Submitted and Not In carry no number; To Grade and To Return carry theirs.
+    expect(bar('submitted').textContent).toBe('Submitted');
+    expect(badge('submitted')).toBeNull();
     click(bar('submitted'));
     expect(pressed()).toEqual(['submitted']);
     expect(cards().sort()).toEqual([LAB, TALK].sort());
@@ -186,9 +190,21 @@ describe('Show: Submitted', () => {
     expect(folder().classList.contains('open')).toBe(true);
   });
 
-  it('there is no bar while Send Work is off', () => {
+  it('with Send Work off the bar holds All and To Return, and nothing else', () => {
     openAssignments(() => seed({ sendWork: false }), CID, {});
-    expect(document.querySelector('.assess-tograde-seg')).toBeNull();
+    expect(options()).toEqual(['all', 'toreturn']);
+  });
+
+  it('with Send Work off and nothing to return there is no bar', () => {
+    openAssignments(
+      () => {
+        seed({ sendWork: false });
+        Grader.returnGrades(CID, LAB, [IDS[3]]);
+      },
+      CID,
+      {},
+    );
+    expect(document.querySelector('.atb-show')).toBeNull();
   });
 });
 
@@ -196,7 +212,7 @@ describe('Show: To Grade', () => {
   it('lists the work waiting, and a card opened shows only the students it is from; a group counts once', () => {
     openAssignments(() => seed(), CID, {});
     // Lab: 0-2 wait (3 is a draft, 4 returned). Talk: the group (0-2) once, and 5.
-    expect(bar('tograde').textContent).toBe('To Grade 5');
+    expect(badge('tograde').textContent).toBe('5');
     click(bar('tograde'));
     expect(cards().sort()).toEqual([LAB, TALK].sort());
     expect(openCards()).toEqual([]);
@@ -222,7 +238,8 @@ describe('Show: Not In', () => {
   it('lists the pieces that take work, and a card opened shows only the students who sent nothing', () => {
     openAssignments(() => seed(), CID, {});
     // Lab: 5-7. Talk: 3, 4, 6, 7 (the group is in through 0's work, 5 sent). Quiz takes none.
-    expect(bar('notin').textContent).toBe('Not In 7');
+    expect(bar('notin').textContent).toBe('Not In');
+    expect(badge('notin')).toBeNull();
     click(bar('notin'));
     expect(cards().sort()).toEqual([LAB, TALK].sort());
     expect(openCards()).toEqual([]);
@@ -244,5 +261,60 @@ describe('Show: Not In', () => {
     click(bar('notin'));
     openCard(LAB);
     expect(studentsOn(LAB).sort()).toEqual([IDS[5], IDS[6]].sort());
+  });
+});
+
+describe('Show: To Return', () => {
+  it('is an option of the bar, between To Grade and Not In, with its drafts as an amber badge', () => {
+    openAssignments(() => seed(), CID, {});
+    expect(options()).toEqual(['all', 'submitted', 'tograde', 'toreturn', 'notin']);
+    // Lab's one draft: IDS[3]'s grade, not yet returned.
+    expect(badge('toreturn').textContent).toBe('1');
+    expect(badge('toreturn').classList.contains('atb-badge-amber')).toBe(true);
+    expect(document.querySelector('.assess-to-return-btn, .assess-to-return-slot')).toBeNull();
+    // Each card knows what it would stay for (point to preview).
+    const has = aid => (document.getElementById('ac-' + aid).dataset.has || '').split(' ').filter(Boolean);
+    expect(has(LAB).sort()).toEqual(['notin', 'submitted', 'tograde', 'toreturn']);
+    expect(has(TALK).sort()).toEqual(['notin', 'submitted', 'tograde']);
+    expect(has(QUIZ)).toEqual([]);
+  });
+
+  it('lists only the assessments with a draft, shows pressed with All let go, and a second click is All', () => {
+    openAssignments(() => seed(), CID, {});
+    click(bar('toreturn'));
+    expect(pressed()).toEqual(['toreturn']);
+    expect(cards()).toEqual([LAB]);
+    click(bar('toreturn'));
+    expect(pressed()).toEqual(['all']);
+    expect(cards().length).toBe(3);
+  });
+
+  it('is not combined with another option: choosing one lets the other go, and All clears both', () => {
+    openAssignments(() => seed(), CID, {});
+    click(bar('toreturn'));
+    click(bar('submitted'));
+    expect(pressed()).toEqual(['submitted']);
+    expect(cards().sort()).toEqual([LAB, TALK].sort());
+    click(bar('toreturn'));
+    expect(pressed()).toEqual(['toreturn']);
+    expect(cards()).toEqual([LAB]);
+    click(bar('tograde'));
+    expect(pressed()).toEqual(['tograde']);
+    click(bar('toreturn'));
+    click(bar('all'));
+    expect(pressed()).toEqual(['all']);
+    expect(cards().length).toBe(3);
+  });
+
+  it('goes with the last draft: returned, the option leaves and the list is whole again', () => {
+    openAssignments(() => seed(), CID, {});
+    click(bar('toreturn'));
+    expect(cards()).toEqual([LAB]);
+    click(document.querySelector('[data-action="returnDrafts"][data-aid="' + LAB + '"]'));
+    const ok = document.querySelector('.confirm-overlay .confirm-ok');
+    if (ok) click(ok);
+    expect(options().includes('toreturn')).toBe(false);
+    expect(cards().length).toBe(3);
+    expect(pressed()).toEqual(['all']);
   });
 });

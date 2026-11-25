@@ -296,6 +296,26 @@
     height: 40px;
   }
 
+  /* ── Class Settings: the class list, class header and Students bar ── */
+
+  /* Buttons, the ⋯ and the search field a finger can hit; the header and
+     the bar wrap rather than squeeze (e2e/class-settings-bars.spec.js). */
+  html.fv-tablet .cm-bar .tb-action-btn,
+  html.fv-tablet .cm-bar .atb-icon-btn {
+    min-width: 44px;
+  }
+  html.fv-tablet .cm-bar .tb-action-btn,
+  html.fv-tablet .cm-bar .atb-icon-btn,
+  html.fv-tablet .cm-bar .atb-search {
+    min-height: 44px;
+  }
+  html.fv-tablet .cm-bar .atb-search {
+    height: 44px;
+  }
+  html.fv-tablet .cm-bar .atb-field > input {
+    height: 42px;
+  }
+
   /* ── Class Settings › Student Page: Students ───────────────────── */
 
   /* A finger-sized box to tick, name to open, and panel and bar buttons
@@ -401,6 +421,23 @@
   }
   html.fv-tablet .dash-row .dash-bulletins-row {
     height: 48px;
+  }
+
+  /* ── Bulletins: the write bar and the box ───────────────────────── */
+
+  /* Every button, field and the switch's row a finger can hit; the rows
+     wrap rather than squeeze (e2e/bulletins-bar.spec.js). */
+  html.fv-tablet .bulletin-bar-open,
+  html.fv-tablet .bulletin-field,
+  html.fv-tablet .bulletin-page .tb-action-btn,
+  html.fv-tablet .bulletin-kinds .seg-btn {
+    min-height: 44px;
+  }
+  html.fv-tablet .bulletin-react-row {
+    min-height: 44px;
+  }
+  html.fv-tablet textarea.bulletin-field {
+    min-height: 84px;
   }
 
   @media (max-width: 799px) {

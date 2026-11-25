@@ -30,10 +30,10 @@ test('Class Settings shows New Class as a button at the top of the class list', 
   await page.locator('[data-action="openClassManager"]').first().click();
   const btn = page.locator('.cm-sidebar-header [data-action="cmStartCreate"]');
   await expect(btn).toBeVisible();
-  await expect(btn).toHaveText('New Class');
+  await expect(btn).toHaveText('+ New Class');
   const box = await btn.boundingBox();
   expect(box.y).toBeLessThan(200);
-  expect(box.height).toBeGreaterThanOrEqual(28);
+  expect(box.height).toBe(32);
   await btn.click();
   await expect(page.locator('.cw-steps')).toBeVisible();
 });

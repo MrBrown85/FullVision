@@ -56,7 +56,8 @@ async function openAssignments(page) {
 }
 
 const card = page => page.locator('#ac-' + AID);
-const pill = page => page.locator('.assess-to-return-btn');
+// To Return on the Show bar; its amber badge holds the count.
+const pill = page => page.locator('.atb-show [data-show="toreturn"]');
 const row = (page, sid) => card(page).locator('.rsg-student[data-status-student="' + sid + '"]');
 const mark = (page, sid) => row(page, sid).locator('.ret-mark');
 
@@ -150,7 +151,7 @@ for (const colorScheme of ['light', 'dark']) {
       await card(page).locator('.assess-title').click();
       await expect(mark(page, at.sids[0])).toHaveText('Draft');
       await expect(mark(page, at.sids[2])).toHaveText(/^Returned/);
-      await expect(pill(page)).toHaveText('2 to return');
+      await expect(pill(page)).toHaveText(/^To Return\s*2$/);
       // The marks and the pill take their colours from the theme's tokens.
       expect(
         await page.evaluate(() => {
@@ -166,7 +167,8 @@ for (const colorScheme of ['light', 'dark']) {
               getComputedStyle(document.querySelector('.ret-draft')).color === rgb(css('--score-3-text')) &&
               getComputedStyle(document.querySelector('.ret-draft')).borderTopColor === rgb(css('--score-3')),
             pill:
-              getComputedStyle(document.querySelector('.assess-to-return-btn')).color === rgb(css('--demo-pill-text')),
+              getComputedStyle(document.querySelector('.atb-show [data-show="toreturn"] .atb-badge')).color ===
+              rgb(css('--demo-pill-text')),
           };
           probe.remove();
           return out;

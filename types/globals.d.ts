@@ -110,6 +110,7 @@ interface Window {
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
   CmKeepMenu: unknown;
+  FocusBack: { from(el: Element | null): () => void };
   CmTerms: unknown;
   DashCompetencies: unknown;
   DashRecent: unknown;
@@ -372,6 +373,8 @@ declare var PhotoExpiry: any; // shared/photo-expiry.js, for shared/data-courses
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
 declare var GraderWork: { workShown(cid: string, a: unknown): boolean };
+// A dialog gives the focus back to what opened it (teacher/focus-back.js).
+declare var FocusBack: { from(el: Element | null): () => void };
 declare function showConfirm(
   title: string,
   message: string,
@@ -425,6 +428,7 @@ interface Window {
 
 // One Report's page (report-one-words.js, report-one-copy.js, report-one-undo.js).
 interface Window {
+  ReportOneWordOps: any;
   ReportOneWords: any;
   ReportOneCopy: {
     classes(cid: string, key: string): { cid: string; name: string; own: boolean }[];
@@ -440,3 +444,15 @@ declare function getReportConfig(cid: string): any;
 declare function saveReportConfig(cid: string, config: unknown): void;
 declare function printClassName(course: unknown): string;
 declare function isCourseArchived(cid: string): boolean;
+
+// Printing on Legal paper (teacher/print-legal.js).
+interface Window {
+  PrintLegal: {
+    browser(ua?: string): string;
+    stepText(b: string): string;
+    stepHtml(b?: string, lead?: string): string;
+    after(opts: { paper: string; useLetter?: () => void }): void;
+    close(): void;
+  };
+}
+declare var PrintLegal: Window['PrintLegal'];

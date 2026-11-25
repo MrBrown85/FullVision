@@ -662,10 +662,11 @@ window.ReportSheets = (function () {
 
   /* ── The rows engine (pure) ─────────────────────────────────────
      sides: the form's sides, each a list of rows, each a list of cells
-     { id, size, px, rows?, chrome? }: px is the height the student's
+     { id, size, px, rows?, chrome?, pieceH? }: px is the height the student's
      content takes at the cell's width (One Report sends only the parts
      that print something), rows and chrome a table's row heights and the rest of it in
-     px. opts: { H (a side's height), gap, pinned (id), head (the px of
+     px; pieceH(start, end), when given, is the measured height of rows
+     [start, end) printed as one piece, and is used in place of them. opts: { H (a side's height), gap, pinned (id), head (the px of
      the line naming the student at the top of every side after the
      Front) }. Every side but the Front keeps room for that line, so the
      Front is the only side with the whole height.
@@ -709,6 +710,40 @@ window.ReportSheets = (function () {
     };
     var isTable = function (c) {
       return !!c.rows && c.rows.length > 1;
+    };
+    // The height of a table's rows [start, end) as one piece: what the
+    // cell says it is (pieceH, measured: a piece's own heading, and what
+    // prints only with the first or the last rows, differ piece to piece),
+    // else its rows and the rest of it.
+    var pieceH = function (c, start, end) {
+      if (c.pieceH) return c.pieceH(start, end);
+      var used = 0;
+      for (var k = start; k < end; k++) used += c.rows[k];
+      return c.chrome + used;
+    };
+    // How many rows from `start` a piece no taller than `room` holds.
+    var fitRows = function (c, start, room) {
+      var n = c.rows.length - start;
+      if (!c.pieceH) {
+        var take = 0;
+        var used = c.chrome;
+        while (take < n && used + c.rows[start + take] <= room) {
+          used += c.rows[start + take];
+          take++;
+        }
+        return take;
+      }
+      // Measured pieces: all that is left, else the most that fit, found
+      // in a few measures.
+      if (pieceH(c, start, start + n) <= room) return n;
+      var lo = 0;
+      var hi = n - 1;
+      while (lo < hi) {
+        var mid = (lo + hi + 1) >> 1;
+        if (pieceH(c, start, start + mid) <= room) lo = mid;
+        else hi = mid - 1;
+      }
+      return lo;
     };
     // What a side of the form passes on to the next: the rest of a table
     // it began and the rows after it.
@@ -771,23 +806,11 @@ window.ReportSheets = (function () {
       var flow = function (c, start, from) {
         while (start < c.rows.length) {
           var lim = cur === side ? limit : H;
-          var room = lim - y - c.chrome - 1;
-          var take = 0;
-          var used = 0;
-          while (start + take < c.rows.length && used + c.rows[start + take] <= room) {
-            used += c.rows[start + take];
-            take++;
-          }
+          var take = fitRows(c, start, lim - y - 1);
           // A page never ends on a row kept with the one under it (a heading).
-          while (take > 1 && start + take < c.rows.length && c.keep && c.keep[start + take - 1]) {
-            take--;
-            used -= c.rows[start + take];
-          }
+          while (take > 1 && start + take < c.rows.length && c.keep && c.keep[start + take - 1]) take--;
           // Only a heading fits here: it goes on with its rows.
-          if (take === 1 && start + 1 < c.rows.length && c.keep && c.keep[start] && (y > y0 || lim < H)) {
-            take = 0;
-            used = 0;
-          }
+          if (take === 1 && start + 1 < c.rows.length && c.keep && c.keep[start] && (y > y0 || lim < H)) take = 0;
           if (!take) {
             if (y > y0 || lim < H) {
               // No room for a row here: the next side.
@@ -797,10 +820,9 @@ window.ReportSheets = (function () {
             }
             // One row taller than a whole side: alone, and over.
             take = 1;
-            used = c.rows[start];
             over = true;
           }
-          var h = Math.min(H - y, c.chrome + used);
+          var h = Math.min(H - y, pieceH(c, start, start + take));
           place([{ id: c.id, size: c.size, h: h, part: { start: start, end: start + take } }], h, from);
           start += take;
           if (start < c.rows.length) {
@@ -897,6 +919,13 @@ window.ReportSheets = (function () {
     };
   }
 
+  /* Ruled lines, one bordered element a line, in a layer that takes no
+     room: the box is as tall as the page gives it, and the lines past its
+     foot are clipped. Not a background pattern: Chrome's print engine
+     dropped most of its one-pixel stripes, and the lines did not print
+     (Colin, 2026-11-25). Enough lines for a whole Legal side. */
+  var RULED_LINES =
+    '<div class="report-ruled-lines">' + new Array(65).join('<div class="report-line"></div>') + '</div>';
   /* A comment box with ruled lines for a student with no comment yet. */
   function _emptyCommentBox(lines) {
     var n = Math.max(1, Number(lines) || BLOCKS['teacher-narrative'].lines);
@@ -904,12 +933,36 @@ window.ReportSheets = (function () {
       '<div class="report-block-box report-comment-box"><div class="report-block-title">Teacher Comment</div>' +
       '<div class="report-ruled report-ruled-fill report-ruled-empty" style="height:' +
       n * LINE_PX +
-      'px"></div></div>'
+      'px">' +
+      RULED_LINES +
+      '</div></div>'
     );
+  }
+  /* A copy issued before Nov 25 saved its writing boxes empty (the lines
+     were their background, and most did not print). Before it is shown or
+     printed again, each empty box gets its lines as elements: what the
+     copy says is unchanged. */
+  function ruleOldCopy(root) {
+    var lines = function (box, n) {
+      for (var i = 0; i < n; i++) {
+        var line = document.createElement('div');
+        line.className = 'report-line';
+        box.appendChild(line);
+      }
+      return box;
+    };
+    Array.prototype.forEach.call(root.querySelectorAll('.report-write-lines:empty'), function (box) {
+      lines(box, Math.max(1, Math.round((parseFloat(box.style.height) || 78) / 26)));
+    });
+    Array.prototype.forEach.call(root.querySelectorAll('.report-ruled:empty'), function (box) {
+      var layer = document.createElement('div');
+      layer.className = 'report-ruled-lines';
+      box.appendChild(lines(layer, 64));
+    });
   }
   /* Ruled lines into the room a text block leaves. */
   function _withRuled(html) {
-    return html.replace(/<\/div>\s*$/, '<div class="report-ruled report-ruled-fill"></div></div>');
+    return html.replace(/<\/div>\s*$/, '<div class="report-ruled report-ruled-fill">' + RULED_LINES + '</div></div>');
   }
 
   /* A cell's options with the registry's defaults filled in, plus its
@@ -1247,6 +1300,7 @@ window.ReportSheets = (function () {
     keptLayouts: keptLayouts,
     paperSize: paperSize,
     renderPreview: renderPreview,
+    ruleOldCopy: ruleOldCopy,
     clearPageStyle: clearPageStyle,
     setPageStyle: _setPageStyle,
     // One Report (report-one.js) lays its own cells out with these.

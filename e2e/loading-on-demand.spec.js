@@ -18,7 +18,7 @@
  * offline after a first visit, and after a file that could not be fetched.
  */
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, gotoApp } from './helpers.js';
+import { mockAuth, seedCourse, seedStudents, gotoApp, clickToolbarItem } from './helpers.js';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -36,6 +36,7 @@ const REPORTS = [
   '/teacher/report-one-panel.js',
   '/teacher/report-one-page.js',
   '/teacher/report-one-comment.js',
+  '/teacher/report-one-word-ops.js',
   '/teacher/report-one-words.js',
   '/teacher/report-one-copy.js',
   '/teacher/report-one-undo.js',
@@ -247,7 +248,7 @@ async function catchSheet(page) {
 }
 
 async function expectRubricBank(page) {
-  await page.locator('[data-action="openRubricBank"]').click();
+  await clickToolbarItem(page, 'more', 'openRubricBank');
   const bank = page.getByRole('dialog', { name: 'Rubric Bank' });
   await expect(bank).toBeVisible();
   await expect(bank.locator('.rb-row').first()).toBeVisible();
@@ -256,7 +257,7 @@ async function expectRubricBank(page) {
 }
 
 async function expectPrintGrades(page) {
-  await page.getByRole('button', { name: 'Print Grades' }).click();
+  await clickToolbarItem(page, 'more', 'printGrades');
   const dialog = page.getByRole('dialog', { name: 'Print Grades' });
   await expect(dialog).toBeVisible();
   await page.keyboard.press('Escape');
@@ -324,7 +325,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
 
     // Away and Back: no file is asked for twice, and nothing else is asked for.
     await page.evaluate(r => window.Router.navigate(r), '/gradebook');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     await page.goBack();
     await expect(page).toHaveURL(/\/assignments/);
     await expectRubricBank(page);
@@ -342,7 +343,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
     await page.reload();
     await expectRubricBank(page);
     await page.goto('/gradebook?course=sci8');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     await page.goBack();
     await expect(page).toHaveURL(/\/assignments/);
     await expectRubricBank(page);
@@ -355,7 +356,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
     const asked = watchScripts(page);
     await demoClass(page);
     await page.goto('/gradebook?course=sci8');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     await page.waitForLoadState('networkidle');
     expect(printAsked(asked)).toEqual([]);
     await expectPrintGrades(page);
@@ -424,7 +425,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
 
     // Print Grades.
     await page.evaluate(r => window.Router.navigate(r), '/gradebook');
-    await page.getByRole('button', { name: 'Print Grades' }).click();
+    await clickToolbarItem(page, 'more', 'printGrades');
     let ask = page.getByRole('dialog', { name: 'Print Grades Could Not Open' });
     await expect(ask).toContainText('Check your internet connection');
     expect(await page.evaluate(() => typeof window.GradesPrint)).toBe('undefined');
@@ -485,7 +486,7 @@ test.describe('Print, QR and the Rubric Bank, signed in', () => {
       );
     });
     await gotoApp(page, '/gradebook');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     expect(printAsked(asked)).toEqual([]);
     await expectPrintGrades(page);
     await page.evaluate(r => window.Router.navigate(r), '/assignments');

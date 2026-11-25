@@ -24,8 +24,7 @@ function measureBar(page, selector) {
     var visible = el => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0;
     var height = el => Math.round(el.getBoundingClientRect().height);
     var all = Array.prototype.slice.call(bar.querySelectorAll('button, select, input, a.tb-action-btn, .seg'));
-    // The Gradebook's To Grade / To Return / Questions pills are chips (#1120).
-    var isChip = el => /chip|gb-pill-part/.test(el.className);
+    var isChip = el => /chip/.test(el.className);
     var chips = all.filter(el => visible(el) && isChip(el));
     var controls = all.filter(
       el => visible(el) && !isChip(el) && !el.classList.contains('seg-btn') && !el.classList.contains('seg-sm'),
@@ -48,6 +47,7 @@ const PAGES = [
   ['/assignments', '.assess-toolbar'],
   ['/gradebook', '.gb-toolbar'],
   ['/reports', '.report-toolbar'],
+  ['/observations', '.obs-toolbar'],
 ];
 
 for (const [hash, bar] of PAGES) {
@@ -62,26 +62,32 @@ for (const [hash, bar] of PAGES) {
   });
 }
 
-test('the secondary bars are in line with the toolbars, chips 24px', async ({ page }) => {
+test('the Observations bar is a page toolbar like the rest: controls 32px, its filter chips 24px', async ({ page }) => {
+  // It was a slimmer "secondary bar" (a 24px search beside 24px chips) until its Search, Show and chips
+  // took the Assignments bar's style (teacher/obs-toolbar.js).
   await open(page, '/observations');
   await page.locator('.obs-toolbar').waitFor();
-  const obs = await measureBar(page, '.obs-toolbar');
-  expect(obs.inset).toBe('12px');
-  expect(obs.border).toBe(HAIRLINE);
-  expect(obs.chips).toEqual([24]);
-  // The search there is chip height, beside the chips.
-  expect(await page.locator('.obs-search-input').evaluate(el => Math.round(el.getBoundingClientRect().height))).toBe(
-    24,
+  expect(await page.locator('#obs-search-input').evaluate(el => Math.round(el.getBoundingClientRect().height))).toBe(
+    32,
   );
+  await page.locator('.obs-toolbar .atb-filter-btn').click();
+  await page.locator('.obp-row[data-grp="y"]').first().click();
+  await page.keyboard.press('Escape');
+  const obs = await measureBar(page, '.obs-toolbar');
+  expect(obs.controls).toEqual([32]);
+  expect(obs.chips).toEqual([24]);
   // The capture bar's two buttons are the control height.
   const capture = await page.evaluate(() =>
     ['.obsc-add', '.obsc-save-starter'].map(s => Math.round(document.querySelector(s).getBoundingClientRect().height)),
   );
   expect(capture).toEqual([32, 32]);
 
+  // The Gradebook's filters are chips in its own bar (teacher/gradebook-toolbar.js), 24px.
   await page.evaluate(r => window.Router.navigate(r), '/gradebook');
-  await page.locator('[data-action="toggleFilterStrip"]').click();
-  const strip = await measureBar(page, '.gb-filter-strip');
-  expect(strip.inset).toBe('12px');
-  expect(strip.chips).toEqual([24]);
+  await page.locator('.atb-filter-btn').click();
+  await page.locator('.gbf-panel [data-catid]').first().click();
+  await page.keyboard.press('Escape');
+  const filtered = await measureBar(page, '.gb-toolbar');
+  expect(filtered.controls).toEqual([32]);
+  expect(filtered.chips).toEqual([24]);
 });

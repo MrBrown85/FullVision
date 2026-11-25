@@ -4,7 +4,6 @@ window.DashOverview = (function () {
 
   function renderDashToolbar(opts) {
     var activeCourse = opts.activeCourse;
-    var students = opts.students;
     var courseOptions = getPickerCourses(activeCourse)
       .map(function (c) {
         return (
@@ -18,30 +17,52 @@ window.DashOverview = (function () {
       courseOptions +
       '</select>' +
       '<button class="tb-action-btn tb-action-secondary" data-action="openClassManager">Class Settings</button>' +
-      '<div class="dash-toolbar-spacer"></div>' +
-      '<span class="dash-toolbar-label">' +
-      students.length +
-      ' Student' +
-      (students.length !== 1 ? 's' : '') +
-      '</span>' +
       '</div>'
     );
   }
 
-  /* Search, sort and Flagged, in the Students heading beside Cards | Grid. */
+  /* Search, Show (All, Flagged) and sort, in the Students heading beside
+     Cards | Grid: the Assignments bar's grey search field and Show control
+     (Colin, Nov 25). Flagged carries its count in a blue badge while any
+     student is flagged; the sort menu is pushed to the right end. */
   function studentControlsHtml(opts) {
     var sortMode = opts.sortMode;
     var searchQuery = opts.searchQuery;
     var showFlaggedOnly = opts.showFlaggedOnly;
     var flagCount = opts.flagCount;
+    function option(show, label, pressed, extra, badge) {
+      return (
+        '<button type="button" class="seg-btn"' +
+        segAttr(pressed) +
+        ' data-action="dashShow" data-show="' +
+        show +
+        '"' +
+        extra +
+        '><span class="atb-lab" data-t="' +
+        label +
+        '"><span>' +
+        label +
+        '</span></span>' +
+        badge +
+        '</button>'
+      );
+    }
     return (
-      '<div class="dash-search-wrap">' +
-      '<span class="search-icon" aria-hidden="true">' +
-      LINE_ICONS.search +
-      '</span>' +
+      '<div class="atb-search"><div class="atb-field">' +
+      '<span class="assess-search-icon atb-ico atb-ico-search" aria-hidden="true"></span>' +
       '<input class="dash-search-input" type="text" placeholder="Search students\u2026" value="' +
       esc(searchQuery) +
       '" data-action-input="dashSearch" aria-label="Search students">' +
+      '</div></div>' +
+      '<div class="seg atb-show dash-show" role="group" aria-label="Show">' +
+      option('all', 'All', !showFlaggedOnly, '', '') +
+      option(
+        'flagged',
+        'Flagged',
+        showFlaggedOnly,
+        ' aria-label="Show flagged students only' + (flagCount > 0 ? ', ' + flagCount + ' flagged' : '') + '"',
+        flagCount > 0 ? '<span class="atb-badge atb-badge-blue" data-n="flagged">' + flagCount + '</span>' : '',
+      ) +
       '</div>' +
       '<select class="term-select dash-sort-select" data-action="dashSort" aria-label="Sort students">' +
       (opts.extraSort
@@ -68,18 +89,7 @@ window.DashOverview = (function () {
       '<option value="flagged"' +
       (sortMode === 'flagged' ? ' selected' : '') +
       '>Flagged First</option>' +
-      '</select>' +
-      '<button class="dash-filter-chip' +
-      (showFlaggedOnly ? ' active' : '') +
-      '" data-action="toggleFlaggedFilter" aria-pressed="' +
-      showFlaggedOnly +
-      '" aria-label="Show flagged students only' +
-      (flagCount > 0 ? ', ' + flagCount + ' flagged' : '') +
-      '">' +
-      LINE_ICONS.flag +
-      'Flagged' +
-      (flagCount > 0 ? ' (' + flagCount + ')' : '') +
-      '</button>'
+      '</select>'
     );
   }
 

@@ -1,7 +1,10 @@
 // @ts-check
 /* ── assign-show.js — the Assignments page's Show bar ─────────────────
-   All | Submitted 17 | To Grade 6 | Not In 21 on the toolbar, in a class
-   whose student page and Send Work are on. Every number is GraderWork's.
+   All | Submitted | To Grade 6 | To Return 2 | Not In on the toolbar. Submitted,
+   To Grade and Not In show in a class whose student page and Send Work are
+   on; To Return shows in a class that holds grades while a draft waits (or
+   while it is pressed). Every number is GraderWork's. Only To Grade and
+   To Return carry one (Colin, Nov 25: "Three Things").
 
    Each of the three lists only the assessments it counts, and inside each
    card only the students it counts (Colin, Nov 16):
@@ -13,6 +16,11 @@
    teacher opens and closes them freely while one is on (Colin, Nov 17).
    One click turns one on; a second click, or All, lets go and puts back
    the scroll the bar found, even after going from one to another.
+
+   To Return is the page's own filter (the assessments with a draft to
+   return), not one of MODES: the page keeps it, and it shows pressed only
+   while the bar is on All. Choosing another option lets it go; it cannot be
+   combined with another (PageAssignments.setToGradeShow).
 
    While one is on, what it listed stays listed until it is let go: grading
    a student does not pull their row, or the card, out from under the
@@ -170,43 +178,94 @@
     if (total === _totals.tograde) return;
     _totals.tograde = total;
     var n = document.querySelector('.assess-tograde-n');
-    if (n) n.textContent = String(total);
+    if (!n) return;
+    n.textContent = String(total);
+    n.classList.toggle('atb-badge-off', !total);
   }
 
+  /* The drafts to return moved (a return, a grade): the badge follows, and
+     the option comes or goes, alone, when the count crosses 0.
+     ret: { holds, total, pressed } from the page. */
+  /** @param {string} cid @param {{ holds: boolean, total: number, pressed: boolean }} ret */
+  function syncReturn(cid, ret) {
+    var slot = document.querySelector('.atb-show-slot');
+    if (!slot) return;
+    var bar = slot.querySelector('.atb-show');
+    var btn = slot.querySelector('[data-show="toreturn"]');
+    var want = ret.holds && (ret.total > 0 || ret.pressed);
+    if (!bar) {
+      // html-safe: built by barHtml
+      if (want) slot.innerHTML = barHtml(cid, ret);
+    } else if (want && !btn) {
+      var notin = bar.querySelector('[data-show="notin"]');
+      // html-safe: built by _btn
+      (notin || bar).insertAdjacentHTML(notin ? 'beforebegin' : 'beforeend', _btn('toreturn', 'To Return', ret));
+    } else if (!want && btn) {
+      btn.remove();
+      if (bar.children.length < 2) slot.textContent = '';
+    } else if (btn) {
+      var n = btn.querySelector('.assess-toreturn-n');
+      if (n) n.textContent = String(ret.total);
+    }
+  }
+
+  /** @type {Record<string, string>} */
   var TIPS = {
     submitted: 'Show only the assessments with work sent in, and only the students who sent it.',
     tograde: 'Show only the work waiting to be graded, and only the students it is from.',
     notin: 'Show only the students who have not sent work yet. Excused students are left out.',
+    toreturn: 'Show only the assessments with a draft to return.',
   };
 
+  /* One option. ret ({ holds, total, pressed }) is the page's reading of
+     To Return. */
   // html-safe: fixed words and numbers
-  /** @param {string} cid */
-  function barHtml(cid) {
-    if (!G.GraderWork.workOnInClass(cid)) return '';
-    /** @param {string} show @param {string} label */
-    function btn(show, label) {
-      var pressed = _mode === show;
-      var n = show === 'all' ? null : _totals[/** @type {'submitted' | 'tograde' | 'notin'} */ (show)];
-      var tip = show === 'all' ? '' : pressed ? 'Click again to show everything.' : TIPS[show];
-      return (
-        '<button type="button" class="seg-btn"' +
-        G.segAttr(pressed) +
-        ' data-action="setToGradeShow" data-show="' +
-        show +
-        '"' +
-        (tip ? ' title="' + tip + '"' : '') +
-        '>' +
-        label +
-        (n == null ? '' : ' <span class="assess-' + show + '-n">' + n + '</span>') +
-        '</button>'
-      );
-    }
+  /** @param {string} show @param {string} label @param {{ holds: boolean, total: number, pressed: boolean }} [ret] */
+  function _btn(show, label, ret) {
+    var returnOn = !!ret && ret.pressed && _mode === 'all';
+    var pressed = show === 'all' ? _mode === 'all' && !returnOn : show === 'toreturn' ? returnOn : _mode === show;
+    var tip = show === 'all' ? '' : pressed ? 'Click again to show everything.' : TIPS[show];
+    var badge = '';
+    if (show === 'tograde')
+      badge =
+        '<span class="atb-badge atb-badge-blue assess-tograde-n' +
+        (_totals.tograde ? '' : ' atb-badge-off') +
+        '">' +
+        _totals.tograde +
+        '</span>';
+    else if (show === 'toreturn' && ret)
+      badge = '<span class="atb-badge atb-badge-amber assess-toreturn-n">' + ret.total + '</span>';
     return (
-      '<div class="seg seg-sm assess-tograde-seg" role="group" aria-label="Show">' +
-      btn('all', 'All') +
-      btn('submitted', 'Submitted') +
-      btn('tograde', 'To Grade') +
-      btn('notin', 'Not In') +
+      '<button type="button" class="seg-btn"' +
+      G.segAttr(pressed) +
+      ' data-action="setToGradeShow" data-show="' +
+      show +
+      '"' +
+      (tip ? ' title="' + tip + '"' : '') +
+      '><span class="atb-lab" data-t="' +
+      label +
+      '"><span>' +
+      label +
+      '</span></span>' +
+      badge +
+      '</button>'
+    );
+  }
+
+  /* The bar: All and what the class has. Nothing is drawn when there is no
+     option besides All. */
+  // html-safe: fixed words and numbers
+  /** @param {string} cid @param {{ holds: boolean, total: number, pressed: boolean }} [ret] */
+  function barHtml(cid, ret) {
+    var work = G.GraderWork.workOnInClass(cid);
+    var back = !!ret && ret.holds && (ret.total > 0 || ret.pressed);
+    if (!work && !back) return '';
+    return (
+      '<div class="seg atb-show" role="group" aria-label="Show">' +
+      _btn('all', 'All', ret) +
+      (work ? _btn('submitted', 'Submitted', ret) + _btn('tograde', 'To Grade', ret) : '') +
+      (back ? _btn('toreturn', 'To Return', ret) : '') +
+      (work ? _btn('notin', 'Not In', ret) : '') +
       '</div>'
     );
   }
@@ -230,6 +289,7 @@
     listed: listed,
     students: students,
     toGradeTotal: toGradeTotal,
+    syncReturn: syncReturn,
     barHtml: barHtml,
     toGradeChipHtml: toGradeChipHtml,
   };

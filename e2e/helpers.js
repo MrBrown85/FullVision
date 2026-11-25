@@ -1524,6 +1524,24 @@ export async function clickAction(page, action) {
   await page.locator(`[data-action="${action}"]`).first().click();
 }
 
+/* The Assignments toolbar's two menus (teacher/assign-toolbar.js): 'more' is
+   the ⋯, 'new' the ▾ beside + New Assessment. openToolbarMenu opens one (it is
+   left open if it already is) and returns it; toolbarItem returns an item. */
+export async function openToolbarMenu(page, which) {
+  const button = page.locator('[data-atb="' + which + '"]');
+  if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
+  return page.locator('.atb-' + which + '-wrap .assess-menu');
+}
+export async function toolbarItem(page, which, action) {
+  const menu = await openToolbarMenu(page, which);
+  // An action's name, or a selector of its own (Bulk Edit is [data-alv-view="list"]).
+  return menu.locator(action.startsWith('[') ? action : '[data-action="' + action + '"]');
+}
+/** Opens a menu and clicks one of its items by its action. */
+export async function clickToolbarItem(page, which, action) {
+  await (await toolbarItem(page, which, action)).click();
+}
+
 /* Signed in, saveRubrics re-keys the rubrics it was given in place: a new
    rubric and its criteria take the server's ids before it resolves, and
    through the outbox idMap comes back empty
@@ -1561,4 +1579,53 @@ export async function closeCompPicker(page) {
   const dlg = page.locator('#af-comp-dialog');
   if (await dlg.isVisible()) await dlg.locator('[data-action="closeCompPicker"]').click();
   await dlg.waitFor({ state: 'hidden' });
+}
+
+/* The chips on a bar: each is on the row and whole, or off it. A chip that is
+   on the row shows its full label; one that does not fit is left off whole. */
+export async function chipsWhole(page, rowSelector) {
+  return page.evaluate(sel => {
+    const row = document.querySelector(sel);
+    const r = row.getBoundingClientRect();
+    return [...row.querySelectorAll('.atb-chip')].map(c => {
+      const b = c.getBoundingClientRect();
+      const label = c.querySelector('.atb-chip-label');
+      return {
+        text: label.textContent,
+        on: b.top < r.bottom - 1 && b.bottom > r.top + 1,
+        within: b.left >= r.left - 0.5 && b.right <= r.right + 0.5,
+        full: label.scrollWidth <= label.clientWidth + 0.5 && c.scrollWidth <= c.clientWidth + 0.5,
+      };
+    });
+  }, rowSelector);
+}
+
+/* Print Reports' pages move by themselves for a moment after most steps: the
+   page scrolls smoothly to a part, a statement or a change, and rows glide
+   to their new places. A test that reads where a row is during that motion
+   aims at the row beside it, which happened under load on GitHub (Nov 25,
+   2026). Resolves once #rb-preview's scroll and every row's place have stood
+   still for ten frames, and no row is gliding. `place` (optional) is run on
+   every frame first, to scroll the pages where the test wants them. */
+export async function reportPagesStill(page, place) {
+  await page.evaluate(
+    placeSrc =>
+      new Promise(done => {
+        const pane = document.getElementById('rb-preview');
+        const placeFn = placeSrc ? new Function('pane', placeSrc) : null;
+        let still = 0;
+        let last = null;
+        const step = () => {
+          if (placeFn) placeFn(pane);
+          const rows = [...pane.querySelectorAll('tr[data-wrow], tr[data-whead]')];
+          const now = pane.scrollTop + ':' + rows.map(r => Math.round(r.getBoundingClientRect().top)).join(',');
+          still = now === last && !rows.some(r => r.style.transform) ? still + 1 : 0;
+          last = now;
+          if (still >= 10) done();
+          else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }),
+    place || null,
+  );
 }

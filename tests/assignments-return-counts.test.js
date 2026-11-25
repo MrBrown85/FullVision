@@ -112,7 +112,7 @@ function readConfirm() {
 function gradebook() {
   mount(() => {}, { course: CID });
   showCompetencies();
-  const pill = document.querySelector('.gb-to-return');
+  const pill = document.querySelector('.atb-show [data-show="toreturn"] .atb-badge');
   const out = { pill: pill ? parseInt(pill.textContent, 10) : 0, columns: {}, dashed: {} };
   WORK.forEach(aid => {
     const button = Array.from(document.querySelectorAll('.gb-return-drafts')).find(
@@ -186,7 +186,7 @@ async function assignments() {
   openAssignments(() => {}, CID);
   click(document.querySelector('[data-action="expandAllAssess"]'));
   await settled();
-  const pill = document.querySelector('.assess-to-return-btn');
+  const pill = document.querySelector('.atb-show [data-show="toreturn"] .atb-badge');
   const out = { pill: pill ? parseInt(pill.textContent, 10) : 0, cards: {}, marked: {} };
   WORK.forEach(aid => {
     const card = document.getElementById('ac-' + aid);
@@ -353,7 +353,9 @@ describe('the Assignments page, the gradebook and the phone agree', () => {
     document.getElementById('confirm-ok-btn').onclick();
     await settled();
     const n = before.columns[ESSAY].n;
-    expect(parseInt(document.querySelector('.assess-to-return-btn').textContent, 10)).toBe(before.pill - n);
+    expect(parseInt(document.querySelector('.atb-show [data-show="toreturn"] .atb-badge').textContent, 10)).toBe(
+      before.pill - n,
+    );
     closePages();
 
     const after = gradebook();

@@ -11,6 +11,7 @@ labels:
   - Sign Out
   - Download All My Data
   - Class Settings
+  - Open Gradebook
   - Class Actions
   - Download Class Backup
   - Restore from Backup
@@ -52,7 +53,7 @@ Choose **Download All My Data** from the account menu at the top right. FullVisi
 A class backup is a file that holds one class's students, competencies, assessments, scores, comments and observations. Reflections are not included. It is saved on the computer, not in FullVision.
 
 1. Open **Class Settings** from the Dashboard and select the class.
-2. Choose **Class Actions**, then **Download Class Backup**. The browser saves the class as a .json file.
+2. Choose the ⋯ button beside **Open Gradebook** (its name is **Class Actions**), then **Download Class Backup**. The browser saves the class as a .json file.
 
 ![The Class Actions menu in Class Settings with Download Class Backup](img/where-your-data-lives.jpg 'Class Actions in Class Settings. Download Class Backup saves the class as a file.')
 

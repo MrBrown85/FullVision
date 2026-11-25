@@ -36,6 +36,14 @@ labels:
   - Resolved
   - Save
   - Not Observed in 3+ Weeks
+  - Show
+  - All
+  - Open Concerns
+  - Tag
+  - Type
+  - Date
+  - Context
+  - Clear Filters
 next:
   - score-a-student-from-the-gradebook
   - fill-in-the-term-questionnaire
@@ -63,6 +71,12 @@ The observation appears in the list under its date, and the strip clears for the
 
 ![The capture strip with a student chosen and the starter menu open](img/record-observations.jpg 'The + Starter menu lists the most-used starters first.')
 
+## Find Observations
+
+The search box looks in the note, the student's name, the tags, the context and the linked assessment. To see one student, choose their name in the list beside the page; shift-click adds more. The filter button at the end of the search box opens a panel to narrow the list by **Tag**, **Type**, **Date** or **Context**. Tick as many tags, types and contexts as you like (an observation shows if it matches any); **Date** takes one choice. Each filter that is on shows as a chip beside **Show**, and the × on a chip removes it. **Clear Filters** removes them all.
+
+On a card, choose its type to show only that type, or one of its tags to show only that tag.
+
 ## Follow Up on an Observation
 
 A follow-up is a dated entry under an observation, such as a call home about a concern. Follow-ups are for the teacher only: they are never printed, sent home or shown to students.
@@ -71,7 +85,7 @@ A follow-up is a dated entry under an observation, such as a call home about a c
 2. Choose **Called Home**, **Spoke With Student**, **Still Happening** or **Resolved**, and type any details. Either one is enough.
 3. Choose **Save**, or press Enter.
 
-The card then shows how many follow-ups it has and the date of the last one; choose that line to show or hide them. Choose a follow-up to change or delete it. A concern with a **Resolved** follow-up is closed. While a class has concerns that are not closed, a button at the start of the filters counts them, such as "2 Open Concerns"; choose it to list only those.
+The card then shows how many follow-ups it has and the date of the last one; choose that line to show or hide them. Choose a follow-up to change or delete it. A concern with a **Resolved** follow-up is closed. The **Open Concerns** option beside the search box counts the concerns that are not closed, such as 2; choose it to list only those, and choose it again (or **All**) to see everything.
 
 Deleting an observation also deletes its follow-ups. The question before the delete says how many.
 

@@ -7,6 +7,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { openToolbarMenu } from './helpers.js';
 
 const SHOTS = process.env.FV_SHOTS || '';
 const shot = (page, name) => (SHOTS ? page.screenshot({ path: SHOTS + '/' + name + '.png' }) : null);
@@ -78,7 +79,9 @@ async function twoClasses(page) {
 }
 
 const open = async page => {
-  await page.getByRole('button', { name: 'Add From Another Class' }).click();
+  // It is an item of the ▾ beside + New Assessment.
+  const menu = await openToolbarMenu(page, 'new');
+  await menu.getByRole('menuitem', { name: 'Add From Another Class' }).click();
   await expect(page.locator('.afrom-row').first()).toBeVisible();
 };
 const row = (page, id) => page.locator('.afrom-row[data-afrom-row="' + id + '"]');
@@ -188,10 +191,10 @@ test('pick from another class: columns, search, Select All, the count on Add, an
   await page.keyboard.press('Space');
   await expect(addBtn(page)).toHaveText('Add 2');
 
-  // Escape closes and gives the focus back to the toolbar's button; nothing was added.
+  // Escape closes and gives the focus back to the toolbar's ▾; nothing was added.
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Add From Another Class' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'More Ways to Add' })).toBeFocused();
   expect(await page.evaluate(() => getAssessments('sci8b').length)).toBe(2);
 
   // Add 2: the copies land in this class, linked, with no scores; the Draft is a Draft.

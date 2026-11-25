@@ -16,7 +16,6 @@
 
   var REFRESH_MS = 15000;
   var FACES_LINE = "Check the photo for students' faces before you post.";
-  var REACT_HINT = 'Students see Got It, Done and I Have a Question. Only you see who chose what.';
 
   var _cid = '';
   var _alive = false;
@@ -56,7 +55,6 @@
   var returnedWhen = F.returnedWhen;
   var timeLabel = F.timeLabel;
   var kindLabel = F.kindLabel;
-  var canSeeText = F.canSeeText;
   var headerNotes = F.headerNotes;
   var _focusSpec = F.focusSpec;
   var _controlOf = F.controlOf;
@@ -161,10 +159,10 @@
       );
     }
     var notes = headerNotes(meta, _pausedNames());
-    var s = esc(canSeeText(meta.can_see));
-    if (notes.noCard) s += ' · <a href="' + esc(_manageHref()) + '">' + esc(notes.noCard) + '</a>';
-    if (notes.paused) s += ' · ' + esc(notes.paused);
-    return h + '<span class="bulletin-sub">' + s + '</span>';
+    var parts = [];
+    if (notes.noCard) parts.push('<a href="' + esc(_manageHref()) + '">' + esc(notes.noCard) + '</a>');
+    if (notes.paused) parts.push(esc(notes.paused));
+    return parts.length ? h + '<span class="bulletin-sub">' + parts.join(' · ') + '</span>' : h;
   }
 
   function _isDemo() {
@@ -186,8 +184,6 @@
 
   /* ── Composer ────────────────────────────────────────────────── */
 
-  var ICON_FILE =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg>';
   var ICON_LINK =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 
@@ -281,12 +277,8 @@
       '<button type="button" class="bulletin-bar-open" data-bulletin="open">Write to ' +
       klass +
       '…</button>' +
-      '<button type="button" class="bulletin-icon-btn" data-bulletin="open-file" aria-label="Add a File" title="Add a File">' +
-      ICON_FILE +
-      '</button>' +
-      '<button type="button" class="bulletin-icon-btn" data-bulletin="open-link" aria-label="Add a Link" title="Add a Link">' +
-      ICON_LINK +
-      '</button></div>';
+      '<button type="button" class="tb-action-btn tb-action-secondary" data-bulletin="open-file">Add a File</button>' +
+      '<button type="button" class="tb-action-btn tb-action-secondary" data-bulletin="open-link">Add a Link</button></div>';
     // The open box.
     h +=
       '<div class="bulletin-card bulletin-compose' +
@@ -402,23 +394,27 @@
       '>' +
       esc(d.note) +
       '</span>';
+    h +=
+      '<div class="bulletin-react-row"><span class="bulletin-react-label" id="bulletin-react-label">Let Students React</span>' +
+      (d.reactions
+        ? '<span class="bulletin-react-chip">Got It</span><span class="bulletin-react-chip">Done</span><span class="bulletin-react-chip">I Have a Question</span>'
+        : '') +
+      '<button type="button" class="bulletin-sw" role="switch" data-bulletin="reactions" aria-labelledby="bulletin-react-label" aria-checked="' +
+      d.reactions +
+      '"><span class="bulletin-sw-knob"></span></button></div>';
     h += '<div class="bulletin-actions">';
     if (!editing) {
-      if (!d.linkOn)
-        h += '<button type="button" class="bulletin-text-btn" data-bulletin="add-link">Add a Link</button>';
-      h += '<button type="button" class="bulletin-text-btn" data-bulletin="add-file">Add a File</button>';
+      var tint = '<button type="button" class="tb-action-btn tb-action-secondary" data-bulletin="';
+      h += tint + 'add-file">Add a File</button>';
+      if (!d.linkOn) h += tint + 'add-link">Add a Link</button>';
     }
     h +=
-      '<button type="button" class="bulletin-switch" role="switch" data-bulletin="reactions" aria-checked="' +
-      d.reactions +
-      '"><span class="bulletin-switch-track" aria-hidden="true"><span class="bulletin-switch-knob"></span></span>Let Students React</button>' +
-      '<span class="bulletin-actions-end"><button type="button" class="btn btn-ghost" data-bulletin="cancel">Cancel</button>' +
-      '<button type="button" class="btn btn-primary" id="bulletin-post" data-bulletin="post"' +
+      '<span class="bulletin-actions-end"><button type="button" class="tb-action-btn tb-action-grey" data-bulletin="cancel">Cancel</button>' +
+      '<button type="button" class="tb-action-btn bulletin-post-btn" id="bulletin-post" data-bulletin="post"' +
       (_canPost(d) ? '' : ' disabled') +
       '>' +
       (editing ? 'Save' : d.busy ? 'Posting…' : 'Post') +
       '</button></span></div>';
-    h += '<span class="bulletin-hint">' + esc(REACT_HINT) + '</span>';
     h +=
       '<input type="file" class="bulletin-file-input" id="bulletin-file-input" accept="image/*,.heic,.heif,application/pdf" multiple hidden>';
     h += '</fieldset></div>';
@@ -777,7 +773,7 @@
     return (
       '<a class="bulletin-linkcard" href="' +
       esc(shown.href) +
-      '" target="_blank" rel="noopener noreferrer"><span class="bulletin-icon-btn" aria-hidden="true">' +
+      '" target="_blank" rel="noopener noreferrer"><span class="bulletin-linkcard-icon" aria-hidden="true">' +
       ICON_LINK +
       '</span><span class="bulletin-linkcard-text"><span>' +
       esc(b.link_title || shown.host) +
@@ -1568,7 +1564,6 @@
       timeLabel: timeLabel,
       kindLabel: kindLabel,
       dateLabel: dateLabel,
-      canSeeText: canSeeText,
       headerNotes: headerNotes,
       returnedWhen: returnedWhen,
       refusal: _refusal,

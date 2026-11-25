@@ -9,6 +9,7 @@ pages:
 demo: /gradebook
 labels:
   - Gradebook
+  - More
   - Print Grades
   - Term
   - All Time
@@ -40,13 +41,14 @@ shots:
   - file: print-grades.jpg
     route: /gradebook
     steps:
-      - click role=button[name="Print Grades"]
+      - click role=button[name="More"]
+      - click role=menuitem[name="Print Grades"]
     clip: 160,100,1120,700
 ---
 
 ## Steps
 
-1. Open the **Gradebook** and choose **Print Grades**.
+1. Open the **Gradebook**, open **More**, the three dots at the right of the toolbar, and choose **Print Grades**.
 2. Set what the sheet holds:
 
 - **Term**: **All Time**, one term to date, or **Custom Dates**.

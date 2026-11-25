@@ -15,7 +15,8 @@ test.setTimeout(120_000);
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
 const LETTER = 'Letter paper (8.5 × 11 in).';
-const LEGAL = 'Load Legal paper (8.5 × 14 in). On Letter paper these pages print shrunken.';
+// The rest, which setting to change in the browser's print box, is the step under it (e2e/print-legal.spec.js).
+const LEGAL = 'Load Legal paper (8.5 × 14 in).';
 const STUDENTS = 27;
 
 async function openReports(page, paper) {

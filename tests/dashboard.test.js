@@ -19,7 +19,7 @@ describe('dashboard-helpers', () => {
       globalThis.isCourseArchived = cid => !!(COURSES[cid] && COURSES[cid].archived);
     });
 
-    it('renders only non-archived course options and the count', () => {
+    it('renders only non-archived course options and Class Settings, with no count', () => {
       const html = DashOverview.renderDashToolbar({
         activeCourse: 'c1',
         students: [{ id: 's1' }, { id: 's2' }],
@@ -27,14 +27,16 @@ describe('dashboard-helpers', () => {
 
       expect(html).toContain('Alpha');
       expect(html).not.toContain('Archived');
-      expect(html).toContain('2 Students');
+      expect(html).toContain('data-action="openClassManager"');
+      expect(html).not.toContain('Students');
+      expect(html).not.toContain('dash-toolbar-label');
       expect(html).not.toContain('dash-search-input');
       // No term picker: the dashboard always shows the year so far (Colin, 2026-11-03).
       expect(html).not.toContain('data-action="setTerm"');
       expect(html).not.toContain('All Time');
     });
 
-    it('puts search, sort and Flagged in the Students heading with their state', () => {
+    it('puts search, Show and sort in the Students heading with their state', () => {
       const html = DashOverview.studentControlsHtml({
         sortMode: 'overall-desc',
         searchQuery: 'noor',
@@ -44,7 +46,25 @@ describe('dashboard-helpers', () => {
 
       expect(html).toContain('value="overall-desc" selected');
       expect(html).toContain('value="noor"');
-      expect(html).toContain('Flagged (3)');
+      // Show: Flagged is pressed and carries its count in a badge; All is not.
+      expect(html).toMatch(/data-action="dashShow" data-show="all"/);
+      expect(html).toMatch(/aria-pressed="true" data-action="dashShow" data-show="flagged"/);
+      expect(html).toContain('aria-label="Show flagged students only, 3 flagged"');
+      expect(html).toContain('<span class="atb-badge atb-badge-blue" data-n="flagged">3</span>');
+      expect(html).not.toContain('Flagged (3)');
+      expect(html).not.toContain('dash-filter-chip');
+    });
+
+    it('draws no badge while nothing is flagged', () => {
+      const html = DashOverview.studentControlsHtml({
+        sortMode: 'last-asc',
+        searchQuery: '',
+        showFlaggedOnly: false,
+        flagCount: 0,
+      });
+      expect(html).toContain('data-show="flagged"');
+      expect(html).not.toContain('atb-badge');
+      expect(html).toContain('aria-label="Show flagged students only"');
     });
 
     it('shows a grid column sort as the selected line of the sort menu', () => {

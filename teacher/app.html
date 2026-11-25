@@ -51,6 +51,7 @@
     <link rel="stylesheet" href="/s/bulletins.css" />
     <link rel="stylesheet" href="/s/quiz.css" />
     <link rel="stylesheet" href="/teacher/grades-print.css" />
+    <link rel="stylesheet" href="/teacher/print-legal.css" />
     <!-- Last, so it wins: an iPad held upright only (html.fv-tablet, set by shared/device.js). -->
     <link rel="stylesheet" href="/teacher/tablet.css" />
     <!-- login.css omitted: only needed on login.html, its body{} rules conflict with SPA layout -->
@@ -166,11 +167,13 @@
     <script src="/s/question-kinds.js"></script>
     <script src="/s/quiz-model.js"></script>
     <script src="/s/quiz-view.js"></script>
+    <script src="/teacher/focus-back.js"></script>
     <script src="/teacher/ui.js"></script>
     <!-- seed-data.js (113KB) lazy-loaded by loadSeedIfNeeded() — only fetched for new accounts -->
     <!-- Submodules (loaded before their parent page modules) -->
     <script src="/teacher/report-scores.js"></script>
     <script src="/teacher/drafts-before-print.js"></script>
+    <script src="/teacher/print-legal.js"></script>
     <script src="/teacher/report-blocks.js"></script>
     <script src="/teacher/comment-realiser.js"></script>
     <script src="/teacher/comment-lint.js"></script>
@@ -268,6 +271,7 @@
     <script src="/teacher/markup.js"></script>
     <script src="/teacher/expand-motion.js"></script>
     <script src="/teacher/assign-show.js"></script>
+    <script src="/teacher/assign-toolbar.js"></script>
     <script src="/teacher/grade-change.js"></script>
     <script src="/teacher/assign-list.js"></script>
     <script src="/teacher/rubric-words.js"></script>
@@ -281,10 +285,12 @@
     <script src="/teacher/page-student.js"></script>
     <script src="/teacher/student-edit-dialog.js"></script>
     <script src="/teacher/student-groups.js"></script>
+    <script src="/teacher/gradebook-toolbar.js"></script>
     <script src="/teacher/page-gradebook.js"></script>
     <script src="/teacher/gradebook-chrome.js"></script>
     <script src="/teacher/gradebook-csv.js"></script>
     <script src="/teacher/obs-roster.js"></script>
+    <script src="/teacher/obs-toolbar.js"></script>
     <script src="/teacher/page-observations.js"></script>
     <script src="/teacher/page-starters.js"></script>
     <script src="/teacher/bulletin-share.js"></script>

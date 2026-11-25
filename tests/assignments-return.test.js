@@ -21,9 +21,12 @@
  *    checkout of origin/main with only this file added:
  *      UPDATE_ASSIGNMENTS_SNAPSHOT=1 npx vitest run tests/assignments-return.test.js
  *    Run that only on code from before a change the page is meant to keep
- *    out; never to make a failing comparison pass.
- * 2. With the switch on and When I Return Them, on the page: the toolbar's
- *    "N to return" and its filter; a card's chips and Return N Graded, which
+ *    out; never to make a failing comparison pass. The toolbar's seven pictures
+ *    were written again on Nov 25 2026 for the "Three Things" toolbar
+ *    (docs/DECISIONS.md); every other picture is still the old one, the
+ *    category pill put back as the span it was (see PILL below).
+ * 2. With the switch on and When I Return Them, on the page: the Show bar's
+ *    To Return option and its filter; a card's chips and Return N Graded, which
  *    asks first; the Draft or Returned mark on every kind of row; grading in
  *    place; one student's Return beside the Draft mark; pair work; Missing
  *    and Excused; and that no number moves. In the grader dialog: Show and
@@ -373,12 +376,24 @@ describe('with the build switch off the Assignments page is what it was', () => 
   // other byte must still be what it was. The snapshot is not re-recorded.
   const ADD_WORK =
     /<button type="button" role="menuitem" class="assess-menu-item assess-add-class-btn" data-action="openAddWorkClass" [^>]*>[\s\S]*?<\/button>/g;
-  // Pin moved on purpose (Colin, Nov 24): + New Quiz sits beside + New Assessment where the
-  // class's Student Page is on. It alone is taken out before comparing.
-  const NEW_QUIZ = /<button class="tb-action-btn tb-action-secondary" data-action="newQuiz">\+ New Quiz<\/button>/g;
+  // Pin moved on purpose (Colin, Nov 24; Nov 25): New Quiz is an item of the toolbar's ▾ menu where
+  // the class's Student Page is on, and the ▾ is drawn only when its menu has an item. The item
+  // alone is taken out before comparing, with the ▾ when it was the only one.
+  const NEW_QUIZ =
+    /<button type="button" role="menuitem" class="assess-menu-item" data-action="newQuiz"><span>New Quiz<\/span><\/button>/g;
+  const EMPTY_NEW_MENU =
+    /<div class="assess-menu-wrap atb-new-wrap"><button [^>]*><svg[\s\S]*?<\/svg><\/button><div class="assess-menu" role="menu" aria-label="More Ways to Add" hidden><\/div><\/div>/;
+  // Pin moved on purpose (Colin, Nov 25, "Three Things"): the category pill is a button, and the
+  // toolbar's pictures were written again (they are the toolbar keys below). The pill is put back
+  // as the span it was before comparing, so every other byte of the list is still what it was.
+  const PILL =
+    /<button type="button" data-action="toggleCategoryFilter" data-catid="[^"]*" aria-pressed="(?:true|false)"( class="type-badge type-badge-s"[^>]*>[^<]*)<\/button>/g;
   const same = now => {
     const stripped = {};
-    Object.keys(now).forEach(name => (stripped[name] = String(now[name]).replace(ADD_WORK, '').replace(NEW_QUIZ, '')));
+    Object.keys(now).forEach(name => {
+      const html = String(now[name]).replace(ADD_WORK, '').replace(NEW_QUIZ, '').replace(PILL, '<span$1</span>');
+      stripped[name] = EMPTY_NEW_MENU.test(html) ? html.replace(EMPTY_NEW_MENU, '').replace(' atb-split', '') : html;
+    });
     const packed = pack(stripped);
     expect(Object.keys(packed)).toEqual(Object.keys(before));
     Object.keys(before).forEach(name => expect(packed[name] === before[name], name).toBe(true));
@@ -472,8 +487,10 @@ const text = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
 const today = () => formatShortDate('2026-11-10T18:00:00.000Z');
 const openPage = (params, more) => openAssignments(seedWith({ config: HELD, ...more }), CID, params);
 const openCard = aid => openPage({ open: aid });
-const pill = () => document.querySelector('.assess-to-return-btn');
-const pillCount = () => (pill() ? parseInt(pill().textContent, 10) : 0);
+// To Return on the Show bar: its badge holds the drafts on screen.
+const pill = () => document.querySelector('.atb-show [data-show="toreturn"]');
+const pillCount = () => (pill() ? parseInt(pill().querySelector('.atb-badge').textContent, 10) : 0);
+const pillText = () => (pill() ? pillCount() + ' to return' : null);
 const toReturnChip = aid => text(inCard(aid, '.assess-to-return'));
 const returnedChip = aid => text(inCard(aid, '.assess-returned'));
 const cardReturn = aid => inCard(aid, '.assess-return-btn');
@@ -519,7 +536,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     openPage();
     await settled();
     expect(pill()).toBe(null);
-    expect(document.querySelector('.assess-to-return-slot')).not.toBe(null);
+    expect(document.querySelector('.atb-show-slot')).not.toBe(null);
     expect(document.querySelector('#main .assess-to-return')).toBe(null);
     expect(document.querySelector('#main .assess-return-btn')).toBe(null);
     // Ava and Eli have an Essay grade from before the switch came on.
@@ -540,10 +557,11 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
   it('counts the drafts on the toolbar and on each card, as GradeState does', async () => {
     openGraded();
     await settled();
-    expect(text(pill())).toBe('8 to return');
+    expect(pillText()).toBe('8 to return');
     expect(pillCount()).toBe(GradeState.draftsWaiting(CID));
     expect(pill().getAttribute('aria-pressed')).toBe('false');
     expect(pill().getAttribute('title')).toBe('Show only the assessments with a draft to return.');
+    expect(pill().textContent.replace(/\s+/g, ' ').trim()).toBe('To Return8');
     WORK.forEach(aid => {
       const n = drafts(aid).length;
       expect(toReturnChip(aid), aid).toBe(n ? n + ' to return' : null);
@@ -626,18 +644,18 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     expect(toReturnChip(ESSAY)).toBe('1 to return');
     expect(returnedChip(ESSAY)).toBe('2 returned');
     expect(text(cardReturn(ESSAY))).toBe('Return 1 Graded');
-    expect(text(pill())).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     // A returned grade changed is a draft again; put back, it is not.
     click(levelOf(tagRow(ESSAY, AVA, QUESTION), 4));
     await settled();
     expect(mark(ESSAY, AVA)).toBe('Draft');
     expect(toReturnChip(ESSAY)).toBe('2 to return');
     expect(returnedChip(ESSAY)).toBe('1 returned');
-    expect(text(pill())).toBe('2 to return');
+    expect(pillText()).toBe('2 to return');
     click(levelOf(tagRow(ESSAY, AVA, QUESTION), 3));
     await settled();
     expect(mark(ESSAY, AVA)).toBe('Returned');
-    expect(text(pill())).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     // The same level clicked again clears it: nothing is left to return.
     click(levelOf(tagRow(ESSAY, BEN, QUESTION), 3));
     await settled();
@@ -680,7 +698,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     typeAndLeave(pointsBox(QUIZ, CARA), '6');
     await settled();
     expect(mark(QUIZ, CARA)).toBe('Draft');
-    expect(text(pill())).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     // The Overall Comment saves 800 ms after the last key, with no event.
     const box = inCard(QUIZ, '.rsg-overall-comment[data-sid="' + BEN + '"]');
     box.value = 'Check question 4.';
@@ -690,7 +708,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     await vi.advanceTimersByTimeAsync(900);
     expect(GradeState.stateOf(CID, BEN, QUIZ)).toBe('draft');
     expect(mark(QUIZ, BEN)).toBe('Draft');
-    expect(text(pill())).toBe('2 to return');
+    expect(pillText()).toBe('2 to return');
   });
 
   it('Return N Graded on a card asks first, naming who gets their grade; Cancel returns nothing', async () => {
@@ -710,7 +728,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     expect(returns).not.toHaveBeenCalled();
     expect(drafts(ESSAY).length).toBe(5);
     expect(document.activeElement).toBe(button);
-    expect(text(pill())).toBe('8 to return');
+    expect(pillText()).toBe('8 to return');
 
     click(cardReturn(ESSAY));
     confirmOk();
@@ -722,7 +740,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     expect(cardReturn(ESSAY)).toBe(null);
     expect(toReturnChip(ESSAY)).toBe(null);
     expect(returnedChip(ESSAY)).toBe('5 returned');
-    expect(text(pill())).toBe('3 to return');
+    expect(pillText()).toBe('3 to return');
     expect(pillCount()).toBe(GradeState.draftsWaiting(CID));
     // The button went with the drafts: the card's next button has the focus.
     expect(document.activeElement).toBe(inCard(ESSAY, '.assess-header-actions button'));
@@ -789,19 +807,17 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     await settled();
     expect(listed().sort()).toEqual([ESSAY, QUIZ, TALK].sort());
     expect(pill().getAttribute('aria-pressed')).toBe('true');
-    expect(pill().className).toContain('active');
-    expect(text(pill())).toBe('8 to return ×');
-    expect(pill().getAttribute('title')).toBe(
-      'Showing only the assessments with a draft to return. Click to show everything.',
-    );
-    // The pill keeps the keyboard.
+    // All lets go while To Return is pressed.
+    expect(document.querySelector('.atb-show [data-show="all"]').getAttribute('aria-pressed')).toBe('false');
+    expect(pill().getAttribute('title')).toBe('Click again to show everything.');
+    // The option keeps the keyboard.
     expect(document.activeElement).toBe(pill());
     // A card with nothing left to return leaves the list.
     click(cardReturn(QUIZ));
     confirmOk();
     await settled();
     expect(listed().sort()).toEqual([ESSAY, TALK].sort());
-    expect(text(pill())).toBe('7 to return ×');
+    expect(pillText()).toBe('7 to return');
     click(pill());
     await settled();
     expect(listed().length).toBe(8);
@@ -829,7 +845,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     fire(box, 'input');
     await vi.advanceTimersByTimeAsync(400);
     expect(listed()).toEqual([QUIZ]);
-    expect(text(pill())).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
   });
 
   describe('with one student open', () => {
@@ -838,7 +854,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
       await settled();
       const returns = vi.spyOn(Grader, 'returnGrades');
       // The count is this student's drafts; the cards offer no Return N Graded.
-      expect(text(pill())).toBe('1 to return');
+      expect(pillText()).toBe('1 to return');
       expect(document.querySelector('#main .assess-return-btn')).toBe(null);
       expect(toReturnChip(ESSAY)).toBe('1 to return');
       expect(returnedChip(ESSAY)).toBe(null);
@@ -874,7 +890,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
       const row = inlineRow(ESSAY);
       expect(text(row.querySelector('.grader-draft-mark'))).toBe('Draft');
       expect(text(row.querySelector('.grader-draft-still'))).toBe('Ava still sees the grade you returned.');
-      expect(text(pill())).toBe('1 to return');
+      expect(pillText()).toBe('1 to return');
       // Returned, then changed again: the line has the date.
       click(inlineReturn(ESSAY));
       await settled();
@@ -919,7 +935,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
       expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
       // Ben's Essay and Quiz drafts are untouched.
       expect(GradeState.stateOf(CID, BEN, ESSAY)).toBe('draft');
-      expect(text(pill())).toBe('2 to return');
+      expect(pillText()).toBe('2 to return');
       returns.mockRestore();
     });
 
@@ -993,9 +1009,10 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     expect(toolbar() + main()).not.toMatch(/to return|returned|ret-mark|assess-return|Draft|grader-return/);
     const returns = vi.spyOn(Grader, 'returnGrades');
     // A made-up button for each new action: nothing is returned or drawn.
-    ['toggleToReturn', 'returnDrafts', 'returnOne'].forEach(action => {
+    ['setToGradeShow', 'returnDrafts', 'returnOne'].forEach(action => {
       const btn = document.createElement('button');
       btn.setAttribute('data-action', action);
+      btn.setAttribute('data-show', 'toreturn');
       btn.setAttribute('data-aid', ESSAY);
       btn.setAttribute('data-sid', BEN);
       card(ESSAY).appendChild(btn);
@@ -1306,7 +1323,7 @@ describe.skipIf(UPDATE)('signed in, in a class the server says holds grades', ()
     openGraded();
     expandAll();
     await settled();
-    expect(text(pill())).toBe('8 to return');
+    expect(pillText()).toBe('8 to return');
     expect(pillCount()).toBe(GradeState.draftsWaiting(CID));
     expect(toReturnChip(ESSAY)).toBe('5 to return');
     expect(text(cardReturn(ESSAY))).toBe('Return 5 Graded');
@@ -1349,7 +1366,7 @@ describe.skipIf(UPDATE)('signed in, in a class the server says holds grades', ()
     // Returned on this device at once.
     expect(drafts(ESSAY)).toEqual([]);
     EVERYONE.forEach(sid => expect(mark(ESSAY, sid), sid).toBe('Returned ' + today()));
-    expect(text(pill())).toBe('3 to return');
+    expect(pillText()).toBe('3 to return');
   });
 
   it('with one student open, Return beside the Draft mark is one click and one return', async () => {

@@ -470,7 +470,11 @@
     function close() {
       overlay.remove();
       document.removeEventListener('keydown', onKey, true);
-      var back = trigger && trigger.isConnected ? trigger : document.querySelector('[data-action="addFromClass"]');
+      // The toolbar's ▾, when the trigger was an item of its menu (a closed menu takes no focus).
+      var back =
+        trigger && trigger !== document.body && trigger.isConnected && trigger.getClientRects().length
+          ? trigger
+          : document.querySelector('[data-atb="new"]');
       try {
         if (back) /** @type {HTMLElement} */ (back).focus();
       } catch (e) {

@@ -872,6 +872,7 @@ window.PageReports = (function () {
         return st.html;
       })
       .join('');
+    ReportSheets.ruleOldCopy(preview);
     preview.classList.add('report-sheets-on');
     preview.classList.toggle('report-fitmap', studioView === 'all');
     preview.classList.toggle('studio-all', studioView === 'all');
@@ -902,6 +903,28 @@ window.PageReports = (function () {
     return reportPrintTitle(activeCourse, chosen.map(fullName), ReportBlocks.reportContext().termLabel);
   }
 
+  /* After a print on Legal: did the pages come out small? Use Letter
+     Instead switches the class to Letter and opens the Print box again
+     (teacher/print-legal.js). */
+  function _afterPrintPaper(paper) {
+    if (typeof PrintLegal === 'undefined') return;
+    PrintLegal.after({
+      paper: paper,
+      useLetter: function () {
+        if (!_mounted) return;
+        if (viewingIssue) {
+          // A copy keeps the paper it was laid out for: back to the live reports.
+          viewingIssue = null;
+          var sel = document.getElementById('report-copy');
+          if (sel) sel.value = '';
+        }
+        setPaper('letter');
+        renderReports();
+        openIssueDialog();
+      },
+    });
+  }
+
   /* Print This Copy prints the whole copy, every student in it, whatever
      the canvas shows: like _printNow, the canvas shows Everyone for the
      print and goes back afterwards. */
@@ -929,9 +952,14 @@ window.PageReports = (function () {
         rec.termLabel,
       ),
     );
+    var asked = false;
     var restore = function () {
       window.removeEventListener('afterprint', restore);
       restoreTitle();
+      if (!asked) {
+        asked = true;
+        _afterPrintPaper(rec.paper);
+      }
       if (!wasOne) return;
       wasOne = false;
       studioView = 'one';
@@ -961,9 +989,15 @@ window.PageReports = (function () {
         renderReports();
       }
       var restoreTitle = setPrintTitle(_liveReportTitle());
+      var paper = reportPaper;
+      var asked = false;
       var restore = function () {
         window.removeEventListener('afterprint', restore);
         restoreTitle();
+        if (!asked) {
+          asked = true;
+          _afterPrintPaper(paper);
+        }
         if (wasOne) {
           studioView = 'one';
           renderReports();
@@ -1028,6 +1062,9 @@ window.PageReports = (function () {
     html += '<span class="issue-k">Sheets</span><span id="issue-sheets" aria-live="polite">';
     html += (wait ? ReportPrintPaper.COUNTING : ReportPrintPaper.sheetsLine(sheets)) + '</span>';
     html += ReportPrintPaper.rowsHtml(wait || reportPaper) + '</div>';
+    var legal = (wait || reportPaper) === 'legal';
+    // The print box may open on Letter whatever the page asks (teacher/print-legal.js).
+    if (legal && typeof PrintLegal !== 'undefined') html += PrintLegal.stepHtml();
     html += '<fieldset class="issue-group"><legend>Which Students</legend>';
     html +=
       '<label class="issue-option"><input type="radio" name="issue-who" value="all" checked><span>All ' +
@@ -1091,7 +1128,10 @@ window.PageReports = (function () {
     }
     html +=
       '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-issue="cancel">Cancel</button>';
-    html += '<button type="button" class="confirm-ok primary" data-issue="go">Print</button></div>';
+    html +=
+      '<button type="button" class="confirm-ok primary" data-issue="go">' +
+      (legal ? 'Print on Legal' : 'Print') +
+      '</button></div>';
     html += '</div>';
     return html;
   }
@@ -1101,6 +1141,7 @@ window.PageReports = (function () {
   var _restoreOneAfterPrint = false;
   function openIssueDialog() {
     closeIssueDialog();
+    if (typeof PrintLegal !== 'undefined') PrintLegal.close();
     // Laid out from the data now, as on every print path: what prints and is saved.
     if (studioView === 'one') {
       studioView = 'all';
@@ -1706,6 +1747,7 @@ window.PageReports = (function () {
 
   /* -- Delegated click handler ---------------------------- */
   function _handleClick(e) {
+    if (ReportToolbar.click(e)) return;
     if (!e.target.closest('.student-picker')) {
       var dd = document.getElementById('picker-dropdown');
       if (dd) dd.classList.remove('open');
@@ -1852,7 +1894,8 @@ window.PageReports = (function () {
         tqCopyNarrative();
       },
       tqApproveNext: function () {
-        RQ.tqApproveNext();
+        if (ReportToolbar.printing()) switchTab('progress');
+        else RQ.tqApproveNext();
       },
       tqCommentTab: function () {
         RQ.tqCommentTab(el.dataset.tab);
@@ -1950,6 +1993,7 @@ window.PageReports = (function () {
 
   /* A key press goes to the open tab, when it listens for keys. */
   function _handleTabKey(e) {
+    if (ReportToolbar.keydown(e)) return;
     var t = _tab();
     if (t.key) t.key(e);
   }
@@ -2063,7 +2107,7 @@ window.PageReports = (function () {
     initSidebarToggle();
 
     // Render the toolbar + output container into main
-    // html-safe: TOOLBAR_HTML is literal markup at the foot of this file, around _tabBarHtml, which is checked
+    // html-safe: TOOLBAR_HTML is ReportToolbar.html's fixed markup around _tabBarHtml, which is checked
     document.getElementById('main').innerHTML = TOOLBAR_HTML;
 
     reportPaper = _loadPaper(activeCourse);
@@ -2150,10 +2194,7 @@ window.PageReports = (function () {
   }
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
-  var TOOLBAR_HTML =
-    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        ' +
-    _tabBarHtml(TABS) +
-    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous Student" aria-label="Previous Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next Student" aria-label="Next Student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Parts</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+  var TOOLBAR_HTML = ReportToolbar.html(_tabBarHtml(TABS));
 
   /* -- Public API ----------------------------------------- */
   return {

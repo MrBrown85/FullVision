@@ -890,8 +890,7 @@ window.ReportQuestionnaire = (function () {
     var ready = students.filter(function (s) {
       return _approved(s.id);
     }).length;
-    _readyText = ready + ' of ' + students.length + ' Ready';
-    _syncReadyLine();
+    ReportToolbar.setReady(ready, students.length);
     var cur = _current();
     var termId = getTermId();
     var annotate = function (sid) {
@@ -922,8 +921,6 @@ window.ReportQuestionnaire = (function () {
     });
     document.body.classList.add('qn-roster');
   }
-  /* The toolbar's Ready count. */
-  var _readyText = '';
   // While a sentence no longer matches the gradebook: 'draft' (its row
   // shows Keep as Written) or 'approved' (the card shows Keep as Approved).
   var _claimsBlocked = '';
@@ -931,10 +928,6 @@ window.ReportQuestionnaire = (function () {
     draft: 'Approve and Next is off until you pick Use the New Sentence or Keep as Written.',
     approved: 'Approve and Next is off until you pick Keep as Approved or Use the New Sentence.',
   };
-  function _syncReadyLine() {
-    var line = document.getElementById('tq-ready');
-    if (line) line.textContent = _claimsBlocked ? CLAIMS_LINE[_claimsBlocked] : _readyText;
-  }
   function restoreRoster() {
     if (typeof setSidebarAnnotator === 'function') setSidebarAnnotator(null);
     document.body.classList.remove('qn-roster');
@@ -1835,11 +1828,11 @@ window.ReportQuestionnaire = (function () {
     var o = document.getElementById(INFO_ID);
     if (!o) return;
     o.remove();
-    var b = document.getElementById('tq-info-btn');
+    var b = document.getElementById('tq-more-btn');
     if (b) b.focus();
   }
 
-  /* The Edit Student icon: the Student Dashboard's own dialog, for the
+  /* ⋯'s Edit Student: the Student Dashboard's own dialog, for the
      student on screen. */
   function tqEditStudent() {
     var st = _current();
@@ -2699,7 +2692,6 @@ window.ReportQuestionnaire = (function () {
     var blocked = approveBlockers(st);
     var approvedNow = !!st && !!(getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).approvedAt;
     _claimsBlocked = blocked.indexOf('claims') < 0 ? '' : approvedNow ? 'approved' : 'draft';
-    _syncReadyLine();
     if (!btn) return;
     var date = blocked.indexOf('deadline') >= 0;
     var ticks = blocked.filter(function (b) {
@@ -2718,8 +2710,7 @@ window.ReportQuestionnaire = (function () {
             : '';
     if (blocked.indexOf('deadlineRange') >= 0) tail = ' ' + _rangeLine() + tail;
     if (_claimsBlocked) tail += ' ' + CLAIMS_LINE[_claimsBlocked];
-    btn.disabled = blocked.length > 0;
-    btn.title = APPROVE_TIP + (tail || ' ⌘ Return');
+    ReportToolbar.setApprove(btn, blocked.length > 0, APPROVE_TIP + (tail || ' ⌘ Return'));
   }
 
   /* ── The deadline calendar ───────────────────────────────── */

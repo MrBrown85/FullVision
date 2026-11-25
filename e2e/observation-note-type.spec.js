@@ -90,8 +90,9 @@ for (const scheme of ['light', 'dark']) {
       await ed.getByRole('button', { name: 'Save' }).click();
       await expect(card.locator('.obs-type')).toHaveText('Note');
 
-      await page.getByRole('button', { name: 'Type' }).click();
-      await page.locator('#filter-type-dropdown [role="option"]', { hasText: 'Note' }).click();
+      await page.getByRole('button', { name: 'Filter', exact: true }).click();
+      await page.locator('.obp-row[data-grp="y"]', { hasText: 'Note' }).click();
+      await page.keyboard.press('Escape');
       const types = page.locator('.obs-card .obs-type');
       await expect(types.first()).toHaveText('Note');
       expect(new Set(await types.allTextContents())).toEqual(new Set(['Note']));

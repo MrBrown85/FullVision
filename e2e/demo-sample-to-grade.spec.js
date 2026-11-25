@@ -65,7 +65,9 @@ test.describe('desktop, 1366 wide', () => {
 
     await page.goto('/gradebook');
     await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
-    await expect(page.locator('.gb-to-grade-btn')).toHaveText(new RegExp('^' + at.classToGrade + ' to grade'));
+    await expect(page.locator('.atb-show [data-show="tograde"]').locator('.atb-badge')).toHaveText(
+      String(at.classToGrade),
+    );
     const marked = page.locator('.gb-scores-cell[data-aid="' + LIGHT + '"]:has(.gb-to-grade)');
     // One cell a piece of work: the pair's is on Aiden's row only.
     await expect(marked).toHaveCount(at.piece.tograde);

@@ -1,7 +1,6 @@
 /**
  * The words on the Bulletins page that come from rules (teacher/page-bulletins.js):
- * the day headings, the kind label, "26 students can see it" and the notes
- * after it. The drawing itself is tried in a browser (e2e/bulletins-teacher.spec.js).
+ * the day headings, the kind label and the title line's notes. The drawing itself is tried in a browser (e2e/bulletins-teacher.spec.js).
  */
 import './setup.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -48,12 +47,6 @@ describe('the kind label', () => {
 });
 
 describe('the header', () => {
-  it('says how many can see it', () => {
-    expect(H.canSeeText(26)).toBe('26 students can see it');
-    expect(H.canSeeText(1)).toBe('1 student can see it');
-    expect(H.canSeeText(0)).toBe('No students can see it yet');
-  });
-
   it('names a paused student when one or two, and counts when more; Have No Card Yet is a count', () => {
     expect(H.headerNotes({ no_card: 4, paused: 1 }, ['Jordan Kim'])).toEqual({
       noCard: '4 Have No Card Yet',

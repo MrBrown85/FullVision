@@ -121,8 +121,8 @@ describe('the same numbers on every screen', () => {
     expect(cell().n).toBe(total);
 
     mount(() => seed(), { course: CID });
-    const pill = document.querySelector('.gb-to-grade-btn');
-    expect(parseInt(pill.textContent, 10)).toBe(total);
+    const pill = document.querySelector('.atb-show [data-show="tograde"]');
+    expect(parseInt(pill.querySelector('.atb-badge').textContent, 10)).toBe(total);
     // The filter leaves the students and columns with work waiting.
     click(pill);
     const cols = Array.from(document.querySelectorAll('.gb-scores-cell')).map(td => td.getAttribute('data-aid'));
@@ -145,7 +145,7 @@ describe('the same numbers on every screen', () => {
     Grader.setLevel(CID, IDS[0], LAB, Q, 3, 0);
     expect(cell().n).toBe(4);
     mount(() => (seed(), Grader.setLevel(CID, IDS[0], LAB, Q, 3, 0)), { course: CID });
-    expect(parseInt(document.querySelector('.gb-to-grade-btn').textContent, 10)).toBe(4);
+    expect(parseInt(document.querySelector('.atb-show [data-show="tograde"] .atb-badge').textContent, 10)).toBe(4);
   });
 });
 
@@ -173,7 +173,7 @@ describe('the gradebook’s cells', () => {
   it('with Send Work off the gradebook is as it was', () => {
     seed({ sendWork: false });
     mount(() => seed({ sendWork: false }), { course: CID });
-    expect(document.querySelector('.gb-to-grade-btn')).toBeNull();
+    expect(document.querySelector('.atb-show [data-show="tograde"]')).toBeNull();
     expect(document.querySelector('.gb-to-grade')).toBeNull();
     expect(document.querySelector('.gb-work-camera')).toBeNull();
   });
@@ -237,7 +237,7 @@ describe('the Assignments page', () => {
     // Done: the page is back, and still answers a click.
     click(overlay.querySelector('[data-grader="close"]'));
     expect(document.getElementById('grader-overlay')).toBeNull();
-    click(document.querySelector('.assess-tograde-seg [data-show="all"]'));
+    click(document.querySelector('.atb-show [data-show="all"]'));
     expect(document.querySelectorAll('.assess-card').length).toBe(3);
   });
 

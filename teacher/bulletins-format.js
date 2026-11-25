@@ -91,15 +91,8 @@
     return 'Announcement';
   }
 
-  /** "26 students can see it" and the note after it. @param {number} n */
-  function canSeeText(n) {
-    if (n === 1) return '1 student can see it';
-    if (n <= 0) return 'No students can see it yet';
-    return n + ' students can see it';
-  }
-
   /**
-   * The header's parts after "26 students can see it": the Have No Card Yet
+   * The header's notes: the Have No Card Yet
    * count, and the students not counted (names when one or two, else a count).
    * @param {{ no_card: number, paused: number }} meta @param {string[]} pausedNames
    * @returns {{ noCard: string, paused: string }}
@@ -236,7 +229,6 @@
     returnedWhen: returnedWhen,
     timeLabel: timeLabel,
     kindLabel: kindLabel,
-    canSeeText: canSeeText,
     headerNotes: headerNotes,
     focusSpec: _focusSpec,
     controlOf: _controlOf,

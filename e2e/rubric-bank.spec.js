@@ -4,7 +4,7 @@
  * only, with its actions (teacher/rubric-bank.js).
  */
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, seedScores, gotoApp, TEST_COURSE } from './helpers.js';
+import { mockAuth, seedCourse, seedStudents, seedScores, gotoApp, clickToolbarItem, TEST_COURSE } from './helpers.js';
 import { cardMenuItem } from './card-menu.js';
 
 const LAB = {
@@ -45,7 +45,7 @@ async function openBank(page) {
   await page.evaluate(() => {
     window.Router.navigate('/assignments');
   });
-  await page.locator('[data-action="openRubricBank"]').click();
+  await clickToolbarItem(page, 'more', 'openRubricBank');
   const bank = page.getByRole('dialog', { name: 'Rubric Bank' });
   await expect(bank).toBeVisible();
   return bank;

@@ -6,6 +6,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { clickToolbarItem } from './helpers.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -36,9 +37,11 @@ test('List: change many rows at once, sort and keep the order, drag a row, open 
   const total = await page.evaluate(() => getAssessments(getActiveCourse()).length);
 
   await page.goto('/assignments');
-  await page.locator('[data-alv-view="list"]').click();
+  await clickToolbarItem(page, 'more', '[data-alv-view="list"]');
   await expect(page.locator('tr[data-alv-row]')).toHaveCount(total);
-  await expect(page.locator('.assess-seg-control')).toHaveCount(0);
+  // In Bulk Edit the ⋯ menu holds Rubrics alone, and Done Editing goes back.
+  await expect(page.locator('.atb-end > [data-alv-view="cards"]')).toHaveText('Done Editing');
+  await expect(page.locator('.atb-more-wrap .assess-menu-item')).toHaveText(['Rubrics']);
   await expect(page.locator('.alv-count')).toHaveText(total + ' of ' + total);
   // The rows fit the page beside the class list: no sideways scroll.
   const fits = await page.locator('.alv-scroll').evaluate(el => el.scrollWidth <= el.clientWidth + 1);

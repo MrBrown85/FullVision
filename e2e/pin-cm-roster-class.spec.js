@@ -112,7 +112,7 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
     const desig = row.locator('.cm-rs-desig');
     await expect(row.locator('[data-col="last"]')).toHaveValue('Blackwood');
     await expect(row.locator('.cm-rs-chip')).toHaveCount(0);
-    await expect(page.locator('#cm-rs-summary')).toHaveText('27 students');
+    await expect(page.locator('#cm-rs-summary')).toHaveText('');
 
     // + lists the BC codes; picking one adds its chip.
     await row.locator('.cm-rs-add').click();
@@ -127,7 +127,7 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
     await expect(chip).toHaveAttribute('aria-label', 'Remove Q Learning Disability');
     await expect(desig.locator('.cm-iep-tag')).toHaveText('IEP');
     await expect(desig.locator('.cm-mod-tag')).toHaveCount(0);
-    await expect(page.locator('#cm-rs-summary')).toHaveText('27 students · 1 with designations');
+    await expect(page.locator('#cm-rs-summary')).toHaveText('1 with designations');
     expect(await page.evaluate(() => getStudents('sci8').find(s => s.id === 'st3').designations)).toEqual(['Q']);
 
     // A code the student has is not offered again.
@@ -139,12 +139,12 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
 
     await page.reload();
     await expect(chip).toHaveText('Q Learning Disability ×');
-    await expect(page.locator('#cm-rs-summary')).toHaveText('27 students · 1 with designations');
+    await expect(page.locator('#cm-rs-summary')).toHaveText('1 with designations');
 
     await chip.click();
     await expect(row.locator('.cm-rs-chip')).toHaveCount(0);
     await expect(desig.locator('.cm-iep-tag')).toHaveCount(0);
-    await expect(page.locator('#cm-rs-summary')).toHaveText('27 students');
+    await expect(page.locator('#cm-rs-summary')).toHaveText('');
     expect(await page.evaluate(() => getStudents('sci8').find(s => s.id === 'st3').designations)).toEqual([]);
 
     await page.reload();
@@ -329,6 +329,26 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
     expect(backup.assessments.map(a => a.id)).toEqual(inApp.assessments);
     expect(Object.keys(backup.scores).sort()).toEqual(inApp.scores);
   });
+  /* A draw while the teacher types in Find a Student took the focus off the
+     box (Nov 25, 2026). The box is drawn with what the page has kept of the
+     search, and the cursor goes back where it was. */
+  test('Find a Student keeps the focus and the cursor when Class Settings is drawn again', async ({ page }) => {
+    const search = page.locator('.cm-rs-search input');
+    const shown = page.locator('.cm-rs-row:not([hidden])');
+    const all = await shown.count();
+    await search.click();
+    await page.keyboard.type('an');
+    const some = await shown.count();
+    expect(some).toBeGreaterThan(0);
+    expect(some).toBeLessThan(all);
+    await page.keyboard.press('ArrowLeft');
+    await page.evaluate(() => DashClassManager.renderClassManager());
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue('an');
+    await expect(shown).toHaveCount(some);
+    await page.keyboard.press('Backspace');
+    await expect(search).toHaveValue('n');
+  });
 });
 
 /* Signed in, the same two class actions go to the server: archive_course,
@@ -385,9 +405,7 @@ test('Signed in, Archive Class and Delete Class send archive_course and delete_c
    again, which closed a menu opened in the meantime: under load the test
    above lost its Archive Class item that way (Nov 25, 2026). Here the server
    holds the reflections back until the menu is open. */
-test('Signed in, reflections that arrive late fill in the Reflect count and leave an open menu open', async ({
-  page,
-}) => {
+test('Signed in, reflections that arrive late draw nothing and leave an open menu open', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockAuth(page);
   await seedTwoClasses(page);
@@ -403,16 +421,17 @@ test('Signed in, reflections that arrive late fill in the Reflect count and leav
   });
   await page.locator(`.cm-class-item[data-cid="${CID_B}"]`).click();
   await expect(page.locator('.cm-head-title')).toHaveText('Science 10');
-  const count = page.locator('#cm-tab-questionnaires .cm-tab-count');
-  await expect(page.locator('#cm-tab-questionnaires')).toBeVisible();
-  await expect(count).toHaveCount(0);
+  const tab = page.locator('#cm-tab-questionnaires');
+  await expect(tab).toBeVisible();
+  await expect(tab).toHaveText('Reflect');
 
   await classActions(page).click();
   const archive = actionsMenu(page).locator('[data-action="cmToggleArchive"]');
   await expect(archive).toBeVisible();
   await page.waitForFunction(() => typeof window.__e2eLetGo === 'function');
   await page.evaluate(() => window.__e2eLetGo());
-  await expect(count).toHaveText('0');
+  // The reflections arriving draw nothing: no count on the tab, and the menu stays open.
+  await expect(tab).toHaveText('Reflect');
   await expect(archive).toBeVisible();
 
   // On the Reflect tab itself, which shows Loading until then, the list is drawn when they arrive.
@@ -473,4 +492,65 @@ test('Signed in, a menu that is open when Class Settings is drawn again stays op
   await redraw();
   await expect(menu).toBeHidden();
   await expect(button).toHaveAttribute('aria-expanded', 'false');
+});
+
+/* The same draw took the focus off the box a teacher was typing in, and in
+   Safari and Firefox it threw the typing away too: "Lab" typed in a
+   competency's title went back to the saved title (Nov 25, 2026). Chrome
+   saves a box as the draw removes it; the others do not. */
+test('Signed in, what a teacher is typing when Class Settings is drawn again stays, with the cursor where it was', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAuth(page);
+  await seedTwoClasses(page);
+  await gotoApp(page, '/dashboard?manage=details');
+  const desc = page.locator('#cm-desc');
+  await expect(desc).toBeVisible();
+  const saved = () => page.evaluate(cid => COURSES[cid].description || '', CID_A);
+  const changes = () => page.evaluate(() => window.__e2eChanges);
+  // The draw puts a new box in place of the old one, which carries a mark here. Changes are counted from the
+  // draw on, on the new box.
+  const redraw = () =>
+    page.evaluate(() => {
+      document.getElementById('cm-desc').__before = true;
+      DashClassManager.renderClassManager();
+      window.__e2eChanges = 0;
+    });
+  await page.evaluate(() => {
+    document.addEventListener('change', e => {
+      if (e.target.id === 'cm-desc') window.__e2eChanges++;
+    });
+  });
+
+  await desc.click();
+  await page.keyboard.type('Bring a calculator');
+  for (let i = 0; i < 'calculator'.length; i++) await page.keyboard.press('ArrowLeft');
+  await redraw();
+  expect(await desc.evaluate(el => el.__before)).toBeUndefined();
+  await expect(desc).toHaveValue('Bring a calculator');
+  await expect(desc).toBeFocused();
+  // The cursor is where it was, so the next keys go in the same place.
+  await page.keyboard.type('graphing ');
+  await expect(desc).toHaveValue('Bring a graphing calculator');
+  await page.keyboard.press('Tab');
+  await expect.poll(saved).toBe('Bring a graphing calculator');
+  expect(await changes()).toBe(1);
+
+  // Typing put back by a draw is saved when the teacher leaves the box without typing more, and the page is
+  // told the box changed, once.
+  await desc.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' every day');
+  await redraw();
+  await expect(desc).toHaveValue('Bring a graphing calculator every day');
+  await expect(desc).toBeFocused();
+  await page.locator('.cm-head-title').click();
+  await expect.poll(saved).toBe('Bring a graphing calculator every day');
+  expect(await changes()).toBe(1);
+
+  // A box the teacher has left is not given the focus back.
+  await redraw();
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await expect(desc).toHaveValue('Bring a graphing calculator every day');
 });

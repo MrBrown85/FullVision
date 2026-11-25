@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Modules, search and empty states on the Assignments list: a closed module
 // stays closed, a search shows its matches inside closed modules, an empty
-// list says so first, and the Filter button doesn't move the search box.
+// list says so first, and a filter's chip doesn't move the search box.
 
 async function openDemo(page) {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -99,16 +99,19 @@ test('an empty class says assessments and offers + New Assessment above Add Modu
   await expect(page.locator('#new-assess-form')).toBeVisible();
 });
 
-test('turning a filter on keeps the search box where it is', async ({ page }) => {
+test('turning a filter on keeps the search box and Show where they are', async ({ page }) => {
   await openDemo(page);
-  const search = page.locator('.assess-search-input');
-  const left = () => search.evaluate(el => Math.round(el.getBoundingClientRect().left));
-  const before = await left();
-  await page.locator('.assess-filter-btn').click();
+  const box = sel =>
+    page.locator(sel).evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return [Math.round(r.left), Math.round(r.width)];
+    });
+  const before = [await box('.assess-search-input'), await box('.atb-show')];
+  await page.locator('.atb-filter-btn').click();
   await page.locator('.assess-filter-menu [data-action="toggleUngraded"]').click();
-  await expect(page.locator('.assess-filter-btn')).toHaveText('Filter · 1');
-  expect(await left()).toBe(before);
+  await expect(page.locator('.atb-chip')).toHaveText(['Ungraded Only']);
+  expect([await box('.assess-search-input'), await box('.atb-show')]).toEqual(before);
   await page.locator('.assess-filter-menu [data-catid]').first().click();
-  await expect(page.locator('.assess-filter-btn')).toHaveText('Filter · 2');
-  expect(await left()).toBe(before);
+  await expect(page.locator('.atb-chip')).toHaveCount(2);
+  expect([await box('.assess-search-input'), await box('.atb-show')]).toEqual(before);
 });
