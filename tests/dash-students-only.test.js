@@ -3,7 +3,7 @@
  *
  * A search, the sort menu, a grid heading, a flag, Flagged and Cards | Grid
  * change only the students: they are drawn again in their own box
- * (#dash-students), with the toolbar's count, and the rest of the page (the
+ * (#dash-students), and the rest of the page (the
  * overview cards) stays. Each of these used to draw the whole page.
  *
  * Counted: whole-page draws (#main) and overview draws. Checked: the
@@ -151,7 +151,7 @@ describe('the Dashboard draws the students alone', () => {
     },
     Flagged() {
       ev(doc.querySelector('.dash-card[data-sid="s3"] [data-action="toggleFlag"]'), 'click');
-      ev(doc.querySelector('[data-action="toggleFlaggedFilter"]'), 'click');
+      ev(doc.querySelector('[data-action="dashShow"][data-show="flagged"]'), 'click');
     },
     'Cards | Grid'() {
       ev(doc.querySelector('[data-action="studentView"][data-view="grid"]'), 'click');
@@ -167,12 +167,27 @@ describe('the Dashboard draws the students alone', () => {
     });
   });
 
-  it('the search and Flagged filter the cards, and the toolbar counts them', () => {
+  it('the search and Flagged filter the cards, and the badge counts the flagged', () => {
     ACTIONS.search();
     expect(names()).toEqual(['s1', 's3', 's5', 's7', 's9', 's11']);
-    expect(doc.querySelector('.dash-toolbar-label').textContent).toBe('6 Students');
+    expect(doc.querySelector('.dash-toolbar-label')).toBeNull();
     ACTIONS.Flagged();
     expect(names()).toEqual(['s3']);
-    expect(doc.querySelector('[data-action="toggleFlaggedFilter"]').textContent).toContain('Flagged (1)');
+    const flagged = doc.querySelector('[data-action="dashShow"][data-show="flagged"]');
+    expect(flagged.getAttribute('aria-pressed')).toBe('true');
+    expect(flagged.querySelector('.atb-badge').textContent).toBe('1');
+  });
+
+  it('All, or a second click on Flagged, shows everyone again', () => {
+    const card = () => doc.querySelector('.dash-card[data-sid="s3"] [data-action="toggleFlag"]');
+    if (card().getAttribute('aria-pressed') !== 'true') ev(card(), 'click');
+    ev(doc.querySelector('[data-action="dashShow"][data-show="flagged"]'), 'click');
+    expect(names()).toEqual(['s3']);
+    ev(doc.querySelector('[data-action="dashShow"][data-show="flagged"]'), 'click');
+    expect(names().length).toBeGreaterThan(1);
+    ev(doc.querySelector('[data-action="dashShow"][data-show="flagged"]'), 'click');
+    ev(doc.querySelector('[data-action="dashShow"][data-show="all"]'), 'click');
+    expect(names().length).toBeGreaterThan(1);
+    expect(doc.querySelector('[data-show="all"]').getAttribute('aria-pressed')).toBe('true');
   });
 });

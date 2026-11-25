@@ -432,9 +432,13 @@ a.dash-ins-name:hover {
 
 /* Students heading: a white bar like every other dashboard section, the
    title 21px in, level with the card titles above. Cards | Grid sits beside
-   the title (it changes what the section shows); search, sort and Flagged,
-   which narrow the list, sit on the right. */
+   the title (it changes what the section shows); Search and Show, which
+   narrow the list, follow in the Assignments bar's style (the shared .atb-*
+   parts in styles.css); the sort menu is pushed to the right end. */
 .dash-students-head {
+  /* Search is 240px and gives up room down to 160px before anything wraps. */
+  --atb-search-min: 160px;
+  --atb-search-max: 240px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -446,29 +450,59 @@ a.dash-ins-name:hover {
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
 }
-.dash-students-head .dash-view-toggle {
-  margin-right: auto;
-}
-/* Every control in the heading is one height (--control-h): the search a
-   white field like the sort menu beside it, Flagged a button of the same
-   shape with a line icon. */
-.dash-students-head .dash-search-input {
-  background: var(--surface);
-  border-color: var(--border);
-}
-.dash-students-head .dash-filter-chip {
-  height: var(--control-h);
-  padding: 0 12px;
-  font-size: var(--text-base);
+.dash-students-head .atb-field > input {
   border-radius: 8px;
-  color: var(--text);
 }
-.dash-students-head .dash-filter-chip svg {
-  color: var(--text-3);
+/* Show holds its room: the badge arriving or going moves nothing beside it. */
+.dash-show [data-show='all'] {
+  min-width: 56px;
+  justify-content: center;
 }
-.dash-students-head .dash-filter-chip.active,
-.dash-students-head .dash-filter-chip.active svg {
-  color: #fff;
+.dash-show [data-show='flagged'] {
+  min-width: 112px;
+  justify-content: center;
+}
+/* The sort: the native select, in the grey fill the Assignments bar's
+   controls use, one width whatever it says. */
+.dash-students-head .dash-sort-select {
+  margin-left: auto;
+  flex: 0 0 176px;
+  width: 176px;
+  max-width: none;
+  padding: 0 28px 0 12px;
+  border: none;
+  background-color: rgba(118, 118, 128, 0.12);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+.dash-students-head .dash-sort-select:hover {
+  background-color: rgba(118, 118, 128, 0.2);
+}
+/* Point to preview: while the pointer or the keyboard rests on an unpressed
+   Flagged, the cards and rows of students who are not flagged dim. The delay
+   keeps the page still as the pointer crosses the bar. */
+#main:has(.dash-show [data-show='flagged']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  :is(.dash-card:not(.flagged), .dash-sg tbody tr:not(.is-flagged)) {
+  opacity: 0.35;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #main .dash-card,
+  #main .dash-sg tbody tr {
+    transition:
+      box-shadow 0.18s var(--ease-out),
+      transform 0.18s var(--ease-out),
+      border-color 200ms,
+      opacity 150ms ease;
+  }
+  #main:has(.dash-show [data-show='flagged']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    :is(.dash-card:not(.flagged), .dash-sg tbody tr:not(.is-flagged)) {
+    transition:
+      box-shadow 0.18s var(--ease-out),
+      transform 0.18s var(--ease-out),
+      border-color 200ms,
+      opacity 150ms ease 120ms;
+  }
 }
 .dash-students-title {
   margin: 0 6px 0 0;
@@ -700,80 +734,22 @@ a.dash-ins-name:hover {
 .dash-toolbar {
   flex-wrap: wrap;
 }
-.dash-search-wrap {
-  position: relative;
-  flex: 0 0 220px;
-}
-.dash-search-wrap .search-icon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  color: var(--text-3);
-  pointer-events: none;
-}
-.dash-search-input {
-  width: 100%;
-  height: var(--control-h);
-  padding: 6px 10px 6px 28px;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  /* A toolbar search: filled, outlined only while typing. */
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--overlay-hover);
-  color: var(--text);
-  transition:
-    background-color 0.2s,
-    border-color 0.2s,
-    box-shadow 0.2s;
-  outline: none;
-}
-.dash-search-input:focus {
-  background: var(--surface);
-  border-color: var(--active);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
-}
-.dash-filter-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: var(--chip-h);
-  padding: 0 10px;
-  font-family: var(--font-base);
+/* Class Settings: the tinted secondary button the Assignments bar uses. */
+.dash-toolbar:not(.cm-toolbar) .tb-action-btn {
+  padding: 0 12px;
   font-size: var(--text-sm);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  transition:
-    background-color 0.12s,
-    border-color 0.12s,
-    color 0.12s;
-  white-space: nowrap;
 }
-.dash-filter-chip:hover {
-  border-color: var(--priority);
+.dash-toolbar:not(.cm-toolbar) .tb-action-btn.tb-action-secondary {
+  border: none;
+  background: var(--active-light);
+  color: var(--link);
 }
-.dash-filter-chip.active {
-  background: var(--priority);
-  color: #fff;
-  border-color: var(--priority);
+.dash-toolbar:not(.cm-toolbar) .tb-action-btn.tb-action-secondary:hover {
+  background: var(--active-light);
+  filter: brightness(0.95);
 }
-/* Class Settings is settings, so it is a secondary (outline) button:
-   solid blue is kept for a screen's main action (docs/DECISIONS.md). */
 .dash-toolbar-spacer {
   flex: 1;
-}
-.dash-toolbar-label {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  font-weight: 500;
-  white-space: nowrap;
 }
 
 /* ── Student Card Grid ──────────────────────────────────────── */
@@ -2298,7 +2274,7 @@ a.dash-ins-name:hover {
 }
 .cm-term-label {
   flex: 1;
-  min-width: 100px;
+  min-width: 112px;
 }
 .cm-term-date {
   width: 140px;
