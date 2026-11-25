@@ -33,8 +33,8 @@ window.MGradePhotos = (function () {
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
   var FULL_SVG =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
-  var NOTE_SVG =
-    '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>';
+  var PENCIL_SVG =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></svg>';
   var UP_SVG =
     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
 
@@ -209,36 +209,24 @@ window.MGradePhotos = (function () {
 
   /* ── The card ───────────────────────────────────────────────── */
 
-  /* When the work came, under the student's name on the card: "Submitted
-     Oct 30 · 2 photos", or "Not In · 7 days late" (not on an Excused piece,
-     which is not owed). */
-  // html-safe: the line goes through MC.esc; CAMERA_SVG is fixed markup
-  function sentHtml(cid, a, st, unit) {
-    var w = _cardWork(cid, a, st, unit);
-    if (w.skip) return '';
-    if (w.sub)
-      return (
-        '<div class="m-work-sent">' +
-        CAMERA_SVG +
-        '<span>' +
-        MC.esc(sentLine(w.sub, 'Submitted', cid)) +
-        '</span></div>'
-      );
-    if (getAssignmentStatus(cid, st.id, a.id) === 'EXC') return '';
-    return '<div class="m-work-sent m-work-sent-notin"><span>' + MC.esc(notInState(cid, a)) + '</span></div>';
-  }
-
-  // html-safe: the note, names and dates go through MC.esc; ids and counts are ours or numbers
-  // opts.status: on a card with nothing in, the status control to put under Add Work.
+  /* The paper card: the chips (IEP, a status), the pages edge to edge with
+     Mark Up and Full Screen on them, a page count when there are several,
+     and the student's note. On a card with nothing in, Add Work, its status
+     track and Grade From Paper instead (the board "Add Work for a Student").
+     opts.chips: the chips row, drawn first; opts.status: the status track
+     for a card with nothing in. */
+  // html-safe: the note, names and dates go through MC.esc; ids and counts are ours or numbers; opts.chips and opts.status are the grader's checked markup
   function cardHtml(cid, a, st, unit, opts) {
     var w = _cardWork(cid, a, st, unit);
     if (w.skip) return '';
     var sub = w.sub;
-    if (!sub) return notInHtml(cid, a, st, (opts && opts.status) || '');
+    var chips = (opts && opts.chips) || '';
+    if (!sub) return notInHtml(cid, a, st, (opts && opts.status) || '', chips);
     var files = sub.files || [];
     var first = displayNameFirst(st) || displayName(st);
-    var html = '<div class="m-work" data-sid="' + st.id + '" data-aid="' + a.id + '">';
+    var html = '<div class="m-work" data-sid="' + st.id + '" data-aid="' + a.id + '">' + chips;
     if (files.length) {
+      var ids = ' data-sid="' + st.id + '" data-aid="' + a.id + '"';
       html +=
         '<div class="m-work-pages" data-action="m-work-full">' +
         '<div class="m-work-scroller">' +
@@ -254,30 +242,20 @@ window.MGradePhotos = (function () {
           })
           .join('') +
         '</div>' +
-        '<button type="button" class="m-work-full" data-action="m-work-full" aria-label="Open the photos full screen">' +
+        (files.length > 1 ? '<span class="m-work-count">1 of ' + files.length + '</span>' : '') +
+        (window.MMarkUp && MMarkUp.can(cid, a.id, st.id, 0)
+          ? '<button type="button" class="m-work-tool m-work-markup" data-action="m-markup-open"' +
+            ids +
+            ' data-page="0" aria-label="Mark Up">' +
+            PENCIL_SVG +
+            '</button>'
+          : '') +
+        '<button type="button" class="m-work-tool m-work-full" data-action="m-work-full" aria-label="Full Screen">' +
         FULL_SVG +
-        '</button></div>' +
-        (files.length > 1
-          ? '<div class="m-work-dots" aria-label="' +
-            MC.esc('Page 1 of ' + files.length) +
-            '">' +
-            files
-              .map(function (f, i) {
-                return '<span class="m-work-dot' + (i === 0 ? ' is-on' : '') + '"></span>';
-              })
-              .join('') +
-            '</div>'
-          : '');
+        '</button></div>';
     }
-    if (sub.note) html += '<div class="m-work-note">' + NOTE_SVG + '<span>' + MC.esc(sub.note) + '</span></div>';
-    // Unsubmit, on one student's own work (photos, or handed in on paper); not on a group's.
-    if (!sub.group)
-      html +=
-        '<div class="m-work-foot"><button type="button" class="m-work-unsubmit" data-action="m-work-unsubmit" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        a.id +
-        '">Unsubmit</button></div>';
+    if (sub.on_paper && !files.length) html += '<div class="m-work-onpaper">Handed in on paper</div>';
+    if (sub.note) html += '<div class="m-work-note">' + MC.esc(sub.note) + '</div>';
     return html + '</div>';
   }
 
@@ -320,10 +298,16 @@ window.MGradePhotos = (function () {
     return Math.round((d1 - d0) / 86400000);
   }
 
-  // "Not In · 7 days late", "Not In · 1 day late", or "Not In".
-  function notInState(cid, a) {
+  // "7 Days Late", "1 Day Late", or '' when it is not late.
+  function lateChip(cid, a) {
     var n = daysLate(cid, a);
-    return 'Not In' + (n ? ' · ' + n + (n === 1 ? ' day late' : ' days late') : '');
+    return n ? n + (n === 1 ? ' Day Late' : ' Days Late') : '';
+  }
+
+  // Unsubmit is on one student's own work (photos, or handed in on paper), not a group's.
+  function canUnsubmit(cid, a, st, unit) {
+    var w = _cardWork(cid, a, st, unit);
+    return !w.skip && !!w.sub && !w.sub.group;
   }
 
   /* A card with nothing in: where it stands, and Add Work for the student
@@ -334,16 +318,21 @@ window.MGradePhotos = (function () {
     return !w.skip && !w.sub && getAssignmentStatus(cid, st.id, a.id) !== 'EXC';
   }
 
-  // html-safe: the name goes through MC.esc; ids are ours; status is the grader's checked status control; CAMERA_SVG is fixed markup
-  function notInHtml(cid, a, st, status) {
+  // html-safe: the name goes through MC.esc; ids are ours; status and chips are the grader's checked markup; CAMERA_SVG is fixed markup
+  function notInHtml(cid, a, st, status, chips) {
     if (getAssignmentStatus(cid, st.id, a.id) === 'EXC') return '';
     var first = displayNameFirst(st) || displayName(st);
+    var late = lateChip(cid, a);
     return (
       '<div class="m-work m-work-notin" data-sid="' +
       st.id +
       '" data-aid="' +
       a.id +
       '">' +
+      (chips || '') +
+      '<div class="m-work-notin-head"><h2 class="m-work-notin-title">Nothing Handed In</h2>' +
+      (late ? '<span class="m-grade-chip m-grade-chip-late">' + MC.esc(late) + '</span>' : '') +
+      '</div>' +
       '<button type="button" class="m-work-add" data-action="m-add-work" data-sid="' +
       st.id +
       '" data-aid="' +
@@ -352,7 +341,6 @@ window.MGradePhotos = (function () {
       CAMERA_SVG +
       MC.esc('Add Work for ' + first) +
       '</button>' +
-      '<div class="m-work-add-hint">Photos or PDFs. Photos are made smaller before they upload.</div>' +
       (status ? '<div class="m-work-notin-status">' + status + '</div>' : '') +
       paperHtml(cid, a, st) +
       '</div>'
@@ -522,7 +510,7 @@ window.MGradePhotos = (function () {
   }
 
   function _fileOf(cid, img) {
-    var box = img.closest('.m-work, .m-work-pin');
+    var box = img.closest('.m-work, .m-work-pin, [data-work-box]');
     var sub = box && work(cid, box.getAttribute('data-sid'), box.getAttribute('data-aid'));
     return (sub && (sub.files || [])[Number(img.getAttribute('data-fv-page'))]) || null;
   }
@@ -583,16 +571,15 @@ window.MGradePhotos = (function () {
     );
   }
 
+  // The page count and Mark Up follow the page in view.
   function _syncDots(scroller) {
     var box = scroller.closest('.m-work');
-    var dots = box && box.querySelectorAll('.m-work-dot');
-    if (!dots || !dots.length || !scroller.clientWidth) return;
+    var count = box && box.querySelector('.m-work-count');
+    if (!box || !scroller.clientWidth) return;
     var i = Math.round(scroller.scrollLeft / scroller.clientWidth);
-    dots.forEach(function (d, k) {
-      d.classList.toggle('is-on', k === i);
-    });
-    var wrap = box.querySelector('.m-work-dots');
-    if (wrap) wrap.setAttribute('aria-label', 'Page ' + (i + 1) + ' of ' + dots.length);
+    if (count) count.textContent = i + 1 + ' of ' + scroller.children.length;
+    var mark = box.querySelector('.m-work-markup');
+    if (mark) mark.setAttribute('data-page', String(i));
   }
 
   // The pinned strip's tap: back to the top of the card, to the pages.
@@ -601,54 +588,11 @@ window.MGradePhotos = (function () {
     if (card) card.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // Every page, large, in a sheet that scrolls.
+  // Full Screen: the pages large, with the marks to score as you read (grade-reader.js).
   function openFull(cid, el) {
     var box = el && el.closest('.m-work');
-    if (!box) return;
-    var sid = box.getAttribute('data-sid');
-    var aid = box.getAttribute('data-aid');
-    var sub = work(cid, sid, aid);
-    var st = getStudents(cid).find(function (s) {
-      return s.id === sid;
-    });
-    if (!sub || !st) return;
-    var first = displayNameFirst(st) || displayName(st);
-    MC.presentSheet(
-      '<div class="m-work m-work-sheet" data-sid="' +
-        sid +
-        '" data-aid="' +
-        aid +
-        '"><div class="m-work-sheet-title">' +
-        MC.esc(displayName(st)) +
-        '</div>' +
-        (sub.files || [])
-          .map(function (f, i) {
-            // Mark Up on each page (S9-F2), where the page can keep marks.
-            var mark =
-              window.MMarkUp && MMarkUp.can(cid, aid, sid, i)
-                ? '<button type="button" class="m-work-markup" data-action="m-markup-open" data-sid="' +
-                  sid +
-                  '" data-aid="' +
-                  aid +
-                  '" data-page="' +
-                  i +
-                  '"' +
-                  ((sub.files || []).length > 1 ? ' aria-label="' + MC.esc('Mark Up page ' + (i + 1)) + '"' : '') +
-                  '>Mark Up</button>'
-                : '';
-            return (
-              '<img class="m-work-sheet-page" alt="' +
-              MC.esc('Page ' + (i + 1) + ' of ' + first + '’s work') +
-              '" data-work-pic data-work-which="page" data-fv-page="' +
-              i +
-              '">' +
-              mark
-            );
-          })
-          .join('') +
-        '</div>',
-    );
-    hydrate(document.getElementById('m-sheet-container'), cid);
+    if (!box || !window.MGradeReader) return;
+    MGradeReader.open(cid, box.getAttribute('data-sid'), box.getAttribute('data-aid'));
   }
 
   return {
@@ -666,14 +610,14 @@ window.MGradePhotos = (function () {
     photosText: photosText,
     sentLine: sentLine,
     notInLine: notInLine,
-    notInState: notInState,
+    lateChip: lateChip,
+    canUnsubmit: canUnsubmit,
     daysLate: daysLate,
     paperLevels: paperLevels,
     studentListHtml: studentListHtml,
     syncTabBadge: syncTabBadge,
     releaseUnused: _letGo,
     cardHtml: cardHtml,
-    sentHtml: sentHtml,
     notInCard: notInCard,
     pinHtml: pinHtml,
     hydrate: hydrate,

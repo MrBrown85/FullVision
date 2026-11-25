@@ -1,8 +1,7 @@
 /**
  * The phone's bars are solid, not blurred (speed, P8).
  *
- * The tab bar, the nav bar, the grader's student strip and the piece tabs
- * each had a 20px backdrop blur over the content. A blur is drawn again on
+ * The tab bar and the nav bar each had a 20px backdrop blur over the content. A blur is drawn again on
  * every frame the content under it moves, the costliest thing on an old
  * phone while the swiper slides. They are solid --surface now, the colour
  * the 82% glass gave over the page, in light and dark.
@@ -14,6 +13,7 @@ import { fileURLToPath } from 'url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const css = readFileSync(resolve(root, 'teacher-mobile/styles.css'), 'utf-8');
+const gradeCss = readFileSync(resolve(root, 'teacher-mobile/grade.css'), 'utf-8');
 
 // The declarations of the first rule whose selector list is exactly `selector`.
 function rule(selector) {
@@ -24,7 +24,7 @@ function rule(selector) {
 }
 
 describe('phone bars: solid, no blur', () => {
-  for (const selector of ['#m-tab-bar', '.m-nav-bar', '.m-thumb-strip', '.m-work-tabs']) {
+  for (const selector of ['#m-tab-bar', '.m-nav-bar']) {
     it(selector + ' has a solid surface and no backdrop blur', () => {
       const body = rule(selector);
       expect(body).not.toMatch(/backdrop-filter/);
@@ -34,5 +34,6 @@ describe('phone bars: solid, no blur', () => {
 
   it('no backdrop blur is left in the phone stylesheet', () => {
     expect(css).not.toMatch(/backdrop-filter/);
+    expect(gradeCss).not.toMatch(/backdrop-filter/);
   });
 });

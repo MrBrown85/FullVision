@@ -158,16 +158,15 @@ describe('with the build switch or Send Work off', () => {
 describe('with the student page and Send Work on', () => {
   beforeEach(() => turnOn());
 
-  it('a not-in card offers Add Work for the student, with the board’s hint; a card with work does not', () => {
+  it('a not-in card says Nothing Handed In and offers Add Work for the student; a card with work does not', () => {
     const root = grading();
     const card = sid => root.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
     const btn = card('st11').querySelector('[data-action="m-add-work"]');
     expect(btn.textContent).toBe('Add Work for ' + displayNameFirst(name('st11')));
     expect(btn.getAttribute('data-aid')).toBe(LAB);
-    expect(card('st11').querySelector('.m-work-add-hint').textContent).toBe(
-      'Photos or PDFs. Photos are made smaller before they upload.',
-    );
-    expect(card('st11').querySelector('.m-work-sent').textContent).toMatch(/^Not In( · \d+ days? late)?$/);
+    expect(card('st11').querySelector('.m-work-notin-title').textContent).toBe('Nothing Handed In');
+    // No line about photo sizes under it.
+    expect(card('st11').querySelector('.m-work-add-hint')).toBeNull();
     expect(card('st1').querySelector('[data-action="m-add-work"]')).toBeNull();
   });
 
@@ -183,14 +182,14 @@ describe('with the student page and Send Work on', () => {
     const a = { id: 'x', dueDate: '2026-01-10' };
     const spy = vi.spyOn(globalThis, 'courseToday');
     spy.mockReturnValue('2026-01-10');
-    expect(MGradePhotos.notInState(CID, a)).toBe('Not In');
+    expect(MGradePhotos.lateChip(CID, a)).toBe('');
     spy.mockReturnValue('2026-01-07');
-    expect(MGradePhotos.notInState(CID, a)).toBe('Not In');
+    expect(MGradePhotos.lateChip(CID, a)).toBe('');
     spy.mockReturnValue('2026-01-11');
-    expect(MGradePhotos.notInState(CID, a)).toBe('Not In · 1 day late');
+    expect(MGradePhotos.lateChip(CID, a)).toBe('1 Day Late');
     spy.mockReturnValue('2026-01-17');
-    expect(MGradePhotos.notInState(CID, a)).toBe('Not In · 7 days late');
-    expect(MGradePhotos.notInState(CID, { id: 'y' })).toBe('Not In');
+    expect(MGradePhotos.lateChip(CID, a)).toBe('7 Days Late');
+    expect(MGradePhotos.lateChip(CID, { id: 'y' })).toBe('');
   });
 
   it('the red count goes when nothing waits', () => {
@@ -532,20 +531,20 @@ describe('the grader on one student’s work', () => {
     expect(MGradePhotos.studentList(CID, 'st2').map(r => r.a.id)).toEqual([LAB, other.id]);
     const screen = open(LAB);
     const first = displayNameFirst(name('st2'));
-    expect(text(screen.querySelector('.m-nav-bar-back span'))).toBe(first);
+    // The chevron alone, named for the screen reader; the bar names the student and counts nothing.
+    expect(screen.querySelector('.m-nav-bar-back').getAttribute('aria-label')).toBe(first);
+    expect(screen.querySelector('.m-nav-bar-back span')).toBeNull();
     const title = screen.querySelector('.m-nav-bar-title-inline');
-    expect(title.firstChild.textContent).toBe(displayName(name('st2')));
-    expect(text(title.querySelector('div'))).toBe('1 of 2 for ' + first);
+    expect(text(title)).toBe(displayName(name('st2')));
     expect(screen.querySelector('.m-work-tabs').getAttribute('aria-label')).toBe(first + '’s work to grade');
     const tabs = [...screen.querySelectorAll('.m-work-tabs [role="tab"]')];
     expect(tabs.map(text)).toEqual([lab().title, other.title + ' · Missing']);
     expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
-    // One card, Noor's, named by the piece; the strip of students is hidden.
+    // One card, Noor's; the progress line is hidden, the tabs are the pieces.
     const cards = screen.querySelectorAll('.m-swiper-card');
     expect(cards.length).toBe(1);
     expect(cards[0].getAttribute('data-sid')).toBe('st2');
-    expect(text(cards[0].querySelector('.m-grade-student-name'))).toBe(lab().title);
-    expect(screen.querySelector('#m-thumb-strip').classList.contains('m-thumb-strip-off')).toBe(true);
+    expect(screen.querySelector('#m-grade-progress').hasAttribute('hidden')).toBe(true);
     expect(MGrade.studentWork()).toEqual({ sid: 'st2', aids: [LAB, other.id], kinds: ['grade', 'notin'] });
   });
 
@@ -554,7 +553,6 @@ describe('the grader on one student’s work', () => {
     expect(MGrade.showStudentPiece(CID, other.id)).toBe(true);
     expect(stack().querySelectorAll('#m-screen-grade-swiper').length).toBe(1);
     const screen = stack().querySelector('#m-screen-grade-swiper');
-    expect(text(screen.querySelector('.m-nav-bar-title-inline div'))).toMatch(/^2 of 2 for /);
     expect(screen.querySelector('.m-work-tab-on').getAttribute('data-aid')).toBe(other.id);
     expect(screen.querySelector('.m-swiper-card [data-action="m-add-work"]')).not.toBeNull();
     expect(JSON.parse(screen.getAttribute('data-restore'))).toEqual({
@@ -588,8 +586,11 @@ describe('the grader on one student’s work', () => {
     expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual(['st2']);
     expect(text(stack().querySelector('.m-grade-return-btn'))).toBe('Return and Next');
     MGrade.returnAndNext();
-    expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual([]);
+    // On to the next piece at once; the return is held seven seconds for Undo, then sent.
     expect(stack().querySelector('.m-work-tab-on').getAttribute('data-aid')).toBe(other.id);
+    expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual(['st2']);
+    MGradeLook.flush();
+    expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual([]);
   });
 });
 

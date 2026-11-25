@@ -145,12 +145,11 @@ function card(i) {
   );
 }
 
+// The cards the grader opens on the work waiting: a segment of its progress line each.
 function grader(aid) {
   // html-safe: MGrade.renderSwiper escapes names and text; a test page
   stack().innerHTML = MGrade.renderSwiper(CID, aid, { only: 'tograde' });
-  const bar = text(document.querySelector('.m-nav-bar'));
-  const m = bar && bar.match(/\d+ of \d+ to grade/);
-  return m ? m[0] : null;
+  return document.querySelectorAll('#m-grade-progress .m-prog-seg').length;
 }
 
 function phone() {
@@ -211,10 +210,10 @@ describe('every phone number for sent work, on the fixture', () => {
       badge: '5',
       segment: '5',
       // Lab: S7 (Missing) and S8 are not in; S5 and S9, graded from paper, are not.
-      lab: { pill: '3 to grade', notin: '2 not in' },
+      lab: { pill: '3 to Grade', notin: '2 Not In' },
       // Talk: the group's work (S0 and S1 sent) counts once, and S5's: 2.
       // Not in: S3, S4, S6, S7, S8, S9; S2 is in through the group.
-      talk: { pill: '2 to grade', notin: '6 not in' },
+      talk: { pill: '2 to Grade', notin: '6 Not In' },
       labMenu: ['Grade the 3 Waiting', 'Add Work for the 2 Not In'],
       talkMenu: ['Grade the 2 Waiting', 'Add Work for the 6 Not In'],
       showing: 'Showing 2 of 3',
@@ -224,8 +223,8 @@ describe('every phone number for sent work, on the fixture', () => {
         S5: ['Talk: Grade'],
         S9: ['Talk: Add Work'],
       },
-      labGrader: '1 of 3 to grade',
-      talkGrader: '1 of 2 to grade',
+      labGrader: 3,
+      talkGrader: 2,
     });
   });
 });
@@ -244,9 +243,9 @@ describe('the same numbers on the phone, the gradebook and the dashboard', () =>
       [TALK, p.talk, p.talkMenu, p.talkGrader],
     ].forEach(([aid, r, m, g]) => {
       const c = GraderWork.workCounts(CID, aid);
-      expect(r).toEqual({ pill: c.tograde + ' to grade', notin: c.notin + ' not in' });
+      expect(r).toEqual({ pill: c.tograde + ' to Grade', notin: c.notin + ' Not In' });
       expect(m).toEqual(['Grade the ' + c.tograde + ' Waiting', 'Add Work for the ' + c.notin + ' Not In']);
-      expect(g).toBe('1 of ' + c.tograde + ' to grade');
+      expect(g).toBe(c.tograde);
     });
     // A student's To Grade list is their state on each piece.
     IDS.forEach((sid, i) => {
@@ -269,6 +268,6 @@ describe('the same numbers on the phone, the gradebook and the dashboard', () =>
     // S8 had nothing in; graded from paper, they are no longer Not In anywhere.
     Grader.setLevel(CID, IDS[8], LAB, Q, 3, 0);
     expect(GraderWork.workCounts(CID, LAB).notin).toBe(1);
-    expect(phone().lab).toEqual({ pill: '3 to grade', notin: '1 not in' });
+    expect(phone().lab).toEqual({ pill: '3 to Grade', notin: '1 Not In' });
   });
 });
