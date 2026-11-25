@@ -1290,14 +1290,8 @@ a.dash-ins-name:hover {
   font-weight: 600;
   color: var(--text);
 }
-.cm-action-btn.cm-new-class-btn {
+.cm-new-class-btn {
   flex-shrink: 0;
-  /* At least 28 px tall whatever the font's line height (Linux fonts drew
-     it at 27). */
-  min-height: 28px;
-  padding: 5px 10px;
-  color: var(--text);
-  white-space: nowrap;
 }
 .cm-class-list {
   flex: 1;
@@ -1459,10 +1453,30 @@ a.dash-ins-name:hover {
 }
 .cm-head-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
-.cm-class-actions-menu {
-  min-width: 240px;
+/* Class Actions' menu, in the look of the Assignments bar's menus (.assess-menu). */
+.cm-std-menu.cm-class-actions-menu {
+  min-width: 220px;
+  padding: 5px;
+  border: 0;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 0.5px var(--divider-medium),
+    0 10px 28px rgba(0, 0, 0, 0.18);
+}
+.cm-std-menu.cm-class-actions-menu .cm-std-menu-item {
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.cm-std-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--divider-medium);
 }
 .cm-class-actions-note {
   font-family: var(--font-base);
@@ -1503,10 +1517,6 @@ a.dash-ins-name:hover {
   outline: 2px solid var(--active);
   outline-offset: -2px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-}
-.cm-tab-count {
-  color: var(--text-3);
-  font-weight: 500;
 }
 .cm-tab-panel {
   display: flex;
@@ -3716,7 +3726,7 @@ a.dash-ins-name:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .cm-roster-buttons {
@@ -3724,9 +3734,11 @@ a.dash-ins-name:hover {
   gap: 8px;
   align-items: center;
 }
-.cm-roster-buttons .cm-action-btn.active {
-  border-color: var(--active);
-  color: var(--link);
+/* Add Student: the shared primary size, one width whatever the font. */
+.cm-roster-bar .tb-action-btn.cm-roster-add {
+  width: 112px;
+  padding: 0;
+  justify-content: center;
 }
 .cm-roster-section {
   padding: 0;
@@ -3750,19 +3762,16 @@ a.dash-ins-name:hover {
 .cm-rs-tools ~ .cm-roster-buttons {
   flex-shrink: 0;
 }
-.cm-rs-search input {
-  width: 240px;
+.cm-rs-search {
+  --atb-search-min: 240px;
+  --atb-search-max: 240px;
+  flex: 0 0 240px;
 }
 .cm-rs-summary {
   margin: 0;
 }
-.cm-rs-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+.cm-rs-summary:empty {
+  display: none;
 }
 .cm-rs-section {
   position: relative;

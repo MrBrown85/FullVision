@@ -1345,7 +1345,7 @@ window.DashClassManager = (function () {
       )
         noParent++;
     });
-    var parts = [students.length + (students.length === 1 ? ' student' : ' students')];
+    var parts = [];
     if (desig) parts.push(desig + ' with designations');
     if (ell) parts.push(ell + ' ELL');
     if (noParent) parts.push(noParent + ' missing a parent email');
@@ -3665,13 +3665,11 @@ window.DashClassManager = (function () {
   function renderCmSidebar(courseIds) {
     var html =
       '<aside class="cm-sidebar" aria-label="Classes">' +
-      '<div class="cm-sidebar-header">' +
+      '<div class="cm-sidebar-header cm-bar">' +
       '<span class="cm-sidebar-title">Classes</span>' +
       // New Class sits at the top of the class list, as a button (in place
       // of the class count, which the list itself shows).
-      '<button type="button" class="cm-action-btn cm-new-class-btn" data-action="cmStartCreate">' +
-      '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
-      'New Class</button>' +
+      '<button type="button" class="tb-action-btn tb-action-secondary cm-new-class-btn" data-action="cmStartCreate">+ New Class</button>' +
       '</div>' +
       '<div class="cm-class-list">';
     if (cmMode === 'create') {
@@ -3748,7 +3746,7 @@ window.DashClassManager = (function () {
       (tab === 'students' ? ' cm-tabbed-wide' : '') +
       '">' +
       _cmRenderHeader(cid, studentCount, assessCount, tagCount) +
-      _cmRenderTabs(tab, studentCount, tagCount) +
+      _cmRenderTabs(tab) +
       '<div class="cm-tab-panel cm-tab-panel-' +
       tab +
       '" role="tabpanel" id="cm-tabpanel" aria-labelledby="cm-tab-' +
@@ -3809,21 +3807,21 @@ window.DashClassManager = (function () {
     var html =
       _cmImportDoneHtml(cid) +
       (students.length
-        ? '<div class="cm-roster-bar">' +
+        ? '<div class="cm-roster-bar cm-bar">' +
           '<div class="cm-rs-tools">' +
-          '<label class="cm-rs-search"><span class="cm-rs-sr">Find a student</span>' +
-          '<input class="cm-input" type="search" placeholder="Find a student" data-action-input="cmRosterSearch" value="' +
+          '<div class="atb-search cm-rs-search"><div class="atb-field">' +
+          '<span class="assess-search-icon atb-ico atb-ico-search" aria-hidden="true"></span>' +
+          '<input type="text" placeholder="Find a Student" aria-label="Find a Student" data-action-input="cmRosterSearch" value="' +
           esc(cmRosterQuery) +
-          '"></label>' +
-          '<span class="cm-hint cm-rs-summary">Click any field to edit. Enter or ↓ moves down a column, Tab moves across.' +
-          '<span id="cm-rs-more" hidden> Scroll sideways for more columns.</span></span>' +
+          '"></div></div>' +
+          '<span class="cm-hint cm-rs-summary" id="cm-rs-more" hidden>Scroll sideways for more columns.</span>' +
           '<span class="cm-hint cm-rs-summary" id="cm-rs-summary">' +
           esc(_cmRosterSummary(cid)) +
           '</span>' +
           '</div>' +
           '<div class="cm-roster-buttons">' +
-          '<button type="button" class="cm-action-btn" data-action="cmImportRoster">Import Roster</button>' +
-          '<button type="button" class="btn btn-primary cm-roster-add" data-action="cmShowAddStudent">Add Student</button>' +
+          '<button type="button" class="tb-action-btn tb-action-secondary" data-action="cmImportRoster">Import Roster</button>' +
+          '<button type="button" class="tb-action-btn cm-roster-add" data-action="cmShowAddStudent">Add Student</button>' +
           '</div>' +
           '</div>'
         : '') +
@@ -4164,8 +4162,7 @@ window.DashClassManager = (function () {
   }
 
   /* \u2500\u2500 Class header and tabs \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-     The class's name and counts, Open Gradebook, and Class Actions
-     (Duplicate, Archive, and Delete once archived) in a menu. */
+     The class's name and counts, Open Gradebook, and the ⋯ Class Actions menu. */
   function _cmRenderHeader(cid, studentCount, assessCount, tagCount) {
     var course = COURSES[cid];
     var isArchived = isCourseArchived(cid);
@@ -4187,12 +4184,12 @@ window.DashClassManager = (function () {
       (isArchived ? ' \u00B7 Archived' : '') +
       '</div>' +
       '</div>' +
-      '<div class="cm-head-actions">' +
-      '<button type="button" class="cm-action-btn" data-action="cmOpenGradebook" data-cid="' +
+      '<div class="cm-head-actions cm-bar">' +
+      '<button type="button" class="tb-action-btn tb-action-secondary" data-action="cmOpenGradebook" data-cid="' +
       cid +
       '">Open Gradebook</button>' +
       '<div class="cm-std-menu-wrap">' +
-      '<button type="button" class="cm-action-btn" data-action="cmStdMenu" aria-haspopup="menu" aria-expanded="false">Class Actions \u25BE</button>' +
+      '<button type="button" class="atb-icon-btn" data-action="cmStdMenu" aria-haspopup="menu" aria-expanded="false" aria-label="Class Actions" title="Class Actions"><span class="atb-ico atb-ico-dots" aria-hidden="true"></span></button>' +
       '<div class="cm-std-menu cm-class-actions-menu" role="menu" hidden>' +
       '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmDuplicateCourse" data-cid="' +
       cid +
@@ -4200,7 +4197,10 @@ window.DashClassManager = (function () {
       '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmDownloadBackup" data-cid="' +
       cid +
       '">Download Class Backup</button>' +
-      '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmToggleArchive" data-cid="' +
+      '<span class="cm-std-menu-sep" role="separator"></span>' +
+      '<button type="button" role="menuitem" class="cm-std-menu-item' +
+      (isArchived ? '' : ' danger') +
+      '" data-action="cmToggleArchive" data-cid="' +
       cid +
       '">' +
       (isArchived ? 'Unarchive Class' : 'Archive Class') +
@@ -4256,9 +4256,7 @@ window.DashClassManager = (function () {
     });
   }
 
-  function _cmRenderTabs(active, studentCount, tagCount) {
-    var counts = { students: studentCount, competencies: tagCount };
-    if (typeof CmQuestionnaires !== 'undefined') counts.questionnaires = CmQuestionnaires.countOn(cmSelectedCourse);
+  function _cmRenderTabs(active) {
     return (
       '<div class="cm-tabs" role="tablist" aria-label="Class settings">' +
       CM_TABS.map(function (t) {
@@ -4277,7 +4275,6 @@ window.DashClassManager = (function () {
           t.id +
           '">' +
           t.label +
-          (counts[t.id] != null ? ' <span class="cm-tab-count">' + counts[t.id] + '</span>' : '') +
           '</button>'
         );
       }).join('') +
@@ -11251,6 +11248,9 @@ window.DashClassManager = (function () {
   function handleKeydown(e) {
     var el = e.target;
     if (e.key === 'Escape' && _cmCloseStdMenus()) {
+      var wrap = el && el.closest && el.closest('.cm-std-menu-wrap');
+      var opener = wrap && wrap.querySelector('[aria-haspopup="menu"]');
+      if (opener) opener.focus();
       e.preventDefault();
       return true;
     }

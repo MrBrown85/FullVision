@@ -33,7 +33,7 @@ shots:
     route: /dashboard
     steps:
       - click role=button[name="Class Settings"]
-      - click role=button[name="New Class"]
+      - click role=button[name=/New Class/]
       - click role=button[name="Grade 8"]
       - click role=button[name="Science"]
       - click main >> text="Science 8" >> nth=-1

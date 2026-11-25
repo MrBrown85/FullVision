@@ -443,7 +443,7 @@ describe('Questionnaires tab', () => {
     }
   });
 
-  it('on another tab, reflections that arrive fill in the tab count and draw nothing again', async () => {
+  it('on another tab, reflections that arrive draw nothing and leave the tab without a count', async () => {
     var stubV2 = window.v2;
     var redraws = 0;
     var holder = document.createElement('div');
@@ -481,25 +481,24 @@ describe('Questionnaires tab', () => {
       document.body.appendChild(holder);
       var tab = document.getElementById('cm-tab-questionnaires');
 
-      expect(CmQuestionnaires.countOn(CID)).toBe(null);
+      expect(CmQuestionnaires.prepare(CID)).toBe(false);
       await tick();
       expect(redraws).toBe(0);
-      expect(tab.querySelector('.cm-tab-count').textContent).toBe('1');
-      expect(tab.textContent).toBe('Reflect 1');
+      expect(tab.querySelector('.cm-tab-count')).toBe(null);
+      expect(tab.textContent).toBe('Reflect');
 
-      // Another class on screen by the time they arrive: its tab is left alone.
+      // Another class on screen by the time they arrive: still nothing drawn.
       Questionnaires._reset();
-      tab.querySelector('.cm-tab-count').textContent = '7';
       holder.querySelector('.cm-class-item').dataset.cid = 'another-class';
-      expect(CmQuestionnaires.countOn(CID)).toBe(null);
+      expect(CmQuestionnaires.prepare(CID)).toBe(false);
       await tick();
       expect(redraws).toBe(0);
-      expect(tab.querySelector('.cm-tab-count').textContent).toBe('7');
+      expect(tab.textContent).toBe('Reflect');
 
       // On the Reflect tab itself, which shows Loading until then, the panel is drawn again.
       Questionnaires._reset();
       tab.classList.add('active');
-      expect(CmQuestionnaires.countOn(CID)).toBe(null);
+      expect(CmQuestionnaires.prepare(CID)).toBe(false);
       await tick();
       expect(redraws).toBe(1);
     } finally {
