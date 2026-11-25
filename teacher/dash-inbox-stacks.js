@@ -235,7 +235,7 @@ window.DashInboxStacks = (function () {
     var q = queue || DashInboxQueue.build(cid, {});
     if (!q.on) return '';
     if (q.stacks.length)
-      return '<button type="button" class="btn btn-primary dash-inbox-action" data-dash-inbox="start">Start Grading</button>';
+      return '<button type="button" class="btn dash-inbox-action is-start" data-dash-inbox="start">Start Grading</button>';
     if (q.returns.length > 1)
       return (
         '<button type="button" class="btn dash-inbox-action is-return" data-dash-inbox="returnall">Return All ' +
