@@ -26,6 +26,16 @@
   min-height: 38px;
   font-weight: 600;
 }
+/* The Dashboard has no solid blue action (e2e/primary-actions.spec.js):
+   Start Grading is an outline button, as Class Settings is. */
+.dash-inbox-action.is-start {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.dash-inbox-action.is-start:hover {
+  background: var(--overlay-hover);
+}
 .dash-inbox-action.is-return {
   color: #fff;
   background: var(--score-3);
