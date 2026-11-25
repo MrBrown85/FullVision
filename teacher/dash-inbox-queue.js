@@ -82,7 +82,7 @@ window.DashInboxQueue = (function () {
 
   /** @param {string} cid @param {{ seen?: string | null, classCounts?: (cid: string, ids: string[]) => any }} [opts]
    * @returns {any} */
-  function build(cid, opts) {
+  function _buildQueue(cid, opts) {
     var GW = _gw();
     /** @type {any} */
     var out = {
@@ -317,10 +317,10 @@ window.DashInboxQueue = (function () {
    * @param {string} cid
    * @returns {{ aid: string, studentIds: string[] }[]} */
   function order(cid) {
-    return build(cid, {}).stacks.map(function (/** @type {any} */ s) {
+    return _buildQueue(cid, {}).stacks.map(function (/** @type {any} */ s) {
       return { aid: s.aid, studentIds: DashInboxModel.gradeOrder(cid, s.aid) };
     });
   }
 
-  return { build: build, open: open, order: order };
+  return { build: _buildQueue, open: open, order: order };
 })();
