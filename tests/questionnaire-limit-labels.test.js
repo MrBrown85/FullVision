@@ -425,11 +425,11 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
   });
 
   describe('9. the ⓘ sheet keeps the focus', () => {
-    it('Tab and Shift-Tab cycle inside it; Escape closes it and the ⓘ button gets the focus', () => {
+    it('Tab and Shift-Tab cycle inside it; Escape closes it and the ⋯ button gets the focus', () => {
       const st = byName('Tyler');
       open(st);
-      const info = el('tq-info-btn');
-      els['tq-info-btn'] = info;
+      const info = el('tq-more-btn');
+      els['tq-more-btn'] = info;
       const o = sheet();
       const done = el('done');
       const other = el('other');

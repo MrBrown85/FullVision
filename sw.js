@@ -289,6 +289,7 @@ const PRECACHE_URLS = [
   '/teacher/report-one-zoom.js',
   '/teacher/report-one-head.js',
   '/teacher/report-print-paper.js',
+  '/teacher/report-toolbar.js',
   '/teacher/report-one-zoom.css',
   '/teacher/report-one-panel.css',
   '/teacher/report-one-page.css',

@@ -38,6 +38,7 @@ const LAZY = {
     'teacher/report-one-zoom.js',
     'teacher/report-one-head.js',
     'teacher/report-print-paper.js',
+    'teacher/report-toolbar.js',
     'teacher/page-reports.js',
     // Assignments' rubric scripts, loaded before Assignments first draws (teacher/router.js _onDemand).
     'teacher/rubric-library.js',
