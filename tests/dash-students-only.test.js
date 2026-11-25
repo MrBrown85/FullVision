@@ -204,11 +204,11 @@ describe('the Dashboard draws the students alone', () => {
     expect(wholePage()).toBe(alone);
   });
 
-  it('an observation tagged with a Core Competency draws the whole page (its count changes)', () => {
+  it('an observation tagged with a Core Competency draws no more than any other (the tile counts assessments)', () => {
     ev(doc.querySelector('[data-action="obsAdd"][data-sid="s4"]'), 'click');
     addQuickOb(CID, 's4', 'Worked well with others', ['cc:COL'], 'strength', null);
     dialog.onAdd({ studentIds: ['s4'], ok: true });
     vi.advanceTimersByTime(10);
-    expect(n.page).toBe(1);
+    expect(n.page).toBe(0);
   });
 });

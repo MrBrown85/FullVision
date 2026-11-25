@@ -95,10 +95,12 @@ test('the answer comes late: no slot at first, then the row is drawn once, and n
   await expect(page.locator('.dash-row-bulletins')).toHaveCount(0);
   await expect(page.locator('.dash-bulletins-tile')).toHaveCount(0);
 
-  // The page settles (its own late draws are over), then a view menu is opened on the row and the server answers.
+  // The page settles (its own late draws are over), then the Not Tagged line is opened on the row and the server answers.
   await page.waitForTimeout(1500);
-  await page.locator('#dash-view-btn-comp').click();
-  await expect(page.locator('#dash-view-menu-comp')).toBeVisible();
+  await page.locator('#dash-comp-tab-core').click();
+  const open = page.locator('#dash-comp-page-core .dash-comp-quiet');
+  await open.click();
+  await expect(open).toHaveAttribute('aria-expanded', 'true');
   await page.evaluate(() => {
     window.__renders = 0;
     const render = PageDashboard.render;
@@ -111,12 +113,12 @@ test('the answer comes late: no slot at first, then the row is drawn once, and n
   await page.waitForTimeout(2500);
   expect(await height(page, '.dash-row-inbox')).toBe(row);
   await expect(page.locator('.dash-row-bulletins')).toHaveCount(0);
-  await expect(page.locator('#dash-view-menu-comp')).toBeVisible();
+  await expect(open).toHaveAttribute('aria-expanded', 'true');
   expect(await page.evaluate(() => window.__renders)).toBe(0);
 
   // The menu closes: the row is drawn once more, with the tile under a 299 px Inbox.
-  await page.keyboard.press('Escape');
-  await expect(page.locator('#dash-view-menu-comp')).toBeHidden();
+  await open.click();
+  await expect(open).toHaveAttribute('aria-expanded', 'false');
   await expect.poll(() => page.locator('.dash-bulletins-tile').count(), { timeout: 6000 }).toBe(1);
   // 60 and 40 percent of the row less the 12 px gap.
   expect(Math.abs((await height(page, '.dash-row-inbox')) - (row - 12) * 0.6)).toBeLessThanOrEqual(1);

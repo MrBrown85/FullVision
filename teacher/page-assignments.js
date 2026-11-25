@@ -17704,12 +17704,8 @@ window.PageAssignments = (function () {
       });
     }
 
-    // Auto-open new form if ?new=1
-    if (params && params.new === '1') {
-      setTimeout(function () {
-        showNewForm();
-      }, 100);
-    }
+    // ?new=1 opens the form; ?tags= ticks those competencies in it (the Dashboard's Not Assessed names).
+    if (params && params.new === '1') setTimeout(() => AssignCompPicker.openNew(showNewForm, params.tags), 100);
 
     // ?edit= opens that assessment in the editor (the gradebook's Edit
     // Assignment Details).

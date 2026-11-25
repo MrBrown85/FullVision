@@ -204,28 +204,39 @@ export async function buildClass(page, o) {
 /* The dashboard for a class built here: the page drawn again for it. */
 export async function showClass(page, cid) {
   await page.evaluate(id => window._pageSwitchCourse && window._pageSwitchCourse(id), cid);
-  await page.locator('.dash-comp-tile .dash-comp-card').waitFor();
+  await page.locator('.dash-comp-tile .dash-comp-list').first().waitFor();
 }
 
 /* What the stress test measures for the Competencies tile's open page: the
-   tile's and the row's heights, sideways overflow, the Needs Support codes
-   drawn, the heights of Level Mix's and Self-Assessment's rows, and whether
-   the page itself scrolls (only the list inside it may). */
+   tile's and the row's heights, sideways overflow, the heights of the rows,
+   whether any row's ticks or name run past the tile, whether the page
+   itself scrolls (only the list inside it may), and how far the list does. */
 export async function measureTile(page) {
   return page.evaluate(() => {
     const tile = document.querySelector('.dash-comp-tile');
     const row = document.querySelector('.dash-row');
     const on = document.querySelector('.dash-comp-page.is-on');
-    const lines = Array.prototype.map.call(on.querySelectorAll('.dash-comp-ln'), el =>
-      Math.round(el.getBoundingClientRect().height),
-    );
-    const codes = Array.prototype.map.call(on.querySelectorAll('.dash-comp-code'), el => el.textContent);
+    const list = on.querySelector('.dash-comp-list');
+    const t = tile.getBoundingClientRect();
+    const rows = Array.prototype.slice.call(on.querySelectorAll('.dash-comp-it'));
+    const lines = rows.map(el => Math.round(el.getBoundingClientRect().height));
+    const outside = Array.prototype.slice
+      .call(on.querySelectorAll('.dash-comp-it > *, .dash-comp-tick, .dash-comp-sub > *'))
+      .filter(el => {
+        const r = el.getBoundingClientRect();
+        // A row scrolled out of the list is not "outside": only sideways and the tile's edges count.
+        return r.width > 0 && (r.right > t.right + 0.5 || r.left < t.left - 0.5);
+      }).length;
     const m = document.getElementById('main');
     return {
-      tileH: Math.round(tile.getBoundingClientRect().height),
+      tileH: Math.round(t.height),
       rowH: Math.round(row.getBoundingClientRect().height),
       lines,
-      codes,
+      folders: on.querySelectorAll('.dash-comp-fold').length,
+      ticks: Array.prototype.map.call(rows, el => el.querySelectorAll('.dash-comp-tick').length),
+      outside,
+      listScrollsSideways: list.scrollWidth - list.clientWidth,
+      listScrolls: list.scrollHeight > list.clientHeight + 1,
       pageScrolls: on.scrollHeight > on.clientHeight + 1,
       docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       mainOverflow: m.scrollWidth - m.clientWidth,

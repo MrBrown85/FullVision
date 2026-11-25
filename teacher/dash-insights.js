@@ -9,6 +9,21 @@ window.DashInsights = (function () {
   var GLYPHS = { 1: '○', 2: '◐', 3: '●', 4: '◆' };
   var DEFAULT_RULE = { below: 3, min: 3 };
 
+  /* One competency as a column, as columns() draws a section outside any
+     folder. The Competencies tile lists every competency on its own, so it
+     asks for a section's column even where the class groups them in folders. */
+  function _sectionCol(sec) {
+    var tag = sec.tags && sec.tags[0];
+    return {
+      key: 's:' + sec.id,
+      which: { sectionId: sec.id },
+      label: sec.shortName || (tag && (tag.label || tag.code || tag.name)) || sec.name || '',
+      title: sec.name || '',
+      color: sec.color,
+      sectionIds: [sec.id],
+    };
+  }
+
   /* The class's competencies as the dashboard lists them: each group, then
      the sections outside a group; every section when there are no groups.
      Each has `which` for competencyDistribution, its short `label`, its
@@ -18,17 +33,7 @@ window.DashInsights = (function () {
     var hasGroups = grouped.groups.some(function (g) {
       return g.sections.length > 0;
     });
-    var secCol = function (sec) {
-      var tag = sec.tags && sec.tags[0];
-      return {
-        key: 's:' + sec.id,
-        which: { sectionId: sec.id },
-        label: sec.shortName || (tag && (tag.label || tag.code || tag.name)) || sec.name || '',
-        title: sec.name || '',
-        color: sec.color,
-        sectionIds: [sec.id],
-      };
-    };
+    var secCol = _sectionCol;
     if (!hasGroups) return getSections(cid).map(secCol);
     var out = [];
     grouped.groups.forEach(function (gi) {
@@ -224,6 +229,13 @@ window.DashInsights = (function () {
     var col = columns(cid).find(function (c) {
       return c.key === pop.key;
     });
+    // A competency inside a folder is not a column of its own: build it.
+    if (!col && String(pop.key).indexOf('s:') === 0) {
+      var sec = getSections(cid).find(function (x) {
+        return 's:' + x.id === pop.key;
+      });
+      col = sec ? _sectionCol(sec) : null;
+    }
     if (!col) return '';
     var dist = competencyDistribution(cid, _ids(allStudents), col.which);
     var band = dist.bands[pop.level - 1];
