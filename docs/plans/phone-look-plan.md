@@ -60,8 +60,8 @@ Colin, Nov 24: "Yes, hold it", and the toast must not get in the way of grading 
 
 - **Held, not taken back.** Return and Next moves on at once, but the return is sent seven seconds later. Undo inside those seconds sends nothing and brings the card back with its grade still a draft. A grade is never taken back from a student.
 - **Where the toast sits.** "Returned to Maya" and Undo lie over the tab bar for the seven seconds. That strip is the one part of the grading screen the next student is not graded with: the toast covers no paper, no criterion and neither button.
-- **One at a time.** The next Return and Next sends the one held and holds the new one. Leaving the grading screen (Back, a tab) or the app sends it at once. While it is held, its card reads Returned.
-- **If the app is closed first** without leaving the screen, the grade is still a draft, in To Return.
+- **One at a time.** The next Return and Next sends the one held and holds the new one. Leaving the grading screen (Back, a tab) or the app (locking the phone, switching apps) sends it at once (Colin, Nov 24: "Yes, send it"). While it is held, its card reads Returned.
+- **If the app is killed outright** inside the seven seconds, the grade is still a draft, in To Return.
 - With the switch off, and in a class on As Soon As I Save, nothing changes.
 
 It lives in `grade-look.js` (`hold`, `held`, `flush`, `undo`); `tab-grade.js` hands it the return and asks whether a card's return is held.
