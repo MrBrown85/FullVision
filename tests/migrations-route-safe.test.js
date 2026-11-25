@@ -53,6 +53,10 @@ export const LISTED = [
   'migrations/local-test/criterion-own-line-live-precheck.sql',
   'migrations/local-test/criterion-own-line-live-postcheck.sql',
   'migrations/local-test/criterion-own-line-undo.sql',
+  'migrations/local-test/bc-time-live-fingerprints.sql',
+  'migrations/local-test/bc-time-live-precheck.sql',
+  'migrations/local-test/bc-time-live-postcheck.sql',
+  'migrations/local-test/bc-time-undo.sql',
 ];
 
 const BS = String.fromCharCode(92);
