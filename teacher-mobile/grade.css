@@ -354,6 +354,29 @@
 .m-grade-chip-exc {
   color: var(--text-2);
 }
+/* A status chip is a button: tapped, it takes the status off. */
+button.m-grade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Its ×, drawn here so the chip's words stay the status's. */
+button.m-grade-chip::after {
+  content: '\00d7';
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0.7;
+}
+button.m-grade-chip:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
 .m-grade-chips .m-badge {
   margin: 0;
   font-size: 13px;

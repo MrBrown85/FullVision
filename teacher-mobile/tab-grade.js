@@ -1143,11 +1143,9 @@ window.MGrade = (function () {
       });
     }
 
-    /* What is out of the ordinary on a card, as chips above the paper: IEP,
-       MOD or ELL; a status that is set (Late, Missing, Excused) and, on a
-       pair's or group's card, whose it is; Graded Separately. Nothing at
-       all when there is nothing to say. The chips are not controls: a status
-       is set from ⋯ (grade-look.js). */
+    /* What is out of the ordinary on a card, as chips above the paper: IEP, MOD or ELL; a
+       status (Late, Missing, Excused; set from ⋯, a tap on its chip takes it off) and, on a
+       pair's or group's card, whose it is; Graded Separately. Nothing when there is nothing to say. */
     // html-safe: names go through MC.esc; classes and labels are fixed words
     function _chipsHtml(cid, assessment, unit, allStatuses) {
       var members = unit.view ? unit.view.members : [unit.st.id];
@@ -1178,7 +1176,7 @@ window.MGrade = (function () {
         var who = unit.view && st ? (displayNameFirst(st) || displayName(st)) + ': ' : '';
         if (unit.view && isGradedSeparately(assessment, m)) return add('m-grade-chip', who + 'Graded Separately');
         var status = allStatuses[m + ':' + assessment.id] || null;
-        if (status) add('m-grade-chip m-grade-chip-' + status.toLowerCase(), who + _STATUS_WORDS[status]);
+        if (status) html += MGradeLook.statusChip(m, assessment.id, status, who + _STATUS_WORDS[status]);
       });
       if (unit.separateFrom) add('m-grade-chip', 'Graded Separately');
       return html ? '<div class="m-grade-chips">' + html + '</div>' : '';
@@ -3054,6 +3052,8 @@ window.MGrade = (function () {
       });
       if (groupGradingUnits(cid, a, [])) _redrawSwiper(cid, aid);
       _syncReturnBar();
+      // Undo is the same tap again: it sets back the status that was, or takes this one off.
+      MGradeLook.statusUndo(cid, sid, aid, current, newStatus, () => setStatus(cid, sid, aid, current || newStatus));
     }
 
     /* The entries an undo puts back. Missing or Excused work takes no score
