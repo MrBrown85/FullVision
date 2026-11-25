@@ -541,23 +541,8 @@
   }
 
   /* ── Demo Mode pill ─────────────────────────────────────────
-     In Demo Mode each tab's first screen shows the amber Demo Mode pill
-     after the class name, as on the desktop top bar. A tap opens a sheet
-     with the same items as the desktop panel. */
-  var DEMO_PILL_HTML =
-    '<button type="button" class="tb-demo-pill m-demo-pill" data-action="m-demo-menu" aria-haspopup="dialog">Demo Mode' +
-    '<svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5l3 3 3-3"/></svg>' +
-    '</button>';
-
-  function _addDemoPill(screen) {
-    if (!screen || typeof isDemoMode !== 'function' || !isDemoMode()) return;
-    var inner = screen.querySelector('.m-nav-bar-inner');
-    if (!inner || inner.querySelector('.m-demo-pill')) return;
-    var title = inner.querySelector('.m-nav-bar-title-inline');
-    // html-safe: DEMO_PILL_HTML is fixed markup.
-    if (title) title.insertAdjacentHTML('beforebegin', DEMO_PILL_HTML);
-  }
-
+     In Demo Mode each tab's top bar (MC.tabBar) shows the amber Demo pill at
+     its left. A tap opens a sheet with the same items as the desktop panel. */
   var DEMO_SECONDARY_STYLE = 'background:var(--surface-2);color:var(--text);border:none';
 
   function _demoSheetHtml() {
@@ -628,7 +613,6 @@
     // html-safe: html is MStudents.renderList, MObserve.renderFeed, MGrade.renderPicker or MBulletins.render, each checked to escape its text.
     stack.innerHTML = html;
     _navStacks[tab].push(tab);
-    _addDemoPill(stack.querySelector('.m-screen'));
 
     // The saved filters (renderPicker draws every cell; filterAssessments hides those that don't match).
     if (tab === 'grade') MGrade.filterAssessments(_cid);
@@ -648,7 +632,7 @@
     if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
   }
 
-  // The Settings sheet's Active Class, or Open Class on a photo warning.
+  // The top bar's class list, or Open Class on a photo warning.
   function _switchClass(newCid) {
     if (!newCid || newCid === _cid) return;
     MGradeLook.flush(); // a return held for Undo goes now
@@ -1024,17 +1008,8 @@
         return;
       }
 
-      // Settings sheet (course switcher, sign out, switch to desktop)
+      // ⋯: the Settings sheet (Help, sign out, switch to desktop)
       if (action === 'm-settings') {
-        var pickerCourses = getPickerCourses(_cid);
-        var courseOpts = pickerCourses
-          .map(function (c) {
-            return (
-              '<option value="' + c.id + '"' + (c.id === _cid ? ' selected' : '') + '>' + MC.esc(c.name) + '</option>'
-            );
-          })
-          .join('');
-        var hasCourses = pickerCourses.length > 1;
         // getLastSyncedAt() is an ISO string (data.js). Calling .toISOString()
         // on it threw, so the gear did nothing after the first sync.
         var lastSyncedAt = window.GB ? window.GB.getLastSyncedAt() : null;
@@ -1061,14 +1036,6 @@
             '<div style="font-size:17px;font-weight:600;text-align:center;margin-bottom:4px">Settings</div>' +
             userBlock +
             syncLine +
-            (hasCourses
-              ? '<div style="margin-bottom:16px">' +
-                '<div style="font-size:13px;font-weight:600;color:var(--text-3);margin-bottom:6px">Active Class</div>' +
-                '<select id="m-course-select" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);font-size:17px;font-family:inherit;background:var(--surface);color:var(--text)">' +
-                courseOpts +
-                '</select>' +
-                '</div>'
-              : '') +
             // Help opens the help site in a new tab.
             '<a class="m-btn-primary m-help-link" href="/help" target="_blank" rel="noopener">Help</a>' +
             '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-switch-desktop">Switch to Desktop</button>' +
@@ -1076,11 +1043,40 @@
             versionBlock +
             '</div>',
         );
-        var courseSelect = document.getElementById('m-course-select');
-        if (courseSelect)
-          courseSelect.addEventListener('change', function () {
-            _switchClass(this.value);
-          });
+        return;
+      }
+      // The class name in the top bar: the teacher's classes, the open one ticked.
+      if (action === 'm-class-switch') {
+        var classes = getPickerCourses(_cid);
+        MC.presentSheet(
+          '<div class="m-class-sheet" role="group" aria-label="Choose a Class">' +
+            '<h2 class="m-class-sheet-title">Choose a Class</h2>' +
+            classes
+              .map(function (c) {
+                var open = c.id === _cid;
+                return (
+                  '<button type="button" class="m-class-row" data-action="m-class-pick" data-cid="' +
+                  MC.esc(c.id) +
+                  '"' +
+                  (open ? ' aria-current="true"' : '') +
+                  '><span class="m-class-row-name">' +
+                  MC.esc(c.name) +
+                  '</span>' +
+                  (open
+                    ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
+                    : '') +
+                  '</button>'
+                );
+              })
+              .join('') +
+            '</div>',
+        );
+        return;
+      }
+      if (action === 'm-class-pick') {
+        var picked = target.getAttribute('data-cid');
+        if (picked === _cid) MC.dismissSheet();
+        else _switchClass(picked);
         return;
       }
       // Open Class on a photo warning (shared/photo-expiry.js): opening it keeps the photos.

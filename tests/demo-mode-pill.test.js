@@ -1,6 +1,7 @@
-import './setup.js';
+import './setup-mobile.js';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
+import { parseHTML } from 'linkedom';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -48,8 +49,15 @@ describe('Demo Mode pill', () => {
   });
 
   it('is on the phone too, with the same sheet', () => {
+    var bar = html => parseHTML(html).document.querySelector('.m-tabbar');
+    var out = withDemo(false, () => bar(MComponents.tabBar('c1', { id: 'x' })));
+    expect(out.querySelector('.m-tabbar-demo')).toBeNull();
+    var inDemo = withDemo(true, () => bar(MComponents.tabBar('c1', { id: 'x' })));
+    expect(inDemo.querySelector('.m-tabbar-demo').getAttribute('data-action')).toBe('m-demo-menu');
+    // At the left of the class name, which is before the sync dot and the menu.
+    var kids = [...inDemo.querySelector('.m-tabbar-inner').children].map(n => n.className);
+    expect(kids[0]).toBe('m-tabbar-demo');
     var src = readFileSync(resolve(root, 'teacher-mobile/shell.js'), 'utf8');
-    expect(src).toContain('_addDemoPill(stack.querySelector');
     expect(src).toContain('Demo Mode');
     expect(src).toContain("'/login.html#signup'");
     expect(src).toContain('Reset Demo Data');

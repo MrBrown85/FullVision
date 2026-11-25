@@ -58,10 +58,10 @@ afterEach(() => {
 
 /* ── renderPicker ───────────────────────────────────────────── */
 describe('MGrade.renderPicker', () => {
-  it('renders assessment picker with title', () => {
+  it('renders the Grade tab under the tabs’ top bar', () => {
     mockDataLayer({});
     const html = MGrade.renderPicker(CID);
-    expect(html).toContain('Grade');
+    expect(html).toContain('m-tabbar');
     expect(html).toContain('m-screen');
   });
 

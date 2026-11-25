@@ -167,7 +167,7 @@ for (const scheme of ['light', 'dark']) {
     test('the sheet adds a Note, the card is yellow, and the Note pill filters the feed', async ({ page }) => {
       await enterDemo(page, { phone: true });
       await page.locator('.m-tab-item[data-tab="observe"]').click();
-      const avatar = page.locator('.m-quick-avatar').first();
+      const avatar = page.locator('.m-obs-face[data-action="m-obs-quick-menu"]').first();
       const sid = await avatar.getAttribute('data-sid');
       await avatar.click();
       await page.getByRole('button', { name: 'Write Your Own…' }).click();
@@ -180,7 +180,7 @@ for (const scheme of ['light', 'dark']) {
       await sheet.locator('#m-obs-submit').click();
       await expect.poll(async () => (await storedObs(page, sid)).map(o => o.sentiment)).toContain('note');
 
-      const filter = page.locator('.m-filter-pill[data-filter="sentiment:note"]');
+      const filter = page.locator('.m-obs-track .m-seg-btn[data-filter="sentiment:note"]');
       await expect(filter).toHaveText('Note');
       await filter.click();
       const blocks = page.locator('#m-obs-cards .m-obs-card .m-obs-type');
@@ -196,7 +196,7 @@ for (const scheme of ['light', 'dark']) {
     test('the class sweep offers Note and saves it', async ({ page }) => {
       await enterDemo(page, { phone: true });
       await page.locator('.m-tab-item[data-tab="observe"]').click();
-      await page.getByRole('button', { name: 'Start a sweep' }).click();
+      await page.getByRole('button', { name: 'Sweep' }).click();
       await expect(page.locator('#m-screen-obs-sweep')).toBeVisible();
       await page.locator('.m-sweep-tile[data-state=""]').first().click();
       const types = page.locator('.m-sweep-type');

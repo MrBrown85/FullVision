@@ -77,7 +77,7 @@ test.describe('Photo warning on the phone', () => {
     if (SHOTS) await page.screenshot({ path: SHOTS + '/photo-expiry-phone.png' });
     await btn.click();
     await expect.poll(() => page.evaluate(() => getActiveCourse())).toBe(cid);
-    await expect(page.locator('.m-nav-bar-class-name').first()).toHaveText('Social Studies 10');
+    await expect(page.locator('.m-tabbar-name').first()).toHaveText('Social Studies 10');
     await expect(page.locator('.photo-expiry-line')).toHaveCount(0);
   });
 });

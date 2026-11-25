@@ -44,7 +44,7 @@ test('every sheet dims the page and a tap on the dim closes it', async ({ page }
   await expectDimCloses(page, () => page.locator('[data-action="m-settings"]').first().click());
 
   await tab(page, 'observe');
-  await expectDimCloses(page, () => page.locator('.m-quick-avatar[data-action="m-obs-quick-menu"]').first().click());
+  await expectDimCloses(page, () => page.locator('.m-obs-face[data-action="m-obs-quick-menu"]').first().click());
   await expectDimCloses(page, () => page.locator('[data-action="m-obs-new"]').click());
   await expectDimCloses(page, () => page.locator('#m-obs-cards [data-action="m-obs-edit"]').first().click());
   await expectDimCloses(page, async () => {

@@ -77,7 +77,7 @@ test('the fourth tab is last; Post a Photo shows the photo, a caption and the fa
   ]);
   await expect(tabs.nth(3)).toBeVisible();
   await openTab(page);
-  await expect(page.locator('#m-screen-bulletins .m-title-large')).toHaveText('Bulletins');
+  await expect(page.locator('#m-screen-bulletins .m-tabbar-name')).toHaveText('Science 8');
   await expect(page.locator('.m-bulletin-card').first()).toBeVisible();
   expect(await atRest(page)).toEqual({ camera: false, sheet: false, backdrop: 'none', inputs: 0 });
 
@@ -85,7 +85,7 @@ test('the fourth tab is last; Post a Photo shows the photo, a caption and the fa
   const cam = page.locator('#m-bulletin-camera');
   await expect(cam).toBeVisible();
   await expect(cam.locator('.m-addwork-shutter')).toBeVisible();
-  await expect(cam).toContainText('Posts to Science 8: every student’s phone.');
+  await expect(cam).not.toContainText('Posts to');
   const input = cam.locator('input[type=file]');
   await expect(input).toHaveAttribute('capture', 'environment');
   await expect(input).toBeHidden();
@@ -99,8 +99,9 @@ test('the fourth tab is last; Post a Photo shows the photo, a caption and the fa
   await expect(cam).toHaveCount(0);
 
   const first = page.locator('.m-bulletin-card').first();
-  await expect(first.locator('.m-bulletin-kind')).toHaveText('Photo of the Board');
-  await expect(first.locator('.m-bulletin-time')).toHaveText('Just Now');
+  // Posted just now: it is under Today, and a photo of the board says nothing of its kind.
+  await expect(page.locator('#m-bulletin-feed > :first-child')).toHaveText('Today');
+  await expect(first.locator('.m-bulletin-photo img')).toHaveAttribute('alt', 'Photo of the board');
   await expect(first.locator('.m-bulletin-words')).toHaveText('Tonight’s question');
   await expect(first.locator('.m-bulletin-photo img')).toHaveAttribute('src', /^data:image\/jpeg/);
   await expect(first.locator('.m-bulletin-seen')).toHaveText('Not Seen Yet');
@@ -133,7 +134,7 @@ test('Write a Bulletin posts a reminder with its last day and its assignment', a
 
   const card = page.locator('.m-bulletin-card', { hasText: 'Bring your signed lab safety form' });
   await expect(card).toHaveCount(1);
-  await expect(card.locator('.m-bulletin-kind')).toHaveText(/^Reminder · Until /);
+  await expect(card.locator('.m-bulletin-reminder')).toHaveText(/^Reminder · Until /);
   const kept = await page.evaluate(
     () => getBulletins(getActiveCourse()).filter(b => b.body === 'Bring your signed lab safety form on Thursday.')[0],
   );
@@ -160,6 +161,7 @@ test('who has seen it: the sheet lists the students not seen first, with Show It
   await expect(sheet.locator('.m-bulletin-sec')).toHaveText('Not Seen Yet · ' + n);
   await expect(sheet.locator('.m-bulletin-names').first().locator('.m-cell')).toHaveCount(n);
   await expect(sheet.locator('[data-m-bulletin="again"]')).toHaveText('Show It Again on These ' + n + ' Phones');
+  await expect(sheet.locator('[data-m-bulletin="observe-these"]')).toHaveText('Observe These ' + n);
   await expect(sheet.locator('[data-m-bulletin="show-seen"]')).toHaveText(/^Show Who Has Seen It \(\d+\)$/);
   await sheet.locator('[data-m-bulletin="again"]').click();
   await expect(sheet.locator('[data-m-bulletin="again"]')).toBeDisabled();
@@ -288,9 +290,87 @@ test('with motion on: a new photo glides in at the top, and the feed is not draw
   await expect(page.locator('#m-bulletin-caption')).toBeVisible({ timeout: 15000 });
   await page.locator('[data-m-bulletin-cam="post"]').click();
   const added = page.locator('.m-bulletin-card').first();
-  await expect(added.locator('.m-bulletin-kind')).toHaveText('Photo of the Board');
+  await expect(added.locator('.m-bulletin-photo img')).toHaveAttribute('alt', 'Photo of the board');
   // The card that was first is the same element, moved down (it was not drawn again).
   await expect(page.locator('.m-bulletin-card[data-mark="kept"]')).toHaveCount(1);
+});
+
+test('the tab as the board draws it: its own top bar, day headings, tiles, and "8 Not Seen" or "All Seen"', async ({
+  page,
+}) => {
+  await openPhone(page);
+  await openTab(page);
+  // The top bar: the Demo pill, the class's name with a chevron, the sync dot and ⋯. No large title.
+  const bar = page.locator('#m-screen-bulletins .m-tabbar');
+  await expect(bar.locator('.m-tabbar-demo')).toBeVisible();
+  await expect(bar.locator('.m-tabbar-name')).toHaveText('Science 8');
+  await expect(bar.locator('#sync-indicator-dot')).toBeVisible();
+  await expect(bar.locator('[data-action="m-settings"]')).toBeVisible();
+  await expect(page.locator('#m-screen-bulletins .m-title-large')).toHaveCount(0);
+  // The page is a step darker than the cards, which stand off it.
+  const tone = await page.evaluate(() => {
+    const body = getComputedStyle(document.querySelector('.m-bulletin-content')).backgroundColor;
+    const card = getComputedStyle(document.querySelector('.m-bulletin-card'));
+    return { body, card: card.backgroundColor, shadow: card.boxShadow };
+  });
+  expect(tone.body).not.toBe(tone.card);
+  expect(tone.shadow).not.toBe('none');
+  // A day heading, not each card's kind and time.
+  await expect(page.locator('.m-bulletin-day').first()).toHaveText('Today');
+  await expect(page.locator('.m-bulletin-kind, .m-bulletin-time')).toHaveCount(0);
+  // A file and a link are tiles: the name, then what it is.
+  const tile = page.locator('.m-bulletin-tile').first();
+  await expect(tile.locator('.m-bulletin-tile-title')).toBeVisible();
+  await expect(tile.locator('.m-bulletin-tile-sub')).toBeVisible();
+  // "8 Not Seen" as one button (read out in full), or "All Seen".
+  const open = page.locator('.m-bulletin-seen:not(.is-all)', { hasText: 'Not Seen' }).first();
+  await expect(open).toHaveText(/^\d+ Not Seen$/);
+  await expect(open).toHaveAttribute('aria-label', /^Seen by \d+ of \d+ · \d+ Not Seen$/);
+  await expect(page.locator('.m-bulletin-seen.is-all').first()).toHaveText('All Seen');
+});
+
+test('Write a Bulletin and Post a Photo say nothing of where they post; Let Students React is a row with its switch at the right', async ({
+  page,
+}) => {
+  await openPhone(page);
+  await openTab(page);
+  await page.locator('[data-m-bulletin="write"]').click();
+  const sheet = page.locator('#m-bulletin-write');
+  await expect(sheet).not.toContainText('Posts to');
+  const row = sheet.locator('.m-bulletin-switch');
+  await expect(row).toBeVisible();
+  const at = await row.evaluate(el => {
+    const r = e => e.getBoundingClientRect();
+    const box = r(el);
+    return {
+      words: r(el.querySelector('span')).left - box.left,
+      input: box.right - r(el.querySelector('input')).right,
+    };
+  });
+  expect(at.words).toBeLessThan(20);
+  expect(at.input).toBeLessThan(20);
+  const switchBox = row.locator('input');
+  const was = await switchBox.isChecked();
+  await switchBox.click();
+  expect(await switchBox.isChecked()).toBe(!was);
+  await sheet.locator('[data-m-bulletin="close"]').click();
+  await page.locator('[data-m-bulletin="photo"]').click();
+  await expect(page.locator('#m-bulletin-camera')).not.toContainText('Posts to');
+});
+
+test('8 Not Seen: Observe These starts one observation on the students who have not seen it', async ({ page }) => {
+  await openPhone(page);
+  await openTab(page);
+  const seen = page.locator('.m-bulletin-seen:not(.is-all)', { hasText: 'Not Seen' }).first();
+  const n = Number(/^(\d+) Not Seen$/.exec((await seen.innerText()).trim())[1]);
+  await seen.click();
+  const sheet = page.locator('#m-bulletin-seen-sheet');
+  const names = await sheet.locator('.m-bulletin-names').first().locator('.m-cell-title').allTextContents();
+  expect(names).toHaveLength(n);
+  await sheet.locator('[data-m-bulletin="observe-these"]').click();
+  const form = page.locator('#m-obs-edit');
+  await expect(form).toBeVisible();
+  await expect(form.locator('#m-obs-stu-row')).toContainText(String(n));
 });
 
 test('the confirm’s main button is never under the tap that opened it', async ({ page }) => {

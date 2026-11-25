@@ -203,7 +203,7 @@ test('Reset Demo Data deletes the photos a teacher added on the phone', async ({
   );
   expect(kept).toEqual({ result: 'sent', queued: 1 });
 
-  await page.locator('.m-screen .m-demo-pill').click();
+  await page.locator('.m-screen .m-tabbar-demo').click();
   const sheet = page.locator('#m-sheet-container .m-sheet.m-sheet-visible');
   await sheet.getByRole('button', { name: 'Reset Demo Data' }).click();
   // The reset reloads the page once the photos are gone.

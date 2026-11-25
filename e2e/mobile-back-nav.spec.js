@@ -121,10 +121,10 @@ test('after a class switch the Grade tab opens on its list, not the old class’
   await page.waitForTimeout(500);
 
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('#m-nav-stack [data-action="m-settings"]').first().click();
-  await page.locator('#m-course-select').selectOption(other);
+  await page.locator('#m-nav-stack .m-tabbar-class').first().click();
+  await page.locator('#m-sheet-container .m-class-row[data-cid="' + other + '"]').click();
   await expect.poll(() => page.evaluate(() => getActiveCourse())).toBe(other);
-  await expect(page.locator('#m-course-select')).toHaveCount(0);
+  await expect(page.locator('#m-sheet-container .m-class-sheet')).toHaveCount(0);
 
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await expect(page.locator('#m-nav-stack')).not.toContainText('Assessment not found');

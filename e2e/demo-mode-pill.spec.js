@@ -148,17 +148,19 @@ test.describe('phone', () => {
     await page.locator('#demo-mode-btn').click();
     await page.waitForURL(/teacher-mobile\//);
     await expect(page.locator('#m-loading')).toBeHidden();
-    const pill = page.locator('.m-screen .m-demo-pill');
+    const pill = page.locator('.m-screen .m-tabbar-demo');
     await expect(pill).toHaveCount(1);
     await expect(pill).toBeVisible();
-    // It fits in the bar beside the class name and the buttons.
-    const bar = await page.locator('.m-nav-bar-inner').first().boundingBox();
+    // It is at the left of the bar, before the class name.
+    const bar = await page.locator('.m-tabbar-inner').first().boundingBox();
     const p = await pill.boundingBox();
+    const name = await page.locator('.m-screen .m-tabbar-class').first().boundingBox();
+    expect(p.x).toBeLessThan(name.x);
     expect(p.x + p.width).toBeLessThanOrEqual(bar.x + bar.width);
 
     for (const tab of ['observe', 'grade', 'students']) {
       await page.locator(`#m-tab-bar [data-tab="${tab}"]`).click();
-      await expect(page.locator('.m-screen .m-demo-pill')).toBeVisible();
+      await expect(page.locator('.m-screen .m-tabbar-demo')).toBeVisible();
     }
 
     await pill.click();
@@ -197,7 +199,7 @@ test.describe('phone', () => {
     await sheet.getByRole('button', { name: 'Reset', exact: true }).click();
     await page.waitForLoadState('load');
     await expect(page.locator('#m-loading')).toBeHidden();
-    await expect(page.locator('.m-screen .m-demo-pill')).toBeVisible();
-    await expect(page.locator('.m-nav-bar-class-name').first()).toHaveText('Science 8');
+    await expect(page.locator('.m-screen .m-tabbar-demo')).toBeVisible();
+    await expect(page.locator('.m-tabbar-name').first()).toHaveText('Science 8');
   });
 });

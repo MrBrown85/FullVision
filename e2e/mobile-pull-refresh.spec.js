@@ -41,7 +41,7 @@ const lift = page =>
   page.evaluate(() => {
     const ev = new Event('touchend', { bubbles: true, cancelable: true });
     Object.defineProperty(ev, 'touches', { value: [] });
-    document.querySelector('#m-obs-feed-content .m-filter-strip').dispatchEvent(ev);
+    document.querySelector('#m-obs-feed-content .m-obs-faces').dispatchEvent(ev);
   });
 
 const feed = '#m-obs-feed-content';
@@ -68,12 +68,12 @@ test('a short pull follows the finger and springs back; a long one holds while t
   await page.locator('.m-tab-item[data-tab="observe"]').click();
   await expect(page.locator(feed)).toBeVisible();
 
-  await pull(page, feed + ' .m-filter-strip', 300, 380, false);
+  await pull(page, feed + ' .m-obs-faces', 300, 380, false);
   expect(await pullState(page)).toEqual({ transform: 'translateY(40px)', height: '40px', ready: false });
   await lift(page);
   await expect.poll(() => pullState(page)).toEqual({ transform: '', height: '0px', ready: false });
 
-  await pull(page, feed + ' .m-filter-strip', 300, 480, false);
+  await pull(page, feed + ' .m-obs-faces', 300, 480, false);
   expect(await pullState(page)).toEqual({ transform: 'translateY(90px)', height: '90px', ready: true });
   await lift(page);
   // Held while the reload runs, then back in place.
@@ -87,6 +87,6 @@ test('a scrolled list does not pull', async ({ page }) => {
   await page.locator(feed).evaluate(el => {
     el.scrollTop = 200;
   });
-  await pull(page, feed + ' .m-filter-strip', 300, 480, true);
+  await pull(page, feed + ' .m-obs-faces', 300, 480, true);
   expect((await pullState(page)).transform).toBe('');
 });
