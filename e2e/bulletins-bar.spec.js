@@ -122,8 +122,11 @@ test('the open box: grey fields, the buttons along the bottom and Post at its fi
     '#bulletin-link-url',
     '#bulletin-link-title',
   ]) {
-    const look = await page.locator(sel).evaluate(el => {
+    const look = await page.locator(sel).evaluate(async el => {
       el.blur();
+      // Add a Link puts the keyboard in the address field; its fill eases
+      // back to grey on blur, so read it once that has finished.
+      await Promise.all(el.getAnimations().map(a => a.finished));
       const cs = getComputedStyle(el);
       return { fill: cs.backgroundColor, border: cs.borderTopColor, radius: cs.borderTopLeftRadius };
     });
