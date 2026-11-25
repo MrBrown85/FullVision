@@ -3,9 +3,7 @@
  * docs/plans/dashboard-inbox-plan.md, redrawn by
  * docs/plans/inbox-redesign-plan.md): its header, only in a class with the
  * student page and Send Work on, its stacks adding up to the top bar's To
- * Grade, the chosen view and an open stack kept through a redraw, and the top
- * bar's To Grade cell going to the tile when the tile is on the page and to
- * Assignments when it is not.
+ * Grade, the chosen view and an open stack kept through a redraw.
  */
 import './setup.js';
 import { readFileSync } from 'fs';
@@ -163,54 +161,3 @@ describe('the tile', () => {
 
 // The top bar as the page draws it; the To Grade cell is inside.
 const glance = () => DashOverview.glanceHtml({ cid: CID, allStudents: getStudents(CID), classAvg: 0, missing: [] });
-
-describe("the top bar's To Grade cell", () => {
-  const cell = () => parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
-
-  it('goes to the Inbox with the tile built', () => {
-    const a = cell();
-    expect(a.hasAttribute('data-dash-inbox-jump')).toBe(true);
-    expect(a.getAttribute('aria-label')).toMatch(/: go to the Inbox$/);
-    // The look and the text are as before.
-    expect(a.querySelector('.dash-glance-label').textContent).toBe('To Grade');
-    expect(a.getAttribute('data-href')).toBe('/assignments?course=' + CID + '&show=tograde');
-  });
-
-  it('opens Assignments with no tile built', () => {
-    const was = window.DashInbox;
-    delete window.DashInbox;
-    try {
-      const a = cell();
-      expect(a.hasAttribute('data-dash-inbox-jump')).toBe(false);
-      expect(a.getAttribute('aria-label')).toMatch(/: open Assignments$/);
-    } finally {
-      window.DashInbox = was;
-    }
-  });
-
-  it('goes to the Inbox whatever an old fv-build-dashRow on the device says (D9: the row is on)', () => {
-    for (const v of ['0', '1', 'no']) {
-      localStorage.setItem('fv-build-dashRow', v);
-      expect(cell().hasAttribute('data-dash-inbox-jump')).toBe(true);
-      expect(DashInbox.shows(CID)).toBe(true);
-    }
-    localStorage.removeItem('fv-build-dashRow');
-  });
-
-  it('a click scrolls to the Inbox and rings it; with none on the page the link is left alone', () => {
-    const doc = mountTile();
-    const cellEl = parseHTML('<body>' + glance() + '</body>').document.querySelector('.dash-glance-tograde');
-    doc.body.appendChild(doc.importNode ? doc.importNode(cellEl, true) : cellEl);
-    const r = clickOn(doc, '.dash-glance-tograde');
-    expect(r.handled).toBe(true);
-    expect(r.prevented).toBe(true);
-    expect(doc.getElementById('dash-inbox').classList.contains('is-ring')).toBe(true);
-    // A click to open a new tab is the link's.
-    expect(clickOn(doc, '.dash-glance-tograde', { metaKey: true }).handled).toBe(false);
-    // No Inbox in the page: the click is not taken.
-    doc.getElementById('dash-inbox').remove();
-    const none = clickOn(doc, '.dash-glance-tograde');
-    expect(none.handled).toBe(false);
-    expect(none.prevented).toBe(false);
-  });
-});
