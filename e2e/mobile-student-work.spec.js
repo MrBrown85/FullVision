@@ -11,6 +11,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { jumpTo } from './phone-jump.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -116,7 +117,7 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
 
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   await expect(page.locator('#m-thumb-strip .m-thumb')).toHaveCount(2);
-  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of 2 to grade');
+  await expect(page.locator('#m-thumb-strip .m-thumb')).toHaveCount(2);
   const card = page.locator('.m-swiper-card').first();
   await expect(card.locator('.m-work-sent')).toContainText('Submitted');
   await expect(card.locator('.m-work-sent')).toContainText('2 photos');
@@ -160,7 +161,7 @@ test('the grader fills the card on screen and its neighbours, the rest when reac
   const fullPage = /sample-work\/[a-z-]+-\d\.jpg$/;
   await expect(strip(withWork[0])).toHaveAttribute('src', fullPage);
   await expect(strip(far)).not.toHaveAttribute('src', /./);
-  await page.locator('#m-thumb-strip .m-thumb').nth(far).click();
+  await jumpTo(page, far);
   await expect(strip(far)).toHaveAttribute('src', fullPage);
 });
 

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
+import { scoreBy } from './phone-jump.js';
 
 /* Phone grading keeps its place. A score, ± or clear tapped low on a long
    rubric (or on a competency in Competencies view) used to scroll the student's
@@ -80,7 +81,7 @@ test.describe('Phone grading card', () => {
 
   test('competency scores in Competencies view', async ({ page }) => {
     await openLongRubric(page);
-    await page.getByRole('button', { name: 'Competencies', exact: true }).click();
+    await scoreBy(page, 'Competencies');
     await expect(card(page).locator('.m-score-group').first()).toBeVisible();
     // Short competency lists don't scroll; give the card room to scroll. A
     // style rule, because a competency on rubric work redraws the card (its

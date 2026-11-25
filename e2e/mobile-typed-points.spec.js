@@ -54,11 +54,11 @@ test('typed points replace the score, clamp like the desktop, and reach the grad
   // Out of range clamps to 0 and to twice the maximum, as on the desktop.
   await field.tap();
   await page.keyboard.type('999');
-  await card.locator('.m-grade-student-name').click();
+  await card.locator('.m-overall-label').click();
   await expect(field).toHaveValue('160');
   await field.tap();
   await page.keyboard.type('-5');
-  await card.locator('.m-grade-student-name').click();
+  await card.locator('.m-overall-label').click();
   await expect(field).toHaveValue('0');
   expect(await stored(page, sid)).toBe(0);
 

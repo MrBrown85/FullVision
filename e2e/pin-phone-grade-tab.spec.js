@@ -9,6 +9,7 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
 import { gotoApp, clickAction, getText } from './helpers.js';
+import { jumpTo } from './phone-jump.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -79,23 +80,40 @@ test('Missing, Excused and Late on one student, and when Missing and Excused are
   await enterDemo(page);
   const card = await openWork(page, LAB_SKILLS);
   const sid = await card.getAttribute('data-sid');
+  // The card's status control (in ⋯ now, copied into its sheet): its state is the card's.
   const pill = val => card.locator('.m-status-pill[data-val="' + val + '"]');
-  const hint = card.locator('.m-status-hint');
   const surface = card.locator('.m-grade-card-surface');
+  const more = page.locator('#m-sheet-container .m-more-sheet');
+  const openMore = async () => {
+    await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+    await expect(more).toBeVisible();
+  };
+  const closeMore = async () => {
+    await page.locator('#m-sheet-backdrop').click({ position: { x: 10, y: 10 } });
+    await expect(more).toHaveCount(0);
+  };
+  // A tap in ⋯, which closes it.
+  const tapStatus = async val => {
+    await openMore();
+    await more.locator('.m-status-pill[data-val="' + val + '"]').click();
+    await expect(more).toHaveCount(0);
+  };
 
   // Scored work: Missing and Excused are greyed out and the hint says why.
   await expect(pill('NS')).toBeDisabled();
   await expect(pill('EXC')).toBeDisabled();
   await expect(pill('LATE')).toBeEnabled();
-  await expect(hint).toBeVisible();
-  await expect(hint).toHaveText('Clear the score and comment to mark Missing or Excused.');
+  await openMore();
+  await expect(more.locator('.m-status-pill[data-val="NS"]')).toBeDisabled();
+  await expect(more.locator('.m-status-hint')).toHaveText('Clear the score and comment to mark Missing or Excused.');
+  await closeMore();
 
   // Late goes on scored work and leaves the levels live.
-  await pill('LATE').click();
+  await tapStatus('LATE');
   await expect(pill('LATE')).toHaveClass(/m-status-active/);
   await expect(surface).not.toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('LATE');
-  await pill('LATE').click();
+  await tapStatus('LATE');
   await expect(pill('LATE')).not.toHaveClass(/m-status-active/);
   expect(await status(page, sid, LAB_SKILLS)).toBe(null);
 
@@ -105,28 +123,30 @@ test('Missing, Excused and Late on one student, and when Missing and Excused are
   await row(card, 'PC4').locator('.m-score-btn.m-score-active').click();
   await expect(pill('NS')).toBeEnabled();
   await expect(pill('EXC')).toBeEnabled();
-  await expect(hint).toBeHidden();
+  await openMore();
+  await expect(more.locator('.m-status-hint')).toHaveCount(0);
+  await closeMore();
 
-  await pill('NS').click();
+  await tapStatus('NS');
   await expect(pill('NS')).toHaveClass(/m-status-active/);
   await expect(surface).toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('NS');
 
   // Excused replaces Missing.
-  await pill('EXC').click();
+  await tapStatus('EXC');
   await expect(pill('EXC')).toHaveClass(/m-status-active/);
   await expect(pill('NS')).not.toHaveClass(/m-status-active/);
   await expect(surface).toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('EXC');
 
   // Late replaces Excused and the card is live again.
-  await pill('LATE').click();
+  await tapStatus('LATE');
   await expect(card.locator('.m-status-pill.m-status-active')).toHaveText('Late');
   await expect(surface).not.toHaveClass(/m-card-status-disabled/);
   expect(await status(page, sid, LAB_SKILLS)).toBe('LATE');
 
   // Tapping the chosen status again takes it off.
-  await pill('LATE').click();
+  await tapStatus('LATE');
   await expect(card.locator('.m-status-pill.m-status-active')).toHaveCount(0);
   expect(await status(page, sid, LAB_SKILLS)).toBe(null);
 });
@@ -185,7 +205,7 @@ test('Set To on a not-in card, then the toast Undo takes the levels back off', a
   await page.reload();
   await expect(page.locator('#m-loading')).toBeHidden();
   await openWork(page, CELL_LAB);
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  await jumpTo(page, sid);
   const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
   const first = await page.evaluate(sid => displayNameFirst(getStudents('sci8').find(s => s.id === sid)), sid);
   const levels = () =>
@@ -259,7 +279,8 @@ test('a level and Late set on the phone show in the desktop gradebook', async ({
   const sid = await card.getAttribute('data-sid');
   await row(card, 'PC3').locator('.m-score-btn[data-score="1"]').click();
   await row(card, 'PC4').locator('.m-score-btn[data-score="1"]').click();
-  await card.locator('.m-status-pill[data-val="LATE"]').click();
+  await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
+  await page.locator('#m-sheet-container .m-more-sheet .m-status-pill[data-val="LATE"]').click();
   await expect(card.locator('.m-status-pill[data-val="LATE"]')).toHaveClass(/m-status-active/);
 
   const desktop = await page.context().newPage();

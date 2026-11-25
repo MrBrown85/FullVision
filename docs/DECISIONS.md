@@ -1553,7 +1553,7 @@ Follow-up to "The reflections' questions edited on the page", item 8. The counci
 
 ## The phone's new look (2026-11-24)
 
-Colin on the phone's grading view, Nov 24: it is cluttered, a teacher who is not a software user would be overwhelmed by it, and "the phone is a tool to be used", not the place for how a student is doing in each competency. He went through the board "Phone Grader, Redesigned" (https://claude.ai/artifact/9183YbyUHWKjotWVWo2Guq) row by row the same day. The plan is `docs/plans/phone-look-plan.md`; all of it is behind the `phoneLook` switch, and with the switch off none of it shows.
+**On for everyone since Nov 25** (Colin: "Deal with it", after the release carried it switched off). Colin on the phone's grading view, Nov 24: it is cluttered, a teacher who is not a software user would be overwhelmed by it, and "the phone is a tool to be used", not the place for how a student is doing in each competency. He went through the board "Phone Grader, Redesigned" (https://claude.ai/artifact/9183YbyUHWKjotWVWo2Guq) row by row the same day. The plan is `docs/plans/phone-look-plan.md`; all of it is behind the `phoneLook` switch, and with the switch off none of it shows.
 
 1. **The levels read EMG, DEV, PRF and EXT on the phone grader** ("teachers know those terms"): one track of four in the class's level order, from `levelCode`. The chosen one takes the + or − ("PRF +").
 2. **Missing, Excused and Late are under ⋯ on work that is handed in** ("Under ⋯ as drawn"). This replaces the control under the student's name on the grading card (the board "Phone Speed Grader With Photos"). A status that is set shows on the card. A card with nothing handed in keeps all three on the card.

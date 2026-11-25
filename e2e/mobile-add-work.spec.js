@@ -8,6 +8,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { pagesPdf, lockedPdf } from '../tests/fixtures/pdf-fixtures.mjs';
+import { jumpTo } from './phone-jump.js';
 
 test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 
@@ -83,7 +84,7 @@ test('Add Work from a not-in card: a photo, Save and Next, then the work is on t
   await openLab(page);
   const pile = await notIn(page);
   const sid = pile[0];
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  await jumpTo(page, sid);
   const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
   const add = card.locator('[data-action="m-add-work"]');
   await expect(add).toBeInViewport();
@@ -133,7 +134,7 @@ test('the student card’s To Grade list, View Profile’s, the red count, and A
   const badge = page.locator('.m-tab-item[data-tab="grade"] .m-tab-badge');
   await expect(badge).toHaveText('1');
   // Noor's card: her lab waits to grade.
-  await page.locator('[data-action="m-all-students"]').click();
+  await page.locator('.m-card-all[data-action="m-all-students"]').click();
   const row = await page.evaluate(() =>
     sortStudents(getStudents('sci8').slice(), 'alpha').findIndex(s => s.id === 'st2'),
   );
@@ -148,7 +149,7 @@ test('the student card’s To Grade list, View Profile’s, the red count, and A
   await expect(list).toBeInViewport();
   await shot(page, 'S7-F4-student-card-to-grade');
 
-  await top.locator('[data-action="m-student-detail"]').click();
+  await top.locator('.m-sl-profile').click();
   const detail = page.locator('#m-screen-student-detail');
   await expect(detail.locator('.m-scard-tograde .m-scard-return-head')).toHaveText('To Grade');
   await shot(page, 'S7-F4-view-profile-to-grade');
@@ -231,7 +232,7 @@ test('Grade From Paper on a not-in card: Set Logan To, a level, then Handed in o
     { sid, LAB },
   );
   await openLab(page);
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  await jumpTo(page, sid);
   const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
   const first = await page.evaluate(sid => displayNameFirst(getStudents('sci8').find(s => s.id === sid)), sid);
   await expect(card.locator('.m-work-paper-head')).toHaveText('Grade From Paper');
@@ -262,7 +263,7 @@ test('Add Work takes a PDF: each page becomes a photo; a locked PDF says so', as
   await openPhone(page);
   await openLab(page);
   const sid = (await notIn(page))[0];
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  await jumpTo(page, sid);
   await page.locator('.m-swiper-card[data-sid="' + sid + '"] [data-action="m-add-work"]').click();
   const screen = page.locator('#m-addwork');
   await screen

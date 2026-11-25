@@ -12,6 +12,7 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
 import { findLowContrastText } from './contrast-check.js';
+import { jumpTo } from './phone-jump.js';
 
 test.beforeEach(({ page }) => demoStudentPageOff(page));
 
@@ -84,13 +85,18 @@ const segment = page => page.locator('.m-seg-btn[data-val="toreturn"]');
 const sheet = page => page.locator('#m-sheet-container .m-confirm-sheet');
 
 // Controls a finger can reach that are under 44 px high (e2e/mobile-step4-phone.spec.js).
+// Return and Next holds the return seven seconds for Undo (tests/phone-look and
+// e2e/mobile-phone-look.spec.js check that). Here it is sent at once, as leaving the screen does.
+const sendHeld = page => page.evaluate(() => MGradeLook.flush());
+const onCard = n => page => expect.poll(() => page.evaluate(() => MGrade.getCurrentIndex())).toBe(n);
+
 const small = () =>
   [...document.querySelectorAll('button, [role=button], select, input, [data-action]')]
     .filter(e => {
       const r = e.getBoundingClientRect();
       if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight) return false;
       // The sheet's handle is every sheet's, and not this change's.
-      if (e.closest('#m-auth, .m-skip-nav, .m-obs-chev, .m-sheet-handle')) return false;
+      if (e.closest('#m-auth, .m-skip-nav, .m-obs-chev, .m-sheet-handle, [inert]')) return false;
       if (getComputedStyle(e).pointerEvents === 'none') return false;
       return r.height < 43.5;
     })
@@ -131,13 +137,14 @@ test.describe('the grading screen', () => {
     expect(await page.evaluate(small)).toEqual([]);
 
     await returnNext(page).click();
-    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of ');
+    await onCard(1)(page);
+    await sendHeld(page);
     expect(await stateOf(page, info.ids[0], CHECK)).toBe('returned');
     expect(await waiting(page)).toBe(0);
     await expect(bar(page)).toHaveText('Returned');
     // Back on the first card: Returned, with today's date.
     await slideDone(page);
-    await page.locator('#m-thumb-strip .m-thumb').first().click();
+    await jumpTo(page, 0);
     await expect(bar(page)).toHaveText(/^Returned [A-Z][a-z]{2} \d{1,2}$/);
   });
 
@@ -146,13 +153,15 @@ test.describe('the grading screen', () => {
     await openGrading(page, QUIZ);
     await expect(returnNext(page)).toBeEnabled();
     await returnNext(page).dblclick();
+    await sendHeld(page);
     expect(await stateOf(page, info.ids[0], QUIZ)).toBe('returned');
     expect(await stateOf(page, info.ids[1], QUIZ)).toBe('draft');
-    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of ');
+    await onCard(1)(page);
     await slideDone(page);
     await returnNext(page).click();
+    await sendHeld(page);
     expect(await stateOf(page, info.ids[1], QUIZ)).toBe('returned');
-    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('3 of ');
+    await onCard(2)(page);
   });
 
   test('Return and Next is reached and pressed from the keyboard', async ({ page }) => {
@@ -163,14 +172,16 @@ test.describe('the grading screen', () => {
     await page.keyboard.press('Shift+Tab');
     await expect(returnNext(page)).toBeFocused();
     await page.keyboard.press('Enter');
+    await sendHeld(page);
     expect(await stateOf(page, info.ids[0], QUIZ)).toBe('returned');
     // The second student's draft is up, and its button keeps the focus.
-    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of ');
+    await onCard(1)(page);
     await expect(returnNext(page)).toBeFocused();
     await slideDone(page);
     await page.keyboard.press('Enter');
     await slideDone(page);
     await page.keyboard.press('Enter');
+    await sendHeld(page);
     expect(await stateOf(page, info.ids[2], QUIZ)).toBe('returned');
     // The fourth student has nothing to return: the bar itself has the focus.
     await expect(returnNext(page)).toHaveCount(0);
@@ -270,7 +281,7 @@ test.describe('the student card’s To Return list', () => {
   test('lists the student’s drafts, and Return returns one in one tap', async ({ page }) => {
     const info = await openPhone(page, { on: true, drafts: true });
     const card = page.locator('.m-card-stack-item[data-depth="0"]');
-    await expect(card.locator('.m-scard-name')).toContainText(info.names[0]);
+    await expect(card.locator('.m-sl-name')).toContainText(info.names[0]);
     await expect(card.locator('.m-scard-return-head')).toHaveText('To Return');
     const rows = card.locator('.m-scard-return-row');
     await expect(rows).toHaveCount(2);
@@ -353,7 +364,8 @@ for (const colorScheme of ['light', 'dark']) {
       await page.locator('#m-sheet-container [data-action="m-sheet-cancel"]').click();
       await expect(sheet(page)).toHaveCount(0);
       await page.locator('.m-to-return-open').first().click();
-      await expect(bar(page).locator('.m-draft-mark')).toBeVisible();
+      // The new look shows no Draft line on the bar: Return and Next says it.
+      await expect(returnNext(page)).toBeVisible();
       await page.waitForTimeout(500);
       // On the grading screen only the new bar is checked: the screen's own
       // text is not this change's, and the dimmed initials of graded
@@ -362,7 +374,7 @@ for (const colorScheme of ['light', 'dark']) {
       await readable();
       await returnNext(page).click();
       await slideDone(page);
-      await page.locator('#m-thumb-strip .m-thumb').first().click();
+      await jumpTo(page, 0);
       await expect(bar(page).locator('.m-returned-mark')).toBeVisible();
       await readable();
     });

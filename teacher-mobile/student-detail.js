@@ -804,7 +804,7 @@ window.MStudentDetail = (function () {
       var obsCtxL = ObsCard.context(cid);
       return (
         '<div class="m-screen m-screen-hidden m-sl-screen" id="m-screen-student-detail">' +
-        MC.navBar({ id: 'student-detail', title: '', backLabel: 'Students' }) +
+        nav +
         '<div class="m-screen-content"><div class="m-sl-page" id="m-st-panel-profile">' +
         MStudentLook.profile({
           st: st,
@@ -823,6 +823,8 @@ window.MStudentDetail = (function () {
               when: 'date',
             });
           },
+          // The work waiting, under who they are (S7-F4).
+          toGrade: window.MGradePhotos ? MGradePhotos.studentListHtml(cid, st) : '',
           assessHtml: '<div class="m-st-list">' + assessHtml + '</div>',
           compsHtml: focusHTML + sectionCards,
         }) +

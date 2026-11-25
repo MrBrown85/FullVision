@@ -11,10 +11,10 @@ test('tapping an Evidence card opens the edit sheet; Save shows the fix in place
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
   const screen = page.locator('#m-screen-student-detail');
-  await screen.locator('.m-st-tab[data-tab="evidence"]').click();
-  const card = screen.locator('#m-st-panel-evidence .m-obs-card').first();
+  // What You've Noticed: the newest observation.
+  const card = screen.locator('#m-st-panel-profile .m-obs-card').first();
   await expect(card.locator('.m-obs-chev')).toBeVisible();
   const obId = await card.getAttribute('data-obid');
   await card.locator('.m-obs-text').click();
@@ -22,13 +22,13 @@ test('tapping an Evidence card opens the edit sheet; Save shows the fix in place
   await expect(sheet).toBeVisible();
   await page.locator('#m-obs-text').fill('Fixed the typo on the phone');
   await sheet.locator('[data-action="m-obs-save"], .m-edit-save').first().click();
-  await expect(screen.locator('#m-st-panel-evidence .m-obs-card[data-obid="' + obId + '"] .m-obs-text')).toHaveText(
+  await expect(screen.locator('#m-st-panel-profile .m-obs-card[data-obid="' + obId + '"] .m-obs-text')).toHaveText(
     'Fixed the typo on the phone',
   );
 
   // Delete Observation in the sheet takes the card off the list, with Undo.
-  await screen.locator('#m-st-panel-evidence .m-obs-card[data-obid="' + obId + '"] .m-obs-text').click();
+  await screen.locator('#m-st-panel-profile .m-obs-card[data-obid="' + obId + '"] .m-obs-text').click();
   await expect(sheet).toBeVisible();
   await sheet.locator('[data-action="m-obs-delete"]').click();
-  await expect(screen.locator('#m-st-panel-evidence .m-obs-card[data-obid="' + obId + '"]')).toHaveCount(0);
+  await expect(screen.locator('#m-st-panel-profile .m-obs-card[data-obid="' + obId + '"]')).toHaveCount(0);
 });

@@ -4,6 +4,7 @@
  * Runs in Demo Mode, where Science Fair Proposal is the newest assessment.
  */
 import { test, expect } from '@playwright/test';
+import { jumpTo, settled } from './phone-jump.js';
 
 test.use({ viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
 
@@ -23,6 +24,12 @@ async function currentCardName(page) {
   });
 }
 
+// A piece from the profile's All Work, which opens in place.
+async function openWork(detail, title) {
+  await detail.locator('summary', { hasText: 'All Work' }).click();
+  await detail.locator('.m-assess-compact', { hasText: title }).first().click();
+}
+
 for (const row of [0, 3]) {
   test(`Grade on student ${row + 1}'s page lands on their card for the newest assessment, and Back returns`, async ({
     page,
@@ -31,22 +38,23 @@ for (const row of [0, 3]) {
     await page.locator('#demo-mode-btn').click();
     await page.waitForURL(/teacher-mobile\//);
     await page.locator('.m-tab-item[data-tab="students"]').click();
-    await page.locator('[data-action="m-all-students"]').click();
+    await page.locator('.m-card-all[data-action="m-all-students"]').click();
     await page.locator('[data-action="m-jump-student"]').nth(row).click();
-    await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+    await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
     const detail = page.locator('#m-screen-student-detail');
-    const name = (await detail.locator('.m-hero-name').textContent()).trim();
+    const name = (await detail.locator('.m-sl-id-name').textContent()).trim();
 
-    await detail.locator('[data-action="m-student-grade"]').click();
+    // All Work, newest first: the first piece is the newest.
+    await openWork(detail, 'Science Fair Proposal');
     await expect(page.locator('.m-tab-item[data-tab="grade"]')).toHaveAttribute('aria-selected', 'true');
     const bar = page.locator('#m-nav-bar-grade-swiper');
-    await expect(bar).toContainText('Science Fair Proposal');
-    await expect(bar.locator('.m-nav-bar-title-inline div')).toHaveText(`${row + 1} of 27`);
+    await expect(bar.locator('.m-nav-title-text')).toHaveText(name);
+    expect(await settled(page)).toBe(row);
     expect(await currentCardName(page)).toBe(name);
 
     await bar.locator('[data-action="m-back"]').click();
     await expect(page.locator('.m-tab-item[data-tab="students"]')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#m-screen-student-detail .m-hero-name')).toHaveText(name);
+    await expect(page.locator('#m-screen-student-detail .m-sl-id-name')).toHaveText(name);
     await expect(page.locator('#m-screen-grade-swiper')).toHaveCount(0);
 
     // Back again returns to the cards, as from any student page.
@@ -79,19 +87,20 @@ test('Grade on a student page on Group work opens their group card, or their own
 
   const openGrade = async row => {
     await page.locator('.m-tab-item[data-tab="students"]').click();
-    await page.locator('[data-action="m-all-students"]').click();
+    await page.locator('.m-card-all[data-action="m-all-students"]').click();
     await page.locator('[data-action="m-jump-student"]').nth(row).click();
-    await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+    await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
     const detail = page.locator('#m-screen-student-detail');
-    const name = (await detail.locator('.m-hero-name').textContent()).trim();
-    await detail.locator('[data-action="m-student-grade"]').click();
+    const name = (await detail.locator('.m-sl-id-name').textContent()).trim();
+    await openWork(detail, 'Science Fair Proposal');
     return name;
   };
-  const bar = page.locator('#m-nav-bar-grade-swiper .m-nav-bar-title-inline div');
+  const bar = page.locator('#m-nav-bar-grade-swiper .m-nav-title-text');
 
   // Student 4 is in the second group.
   await openGrade(3);
-  await expect(bar).toHaveText('Group 2 · 2 of 18');
+  await expect(bar).toHaveText('Group 2');
+  expect(await settled(page)).toBe(1);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -106,7 +115,8 @@ test('Grade on a student page on Group work opens their group card, or their own
   await page.locator('#m-nav-bar-grade-swiper [data-action="m-back"]').click();
   await page.locator('#m-screen-student-detail [data-action="m-back"]').click();
   const name = await openGrade(13);
-  await expect(bar).toHaveText(/ · 5 of 18$/);
+  await expect(bar).toHaveText(name);
+  expect(await settled(page)).toBe(4);
   expect(await currentCardName(page)).toBe(name);
 });
 
@@ -136,15 +146,15 @@ test('Grade on a student page with a grading screen open on the Grade tab opens 
   await page.waitForTimeout(500);
 
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('[data-action="m-all-students"]').click();
+  await page.locator('.m-card-all[data-action="m-all-students"]').click();
   await page.locator('[data-action="m-jump-student"]').nth(3).click();
-  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
   const detail = page.locator('#m-screen-student-detail');
-  const name = (await detail.locator('.m-hero-name').textContent()).trim();
-  const sid = await detail.locator('[data-action="m-student-grade"]').getAttribute('data-sid');
-  await detail.locator('[data-action="m-student-grade"]').click();
+  const name = (await detail.locator('.m-sl-id-name').textContent()).trim();
+  const sid = await detail.locator('.m-sl-observe').getAttribute('data-sid');
+  await openWork(detail, 'Mid-Year Comprehensive Exam');
 
-  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('Mid-Year Comprehensive Exam');
+  await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-title-text')).toHaveText(name);
   await expect(page.locator('#m-screen-grade-swiper')).toHaveCount(1);
   await expect(page.locator('#m-swiper')).toHaveCount(1);
   expect(await currentCardName(page)).toBe(name);
@@ -164,7 +174,7 @@ test('Grade on a student page with a grading screen open on the Grade tab opens 
 
 // The grading bar always shows what is graded: its title at rest on the Grade list, "N of 27" following a
 // thumbnail tap, and the student page fading its title in on scroll.
-test('the grading bar shows the title and the student count, and follows a thumbnail tap', async ({ page }) => {
+test('the grading bar names the student on screen, and follows the class list', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
@@ -176,13 +186,16 @@ test('the grading bar shows the title and the student count, and follows a thumb
 
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
   await page.locator('#m-grade-list .m-cell', { hasText: 'Science Fair Proposal' }).click();
+  // The bar names the student on screen, and follows the class list.
   const title = page.locator('#m-nav-bar-grade-swiper .m-nav-bar-title-inline');
+  const names = await page.evaluate(() =>
+    sortStudents(getStudents(getActiveCourse()).slice(), 'alpha').map(s => displayName(s)),
+  );
   await expect(title).toHaveCSS('opacity', '1');
-  await expect(title).toContainText('Science Fair Proposal');
-  await expect(title.locator('div')).toHaveText('1 of 27');
+  await expect(title.locator('.m-nav-title-text')).toHaveText(names[0]);
 
-  await page.locator('#m-thumb-strip .m-thumb').nth(4).click();
-  await expect(title.locator('div')).toHaveText('5 of 27');
+  await jumpTo(page, 4);
+  await expect(title.locator('.m-nav-title-text')).toHaveText(names[4]);
   await expect(title).toHaveCSS('opacity', '1');
 });
 
@@ -191,7 +204,7 @@ test('the student page keeps its bar title hidden at rest and fades it in on scr
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sl-profile').click();
   const title = page.locator('#m-nav-bar-student-detail .m-nav-bar-title-inline');
   await expect(title).toHaveCSS('opacity', '0');
   // The scroll handler is bound once the page has slid in, so scroll until it fades in.

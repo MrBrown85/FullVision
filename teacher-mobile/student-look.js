@@ -149,7 +149,7 @@
       esc(st.id) +
       '">Profile</button></div>' +
       // To Grade, To Return and the work scroll inside the card, as its widgets did.
-      '<div class="m-sl-scroll"><div class="m-sl-boxes">' +
+      '<div class="m-sl-scroll m-scard-widgets"><div class="m-sl-boxes">' +
       boxes +
       '</div>' +
       (rows
@@ -226,7 +226,8 @@
      reflections, then All Work and Competencies, each opening in place.
      `p`: { st, cid, badges, voice (StudentVoice.profile, or null while the
      answers load), answerText, obs (the student's observations this term,
-     newest first), obsHtml (an observation's card), assessHtml, compsHtml }. */
+     newest first), obsHtml (an observation's card), toGrade (the work
+     waiting, as grade-photos.js draws it), assessHtml, compsHtml }. */
   // html-safe: names, answers, titles and dates go through esc; badges, obsHtml, assessHtml and compsHtml are built escaped by student-detail.js and obs-card
   /** @param {any} p */
   function profile(p) {
@@ -359,7 +360,8 @@
     // With no reflections the rows share the Reflections card, as on the board.
     var tail = refl ? '<section class="m-sl-block m-sl-rows">' + rows + '</section>' : reflHtml + rows + '</section>';
 
-    return who + noteHtml + goalHtml + aboutHtml + noticed + (refl ? reflHtml : '') + tail;
+    var toGrade = p.toGrade ? '<div class="m-sl-tograde">' + p.toGrade + '</div>' : '';
+    return who + toGrade + noteHtml + goalHtml + aboutHtml + noticed + (refl ? reflHtml : '') + tail;
   }
 
   return { on: on, card: card, profile: profile };

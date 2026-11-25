@@ -261,7 +261,7 @@
   flex: 0 1 auto;
   min-width: min-content;
   /* One line sits level with the round buttons. */
-  padding: 6px 0;
+  padding: 11px 0;
   font-size: 16px;
   font-weight: 600;
 }
@@ -271,7 +271,7 @@
 .m-look .m-grade-marks .m-score-group > .m-score-mods {
   order: 3;
   flex: none;
-  gap: 8px;
+  gap: 0;
   margin-left: auto;
 }
 .m-look .m-grade-marks .m-crit-comment-btn {
@@ -294,7 +294,7 @@
   width: auto;
   min-width: 0;
   height: auto;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 2px;
   border: 0;
   border-radius: 8px;
@@ -349,26 +349,24 @@
 }
 .m-look .m-grade-marks .m-mod-btn,
 .m-look .m-grade-marks .m-crit-comment-btn {
-  position: relative;
+  /* A finger's 44 px, drawn as a 34 px disc in its middle (--m-dot is its colour). */
+  --m-dot: var(--overlay-pressed);
+  --m-dot-r: 17px;
   flex: none;
-  width: 34px;
+  width: 44px;
   min-width: 0;
-  height: 34px;
+  height: 44px;
   min-height: 0;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--overlay-pressed);
+  background: radial-gradient(
+    circle closest-side,
+    var(--m-dot) calc(var(--m-dot-r) - 0.5px),
+    transparent var(--m-dot-r)
+  );
   color: var(--text);
   gap: 0;
-}
-/* A finger's room around a 34 px button. */
-.m-look .m-grade-marks .m-mod-btn::after,
-.m-look .m-grade-marks .m-crit-comment-btn::after,
-.m-look .m-grade-marks .m-checks-btn::after {
-  content: '';
-  position: absolute;
-  inset: -5px -4px;
 }
 .m-look .m-grade-marks .m-mod-sign {
   font-size: 19px;
@@ -376,23 +374,23 @@
   line-height: 1;
 }
 .m-look .m-grade-marks .m-score-group:has(.m-score-active[data-score='1']) .m-mod-active {
-  background: var(--score-1-bg);
+  --m-dot: var(--score-1-bg);
   color: var(--score-1-text);
 }
 .m-look .m-grade-marks .m-score-group:has(.m-score-active[data-score='2']) .m-mod-active {
-  background: var(--score-2-bg);
+  --m-dot: var(--score-2-bg);
   color: var(--score-2-text);
 }
 .m-look .m-grade-marks .m-score-group:has(.m-score-active[data-score='3']) .m-mod-active {
-  background: var(--score-3-bg);
+  --m-dot: var(--score-3-bg);
   color: var(--score-3-text);
 }
 .m-look .m-grade-marks .m-score-group:has(.m-score-active[data-score='4']) .m-mod-active {
-  background: var(--score-4-bg);
+  --m-dot: var(--score-4-bg);
   color: var(--score-4-text);
 }
 .m-look .m-grade-marks .m-crit-comment-btn.is-on {
-  background: var(--active-light);
+  --m-dot: var(--active-light);
   color: var(--link);
 }
 .m-look .m-grade-marks .m-checks-btn {
@@ -401,7 +399,7 @@
   align-items: center;
   justify-content: center;
   width: 26px;
-  height: 34px;
+  height: 44px;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -650,17 +648,13 @@
   .m-look .m-grade-marks .m-score-group {
     column-gap: 6px;
   }
-  .m-look .m-grade-marks .m-score-group > .m-score-mods {
-    gap: 6px;
-  }
   .m-look .m-grade-marks .m-crit-name,
   .m-look .m-grade-marks .m-score-tag-label {
     font-size: 15px;
   }
   .m-look .m-grade-marks .m-mod-btn,
   .m-look .m-grade-marks .m-crit-comment-btn {
-    width: 30px;
-    height: 30px;
+    --m-dot-r: 15px;
   }
   .m-look .m-grade-marks .m-checks-btn {
     width: 20px;
@@ -718,10 +712,6 @@
   box-shadow:
     0 0 0 0.5px rgba(0, 0, 0, 0.08),
     0 2px 10px rgba(0, 0, 0, 0.07);
-}
-.m-look .m-bulletin-btn:not(.m-bulletin-btn-main) {
-  background: var(--active-light);
-  box-shadow: none;
 }
 /* A file reads as a tile, as a link does. */
 .m-look .m-bulletin-file-line {
@@ -978,6 +968,7 @@
 
 /* To Grade, To Return and the work scroll inside the card. */
 .m-look .m-sl-scroll {
+  gap: 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;

@@ -40,7 +40,7 @@ test('every sheet dims the page and a tap on the dim closes it', async ({ page }
 
   await tab(page, 'students');
   await expectDimCloses(page, () => page.locator('[data-action="m-sort"]').click());
-  await expectDimCloses(page, () => page.locator('[data-action="m-all-students"]').click());
+  await expectDimCloses(page, () => page.locator('.m-card-all[data-action="m-all-students"]').click());
   await expectDimCloses(page, () => page.locator('[data-action="m-settings"]').first().click());
   // Customize Card lives in the Settings sheet.
   await expectDimCloses(page, async () => {
