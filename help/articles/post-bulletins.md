@@ -26,6 +26,9 @@ labels:
   - Link Name (Optional)
   - Add a File
   - Let Students React
+  - Got It
+  - Done
+  - I Have a Question
   - Post
   - Not Sent Yet
   - Not Seen Yet
@@ -54,10 +57,10 @@ A bulletin is a short post to every student in a class: an announcement, or a re
 ## Post a Bulletin
 
 1. Choose **Bulletins** in the tabs at the top, after Assignments, or **Write a Bulletin** on the Dashboard's Bulletins tile. **Open Bulletins →** on the tile opens the page.
-2. Select the box at the top of the page. Choose **Announcement** or **Reminder**, then write the words.
+2. Select the grey box at the top of the page. Choose **Announcement** or **Reminder**, then write the words.
 3. For a reminder, set **Stays Pinned Until** to keep it at the top until that day, and choose an assessment under **Linked To** to link it to that piece of work.
-4. To add a website, choose **Add a Link**, then fill in **Link Address** and, if wanted, **Link Name (Optional)**. To add a photo or a PDF, choose **Add a File**.
-5. Turn on **Let Students React** to let students answer with one tap. It is off for each new bulletin.
+4. To add a website, choose **Add a Link**, then fill in **Link Address** and, if wanted, **Link Name (Optional)**. To add a photo or a PDF, choose **Add a File**. Both buttons sit beside the box, and again at the bottom of it.
+5. Turn on the switch at the right of **Let Students React** to let students answer with **Got It**, **Done** or **I Have a Question**. It is off for each new bulletin.
 6. Choose **Post**.
 
 A bulletin written with no connection shows **Not Sent Yet** and goes out when the connection returns.

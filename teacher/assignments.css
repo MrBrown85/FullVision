@@ -7620,19 +7620,6 @@ button.grader-member-name {
 .assess-toolbar .tb-action-btn {
   flex-shrink: 0;
 }
-.assess-toolbar .tb-action-btn {
-  padding: 0 12px;
-  font-size: var(--text-sm);
-}
-.assess-toolbar .tb-action-btn.tb-action-secondary {
-  border: none;
-  background: var(--active-light);
-  color: var(--link);
-}
-.assess-toolbar .tb-action-btn.tb-action-secondary:hover {
-  background: var(--active-light);
-  filter: brightness(0.95);
-}
 .atb-show-slot {
   display: contents;
 }
