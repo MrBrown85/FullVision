@@ -1557,9 +1557,9 @@ Colin on the phone's grading view, Nov 24: it is cluttered, a teacher who is not
 
 1. **The levels read EMG, DEV, PRF and EXT on the phone grader** ("teachers know those terms"): one track of four in the class's level order, from `levelCode`. The chosen one takes the + or − ("PRF +").
 2. **Missing, Excused and Late are under ⋯ on work that is handed in** ("Under ⋯ as drawn"). This replaces the control under the student's name on the grading card (the board "Phone Speed Grader With Photos"). A status that is set shows on the card. A card with nothing handed in keeps all three on the card.
-3. **For Revision sits beside Return and Next,** and an Undo follows a return. How Undo holds the send is his to settle before it is built.
+3. **For Revision sits beside Return and Next,** and an Undo follows a return. The return is held seven seconds and sent when the toast goes ("Yes, hold it"), so Undo never takes a grade back from a student. The toast must not get in the way of grading the next piece: it sits over the tab bar. Leaving the grading screen or the app (locking the phone, switching apps) sends a held return at once ("Yes, send it"); it stays a draft only if the app is killed outright.
 4. **The Students card is the student's My Learning,** with To Grade kept as it is. No row for each competency on the phone.
 5. **A list a teacher finds a student in by position never reorders itself.** Observe's faces stay in alphabetical order.
 6. **Bulletins on the phone:** no large title, and the cards stand off the page. Remind moves the bulletin to the top of those students' Bulletins tab and sends nothing to anyone.
 7. **The profile leads with what the student said** (About Me, the goal, reflections) and what the teacher noticed. The private note is behind a tap.
-8. **No grey lines of explanation on these screens.** A name on a control is fine; a sentence explaining it is not. What is out of the ordinary (Late, IEP, a status) shows only when it is there.
+8. **No grey lines of explanation on these screens.** A name on a control is fine; a sentence explaining it is not. What is out of the ordinary (Late, IEP, a status) shows only when it is there. "Posts to Science 8: every student's phone." on Write a Bulletin and Post a Photo is such a line, and goes. Let Students React is a row with its switch at the right, not a box alone at the left.

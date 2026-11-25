@@ -6,8 +6,9 @@
    is what it was. On, <html> carries m-look, teacher-mobile/look.css
    restyles the grader's own markup, and this file adds the three things a
    style cannot: who is on screen in the top bar, the class list behind that
-   name, and the ⋯ sheet. tab-grade.js asks for those pieces as it draws;
-   the taps on them are heard here. */
+   name, the ⋯ sheet, and a return held seven seconds for Undo (L3).
+   tab-grade.js asks for those pieces as it draws; the taps on them are
+   heard here. */
 /** @type {any} */ (window).MGradeLook = (function () {
   'use strict';
 
@@ -158,6 +159,84 @@
     );
   }
 
+  /* Return and Next, held for Undo (Colin, Nov 24): the return waits seven
+     seconds and is sent when the toast goes, so Undo never has to take a
+     grade back from a student. The toast sits over the tab bar, where it
+     covers nothing the next student is graded with. One return is held at
+     a time: the next one, or leaving the grading screen, sends it at once.
+     If the app closes first, the grade is still a draft, in To Return.
+     With the switch off the return is sent as it always was. */
+  var HOLD_MS = 7000;
+  /** @type {{ cid: string, aid: string, sid: string, send: (late: boolean) => void, timer: any } | null} */
+  var _held = null;
+
+  /** @param {string} cid @param {string} aid @param {any} unit @param {(late: boolean) => void} send */
+  function hold(cid, aid, unit, send) {
+    if (!on()) return send(false);
+    flush();
+    var h = { cid: cid, aid: aid, sid: unit.st.id, send: send, timer: 0 };
+    h.timer = setTimeout(function () {
+      if (_held === h) flush();
+    }, HOLD_MS);
+    _held = h;
+    W.MComponents.showToast('Returned to ' + (unit.view ? unitName(cid, unit) : _first(unit.st)), {
+      onUndo: undo,
+      duration: HOLD_MS,
+      low: true,
+    });
+  }
+
+  // The held return is this card's.
+  /** @param {string} cid @param {string} aid @param {string} sid */
+  function held(cid, aid, sid) {
+    return !!_held && _held.cid === cid && _held.aid === aid && _held.sid === sid;
+  }
+
+  // Send the held return now.
+  function flush() {
+    var h = _held;
+    if (!h) return;
+    _held = null;
+    clearTimeout(h.timer);
+    h.send(true);
+    W.MComponents.hideToast();
+    // The Grade tab's To Return list, if it is the screen showing by now.
+    W.MGrade.refreshToReturn(h.cid);
+  }
+
+  // Undo: nothing is sent, and the card comes back with its grade still a draft.
+  function undo() {
+    var h = _held;
+    if (!h) return;
+    _held = null;
+    clearTimeout(h.timer);
+    var grade = W.MGrade;
+    if (grade.studentWork()) {
+      // One student's work: back to that piece.
+      grade.showStudentPiece(h.cid, h.aid);
+      grade.jumpToStudent(grade.getCurrentIndex(), true);
+      return;
+    }
+    var idx = grade.studentCardIndex(h.cid, h.aid, h.sid);
+    if (idx >= 0) grade.jumpToStudent(idx);
+  }
+
+  // Leaving the grading screen, or the app, sends a held return first.
+  document.addEventListener(
+    'click',
+    function (e) {
+      if (_held && e.target instanceof Element && e.target.closest('[data-action="m-back"], .m-tab-item')) flush();
+    },
+    true,
+  );
+  if (W.addEventListener) {
+    W.addEventListener('popstate', flush);
+    W.addEventListener('pagehide', flush);
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) flush();
+  });
+
   document.addEventListener('click', function (e) {
     var target = e.target instanceof Element ? e.target.closest('[data-action]') : null;
     if (!target) return;
@@ -173,5 +252,16 @@
       W.MComponents.dismissSheet();
   });
 
-  return { on: on, bar: bar, show: show, commentLabel: commentLabel, marks: marks, unitName: unitName };
+  return {
+    on: on,
+    bar: bar,
+    show: show,
+    commentLabel: commentLabel,
+    marks: marks,
+    unitName: unitName,
+    hold: hold,
+    held: held,
+    flush: flush,
+    undo: undo,
+  };
 })();

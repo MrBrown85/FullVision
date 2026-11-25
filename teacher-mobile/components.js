@@ -283,6 +283,8 @@ window.MComponents = (function () {
     clearTimeout(_toastOutTimer);
     el.innerHTML = '<div class="m-toast-item"><span>' + _esc(message) + '</span>' + undoBtn + '</div>';
     _placeToast(el);
+    // `low`: over the tab bar, so it covers nothing on the screen above it (look.css).
+    el.classList.toggle('m-toast-low', !!opts.low);
     if (opts.onUndo) {
       el.querySelector('[data-action="m-toast-undo"]').onclick = function () {
         opts.onUndo();

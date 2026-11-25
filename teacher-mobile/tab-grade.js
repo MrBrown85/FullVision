@@ -1563,6 +1563,9 @@ window.MGrade = (function () {
     function _returnBarOwn(cid, a, unit, last) {
       var none = { state: '', act: '' };
       if (!unit) return none;
+      // A return held for Undo already reads as returned.
+      if (MGradeLook.held(cid, a.id, unit.st.id))
+        return { state: '<span class="m-returned-mark">Returned</span>', act: '' };
       // What the bar says is worked out once for both layouts (S11-T1),
       // revisions with it (S11-F1, the board "Phone: Return for Revision").
       var area = GraderWork.returnArea(cid, a, unit.st.id, _cardReturnIds(unit), { revisions: true });
@@ -1913,8 +1916,12 @@ window.MGrade = (function () {
       _saveTyped(cid, unit.st.id);
       var ids = _cardReturnIds(unit);
       if (!GraderWork.draftsIn(cid, a.id, ids).length) return _syncReturnBar();
-      Grader.returnGrades(cid, a.id, ids);
-      clearProfCache();
+      // Sent now; in the new look, held seven seconds for Undo (grade-look.js).
+      MGradeLook.hold(cid, a.id, unit, function (late) {
+        Grader.returnGrades(cid, a.id, ids);
+        clearProfCache();
+        if (late) _syncReturnBar();
+      });
       MC.haptic();
       // One student's work: on to their next piece.
       if (_student) {
