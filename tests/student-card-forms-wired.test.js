@@ -303,6 +303,15 @@ describe('writing a reflection is activity', () => {
     },
   );
 
+  it('a touch before the page has started, or with nobody signed in, is not an error', async () => {
+    const page = school({});
+    // Before start() the page has no state yet. Every touch, key and scroll comes here (s/app.js, active),
+    // and this threw on each of them (found by main's browser tests, Nov 25).
+    expect(() => page.T.active()).not.toThrow();
+    await page.start('#P3R8-WDK4');
+    expect(() => page.T.active()).not.toThrow();
+  });
+
   it('sixteen minutes with the form untouched: Back signs out, as it did', async () => {
     const page = await signIn(school({}));
     await openQuestions(page);
