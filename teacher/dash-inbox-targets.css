@@ -225,3 +225,8 @@
     height: 64px;
   }
 }
+
+/* Held files: Another Assessment opens Assignments and cannot take them. */
+.is-drag .dash-inbox-target.is-other {
+  display: none;
+}

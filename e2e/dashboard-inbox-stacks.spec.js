@@ -51,7 +51,8 @@ async function open(page, { tile = true, more = false } = {}) {
             enrollment_id: sid,
             is_late: late,
             sent_by: 'student',
-            sent_at: '2026-11-2' + k + 'T1' + (i % 10) + ':00:00.000Z',
+            // After the sample class's own work, whatever day the test runs: later pieces newer, students in order.
+            sent_at: new Date(Date.now() + (k + 1) * 3600000 + i * 60000).toISOString(),
           });
         });
       });
