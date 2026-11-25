@@ -659,3 +659,83 @@
   margin-bottom: 4px;
   margin-top: 0;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   ROSTER AND OPEN CONCERNS (page-observations.js syncRoster)
+   Days since each student was last observed, amber from 3 weeks; the
+   Not Observed in 3+ Weeks switch above the list; the Open Concerns
+   button at the head of the filters. They replace the Dashboard's
+   Observations grid (DECISIONS, "Observations off the Dashboard").
+   ══════════════════════════════════════════════════════════════ */
+/* The days replace the grades here, so the grades menu goes. */
+body.obs-roster #sb-show-btn {
+  display: none;
+}
+#gb-sidebar .student-row-mark.obs-days {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+#gb-sidebar .student-row-mark.obs-days.is-overdue {
+  font-weight: 700;
+  color: var(--score-2-text);
+}
+.obs-roster-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 0 10px 0 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--score-2-text);
+  background: var(--score-2-bg);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.obs-roster-toggle-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.obs-roster-toggle-n {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.obs-roster-toggle.active {
+  color: #fff;
+  background: var(--score-2);
+}
+.obs-roster-toggle:focus-visible,
+.obs-concern-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.obs-concern-slot:empty {
+  display: none;
+}
+.obs-concern-btn {
+  display: inline-flex;
+  align-items: center;
+  height: var(--chip-h);
+  padding: 0 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--score-2-text);
+  background: var(--score-2-bg);
+  border: none;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+}
+.obs-concern-btn.active {
+  color: #fff;
+  background: var(--score-2);
+}

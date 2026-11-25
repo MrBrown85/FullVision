@@ -23,6 +23,8 @@ window.PageObservations = (function () {
   var filterDateTo = '';
   var filterAssessment = null; // 'linked' | 'unlinked'
   var filterQuoted = null; // 'quoted' | 'unquoted'
+  // The Open Concerns button: only Concerns with no Resolved follow-up.
+  var filterOpenConcerns = false;
   var _openPopover = null;
   var _searchDebounce = null;
   var _alive = false;
@@ -55,39 +57,11 @@ window.PageObservations = (function () {
     '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
   var tagColor = obsTagColor;
 
-  /* ── Pure helpers (exported for tests) ──────────────────── */
-  function _pad2(n) {
-    return String(n).padStart(2, '0');
-  }
-  function _ymd(d) {
-    return d.getFullYear() + '-' + _pad2(d.getMonth() + 1) + '-' + _pad2(d.getDate());
-  }
+  var _ymd = DashObservations.ymd;
+  var weekRange = DashObservations.weekRange;
+  var termRange = DashObservations.termRange;
   function obDay(ob) {
     return ob.date || (ob.created || '').slice(0, 10);
-  }
-
-  /* Monday of the week holding todayStr (YYYY-MM-DD), through todayStr. */
-  function weekRange(todayStr) {
-    var d = new Date(todayStr + 'T12:00:00');
-    var back = (d.getDay() + 6) % 7;
-    d.setDate(d.getDate() - back);
-    return { from: _ymd(d), to: todayStr };
-  }
-
-  /* The reporting term holding todayStr, else the latest one that has
-     started, else null. */
-  function termRange(terms, todayStr) {
-    var started = (terms || []).filter(function (t) {
-      return t.starts_on && t.starts_on <= todayStr;
-    });
-    if (!started.length) return null;
-    var inside = started.filter(function (t) {
-      return !t.ends_on || t.ends_on >= todayStr;
-    });
-    var t = (inside.length ? inside : started).sort(function (a, b) {
-      return a.starts_on < b.starts_on ? 1 : -1;
-    })[0];
-    return { from: t.starts_on, to: t.ends_on || todayStr };
   }
 
   var Card = window.ObsCard;
@@ -111,7 +85,8 @@ window.PageObservations = (function () {
       (filterContext ? 1 : 0) +
       (filterDate ? 1 : 0) +
       (filterAssessment ? 1 : 0) +
-      (filterQuoted ? 1 : 0)
+      (filterQuoted ? 1 : 0) +
+      (filterOpenConcerns ? 1 : 0)
     );
   }
 
@@ -125,8 +100,29 @@ window.PageObservations = (function () {
     filterDateTo = '';
     filterAssessment = null;
     filterQuoted = null;
+    filterOpenConcerns = false;
     searchQuery = '';
     _feedLimit = FEED_STEP;
+  }
+
+  /* ── The roster and Open Concerns (obs-roster.js) ───────── */
+  function syncRoster() {
+    if (_alive) ObsRoster.sync({ cid: activeCourse, students: _students, visible: visibleObs, picked: filterStudents });
+  }
+  function toggleNotObserved() {
+    ObsRoster.toggle();
+    syncRoster();
+    ObsRoster.focusToggle();
+  }
+  function syncConcernBtn() {
+    ObsRoster.syncConcerns(activeCourse, filterOpenConcerns);
+  }
+  function toggleOpenConcerns() {
+    filterOpenConcerns = !filterOpenConcerns;
+    syncConcernBtn();
+    refreshFilterStrip();
+    refilter();
+    ObsRoster.focusConcerns();
   }
 
   /* ── Course switch ──────────────────────────────────────── */
@@ -139,7 +135,9 @@ window.PageObservations = (function () {
     refreshStudentCache();
     resetFilters();
     makeCapture([]);
+    ObsRoster.reset();
     render();
+    syncRoster();
     overrideSidebarLinks();
   }
 
@@ -153,26 +151,17 @@ window.PageObservations = (function () {
     });
   }
 
+  // A click on a roster row picks the student; shift-click adds them.
   function overrideSidebarLinks() {
-    requestAnimationFrame(function () {
-      document.querySelectorAll('#gb-roster-list .student-row').forEach(function (a) {
-        a.addEventListener('click', function (e) {
-          e.preventDefault();
-          var sid = new URLSearchParams((a.getAttribute('data-href') || '').split('?')[1] || '').get('id');
-          if (sid && _capture) {
-            // Click picks the student; shift-click adds them to the group.
-            _capture.pickStudent(sid, e.shiftKey);
-            filterStudents = _capture.getStudents();
-            syncPopoverChecks('filter-student-dropdown', filterStudents, 'data-sid');
-            refreshFilterStrip();
-            refilter();
-            document.querySelectorAll('.student-row').forEach(function (r) {
-              var rid = new URLSearchParams((r.getAttribute('data-href') || '').split('?')[1] || '').get('id');
-              r.classList.toggle('selected', filterStudents.indexOf(rid) >= 0);
-            });
-          }
-        });
-      });
+    ObsRoster.wireRows(function (sid, shift) {
+      if (!_capture) return null;
+      _capture.pickStudent(sid, shift);
+      filterStudents = _capture.getStudents();
+      syncPopoverChecks('filter-student-dropdown', filterStudents, 'data-sid');
+      refreshFilterStrip();
+      refilter();
+      syncRoster();
+      return filterStudents;
     });
   }
 
@@ -422,6 +411,7 @@ window.PageObservations = (function () {
 
   function renderFilterRow() {
     var h =
+      ObsRoster.concernsSlotHtml(activeCourse, filterOpenConcerns) +
       renderChip(
         'filterStudents',
         renderStudentPopover('filter-student-dropdown', filterStudents, 'toggleFilterStudent', 'filterFilterStudents'),
@@ -447,6 +437,8 @@ window.PageObservations = (function () {
   function refreshFeedAndCount() {
     feedChanged();
     showFeed();
+    syncConcernBtn();
+    syncRoster();
   }
   // After a search or a filter: the same observations, the newest first again.
   function refilter() {
@@ -594,6 +586,7 @@ window.PageObservations = (function () {
       f = f.filter(function (o) {
         return isLinked(o) === (filterAssessment === 'linked');
       });
+    if (filterOpenConcerns) f = f.filter(isOpenConcern);
     if (filterQuoted) {
       var qi = quotedIndex(getTermRatings(activeCourse));
       f = f.filter(function (o) {
@@ -821,6 +814,7 @@ window.PageObservations = (function () {
     var strip = document.getElementById('obs-filter-strip');
     if (strip) strip.innerHTML = renderFilterRow();
     refilter();
+    syncRoster();
   }
 
   function wireSearch() {
@@ -1316,6 +1310,8 @@ window.PageObservations = (function () {
         setFilterOption(el.dataset.filter, el.dataset.value);
       },
       clearAllFilters: clearAllFilters,
+      toggleOpenConcerns: toggleOpenConcerns,
+      toggleNotObserved: toggleNotObserved,
       obsShowMore: showMore,
       deleteOb: function () {
         ObsFollowUps.confirmDelete(activeCourse, el.dataset.obid, function () {
@@ -1416,14 +1412,14 @@ window.PageObservations = (function () {
 
     refreshStudentCache();
 
-    // The dashboard's coverage grid opens this page with one student selected.
+    // A link with ?student= opens this page with that student picked.
     var preset = [];
     if (params.student && _studentsById[params.student]) {
       preset = [params.student];
       filterStudents = [params.student];
     }
     makeCapture(preset);
-    // The dashboard's open concerns open one card with its follow-ups.
+    // A link with ?ob= opens that card with its follow-ups.
     if (params.ob) ObsFollowUps.reveal(params.ob);
 
     _addDocListener('click', _handleClick);
@@ -1432,8 +1428,11 @@ window.PageObservations = (function () {
     _addDocListener('change', _handleChange);
     _addDocListener('keydown', _handleKeydown);
     _addDocListener('fv:id-rekeyed', onRekeyed);
+    // A Resolved follow-up closes a Concern: the Open Concerns count follows.
+    _addDocListener('fv:follow-ups-changed', syncConcernBtn);
 
     render();
+    syncRoster();
     if (typeof setLongFormAuthContext === 'function') {
       setLongFormAuthContext({
         kind: 'observation-capture',
@@ -1451,6 +1450,7 @@ window.PageObservations = (function () {
   }
 
   function destroy() {
+    ObsRoster.stop();
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });

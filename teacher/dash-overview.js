@@ -395,7 +395,7 @@ window.DashOverview = (function () {
 
   /* The dashboard under the toolbar: the top bar, then the middle row
      (docs/plans/dashboard-inbox-plan.md, on since D9). The students follow
-     (page-dashboard.js), and Observations goes last (obsCardHtml). */
+     (page-dashboard.js). */
   function _renderOverviewPanel(opts) {
     var cid = opts.cid;
     var allStudents = opts.allStudents;
@@ -472,22 +472,10 @@ window.DashOverview = (function () {
     );
   }
 
-  /* The Observations card, at the foot of the page. page-dashboard.js
-     re-renders only its inside for its tab and flag clicks. */
-  function obsCardHtml(opts) {
-    return (
-      '<section class="dash-overview-section dash-ob2" id="dash-obs-card" aria-labelledby="dash-ob2-title">' +
-      DashObservations.renderCard(opts.cid, opts.allStudents, opts.obs || {}) +
-      '</section>'
-    );
-  }
-
-  /* ── Observation weeks and overdue ──────────────────────────
-     The Observations card (dash-observations.js) and the student cards use
-     these. They are pure and take today's date as 'YYYY-MM-DD' so tests can
-     pin it. */
+  /* ── Observation overdue ────────────────────────────────────
+     The student cards and the Observations page's roster use these. They
+     are pure and take today's date as 'YYYY-MM-DD' so tests can pin it. */
   var OBS_OVERDUE_DAYS = 21;
-  var OBS_DEFAULT_WEEKS = 8;
   var DAY_MS = 86400000;
 
   function _dayNum(dateStr) {
@@ -496,34 +484,6 @@ window.DashOverview = (function () {
 
   function _isDateStr(d) {
     return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d) && !isNaN(Date.parse(d.slice(0, 10)));
-  }
-
-  function _dayStr(n) {
-    return new Date(n * DAY_MS).toISOString().slice(0, 10);
-  }
-
-  /** Monday of the ISO week that contains a 'YYYY-MM-DD' date. */
-  function obsWeekStart(dateStr) {
-    var n = _dayNum(dateStr);
-    var mondayOffset = (new Date(n * DAY_MS).getUTCDay() + 6) % 7;
-    return _dayStr(n - mondayOffset);
-  }
-
-  /** Mondays of the grid's columns: the term's weeks up to today, or the last 8 weeks with no term. */
-  function obsCoverageWeeks(todayStr, term) {
-    var first, last;
-    if (term && term.startsOn && term.endsOn) {
-      var end = todayStr < term.endsOn ? todayStr : term.endsOn;
-      if (end < term.startsOn) end = term.startsOn;
-      first = _dayNum(obsWeekStart(term.startsOn));
-      last = _dayNum(obsWeekStart(end));
-    } else {
-      last = _dayNum(obsWeekStart(todayStr));
-      first = last - (OBS_DEFAULT_WEEKS - 1) * 7;
-    }
-    var weeks = [];
-    for (var n = first; n <= last; n += 7) weeks.push(_dayStr(n));
-    return weeks;
   }
 
   /** The latest observation date in a list, or '' when there is none. */
@@ -548,11 +508,8 @@ window.DashOverview = (function () {
     classWorkCounts: classWorkCounts,
     rowHeight: rowHeight,
     sizeRow: sizeRow,
-    obsCardHtml: obsCardHtml,
     glanceHtml: glanceHtml,
     questionsCardHtml: questionsCardHtml,
-    obsWeekStart: obsWeekStart,
-    obsCoverageWeeks: obsCoverageWeeks,
     obsLastDate: obsLastDate,
     obsIsOverdue: obsIsOverdue,
   };
