@@ -872,6 +872,7 @@ window.PageReports = (function () {
         return st.html;
       })
       .join('');
+    ReportSheets.ruleOldCopy(preview);
     preview.classList.add('report-sheets-on');
     preview.classList.toggle('report-fitmap', studioView === 'all');
     preview.classList.toggle('studio-all', studioView === 'all');

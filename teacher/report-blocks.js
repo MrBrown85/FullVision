@@ -1575,7 +1575,10 @@ window.ReportBlocks = (function () {
      Printed forms the student fills in by hand, laid out like the rest of
      the report: a table with a circle per row under each word of the
      scale, then each question with ruled lines to write on
-     (options.writeLines a question, 3 unless the part says). One table, so
+     (options.writeLines a question, 3 unless the part says). Each line is
+     an element with a bottom border, not a background pattern: Chrome's
+     print engine dropped most of the pattern's one-pixel stripes, and the
+     lines did not print (Colin, 2026-11-25). One table, so
      a long form is cut between its rows; the questions print with its last
      rows. */
   function _writeLines(options) {
@@ -1588,7 +1591,7 @@ window.ReportBlocks = (function () {
     return `<div class="report-reflect-write">${list
       .map(
         (o, i) =>
-          `<div class="report-reflect-q" data-wrow="open.${i}"><div class="report-reflect-q-label" data-wt="open.${i}">${_say(o)}</div><div class="report-write-lines" style="height:${lines * 26}px"></div></div>`,
+          `<div class="report-reflect-q" data-wrow="open.${i}"><div class="report-reflect-q-label" data-wt="open.${i}">${_say(o)}</div><div class="report-write-lines" style="height:${lines * 26}px">${'<div class="report-line"></div>'.repeat(lines)}</div></div>`,
       )
       .join('')}</div>`;
   }

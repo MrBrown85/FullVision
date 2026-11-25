@@ -921,9 +921,23 @@
   outline: 2px solid var(--score-2);
 }
 .report-ruled {
-  background: repeating-linear-gradient(to bottom, transparent 0 21px, #bbb 21px 22px);
+  position: relative;
+  overflow: hidden;
   margin-top: 6px;
 }
+/* Its lines (report-sheets.js RULED_LINES): borders, so they print; a
+   layer, so they take no room. */
+.report-ruled-lines {
+  position: absolute;
+  inset: 0;
+}
+.report-ruled-lines > .report-line {
+  height: 22px;
+  box-sizing: border-box;
+  border-bottom: 1px solid #bbb;
+}
+/* A copy issued before Nov 25 saved its boxes with no lines in them:
+   ReportSheets.ruleOldCopy puts them in before it is shown again. */
 .report-ct {
   width: 100%;
   border-collapse: collapse;
@@ -6053,8 +6067,17 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-weight: 700;
   margin-bottom: 2px;
 }
-/* Writing lines 26px apart: room for a student's handwriting. */
-.report-write-lines {
+/* Writing lines 26px apart: room for a student's handwriting. Each line
+   is an element with a bottom border (report-blocks.js _openHtml). They
+   were a background pattern, and Chrome's print engine dropped most of
+   its one-pixel stripes (Colin, 2026-11-25: the lines did not print). */
+.report-write-lines > .report-line {
+  height: 26px;
+  box-sizing: border-box;
+  border-bottom: 1px solid #888;
+}
+/* The row being added on the page (report-one-words.js), on screen only. */
+.report-write-lines.one-w-newlines {
   background: repeating-linear-gradient(to bottom, transparent 0 25px, #888 25px 26px);
 }
 .report-disp-half .report-ct .report-habit-o {
