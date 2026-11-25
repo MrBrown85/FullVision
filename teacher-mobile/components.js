@@ -33,12 +33,18 @@ window.MComponents = (function () {
   function navBar(opts) {
     var back = '';
     if (opts.backLabel) {
-      back =
-        '<button class="m-nav-bar-back" data-action="m-back">' +
-        ICONS.chevronLeft +
-        '<span>' +
-        _esc(opts.backLabel) +
-        '</span></button>';
+      // `backIconOnly`: the chevron alone; the label is what a screen reader says.
+      back = opts.backIconOnly
+        ? '<button class="m-nav-bar-back" data-action="m-back" aria-label="' +
+          _esc(opts.backLabel) +
+          '">' +
+          ICONS.chevronLeft +
+          '</button>'
+        : '<button class="m-nav-bar-back" data-action="m-back">' +
+          ICONS.chevronLeft +
+          '<span>' +
+          _esc(opts.backLabel) +
+          '</span></button>';
     }
     // `classId`: a tab's first screen names the open class at the left.
     if (!back && opts.classId) back = classLabelHTML(opts.classId);
@@ -424,20 +430,13 @@ window.MComponents = (function () {
      (competencies that disagree: the lowest, outlined, no + or −), action,
      attrs (the data attributes every button carries; ids are ours). */
   // html-safe: levels are numbers, words constants, attrs ours
-  // The phone's new look (docs/plans/phone-look-plan.md), whose styles are look.css.
-  function _look() {
-    var flags = /** @type {any} */ (window).BuildFlags;
-    return !!(flags && flags.on('phoneLook'));
-  }
-
-  // "PRF", and "PRF +" on the chosen level: what the new look's track reads (look.css).
+  // "PRF", and "PRF +" on the chosen level: what the grader's track reads.
   function _levelCode(lv, mod) {
     return levelCode(lv) + (mod ? ' ' + scoreModSuffix(mod) : '');
   }
 
   function levelButtonsHTML(opts) {
     var mod = opts.mixed ? 0 : opts.mod;
-    var look = _look();
     return opts.order
       .map(function (lv) {
         var on = opts.level === lv;
@@ -451,81 +450,17 @@ window.MComponents = (function () {
           '" data-score="' +
           lv +
           '"' +
-          (look ? ' data-code="' + _levelCode(lv, on ? mod : 0) + '"' : '') +
           opts.attrs +
           ' aria-label="' +
           fig +
           ', ' +
           scoreLevelText(lv) +
-          '"><span class="m-level-fig">' +
-          fig +
-          '</span><span class="m-level-word">' +
-          scoreLevelText(lv) +
+          '"><span class="m-level-code">' +
+          _levelCode(lv, on ? mod : 0) +
           '</span></button>'
         );
       })
       .join('');
-  }
-
-  /* Each chip's letters on the grading screen's strip (tab-grade.js): the
-     initials, or, where students share them (two JC), the shortest start of
-     the first name, with the last initial, that tells them apart ("JaC" and
-     "JoC"; "JasC" and "JaqC"), else of the last name ("JCha" and "JChe"). A
-     group's chip keeps its G1 / P1. */
-  function chipTexts(students, units) {
-    var first = function (st) {
-      return String(st.preferred || st.firstName || '');
-    };
-    var last = function (st) {
-      return String(st.lastName || '');
-    };
-    var cap = function (s) {
-      return s.charAt(0).toUpperCase() + s.slice(1);
-    };
-    var out = students.map(function (st, i) {
-      return units[i] && units[i].view ? units[i].thumb : avatarInitials(st);
-    });
-    var groups = {};
-    out.forEach(function (txt, i) {
-      if (units[i] && units[i].view) return;
-      (groups[txt] = groups[txt] || []).push(i);
-    });
-    Object.keys(groups).forEach(function (key) {
-      var idxs = groups[key];
-      if (idxs.length < 2) return;
-      var ways = [];
-      for (var k = 2; k <= 5; k++) {
-        ways.push(
-          (function (n) {
-            return function (st) {
-              return cap(first(st).slice(0, n)) + last(st).charAt(0).toUpperCase();
-            };
-          })(k),
-        );
-      }
-      for (var m = 2; m <= 5; m++) {
-        ways.push(
-          (function (n) {
-            return function (st) {
-              return first(st).charAt(0).toUpperCase() + cap(last(st).slice(0, n));
-            };
-          })(m),
-        );
-      }
-      idxs.forEach(function (i) {
-        var st = students[i];
-        var mine = null;
-        for (var w = 0; w < ways.length && !mine; w++) {
-          var t = ways[w](st);
-          var clash = idxs.some(function (j) {
-            return j !== i && ways[w](students[j]) === t;
-          });
-          if (!clash) mine = t;
-        }
-        out[i] = mine || key;
-      });
-    });
-    return out;
   }
 
   // A row's buttons after a save, without drawing the row again; `mixed` as levelButtonsHTML draws it.
@@ -537,10 +472,9 @@ window.MComponents = (function () {
       var fig = on ? formatScoreLevel(lv, mod) : String(lv);
       btn.classList.toggle('m-score-active', on);
       btn.classList.toggle('m-score-mixed', on && !!mixed);
-      if (btn.hasAttribute('data-code')) btn.setAttribute('data-code', _levelCode(lv, on ? mod : 0));
       btn.setAttribute('aria-label', fig + ', ' + scoreLevelText(lv));
-      var f = btn.querySelector('.m-level-fig');
-      if (f) f.textContent = fig;
+      var code = btn.querySelector('.m-level-code');
+      if (code) code.textContent = _levelCode(lv, on ? mod : 0);
     });
   }
 
@@ -568,8 +502,10 @@ window.MComponents = (function () {
           '><span class="m-mod-sign" aria-hidden="true">' +
           scoreModSuffix(m) +
           '</span>' +
-          // The new look shows the sign alone; the word is still read out.
-          (_look() ? '<span class="m-mod-word">' + (m > 0 ? 'Plus' : 'Minus') + '</span>' : m > 0 ? 'Plus' : 'Minus') +
+          // The sign alone shows; the word is still read out.
+          '<span class="m-sr">' +
+          (m > 0 ? 'Plus' : 'Minus') +
+          '</span>' +
           '</button>'
         );
       })
@@ -579,7 +515,6 @@ window.MComponents = (function () {
   return {
     levelButtonsHTML: levelButtonsHTML,
     paintLevelButtons: paintLevelButtons,
-    chipTexts: chipTexts,
     fineTuneLabel: fineTuneLabel,
     fineTuneButtonsHTML: fineTuneButtonsHTML,
     scoredAssessmentCount: scoredAssessmentCount,

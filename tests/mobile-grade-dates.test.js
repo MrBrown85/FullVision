@@ -52,19 +52,33 @@ function restoreDataLayer() {
 }
 
 /* Run filterAssessments over fake list cells and return the ids left showing. */
+// A row of the list, as _setHidden sees it: hidden is an attribute.
+function fakeRow(id) {
+  return {
+    off: false,
+    getAttribute: k => (k === 'data-aid' ? id : null),
+    setAttribute(k) {
+      if (k === 'hidden') this.off = true;
+    },
+    removeAttribute(k) {
+      if (k === 'hidden') this.off = false;
+    },
+  };
+}
+
 function visibleAfter(mode) {
   const cells = {};
   ASSESSMENTS.forEach(a => {
-    cells[a.id] = { style: { display: '' }, getAttribute: k => (k === 'data-aid' ? a.id : null) };
+    cells[a.id] = fakeRow(a.id);
   });
   const origAll = document.querySelectorAll;
-  document.querySelectorAll = sel => (sel === '#m-grade-list .m-cell' ? Object.values(cells) : []);
+  document.querySelectorAll = sel => (sel === '#m-grade-list .m-tg-row' ? Object.values(cells) : []);
   try {
     MGrade.filterAssessments(CID, mode);
   } finally {
     document.querySelectorAll = origAll;
   }
-  return Object.keys(cells).filter(id => cells[id].style.display !== 'none');
+  return Object.keys(cells).filter(id => !cells[id].off);
 }
 
 function saveDateRange(dateRange) {

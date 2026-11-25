@@ -275,8 +275,7 @@ describe('pin: the phone Grade tab’s writes', () => {
     MGrade.setupSwiper(CID, aid);
     // The tab remembers the view picked for a piece of work, from one test
     // to the next: rubric work starts in the Rubric view, as it first opens.
-    const rubricView = document.querySelector('[data-action="m-grade-view"][data-view="rubric"]');
-    if (rubricView && rubricView.getAttribute('aria-pressed') !== 'true') MGrade.setGradeView(CID, aid, 'rubric');
+    if (getAssessments(CID).find(a => a.id === aid).rubricId) MGrade.setGradeView(CID, aid, 'rubric');
     session = signIn();
     writers = watchWriters();
   }
@@ -316,7 +315,6 @@ describe('pin: the phone Grade tab’s writes', () => {
       );
     if (action === 'm-grade-status') return MGrade.setStatus(CID, a('sid'), a('aid'), a('val'));
     const group = {
-      'm-grade-group-more': MGrade.openMemberSheet,
       'm-grade-separate': MGrade.gradeSeparately,
       'm-grade-rejoin': MGrade.confirmBackToGroup,
       'm-grade-rejoin-yes': MGrade.backToGroup,
@@ -348,11 +346,30 @@ describe('pin: the phone Grade tab’s writes', () => {
   const points = (sid, aid) => document.getElementById('m-pts-' + sid + '-' + aid);
   const step = (sid, which) => on(sid, '[data-action="m-grade-points-' + which + '"]');
   const mark = (sid, which) => on(sid, '[data-action="m-grade-completion"][data-mark="' + which + '"]');
-  const pill = (sid, which) => on(sid, '.m-status-row [data-action="m-grade-status"][data-val="' + which + '"]');
-  const memberPill = (member, which) =>
-    document.querySelector('.m-group-pill[data-sid="' + member + '"][data-val="' + which + '"]');
-  const view = which => document.querySelector('[data-action="m-grade-view"][data-view="' + which + '"]');
   const inSheet = action => document.querySelector('#m-sheet-container [data-action="' + action + '"]');
+  // What a card rarely needs is under ⋯ for the card on screen: its status, Competencies or Rubric.
+  function more(sid) {
+    const aid = MGrade.moreContext().a.id;
+    MGrade.jumpToStudent(MGrade.studentCardIndex(CID, aid, sid), true);
+    MComponents.dismissSheet();
+    MGradeLook.openMore();
+  }
+  const pill = (sid, which) => {
+    more(sid);
+    return document.querySelector(
+      '#m-sheet-container .m-status-row [data-action="m-grade-status"][data-sid="' +
+        sid +
+        '"][data-val="' +
+        which +
+        '"]',
+    );
+  };
+  const memberPill = pill;
+  const view = which => {
+    MComponents.dismissSheet();
+    MGradeLook.openMore();
+    return document.querySelector('#m-sheet-container [data-action="m-grade-view"][data-view="' + which + '"]');
+  };
 
   const send = (el, type) => el.dispatchEvent(new win.Event(type, { bubbles: true }));
   function typeAndLeave(el, text) {
@@ -991,8 +1008,8 @@ describe('pin: the phone Grade tab’s writes', () => {
       tap(level(AVA, QUESTION, 3));
       session.since();
       writers.since();
-      tap(document.querySelector('[data-action="m-grade-group-more"][data-sid="' + BEN + '"]'));
-      tap(inSheet('m-grade-separate'));
+      more(AVA);
+      tap(document.querySelector('#m-sheet-container [data-action="m-grade-separate"][data-sid="' + BEN + '"]'));
       await settle();
 
       expect(writers.since()).toEqual([['setGradedSeparately', CID, TALK, BEN, true]]);
@@ -1027,7 +1044,8 @@ describe('pin: the phone Grade tab’s writes', () => {
           [BEN]: [entry(BEN, TALK, QUESTION, 2, { date: '2026-10-16', note: 'His own' })],
         },
       });
-      tap(document.querySelector('[data-action="m-grade-rejoin"][data-sid="' + BEN + '"]'));
+      more(BEN);
+      tap(inSheet('m-grade-rejoin'));
       // The sheet is up; nothing is saved until it is answered.
       expect(writers.since()).toEqual([]);
       tap(inSheet('m-grade-rejoin-yes'));

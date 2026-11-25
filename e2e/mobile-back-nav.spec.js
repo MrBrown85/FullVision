@@ -116,7 +116,7 @@ test('after a class switch the Grade tab opens on its list, not the old class’
   const other = await page.evaluate(() => createCourse({ name: 'Second Class' }).id);
 
   await page.locator('.m-tab-item[data-tab="grade"]').click();
-  await page.locator('#m-grade-list .m-cell').first().click();
+  await page.locator('#m-grade-list .m-tg-row').first().click();
   await expect(page.locator('#m-swiper')).toBeVisible();
   await page.waitForTimeout(500);
 

@@ -17,11 +17,8 @@ async function currentCardName(page) {
     last = now;
     await page.waitForTimeout(150);
   }
-  return page.evaluate(() => {
-    const sw = document.getElementById('m-swiper');
-    const card = sw.querySelectorAll('.m-swiper-card')[Math.round(sw.scrollLeft / sw.clientWidth)];
-    return card.querySelector('.m-grade-student-name').textContent.trim();
-  });
+  // The card is named in the top bar, not on itself.
+  return page.evaluate(() => document.querySelector('#m-nav-bar-grade-swiper .m-nav-title-text').textContent.trim());
 }
 
 // A piece from the profile's All Work, which opens in place.
@@ -101,15 +98,6 @@ test('Grade on a student page on Group work opens their group card, or their own
   await openGrade(3);
   await expect(bar).toHaveText('Group 2');
   expect(await settled(page)).toBe(1);
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const sw = document.getElementById('m-swiper');
-        const card = sw.querySelectorAll('.m-swiper-card')[Math.round(sw.scrollLeft / sw.clientWidth)];
-        return card.querySelector('.m-group-title')?.textContent;
-      }),
-    )
-    .toBe('Group 2');
 
   // Student 14 is in no group: their own card, after the three group cards.
   await page.locator('#m-nav-bar-grade-swiper [data-action="m-back"]').click();
@@ -141,7 +129,7 @@ test('Grade on a student page with a grading screen open on the Grade tab opens 
 
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell', { hasText: 'Mid-Year Comprehensive Exam' }).click();
+  await page.locator('#m-grade-list .m-tg-row', { hasText: 'Mid-Year Comprehensive Exam' }).click();
   await expect(page.locator('#m-swiper')).toBeVisible();
   await page.waitForTimeout(500);
 
@@ -185,7 +173,7 @@ test('the grading bar names the student on screen, and follows the class list', 
   await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-title-inline')).toHaveCSS('opacity', '1');
 
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell', { hasText: 'Science Fair Proposal' }).click();
+  await page.locator('#m-grade-list .m-tg-row', { hasText: 'Science Fair Proposal' }).click();
   // The bar names the student on screen, and follows the class list.
   const title = page.locator('#m-nav-bar-grade-swiper .m-nav-bar-title-inline');
   const names = await page.evaluate(() =>

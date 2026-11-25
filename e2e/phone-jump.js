@@ -27,7 +27,7 @@ export async function jumpTo(page, which) {
     typeof which === 'number'
       ? which
       : await page.evaluate(
-          sid => [...document.querySelectorAll('#m-thumb-strip .m-thumb')].findIndex(t => t.dataset.sid === sid),
+          sid => [...document.querySelectorAll('#m-grade-progress .m-prog-seg')].findIndex(t => t.dataset.sid === sid),
           which,
         );
   expect(idx).toBeGreaterThanOrEqual(0);
@@ -37,9 +37,18 @@ export async function jumpTo(page, which) {
   expect(await settled(page)).toBe(idx);
 }
 
-// Competencies or Rubric, from ⋯.
+/* Competencies or Rubric, from ⋯: the sheet offers the other view, as one
+   button ("Grade by Competencies" on the Rubric view, "Grade by Rubric" on the
+   Competencies view). Asked for the view already on, it does nothing. */
 export async function scoreBy(page, label) {
+  const view = /^Competenc/.test(label) ? 'tags' : 'rubric';
   await page.locator('#m-nav-bar-grade-swiper .m-grade-more').click();
-  await page.locator('#m-sheet-container .m-more-sheet .m-seg-btn', { hasText: label }).click();
-  await expect(page.locator('#m-sheet-container .m-more-sheet')).toHaveCount(0);
+  const sheet = page.locator('#m-sheet-container .m-more-sheet');
+  const button = sheet.locator('[data-action="m-grade-view"][data-view="' + view + '"]');
+  if (await button.count()) {
+    await button.click();
+  } else {
+    await page.evaluate(() => MComponents.dismissSheet());
+  }
+  await expect(sheet).toHaveCount(0);
 }

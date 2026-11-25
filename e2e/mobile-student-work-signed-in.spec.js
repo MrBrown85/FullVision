@@ -373,7 +373,7 @@ test('To Grade, the speed grader with the student’s photos, and Return', async
   await row.locator('[data-action="m-grade-row-menu"]').click();
   await page.locator('#m-sheet-container .m-tg-menu [data-only="tograde"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-  await expect(page.locator('#m-thumb-strip .m-thumb')).toHaveCount(1);
+  await expect(page.locator('#m-grade-progress .m-prog-seg')).toHaveCount(1);
   const card = page.locator('.m-swiper-card').first();
   await expect(card.locator('.m-work-page img').first()).toHaveAttribute('src', /^blob:/);
   expect(errors).toEqual([]);
@@ -406,7 +406,7 @@ test('Add Work from a Not In card: the photo goes to the server and the work is 
   await server(page);
   await openGradeTab(page);
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   await jumpTo(page, BOB);
   const card = page.locator('.m-swiper-card[data-sid="' + BOB + '"]');
@@ -469,11 +469,11 @@ test('Mark Up on the phone saves to the server when Done is pressed', async ({ p
   await server(page);
   await openGradeTab(page);
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + LAB + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + LAB + '"]').click();
   await jumpTo(page, ALICE);
   const card = page.locator('.m-swiper-card[data-sid="' + ALICE + '"]');
-  await card.locator('.m-work-full').click();
-  await page.locator('#m-sheet-container [data-action="m-markup-open"]').first().click();
+  // The pencil on the paper is Mark Up for the page in view.
+  await card.locator('[data-action="m-markup-open"]').click();
   const mk = page.locator('#m-markup');
   await expect(mk.locator('.m-markup-title')).toHaveText('Mark Up');
   // The piece's marks were read before drawing.
@@ -504,7 +504,7 @@ test('One per Group: the group’s work is one to grade, with every member’s p
   await page.locator('#m-sheet-container .m-tg-menu [data-only="tograde"]').click();
   const card = page.locator('.m-swiper-card').first();
   await expect(card.locator('.m-work-page img').first()).toHaveAttribute('src', /^blob:/);
-  await expect(card.locator('.m-work-dot')).toHaveCount(2);
+  await expect(card.locator('.m-work-count')).toHaveText('1 of 2');
   expect(errors).toEqual([]);
 });
 

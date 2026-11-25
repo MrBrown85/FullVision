@@ -177,26 +177,27 @@ describe('a level on a competency row of rubric work (P2)', () => {
   });
 });
 
-describe('a score tap checks one student (P3)', () => {
-  it('Missing and Excused are checked for the student tapped only, and the class is not sorted again', () => {
+describe('a score tap checks no one (P3)', () => {
+  it('Missing and Excused are not checked at all, and the class is not sorted again', () => {
     const can = vi.spyOn(globalThis, 'canSetAssignmentStatus');
     const sorted = vi.spyOn(globalThis, 'sortStudents');
     MGrade.setCriterionScore(CID, S[4], AID, CRITS[0], 3);
     // Before: 3 for each of 30 students (91 in all), and the class sorted for the bar.
-    expect(can.mock.calls.length).toBeLessThanOrEqual(4);
-    expect(can.mock.calls.every(c => c[1] === S[4])).toBe(true);
+    // Now a status is set from ⋯, which asks about the one card when it opens.
+    expect(can).toHaveBeenCalledTimes(0);
     expect(sorted).toHaveBeenCalledTimes(0);
-    const pills = card(S[4]).querySelectorAll('.m-status-pill[data-val="NS"], .m-status-pill[data-val="EXC"]');
-    expect([...pills].every(p => p.disabled)).toBe(true);
-    expect(card(S[4]).querySelector('.m-status-hint').hidden).toBe(false);
-    expect(document.querySelector('.m-thumb[data-sid="' + S[4] + '"]').classList.contains('m-thumb-graded')).toBe(true);
-    expect(document.querySelector('.m-thumb[data-sid="' + S[5] + '"]').classList.contains('m-thumb-graded')).toBe(
-      false,
-    );
+    const seg = sid => document.querySelector('.m-prog-seg[data-sid="' + sid + '"]');
+    expect(seg(S[4]).classList.contains('is-graded')).toBe(true);
+    expect(seg(S[5]).classList.contains('is-graded')).toBe(false);
   });
 
-  it('the bar still follows the card on screen', () => {
+  it('the bar still follows the card on screen: Return and Next is there once a level is given', () => {
+    const btn = () => document.querySelector('#m-grade-return-act .m-grade-return-btn');
+    expect(btn().disabled).toBe(true);
     MGrade.setCriterionScore(CID, S[0], AID, CRITS[0], 3);
-    expect(document.getElementById('m-grade-return-state').textContent).toContain('Saved. Not returned yet.');
+    expect(btn().disabled).toBe(false);
+    expect(btn().textContent).toBe('Return and Next');
+    // The old Draft mark and its line are gone.
+    expect(document.getElementById('m-grade-return').textContent).not.toContain('Saved. Not returned yet.');
   });
 });

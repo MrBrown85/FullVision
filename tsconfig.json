@@ -91,6 +91,7 @@
     "teacher-mobile/crit-own.js",
     "teacher-mobile/grade-look.js",
     "teacher-mobile/student-card.js",
+    "teacher-mobile/grade-reader.js",
     "teacher-mobile/level-sheet.js",
     "teacher-mobile/pull-refresh.js",
     "teacher-mobile/pin-page.js",
