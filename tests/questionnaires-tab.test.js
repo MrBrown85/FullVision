@@ -171,6 +171,12 @@ describe('Questionnaires tab', () => {
     DashClassManager.renderClassManager = originals.rerender;
   });
 
+  it('the tab count is there before the Reflect tab is opened (Nov 25: the Dashboard no longer reads the reflections first)', async () => {
+    Questionnaires._reset();
+    expect(Questionnaires.loaded(CID)).toBe(false);
+    expect(CmQuestionnaires.countOn(CID)).toBe(0);
+  });
+
   it('in Demo Mode the tab draws its list on the first draw, with nothing read before it (Nov 25: it stayed on Loading)', () => {
     Questionnaires._reset();
     expect(Questionnaires.loaded(CID)).toBe(false);
