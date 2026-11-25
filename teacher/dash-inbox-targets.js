@@ -25,7 +25,9 @@
   'use strict';
 
   var MAX_PIECES = 7;
-  var CHANGED = 'The list of assessments changed, so those files were not added. Drop them again.';
+  // A piece that stopped taking work between the targets being drawn and the press or the drop.
+  var STOPPED_DROP = 'That assessment stopped taking work, so the files were not added.';
+  var STOPPED_PICK = 'That assessment stopped taking work. Choose another.';
   var PLUS =
     '<svg width="22" height="22" viewBox="0 0 30 30" aria-hidden="true" focusable="false"><path d="M15 6v18M6 15h18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
   var CLOSE =
@@ -255,9 +257,10 @@
     var aid = on.getAttribute('data-aid') || '';
     var AW = /** @type {any} */ (window).AddWorkClass;
     if (!AW) return;
-    if (!D.stillOffered(cid, aid)) {
+    // Asked of the same list the targets were drawn from (seven, not the box's three).
+    if (!D.stillOffered(cid, aid, MAX_PIECES)) {
       // The piece stopped taking work: nothing is opened in its place.
-      _note = CHANGED;
+      _note = STOPPED_DROP;
       if (_rest) {
         _redraw(cid);
         return;
@@ -319,11 +322,8 @@
       var AW = /** @type {any} */ (window).AddWorkClass;
       var aid = el.getAttribute('data-aid') || '';
       if (!D || !AW) return true;
-      if (!D.stillOffered(ctx.cid, aid)) {
-        _note = CHANGED.replace(
-          'so those files were not added. Drop them again.',
-          'so nothing was opened. Choose again.',
-        );
+      if (!D.stillOffered(ctx.cid, aid, MAX_PIECES)) {
+        _note = STOPPED_PICK;
         // html-safe: panelHtml escapes every title and note
         if (_panel && !_rest) _panel.innerHTML = panelHtml(ctx.cid, { close: true });
         else ctx.redraw();
