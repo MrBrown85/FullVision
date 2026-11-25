@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { reportPagesStill } from './helpers.js';
 
 /* A reflection on One Report flows down the page (teacher/report-one.js,
    report-sheets.js pack) and its rows can be reached and dragged
@@ -138,6 +139,9 @@ test('⋯ and ⠿ stay while the pointer goes to them, and a statement drags und
   };
   const row = page.locator('#rb-preview tr[data-wrow="items.1"]');
   await row.scrollIntoViewIfNeeded();
+  // Where the row is, once the pages have stopped moving: under load the test aimed mid-scroll and the
+  // pointer went to the row beside it, whose ⋯ showed instead (Nov 25, 2026).
+  await reportPagesStill(page);
   const words = await mid(row.locator('.report-habit-name'));
 
   // Slowly from the statement to its ⋯ in the right margin: it is still there to click.
@@ -182,6 +186,7 @@ test('⋯ and ⠿ stay while the pointer goes to them, and a statement drags und
   // Escape during a drag puts the row back.
   const again = page.locator('#rb-preview tr[data-wrow="items.0"]');
   await again.scrollIntoViewIfNeeded();
+  await reportPagesStill(page);
   await again.hover();
   const g0 = await mid(page.locator('#rb-preview [data-wgrip="items.0"]'));
   const wording = () =>
