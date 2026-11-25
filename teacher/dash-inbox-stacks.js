@@ -501,6 +501,10 @@ window.DashInboxStacks = (function () {
       return q.aid === aid;
     })[0];
     var ids = mine && mine.studentIds.length ? mine.studentIds : [sid];
+    // The grader carries on from the piece clicked, then round to the stacks
+    // before it, so it reaches All Caught Up only when nothing is left.
+    var at = queue.indexOf(mine);
+    if (at > 0) queue = queue.slice(at).concat(queue.slice(0, at));
     PA.openGrader(cid, aid, sid, { studentIds: ids, show: 'tograde', onClose: redraw, queue: queue });
   }
 

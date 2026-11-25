@@ -6286,6 +6286,82 @@ body.af-comp-open #gb-tooltip {
   opacity: 0.35;
   cursor: default;
 }
+/* In a queue (I3): on a piece's last step Next names the next piece. The
+   title is cut with an ellipsis so the row keeps its shape. */
+.grader-step.is-queue {
+  width: auto;
+  min-width: 0;
+  max-width: 250px;
+  flex: 0 1 auto;
+  padding: 0 12px;
+  gap: 0;
+  background: var(--active-fill);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.grader-step.is-queue .grader-next-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grader-step.is-queue .grader-next-pre,
+.grader-step.is-queue .grader-next-arrow {
+  flex: none;
+  white-space: pre;
+}
+/* All Caught Up (I3): over the dialog after the last piece in a queue. */
+.grader-caught-up {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--bg);
+  border-radius: inherit;
+}
+.grader-caught-up-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.grader-caught-up-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.grader-caught-up-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.grader-caught-up-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grader-caught-up-n {
+  flex: none;
+  font-weight: 600;
+}
+.grader-caught-up-actions {
+  display: flex;
+  gap: 10px;
+}
 .grader-spacer {
   flex: 1;
 }
