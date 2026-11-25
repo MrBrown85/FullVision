@@ -296,7 +296,6 @@ describe('grade-format-guard', () => {
     'teacher/dash-class-manager.js round Math.max(0, Math.min(100, v)) * 10': 'a Counts As % being set',
     "teacher/dash-class-manager.js round (_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10":
       'a Points to Proficiency start being set',
-    'teacher/dash-insights.js round r.min': 'a rule’s fewest pieces',
     'teacher/factor-field.js round Number(v) * 10': 'an assessment’s Factor',
     'teacher/grades-print.js round Math.max(8, r.right - menu.offsetWidth)': 'a menu’s position',
     'teacher/assign-competency-picker.js round r.left + r.width / 2 - boxRect.left - 8': 'a pointer’s position',

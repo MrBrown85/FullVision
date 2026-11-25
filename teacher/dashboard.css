@@ -362,78 +362,6 @@ a.dash-glance-cell:hover {
 }
 
 /* ── Class insights (dash-insights.js) ─────────────────────── */
-/* The competency filter, above the Students heading: the chip that clears
-   it, how the cards are ordered, an observation for those below, and the
-   gradebook on the competency. */
-.dash-comp-filter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  min-height: 32px;
-  margin-top: 12px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-}
-.dash-comp-filter + .dash-students-head {
-  margin-top: 8px;
-}
-.dash-comp-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--active) 45%, transparent);
-  border-radius: 14px;
-  background: var(--active-light);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
-}
-.dash-comp-chip span {
-  font-size: 15px;
-  line-height: 1;
-  color: var(--text-2);
-}
-.dash-comp-chip:hover span {
-  color: var(--text);
-}
-.dash-comp-filter-note {
-  color: var(--text-2);
-}
-.dash-comp-record {
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--divider-strong);
-  border-radius: 8px;
-  background: var(--surface);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
-}
-.dash-comp-record:hover {
-  background: var(--overlay-hover);
-}
-.dash-comp-chip:focus-visible,
-.dash-comp-record:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 1px;
-}
-.page-dashboard .dash-comp-gb {
-  font-weight: 500;
-  color: var(--link);
-  text-decoration: none;
-  cursor: pointer;
-}
-.page-dashboard .dash-comp-gb:hover {
-  text-decoration: underline;
-}
-
 /* The head of a competency row's list of students (the Competencies tile's
    .dash-comp-pop), and the shared next step under it. */
 .dash-mix-pop-head {
@@ -1402,10 +1330,6 @@ a.dash-ins-name:hover {
 .dash-card:focus-within {
   z-index: 2;
 }
-/* With a competency in focus, a student below Proficient on it. */
-.dash-card.is-focus-below {
-  border-color: color-mix(in srgb, var(--score-2) 55%, var(--divider-strong));
-}
 .dash-card.flagged {
   box-shadow:
     inset 4px 0 0 var(--priority),
@@ -1627,26 +1551,9 @@ a.dash-ins-name:hover {
   font-weight: 400;
   line-height: 1.5;
 }
-/* A competency pointed at on Curricular Competencies: its chip is
-   outlined on every card, nothing else changes (plan F.7a). */
-.dash-card-seg.is-lit {
-  outline-color: var(--text);
-}
-/* A column in focus (part of the page's competency filter): it is outlined,
-   the others fade (a mix with the card, so the pop-up stays solid). */
-.dash-card-strip.has-focus .dash-card-seg.is-focus {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
-}
-.dash-card-strip.has-focus .dash-card-seg:not(.is-focus) {
-  background: color-mix(in srgb, var(--chip-bg) 35%, var(--surface));
-  color: color-mix(in srgb, var(--chip-fg) 35%, var(--surface));
-}
-
-/* The competency filter's motion (page-dashboard.js _slideCardsFrom): a
-   card is put back where it was, in its old look, with no transition
-   (is-placing), then slides to its new place as its chips and border
-   change (is-sliding). */
+/* A sort's motion (StudentCards.slideFrom): a card is put back where it
+   was with no transition (is-placing), then slides to its new place
+   (is-sliding). */
 .dash-card.is-placing,
 .dash-card.is-placing .dash-card-seg {
   transition: none;
@@ -1678,8 +1585,7 @@ a.dash-ins-name:hover {
 }
 
 /* Card Footer: the flag, the observation line, missing work, and on the
-   right "N not assessed" or, with a column in focus, the student's level
-   on it. */
+   right "N not assessed". */
 .dash-card-footer {
   display: flex;
   align-items: center;
@@ -1687,8 +1593,7 @@ a.dash-ins-name:hover {
   padding: 0 12px 10px;
 }
 .dash-card-missing,
-.dash-card-unassessed,
-.dash-card-focus {
+.dash-card-unassessed {
   flex-shrink: 0;
   margin-left: auto;
   font-family: var(--font-base);
@@ -1697,11 +1602,6 @@ a.dash-ins-name:hover {
   color: var(--text-2);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-}
-.dash-card-focus {
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .dash-card-obs {
   /* On a narrow card the observation line takes its own row rather than

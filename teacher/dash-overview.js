@@ -367,38 +367,6 @@ window.DashOverview = (function () {
     return html + '</ul></section>';
   }
 
-  /* The bar above the Students heading while a competency is picked: the
-     chip that clears it, how the cards are ordered, an observation for the
-     students below the Who Needs Help rule on it, and the gradebook on it.
-     col: a DashInsights.columns entry; belowIds: those students. */
-  function compFilterHtml(cid, col, belowIds) {
-    if (!col) return '';
-    var n = (belowIds || []).length;
-    return (
-      '<div class="dash-comp-filter" role="group" aria-label="' +
-      esc('Filtered to ' + col.title) +
-      '">' +
-      '<button type="button" class="dash-comp-chip" data-action="naComp" data-key="" aria-label="' +
-      esc('Clear the ' + col.label + ' filter') +
-      '">' +
-      esc(col.label) +
-      '<span aria-hidden="true">×</span></button>' +
-      '<span class="dash-comp-filter-note">Weakest first</span>' +
-      (n
-        ? '<button type="button" class="dash-comp-record" data-action="compRecord" data-key="' +
-          esc(col.key) +
-          '">' +
-          esc('Record an Observation for the ' + n + ' Below') +
-          '</button>'
-        : '') +
-      '<a class="dash-comp-gb" role="link" tabindex="0" data-href="' +
-      esc(DashInsights.gradebookHref(cid, [], col)) +
-      '">' +
-      esc('View ' + col.label + ' in Gradebook →') +
-      '</a></div>'
-    );
-  }
-
   /* One count of the class's work for one draw, shared by the top bar's To
      Grade cell and the Inbox (D4 follow-up): classWorkCounts goes through
      every piece, and a busy class has dozens. Outside a draw, a plain call.
@@ -583,7 +551,6 @@ window.DashOverview = (function () {
     obsCardHtml: obsCardHtml,
     glanceHtml: glanceHtml,
     questionsCardHtml: questionsCardHtml,
-    compFilterHtml: compFilterHtml,
     obsWeekStart: obsWeekStart,
     obsCoverageWeeks: obsCoverageWeeks,
     obsLastDate: obsLastDate,

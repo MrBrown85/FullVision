@@ -1,13 +1,10 @@
 /* dash-insights.js — the dashboard's class insights: the students at one
-   proficiency on a competency (the Level Mix pop-up), the Who Needs Help
-   rule (the Needs Support view, the cards' amber border and the competency
-   filter use it; the Needs Attention card is gone, plan F.8), Missing and
-   Late, and the student grid. */
+   proficiency on a competency (the pop-up), Missing and Late, and the
+   student grid. */
 window.DashInsights = (function () {
   'use strict';
 
   var GLYPHS = { 1: '○', 2: '◐', 3: '●', 4: '◆' };
-  var DEFAULT_RULE = { below: 3, min: 3 };
 
   /* One competency as a column, as columns() draws a section outside any
      folder. The Competencies tile lists every competency on its own, so it
@@ -174,16 +171,6 @@ window.DashInsights = (function () {
     return _baseCode(col, byId);
   }
 
-  /* One student on one column under the Who Needs Help rule: their value is
-     below the rule's proficiency and rests on at least `min` scores. */
-  function isBelowRule(cid, col, sid, value, rule) {
-    if (!(value > 0) || roundLevel(value) >= rule.below) return false;
-    var evidence = col.sectionIds.reduce(function (n, secId) {
-      return n + getSectionEvidenceCount(cid, sid, secId);
-    }, 0);
-    return evidence >= rule.min;
-  }
-
   function showsProficiency(cid) {
     return courseGradeMode(cid) !== 'letter';
   }
@@ -279,37 +266,6 @@ window.DashInsights = (function () {
     );
   }
 
-  /* ── Who Needs Help rule ────────────────────────────────── */
-  // The saved rule ({ below, min }) with anything missing or out of range
-  // set to the default: below Proficient, at least 3 scores.
-  function readRule(saved) {
-    var r = saved && typeof saved === 'object' ? saved : {};
-    return {
-      below: r.below === 2 ? 2 : DEFAULT_RULE.below,
-      min: r.min >= 1 && r.min <= 5 ? Math.round(r.min) : DEFAULT_RULE.min,
-    };
-  }
-
-  // The level the rule's students are below, by name ("Proficient",
-  // "Developing"), for any text that says who counts.
-  function ruleLevelName(rule) {
-    return PROF_LABELS[readRule(rule).below];
-  }
-
-  /* Each competency with the students under the rule on it: their value is
-     below the rule's proficiency and rests on at least `min` scores.
-     → [{ col, ids, values }] in column order */
-  function belowLists(cid, allStudents, rule) {
-    var ids = _ids(allStudents);
-    return columns(cid).map(function (col) {
-      var dist = competencyDistribution(cid, ids, col.which);
-      var below = ids.filter(function (sid) {
-        return isBelowRule(cid, col, sid, dist.values[sid], rule);
-      });
-      return { col: col, ids: below, values: dist.values };
-    });
-  }
-
   /* ── Missing and Late ───────────────────────────────────── */
   var MISSING_KINDS = {
     ns: { label: 'Missing', cls: 'is-ns' },
@@ -383,101 +339,6 @@ window.DashInsights = (function () {
       missingSubLine(c) +
       '</span></a>'
     );
-  }
-
-  /* ── The attention model ──────────────────────────────── */
-  /* (Once the Needs Attention card's; the card is gone, plan F.8. The
-     page's competency filter and Needs Support read its lists.)
-     One entry per student who needs something: competencies under the rule
-     (not in a Letter class), no observation in 3+ weeks, no strength
-     recorded in the Observations card's By week window, and missing or late
-     work. Worst first.
-       opts: { rule, todayStr }
-     → { prof, rule, lists, people: [{ student, below, overdue, daysSince,
-         noStrength, missing }], counts } */
-  function attentionModel(cid, allStudents, opts) {
-    opts = opts || {};
-    var today = opts.todayStr || getTodayStr();
-    var prof = showsProficiency(cid);
-    var rule = readRule(opts.rule);
-    var lists = prof ? belowLists(cid, allStudents, rule) : [];
-    var belowBy = {};
-    lists.forEach(function (l) {
-      l.ids.forEach(function (sid) {
-        (belowBy[sid] = belowBy[sid] || []).push({ col: l.col, value: l.values[sid] });
-      });
-    });
-    var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-    var win = DashObservations.weekWindow(today, term);
-    var rows = allStudents.map(function (st) {
-      return DashObservations.weekRow(st, getStudentQuickObs(cid, st.id).slice(), win, today);
-    });
-    // As on the Observations card: a class with no observations at all has
-    // nobody overdue yet.
-    var classObserved = rows.some(function (r) {
-      return r.observed;
-    });
-    var missingBy = {};
-    missingItems(cid, allStudents).forEach(function (it) {
-      (missingBy[it.student.id] = missingBy[it.student.id] || []).push(it);
-    });
-    var people = [];
-    allStudents.forEach(function (st, i) {
-      var r = rows[i];
-      var p = {
-        student: st,
-        below: belowBy[st.id] || [],
-        overdue: classObserved && r.overdue,
-        daysSince: r.daysSince,
-        noStrength: r.noStrength,
-        missing: missingBy[st.id] || [],
-      };
-      if (p.below.length || p.overdue || p.noStrength || p.missing.length) people.push(p);
-    });
-    var weight = function (p) {
-      return p.below.length * 2 + (p.overdue ? 3 : 0) + (p.noStrength ? 2 : 0) + p.missing.length * 2;
-    };
-    people.sort(function (a, b) {
-      return (
-        weight(b) - weight(a) ||
-        (getOverallProficiency(cid, a.student.id) || 9) - (getOverallProficiency(cid, b.student.id) || 9) ||
-        (a.student.lastName || '').localeCompare(b.student.lastName || '') ||
-        (a.student.firstName || '').localeCompare(b.student.firstName || '')
-      );
-    });
-    var count = function (fn) {
-      return people.filter(fn).length;
-    };
-    return {
-      prof: prof,
-      rule: rule,
-      lists: lists,
-      people: people,
-      counts: {
-        all: people.length,
-        below: count(function (p) {
-          return p.below.length > 0;
-        }),
-        notobs: count(function (p) {
-          return p.overdue;
-        }),
-        nostr: count(function (p) {
-          return p.noStrength;
-        }),
-        missing: count(function (p) {
-          return p.missing.length > 0;
-        }),
-      },
-    };
-  }
-
-  /** Each competency's count of students under the rule, by column key. */
-  function belowCounts(model) {
-    var out = {};
-    (model.lists || []).forEach(function (l) {
-      out[l.col.key] = l.ids.length;
-    });
-    return out;
   }
 
   /* The curriculum bank's next step for one competency at a value's level
@@ -854,17 +715,11 @@ window.DashInsights = (function () {
     columns: columns,
     columnCode: columnCode,
     columnCodes: columnCodes,
-    isBelowRule: isBelowRule,
     showsProficiency: showsProficiency,
     popHtml: popHtml,
     gradebookHref: _gradebookHref,
-    readRule: readRule,
-    ruleLevelName: ruleLevelName,
-    belowLists: belowLists,
     missingItems: missingItems,
     missingGlanceHtml: missingGlanceHtml,
-    attentionModel: attentionModel,
-    belowCounts: belowCounts,
     studentsHeaderHtml: studentsHeaderHtml,
     studentGridHtml: studentGridHtml,
     gridSortOf: gridSortOf,
