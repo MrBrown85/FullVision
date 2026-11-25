@@ -114,8 +114,9 @@ describe('the student cards slide after a sort', () => {
     sortBy('last-desc');
     // N places before the sort, N after.
     expect(reads).toBe(2 * N);
-    // One layout for the old places, one for the new: not one per card.
-    expect(forced).toBe(2);
+    // One layout for the new places, not one per card. (The old places cost
+    // none now: the sort no longer redraws the toolbar first.)
+    expect(forced).toBe(1);
   });
 
   it('starts each card where it was and lets it slide', () => {

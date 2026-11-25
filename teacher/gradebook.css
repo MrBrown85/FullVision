@@ -26,6 +26,12 @@
   --atb-search-min: 160px;
   --atb-search-max: 260px;
 }
+/* + New Assessment is the size it is on the Assignments bar. */
+.gb-toolbar .tb-action-btn {
+  flex-shrink: 0;
+  padding: 0 12px;
+  font-size: var(--text-sm);
+}
 /* Scores | Competencies keep their widths whichever is chosen: each button
    reserves its label's bold width, so nothing after them moves. */
 .gb-toolbar .gb-seg-btn {
