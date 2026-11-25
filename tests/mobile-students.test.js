@@ -186,11 +186,12 @@ describe('MStudents.renderAllStudents', () => {
 
 /* ── renderDetail ───────────────────────────────────────────── */
 describe('MStudents.renderList', () => {
-  it('shows the card stack and All Students, with no title, search or view switch', () => {
+  it('shows the card stack alone, with no All Students button, title, search or view switch', () => {
     mockDataLayer({});
     const html = MStudents.renderList(CID);
     expect(html).toContain('m-student-card-stack');
-    expect(html).toContain('data-action="m-all-students"');
+    // The class list opens from the name on a card (student-card.test.js).
+    expect(html).not.toContain('m-all-students');
     expect(html).toContain('sync-indicator-dot');
     expect(html).not.toContain('m-title-large');
     expect(html).not.toContain('m-search-input');
@@ -650,7 +651,7 @@ describe('Student detail recent assessments', () => {
 
 /* ── Detail screen: score chips on assessments ──────────────── */
 describe('Assessment score chips', () => {
-  it('shows the assessment score as the gradebook does, and what it counts toward', () => {
+  it('shows the assessment score as the gradebook does, and no competency list', () => {
     mockDataLayer({
       getAssessments: () => [{ id: 'a1', title: 'Test', type: 'summative', date: '2025-03-01', tagIds: ['t1'] }],
       getScores: () => ({
@@ -661,7 +662,7 @@ describe('Assessment score chips', () => {
     const html = MStudents.renderDetail(CID, 'stu1');
     expect(html).toContain('m-st-score');
     expect(html).toContain('3.5');
-    expect(html).toContain('m-st-toward">Questioning<');
+    expect(html).not.toContain('Questioning');
   });
 
   it('shows dash for unscored tags', () => {

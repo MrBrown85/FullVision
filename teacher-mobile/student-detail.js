@@ -574,8 +574,7 @@ window.MStudentDetail = (function () {
       id: 'student-detail',
       title: displayName(st),
       backLabel: 'Students',
-      rightHTML:
-        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>',
+      rightHTML: MC.syncDot(),
     });
     // Each designation by its code and name ("P Gifted"), as the desktop
     // header shows them, then the IEP / MOD / ELL badges.
@@ -619,12 +618,6 @@ window.MStudentDetail = (function () {
       var cell = assessmentCellValue(cid, sid, a);
       var badge = _assessmentBadgeData(cid, a);
       var status = statuses[sid + ':' + a.id];
-      var toward = [];
-      (a.tagIds || []).forEach(function (tid) {
-        var tag = getTagById(cid, tid);
-        var name = tag ? tag.label || tag.shortName || tag.code || '' : '';
-        if (name && toward.indexOf(name) < 0) toward.push(name);
-      });
       assessHtml +=
         '<div class="m-assess-compact" role="button" tabindex="0" data-action="m-assess-grade" data-sid="' +
         MC.esc(sid) +
@@ -634,9 +627,6 @@ window.MStudentDetail = (function () {
         MC.esc(a.title) +
         '">' +
         '<div class="m-assess-top">' +
-        '<span class="m-assess-date">' +
-        MC.esc(_shortDay(a.date)) +
-        '</span>' +
         '<span class="m-assess-title">' +
         MC.esc(a.title) +
         (status === 'NS'
@@ -652,10 +642,12 @@ window.MStudentDetail = (function () {
         '</span>' +
         '</div>' +
         '<div class="m-st-assess-sub">' +
+        '<span class="m-assess-date">' +
+        MC.esc(_shortDay(a.date)) +
+        '</span>' +
         (showsCategoryBadge(cid, a)
           ? '<span class="m-type-badge ' + badge.className + '">' + MC.esc(badge.label) + '</span>'
           : '') +
-        (toward.length ? '<span class="m-st-toward">' + MC.esc(toward.join(', ')) + '</span>' : '') +
         '</div>' +
         '</div>';
     });

@@ -211,7 +211,8 @@
       CLOSE +
       '</button><div class="m-reader-name">' +
       _esc(name) +
-      '</div><div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+      '</div>' +
+      MC.syncDot() +
       (W.MMarkUp && W.MMarkUp.can(cid, aid, sid, 0)
         ? '<button type="button" class="m-reader-round" data-action="m-markup-open"' +
           ids +

@@ -37,7 +37,7 @@ export default defineConfig({
           {
             name: 'webkit-student',
             testMatch:
-              /(student-settings|student-home-screen|student-card-[\w-]+|student-carousel|student-handout-out|student-handout-original|student-text-size-sweep|student-see-work|bulletins-student|quiz-student|quiz-returned|student-reflect)\.spec\.js$/,
+              /(student-settings|student-home-screen|student-card-[\w-]+|student-carousel|student-handout-out|student-handout-original|student-text-size-sweep|student-see-work|bulletins-student|quiz-student|quiz-returned|student-reflect|student-page-keeps-place)\.spec\.js$/,
             use: {
               browserName: 'webkit',
               viewport: { width: 390, height: 844 },
@@ -61,7 +61,7 @@ export default defineConfig({
           {
             name: 'webkit-phone',
             testMatch:
-              /(mobile-bulletins|phone-grader|mobile-students-card|mobile-student-profile|mobile-tabs-fit)\.spec\.js$/,
+              /(mobile-bulletins|phone-grader|mobile-students-card|mobile-student-profile|mobile-tabs-fit|mobile-sync-dot|phone-redraw-keeps-place)\.spec\.js$/,
             use: { browserName: 'webkit' },
           },
         ]

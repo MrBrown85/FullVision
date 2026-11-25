@@ -270,6 +270,116 @@ describe('nothing outlasts the session', () => {
   });
 });
 
+/* Fifteen minutes with no activity signs the page out (DECISIONS, "Student
+   page build rulings" 4). A reflection opened from the page is never taken
+   down mid-answer, but a key or a touch on it was not counted as activity
+   either: a student who wrote for more than fifteen minutes was signed out,
+   and the answers deleted, on going back to the page (Nov 25 2026). */
+describe('writing a reflection is activity', () => {
+  const MIN = 60 * 1000;
+  const afterBack = async page => {
+    await page.click('[data-act="back"]');
+    page.T.checkSession();
+    page.runTimers();
+    await page.settle();
+  };
+
+  it.each(['keydown', 'touchstart', 'pointerdown'])(
+    'twenty minutes of writing (%s), then Back: still signed in, the page up, the draft kept',
+    async name => {
+      const page = await signIn(school({}));
+      await openQuestions(page);
+      for (let i = 0; i < 4; i++) {
+        page.advance(5 * MIN);
+        page.fire(name);
+      }
+      page.type('#q-q1', 'A long answer, twenty minutes in the writing');
+      await new Promise(r => setTimeout(r, 450)); // the draft is kept once the student pauses
+      await afterBack(page);
+      expect(page.T.state().screen).toBe('assignments');
+      expect(page.root().querySelector('.sp-page-title')).toBeTruthy();
+      expect(Object.keys(page.tab)).toEqual(['fv-s-card-drafts']);
+      expect(bodies(page, 'done')).toEqual([]);
+    },
+  );
+
+  it('a touch before the page has started, or with nobody signed in, is not an error', async () => {
+    const page = school({});
+    // Before start() the page has no state yet. Every touch, key and scroll comes here (s/app.js, active),
+    // and this threw on each of them (found by main's browser tests, Nov 25).
+    expect(() => page.T.active()).not.toThrow();
+    await page.start('#P3R8-WDK4');
+    expect(() => page.T.active()).not.toThrow();
+  });
+
+  it('sixteen minutes with the form untouched: Back signs out, as it did', async () => {
+    const page = await signIn(school({}));
+    await openQuestions(page);
+    page.advance(16 * MIN);
+    await afterBack(page);
+    expect(page.T.state().screen).not.toBe('assignments');
+    expect(bodies(page, 'done').length).toBe(1);
+    expect(page.tab).toEqual({});
+  });
+
+  it('a touch after the fifteen minutes does not bring the session back', async () => {
+    const page = await signIn(school({}));
+    await openQuestions(page);
+    page.advance(16 * MIN);
+    page.fire('keydown');
+    await afterBack(page);
+    expect(page.T.state().screen).not.toBe('assignments');
+    expect(bodies(page, 'done').length).toBe(1);
+  });
+});
+
+/* An answer from the server draws the page again. Drawn under a press, the
+   button is replaced before the finger lifts and the tap does nothing, so
+   that redraw waits for the press to end (s/student.js, later). */
+describe('a redraw the student did not ask for waits for a press to end', () => {
+  const start = page => page.root().querySelector('[data-act="q-start"][data-form-id="' + Q + '"]');
+  // Reflect opened 21 s after `forms` was last asked: it is asked again, and this time lists the questionnaire as sent.
+  async function askedAgainUnderAPress(world) {
+    const page = await signIn(school(world));
+    await page.click('[data-act="tab"][data-tab="questionnaires"]');
+    expect(start(page)).toBeTruthy();
+    page.advance(21000);
+    world.sent = '2026-11-11T19:00:00Z';
+    const tab = page.root().querySelector('.sp-tabs-bottom [data-act="tab"][data-tab="questionnaires"]');
+    await page.click('[data-act="tab"][data-tab="assignments"]');
+    page
+      .root()
+      .querySelector('.sp-tabs-bottom [data-act="tab"][data-tab="questionnaires"]')
+      .dispatchEvent(new tab.ownerDocument.defaultView.Event('click', { bubbles: true }));
+    page.fire('pointerdown'); // a finger comes down before the answer arrives
+    await page.settle();
+    expect(bodies(page, 'forms')).toHaveLength(2);
+    return page;
+  }
+
+  it('`forms` answered while a finger is down: the page is drawn when it lifts', async () => {
+    const page = await askedAgainUnderAPress({});
+    // The answer is in, the page not yet drawn again: Start is still the button under the finger.
+    expect(viewOf(page).questionnaires[0].state).toBe('sent');
+    const held = start(page);
+    expect(held).toBeTruthy();
+    page.fire('pointerup');
+    expect(start(page)).toBe(held); // not before the click the lift brings
+    page.advance(100);
+    page.runTimers();
+    expect(start(page)).toBeNull();
+  });
+
+  it('a lift the page never hears of holds the redraw for 700 ms, no longer', async () => {
+    const page = await askedAgainUnderAPress({});
+    expect(start(page)).toBeTruthy();
+    page.advance(800);
+    page.runTimers(); // the press is called over
+    page.runTimers(); // and what waited runs
+    expect(start(page)).toBeNull();
+  });
+});
+
 describe('Reflect asks again', () => {
   it('opening Reflect asks `forms` again at most every 20 seconds, so one turned on mid-class shows', async () => {
     const page = await signIn(school({}));

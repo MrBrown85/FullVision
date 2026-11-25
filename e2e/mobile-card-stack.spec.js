@@ -41,7 +41,7 @@ for (const viewport of [
   { width: 375, height: 667 },
   { width: 393, height: 852 },
 ]) {
-  test(`the card, its count and All Students sit above the tab bar at ${viewport.width}×${viewport.height}`, async ({
+  test(`the card has the same 16 px above, below and at its sides at ${viewport.width}×${viewport.height}`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -49,16 +49,20 @@ for (const viewport of [
     const m = await page.evaluate(() => {
       const box = s => document.querySelector(s).getBoundingClientRect();
       const content = document.querySelector('#m-screen-students-list .m-screen-content');
+      const card = box('.m-card-stack-item[data-depth="0"]');
       return {
-        actionsBottom: box('.m-card-stack-item[data-depth="0"] .m-scard').bottom,
-        counterBottom: box('.m-card-foot').bottom,
-        tabTop: box('#m-tab-bar').top,
+        top: card.top - box('#m-nav-bar-students-list').bottom,
+        left: card.left,
+        right: window.innerWidth - card.right,
+        bottom: box('#m-tab-bar').top - card.bottom,
         pageScrolls: content.scrollHeight > content.clientHeight,
+        // The name row is the one way to the class list (no button under the card).
+        underCard: document.querySelectorAll('.m-card-foot, .m-card-all').length,
       };
     });
-    expect(m.actionsBottom).toBeLessThan(m.counterBottom);
-    expect(m.counterBottom).toBeLessThanOrEqual(m.tabTop);
+    expect([m.top, m.left, m.right, m.bottom].map(Math.round)).toEqual([16, 16, 16, 16]);
     expect(m.pageScrolls).toBe(false);
+    expect(m.underCard).toBe(0);
   });
 }
 
@@ -71,7 +75,7 @@ test('a swipe moves the next card up in place and keeps the stack', async ({ pag
   });
 
   await swipeTopCard(page);
-  await expect(page.locator('#m-student-card-count')).toHaveText('2 of 27');
+  await expect(page.locator('.m-card-stack-item[data-depth="0"]')).toHaveAttribute('data-idx', '1');
   // The card that was behind is now on top: the same element, not a rebuild.
   const top = page.locator('.m-card-stack-item[data-depth="0"]');
   await expect(top).toHaveAttribute('data-test-next', '1');

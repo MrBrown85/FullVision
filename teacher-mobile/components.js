@@ -112,11 +112,43 @@ window.MComponents = (function () {
       title +
       '<div class="m-tabbar-right">' +
       (opts.rightHTML || '') +
-      '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+      syncDot() +
       '<button type="button" class="m-tabbar-more" data-action="m-settings" aria-label="More">' +
       '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' +
       '</button></div></div></div>'
     );
+  }
+
+  /* The sync dot, as every phone bar carries it. data.js sets its colour
+     and words; a tap says them (a phone has no hover) and, when red, tries
+     again (showSyncTip). */
+  function syncDot() {
+    return (
+      '<button type="button" class="m-sync" data-action="m-sync-dot" aria-label="Sync Status">' +
+      '<span class="tb-sync-dot idle" id="sync-indicator-dot" role="status" title="All changes saved" aria-label="All changes saved"></span>' +
+      '</button>'
+    );
+  }
+
+  /* The sync dot's words under it for four seconds, as the desktop's
+     hover title shows them; a red dot also tries again (data.js). Plain
+     text, and only on the dot: sync problems show nowhere else. */
+  var _syncTipTimer = null;
+  function showSyncTip(btn) {
+    var dot = btn.querySelector('.tb-sync-dot');
+    if (!dot) return;
+    if (/\berror\b/.test(dot.className) && typeof window.retryFromSyncDot === 'function') window.retryFromSyncDot();
+    var tip = btn.querySelector('.m-sync-tip');
+    if (!tip) {
+      tip = document.createElement('span');
+      tip.className = 'm-sync-tip';
+      btn.appendChild(tip);
+    }
+    tip.textContent = dot.title || 'All changes saved';
+    clearTimeout(_syncTipTimer);
+    _syncTipTimer = setTimeout(function () {
+      if (tip.parentNode) tip.parentNode.removeChild(tip);
+    }, 4000);
   }
 
   /* ── Sheet (present / dismiss) ─────────────────────────────── */
@@ -535,6 +567,8 @@ window.MComponents = (function () {
   }
 
   return {
+    syncDot: syncDot,
+    showSyncTip: showSyncTip,
     levelButtonsHTML: levelButtonsHTML,
     paintLevelButtons: paintLevelButtons,
     fineTuneLabel: fineTuneLabel,

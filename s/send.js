@@ -740,7 +740,7 @@
 
   // The page again with what came back, the focus left where it was. Only the Assignments list.
   function repaint() {
-    if (!S || S.screen !== 'assignments' || S.sendAsk) return;
+    if (!S || S.screen !== 'assignments' || S.sendAsk || StudentPage.later(repaint)) return;
     var el = typeof document !== 'undefined' ? document.activeElement : null;
     var sel = '';
     if (el && el.getAttribute && el.getAttribute('data-act')) {

@@ -1327,24 +1327,6 @@ function refreshSyncStatusUI() {
   if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
 }
 
-/* A click on a red sync dot tries again at once: paused cloud sync probes
-   the server, a class that couldn't load loads again. Otherwise it does
-   nothing; the outbox already retries on its own. */
-function _retryFromSyncDot() {
-  var dot = document.getElementById('sync-indicator-dot');
-  if (!dot || !/\berror\b/.test(dot.className || '')) return;
-  // Add Work's photos the server refused after the screen said sent (shared/data.js).
-  if (typeof retryHeldStudentWork === 'function') retryHeldStudentWork();
-  if (window.GB && typeof window.GB.isSupabaseDegraded === 'function' && window.GB.isSupabaseDegraded()) {
-    if (typeof window.GB.retrySupabaseRecovery === 'function') window.GB.retrySupabaseRecovery();
-    return;
-  }
-  var cid = typeof getActiveCourse === 'function' ? getActiveCourse() : null;
-  if (cid && typeof courseLoadFailed === 'function' && courseLoadFailed(cid)) {
-    if (typeof window.retryActiveCourseLoad === 'function') window.retryActiveCourseLoad();
-  }
-}
-
 function _ensureSyncStatusUI() {
   if (_syncUIBound) return;
   _syncUIBound = true;
@@ -2731,7 +2713,7 @@ document.addEventListener('click', function (e) {
       dismissSyncToast();
       break;
     case 'retry-sync-dot':
-      _retryFromSyncDot();
+      retryFromSyncDot();
       break;
     case 'copy-session-draft':
       _copySessionExpiredDraft().then(function (copied) {

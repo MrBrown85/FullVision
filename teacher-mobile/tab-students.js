@@ -47,7 +47,7 @@ window.MStudents = (function () {
     if (!students.length) return;
 
     _stackInstance = MCardStack.create(container, students, {
-      counterEl: document.getElementById('m-student-card-count'),
+      counter: false, // no "6 of 30": Colin, Nov 25, "It's unnecessary"
       renderCard: function (st) {
         return MStudentCard.render(st, cid);
       },

@@ -130,7 +130,6 @@ body.fv-switching-course::after {
 .m-tab-item:active,
 .m-nav-bar-action:active,
 .m-nav-bar-back:active,
-.m-card-all:active,
 .m-edit-cancel:active,
 .m-edit-save:active {
   opacity: 0.5;
@@ -382,8 +381,39 @@ body.fv-switching-course::after {
 /* Sync light, as on the desktop top bar. The dot's colours come from
    teacher/styles.css; data.js sets its state. */
 .m-sync {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-sync .tb-sync-dot {
+  display: block;
+}
+/* A tap shows the dot's words under it (MComponents.showSyncTip). */
+.m-sync-tip {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: -36px;
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
 
 /* Large title area */
@@ -1948,7 +1978,8 @@ body.fv-switching-course::after {
   height: auto;
   min-height: 320px;
   max-height: none;
-  margin: 4px 0 0;
+  /* The same 16 px above and below the card as at its sides. */
+  margin: 16px 0;
 }
 /* A warning before the year runs out (shared/photo-expiry.js): one quiet
    line per class whose photos go within 30 days, above the cards. */
@@ -1995,31 +2026,6 @@ body.fv-switching-course::after {
   padding-left: 16px;
   font-size: 13px;
   color: var(--text-3);
-}
-/* Under the stack: "N of M" and All Students, which opens the list sheet. */
-.m-card-foot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 44px;
-}
-.m-card-count {
-  font-size: 13px;
-  color: var(--text-3);
-  font-weight: 500;
-}
-.m-card-all {
-  background: var(--surface);
-  border: none;
-  border-radius: 14px;
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--link);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
 .m-search-wrap.m-search-wrap-sheet {
   padding: 0 0 8px;
@@ -2533,20 +2539,12 @@ body.fv-switching-course::after {
   gap: 6px 8px;
   margin-top: 6px;
 }
-.m-st-toward {
-  font-size: 12px;
-  color: var(--text-3);
-}
 
 /* ── Touch targets (Step 4 sweep, Nov 3) ───────────────────────
-   Every control the teacher taps is at least 44 px high: All Students,
-   segmented controls, the ± level buttons and the Checks button. */
-.m-card-all,
+   Every control the teacher taps is at least 44 px high: segmented
+   controls, the ± level buttons and the Checks button. */
 .m-seg-btn {
   min-height: 44px;
-}
-.m-card-all {
-  border-radius: 22px;
 }
 
 /* "2 missing" under a name in All Students. */

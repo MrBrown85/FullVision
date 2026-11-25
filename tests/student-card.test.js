@@ -62,6 +62,9 @@ describe('the top of the card', () => {
   it('names the student, the level in words with four bars, Observe and Profile', () => {
     const d = card();
     expect(d.querySelector('.m-sc-who').getAttribute('data-action')).toBe('m-all-students');
+    // No count of the class ("6 of 30") on the card.
+    expect(d.querySelector('.m-sc-who').textContent).not.toMatch(/\d+ of \d+/);
+    expect(d.querySelector('.m-sc-place')).toBeNull();
     expect(d.querySelector('.m-sc-name').textContent).toBe('Cece Adams');
     expect(d.querySelector('.m-sc-word').textContent).toBe('Proficient');
     expect(d.querySelectorAll('.m-sc-bar.is-on').length).toBe(3);
