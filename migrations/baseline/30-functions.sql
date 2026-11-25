@@ -14643,7 +14643,7 @@ begin
             raise exception 'questionnaire not found' using errcode = 'P0002';
         end if;
         _course := _q.course_id;
-        _expires := coalesce((_q.closes_on + 1)::timestamptz, now() + interval '30 days');
+        _expires := coalesce(((_q.closes_on + 1)::timestamp at time zone public._fv_timezone((select c.timezone from public.course c where c.id = _q.course_id))), now() + interval '30 days');
     else
         select * into _r from phone_report where id = p_target_id and fv_owns_course(course_id);
         if _r.id is null then
