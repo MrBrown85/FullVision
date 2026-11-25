@@ -71,7 +71,7 @@ async function openGradeTab(page) {
 async function openGrading(page, aid) {
   await openGradeTab(page);
   await page.locator('.m-seg-btn[data-val="all"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + aid + '"]').click();
+  await page.locator('#m-grade-list .m-tg-row[data-aid="' + aid + '"]').click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
   // The grading screen slides in and wires its fields.
   await page.waitForTimeout(500);
@@ -111,8 +111,9 @@ test.describe('the grading screen', () => {
     await expect(returnNext(page)).toHaveCount(0);
 
     await page.locator('.m-swiper-card').first().locator('.m-score-btn:not(.m-score-active)').first().click();
-    await expect(bar(page).locator('.m-draft-mark')).toHaveText('Draft');
-    await expect(bar(page)).toContainText('Saved. Not returned yet.');
+    // No Draft mark and no line about saving: the button being ready says it, and what the student still sees.
+    await expect(bar(page).locator('.m-draft-mark')).toHaveCount(0);
+    await expect(bar(page)).not.toContainText('Saved. Not returned yet.');
     await expect(bar(page)).toContainText(info.names[0] + ' still sees the grade you returned.');
     await expect(returnNext(page)).toHaveText('Return and Next');
     await expect(returnNext(page)).toBeEnabled();
@@ -123,7 +124,7 @@ test.describe('the grading screen', () => {
     const button = await box('[data-action="m-grade-return-next"]');
     const tabs = await box('#m-tab-bar');
     const cards = await box('#m-swiper');
-    const whole = await box('#m-grade-return-state');
+    const whole = await box('#m-grade-return');
     expect(button.y + button.height).toBeLessThanOrEqual(tabs.y);
     expect(button.height).toBeGreaterThanOrEqual(44);
     expect(cards.y + cards.height).toBeLessThanOrEqual(whole.y + 1);
@@ -370,7 +371,7 @@ for (const colorScheme of ['light', 'dark']) {
       // On the grading screen only the new bar is checked: the screen's own
       // text is not this change's, and the dimmed initials of graded
       // students in the strip are under 4.5:1 today.
-      skip = [...CONTRAST.skip, '.m-nav-bar', '#m-thumb-strip', '.m-grade-view-row', '#m-swiper'];
+      skip = [...CONTRAST.skip, '.m-nav-bar', '#m-grade-progress', '#m-swiper'];
       await readable();
       await returnNext(page).click();
       await slideDone(page);

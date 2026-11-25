@@ -139,11 +139,14 @@ describe('MGrade.renderPicker', () => {
 
 /* ── renderSwiper ───────────────────────────────────────────── */
 describe('MGrade.renderSwiper', () => {
-  it('renders student card swiper with thumbnail strip', () => {
+  it('draws the cards under a progress line: a segment for each card, none of them a button', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
     expect(html).toContain('m-swiper');
-    expect(html).toContain('m-thumb-strip');
+    expect(html).toContain('id="m-grade-progress"');
+    expect((html.match(/class="m-prog-seg/g) || []).length).toBe(3);
+    expect(html).not.toMatch(/<button[^>]*m-prog-seg/);
+    expect(html).not.toContain('m-thumb');
   });
 
   it('returns error when assessment not found', () => {
@@ -160,12 +163,17 @@ describe('MGrade.renderSwiper', () => {
     expect(count).toBe(3); // 3 students
   });
 
-  it('shows student name and avatar in each card', () => {
+  it('names the first student in the top bar, and each card’s comment for its own student', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
-    expect(html).toContain('Cece Adams');
-    expect(html).toContain('Noor Khan');
-    expect(html).toContain('Liam Chen');
+    // The bar's name is a button that opens the class list.
+    expect(html).toMatch(/data-action="m-grade-roster"><span class="m-nav-title-text">Cece Adams<\/span>/);
+    expect(html).toContain('Comment for Cece');
+    expect(html).toContain('Comment for Noor');
+    expect(html).toContain('Comment for Liam');
+    // No avatar and no name on the cards themselves.
+    expect(html).not.toContain('m-grade-avatar');
+    expect(html).not.toContain('m-grade-student-header');
   });
 
   it('shows score buttons 1-4 for proficiency mode (0 is reached via toggle-off)', () => {
@@ -199,20 +207,20 @@ describe('MGrade.renderSwiper', () => {
     expect(html).toContain('m-score-active');
   });
 
-  it('shows status pills (NS/EXC/LATE)', () => {
+  it('has ⋯ in the bar, and no status control on a card with a grade to give', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
-    expect(html).toContain('data-val="NS"');
-    expect(html).toContain('data-val="EXC"');
-    expect(html).toContain('data-val="LATE"');
+    expect(html).toContain('data-action="m-grade-more"');
+    expect(html).not.toContain('data-action="m-grade-status"');
   });
 
-  it('marks active status pill when student has status', () => {
+  it('shows a status that is set as one chip on the card', () => {
     mockDataLayer({
       getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
     });
     const html = MGrade.renderSwiper(CID, 'a1');
-    expect(html).toContain('m-status-active');
+    expect(html).toContain('<span class="m-grade-chip m-grade-chip-ns">Missing</span>');
+    expect((html.match(/class="m-grade-chip /g) || []).length).toBe(1);
   });
 
   it('shows tag labels with section color dots', () => {
@@ -246,26 +254,27 @@ describe('MGrade.renderSwiper', () => {
     expect(html).toContain('m-badge-iep');
   });
 
-  it('shows first student thumbnail as current', () => {
+  it('marks the first segment as the one on screen', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
-    expect(html).toContain('m-thumb-current');
+    expect((html.match(/is-current/g) || []).length).toBe(1);
+    expect(html).toMatch(/m-prog-seg is-current/);
   });
 
-  it('shows graded indicator on thumbnail for graded students', () => {
+  it('marks the segment of each graded student', () => {
     mockDataLayer({
       getScores: () => ({
         stu1: [{ assessmentId: 'a1', tagId: 't1', score: 3, type: 'summative', date: '2025-03-20' }],
       }),
     });
     const html = MGrade.renderSwiper(CID, 'a1');
-    expect(html).toContain('m-thumb-graded');
+    expect(html).toContain('is-graded');
   });
 
-  it('shows subtitle with student count', () => {
+  it('shows no count of students in the bar', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
-    expect(html).toContain('1 of 3');
+    expect(html).not.toContain('1 of 3');
   });
 });
 
@@ -860,12 +869,11 @@ describe('Swiper card edge cases', () => {
     expect(scoreButtons.length).toBe(24);
   });
 
-  it('shows all three status pills per student', () => {
+  it('keeps Late, Missing and Excused off the cards (they are under ⋯)', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
-    // 3 students x 3 status types = 9 status pills
     const statusPills = html.match(/data-action="m-grade-status"/g) || [];
-    expect(statusPills.length).toBe(9);
+    expect(statusPills.length).toBe(0);
   });
 
   it('shows section color dot on tag labels', () => {

@@ -92,12 +92,18 @@ function fakeCells() {
   const cells = {};
   ASSESSMENTS.forEach(a => {
     cells[a.id] = {
-      style: { display: '' },
+      off: false,
       getAttribute: k => (k === 'data-aid' ? a.id : null),
+      setAttribute(k) {
+        if (k === 'hidden') this.off = true;
+      },
+      removeAttribute(k) {
+        if (k === 'hidden') this.off = false;
+      },
     };
   });
   const origAll = document.querySelectorAll;
-  document.querySelectorAll = sel => (sel === '#m-grade-list .m-cell' ? Object.values(cells) : []);
+  document.querySelectorAll = sel => (sel === '#m-grade-list .m-tg-row' ? Object.values(cells) : []);
   return {
     cells,
     restore() {
@@ -107,7 +113,7 @@ function fakeCells() {
 }
 
 function visibleIds(cells) {
-  return Object.keys(cells).filter(id => cells[id].style.display !== 'none');
+  return Object.keys(cells).filter(id => !cells[id].off);
 }
 
 function saveFilters(filters) {
@@ -180,8 +186,8 @@ describe('filtering by term', () => {
     try {
       MGrade.filterAssessments(CID, 'all');
       expect(visibleIds(fake.cells)).toEqual(['after']);
-      expect(fake.cells.undated.style.display).toBe('none');
-      expect(fake.cells.before.style.display).toBe('none');
+      expect(fake.cells.undated.off).toBe(true);
+      expect(fake.cells.before.off).toBe(true);
     } finally {
       fake.restore();
     }

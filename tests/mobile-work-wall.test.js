@@ -113,7 +113,9 @@ describe('the grader in the wall’s order', () => {
       ids: [...ids, 'nobody', ids[0]],
     });
     expect(order()).toEqual(ids);
-    expect(document.querySelector('.m-nav-bar').textContent).toMatch(/1 of 3(?! to grade)/);
+    // The bar names the first card; the progress line has a segment for each.
+    expect(document.querySelectorAll('#m-grade-progress .m-prog-seg')).toHaveLength(3);
+    expect(document.querySelector('.m-nav-bar').textContent).not.toContain('to grade');
     expect(MGrade.studentCardIndex(CID, LAB, ids[2])).toBe(2);
   });
 

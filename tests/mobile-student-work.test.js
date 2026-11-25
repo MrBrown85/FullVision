@@ -114,7 +114,8 @@ describe('with the build switch or Send Work off', () => {
     const root = picker();
     expect(root.querySelector('[data-val="tograde"]')).toBeNull();
     expect(root.querySelector('[data-val="recent"]')).not.toBeNull();
-    expect(root.querySelector('.m-tg-row, #m-grade-caught')).toBeNull();
+    // The rows have no counts, no ⋯ and no All Caught Up: the line of category, date and count.
+    expect(root.querySelector('.m-tg-pill, .m-tg-notin, .m-tg-more, #m-grade-caught')).toBeNull();
     expect(grading().querySelector('.m-work')).toBeNull();
   });
 });
@@ -140,22 +141,24 @@ describe('with the student page and Send Work on', () => {
     expect(seg.classList.contains('m-seg-active')).toBe(true);
     expect(seg.textContent).toBe('To Grade8');
     const row = root.querySelector('.m-tg-row[data-aid="' + LAB + '"]');
-    expect(row.style.display).not.toBe('none');
-    expect(row.querySelector('.m-tg-pill').textContent).toBe('2 to grade');
-    expect(row.querySelector('.m-tg-notin').textContent).toBe(getStudents(CID).length - 10 + ' not in');
+    expect(row.hidden).toBe(false);
+    expect(row.querySelector('.m-tg-pill').textContent).toBe('2 to Grade');
+    expect(row.querySelector('.m-tg-notin').textContent).toBe(getStudents(CID).length - 10 + ' Not In');
+    // What waits is the row's line; the category and date are left off it.
+    expect(row.querySelector('.m-tg-line')).toBeNull();
     expect(row.querySelector('[data-action="m-grade-row-menu"]').getAttribute('aria-label')).toBe(
       'More for Cell Microscope Lab',
     );
     const light = root.querySelector('.m-tg-row[data-aid="' + LIGHT + '"]');
-    expect(light.style.display).not.toBe('none');
-    expect(light.querySelector('.m-tg-pill').textContent).toBe('6 to grade');
+    expect(light.hidden).toBe(false);
+    expect(light.querySelector('.m-tg-pill').textContent).toBe('6 to Grade');
     // A piece with nothing waiting is not on To Grade.
     const other = [...root.querySelectorAll('.m-tg-row')].filter(
       r => r.getAttribute('data-aid') !== LAB && r.getAttribute('data-aid') !== LIGHT,
     );
     expect(other.length).toBeGreaterThan(0);
-    other.forEach(r => expect(r.style.display).toBe('none'));
-    expect(root.querySelector('#m-grade-caught').style.display).toBe('none');
+    other.forEach(r => expect(r.hidden).toBe(true));
+    expect(root.querySelector('#m-grade-caught').hidden).toBe(true);
   });
 
   it('says All Caught Up when nothing waits', () => {
@@ -163,7 +166,7 @@ describe('with the student page and Send Work on', () => {
     Grader.setOverallComment(CID, 'st3', LAB, 'Done.');
     GraderWork.workCounts(CID, LIGHT).ids.tograde.forEach(sid => Grader.setOverallComment(CID, sid, LIGHT, 'Done.'));
     const caught = picker().querySelector('#m-grade-caught');
-    expect(caught.style.display).not.toBe('none');
+    expect(caught.hidden).toBe(false);
     expect(caught.textContent).toBe('All Caught UpNothing is waiting to grade in Science 8.See All Assessments');
   });
 
@@ -195,17 +198,18 @@ describe('with the student page and Send Work on', () => {
     grading({ only: 'tograde' });
     const cards = document.querySelectorAll('.m-swiper-card');
     expect([...cards].map(c => c.getAttribute('data-sid'))).toEqual(['st2', 'st3']);
-    expect(document.body.textContent).toContain('1 of 2 to grade');
+    // A segment of the progress line for each, and no count of them in the bar.
+    expect(document.querySelectorAll('#m-grade-progress .m-prog-seg')).toHaveLength(2);
+    expect(document.body.textContent).not.toContain('to grade');
     expect(MGrade.gradingOnly()).toBe('tograde');
     const noor = cards[0];
-    expect(noor.querySelector('.m-work-sent').textContent).toMatch(/^Submitted .+ · 2 photos$/);
     expect(noor.querySelector('.m-work-note').textContent).toBe('Page 2 has my answers.');
     expect(noor.querySelectorAll('.m-work-page img')).toHaveLength(2);
-    expect(noor.querySelectorAll('.m-work-dot')).toHaveLength(2);
+    expect(noor.querySelector('.m-work-count').textContent).toBe('1 of 2');
     expect(noor.querySelector('.m-work-pin-btn').getAttribute('aria-label')).toBe('Show Noor’s photos');
-    // The strip's circles say whose work is in.
-    expect(document.querySelectorAll('.m-thumb.m-thumb-work')).toHaveLength(2);
-    // Graded on the way, a card stays in the strip.
+    // Mark Up and Full Screen are on the paper.
+    expect(noor.querySelector('.m-work-full').getAttribute('aria-label')).toBe('Full Screen');
+    // Graded on the way, a card stays in the progress line.
     Grader.setOverallComment(CID, 'st2', LAB, 'Good labels.');
     expect(MGrade.studentCardIndex(CID, LAB, 'st3')).toBe(1);
     // Opened for everyone, it is the whole class again.
@@ -223,10 +227,14 @@ describe('with the student page and Send Work on', () => {
     expect(note.textContent).toBe('<b>hi</b>');
   });
 
-  it('Unsubmit on a card with photos: the confirm, then the work goes and Add Work is back', async () => {
+  it('Unsubmit is under ⋯ on a card with photos: the confirm, then the work goes and Add Work is back', async () => {
     grading();
     const card = () => document.querySelector('.m-swiper-card[data-sid="st2"]');
-    const btn = card().querySelector('[data-action="m-work-unsubmit"]');
+    // Not on the card; under ⋯, for the card on screen.
+    expect(card().querySelector('[data-action="m-work-unsubmit"]')).toBeNull();
+    MGrade.jumpToStudent(MGrade.studentCardIndex(CID, LAB, 'st2'), true);
+    MGradeLook.openMore();
+    const btn = document.querySelector('#m-sheet-container .m-more-sheet [data-action="m-work-unsubmit"]');
     expect(btn.textContent).toBe('Unsubmit');
     MGradePhotos.askUnsubmit(CID, LAB, 'st2', btn);
     const sheet = document.querySelector('#m-sheet-container .m-confirm-sheet');
@@ -239,15 +247,15 @@ describe('with the student page and Send Work on', () => {
     sheet.querySelector('.m-confirm-ok').onclick();
     for (let i = 0; i < 5; i++) await new Promise(r => setTimeout(r, 0));
     expect(getStudentSubmission(CID, 'st2', LAB)).toBeNull();
-    expect(card().querySelector('[data-action="m-work-unsubmit"]')).toBeNull();
+    expect(MGrade.moreContext().canUnsubmit).toBe(false);
     expect(card().querySelector('[data-action="m-add-work"]')).not.toBeNull();
   });
 
   it('Unsubmit on work handed in on paper asks lightly', () => {
     grading();
     const card = document.querySelector('.m-swiper-card[data-sid="st6"]');
-    expect(card.querySelector('.m-work-sent').textContent).toBe('Handed in on paper');
-    MGradePhotos.askUnsubmit(CID, LAB, 'st6', card.querySelector('[data-action="m-work-unsubmit"]'));
+    expect(card.querySelector('.m-work-onpaper').textContent).toBe('Handed in on paper');
+    MGradePhotos.askUnsubmit(CID, LAB, 'st6', card);
     const text = document.querySelector('#m-sheet-container #m-confirm-text').textContent;
     expect(text).toMatch(
       /^Ethan’s work on Cell Microscope Lab goes back to not handed in, .* grade and your comments stay\.$/,
@@ -263,7 +271,7 @@ describe('with the student page and Send Work on', () => {
     const count = () => document.querySelector('#m-sheet-container .m-live-filter-count').textContent;
     expect(count()).toBe('Showing ' + total + ' of ' + total);
     MGrade.onFilterSegChange('gradedStatus', 'has-ungraded');
-    const shown = [...document.querySelectorAll('#m-grade-list .m-cell')].filter(c => c.style.display !== 'none');
+    const shown = [...document.querySelectorAll('#m-grade-list .m-tg-row')].filter(c => !c.hidden);
     expect(shown.length).toBeLessThan(total);
     expect(count()).toBe('Showing ' + shown.length + ' of ' + total);
     // Kept, as Apply keeps it.

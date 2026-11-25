@@ -394,15 +394,20 @@ describe('with the student page and Send Work on', () => {
     expect(q('[data-mk="prev"]').textContent).toBe('‹ Page 1');
   });
 
-  it('the photos full screen has Mark Up for each page', () => {
+  it('the paper has a pencil for Mark Up on the page in view, and Full Screen has one too', () => {
     // html-safe: MGrade.renderSwiper escapes names and text; a test page
     document.getElementById('m-nav-stack').innerHTML = MGrade.renderSwiper(CID, LAB);
     const box = document.querySelector('.m-work[data-sid="' + jordan + '"]');
+    const pencil = box.querySelector('[data-action="m-markup-open"]');
+    expect(pencil.getAttribute('aria-label')).toBe('Mark Up');
+    expect(pencil.getAttribute('data-sid')).toBe(jordan);
+    expect(pencil.getAttribute('data-page')).toBe('0');
     MGradePhotos.openFull(CID, box);
-    const btns = document.querySelectorAll('#m-sheet-container [data-action="m-markup-open"]');
-    expect(btns).toHaveLength(files(jordan).length);
-    expect(btns[0].textContent).toBe('Mark Up');
-    expect(btns[0].getAttribute('data-sid')).toBe(jordan);
+    const reader = document.getElementById('m-reader');
+    expect(reader.querySelectorAll('.m-reader-page')).toHaveLength(files(jordan).length);
+    const mark = reader.querySelector('[data-action="m-markup-open"]');
+    expect(mark.getAttribute('data-sid')).toBe(jordan);
+    MGradeReader.close();
   });
 });
 

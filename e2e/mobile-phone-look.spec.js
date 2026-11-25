@@ -1,218 +1,13 @@
 /**
- * The phone's new look, L1 to L3 (docs/plans/phone-look-plan.md).
- * Demo Mode, Science 8, Light Refraction Lab, with the build switch on:
- * the bar names the card on screen and its name opens the class list; a
- * level on the track, + beside the name; Late from ⋯ shown as one chip on
- * the card; the fit of a criterion's line and the bottom bar on a 375 and
- * a 320 px phone, in the page's font and a wide one. L2: the Grade list
- * and Bulletins. L2b: the Write a Bulletin sheet. L3: Return and Next held
- * seven seconds for Undo.
+ * The phone's new look (docs/plans/phone-look-plan.md) beyond the grader, which
+ * has its own spec (e2e/phone-grader.spec.js): L2b the Write a Bulletin sheet,
+ * the Bulletins tab, L5 the Students card, L6 the profile; each in Demo Mode,
+ * the fit of each on a 375 and a 320 px phone in the page's font and a wide one.
  */
 import { test, expect } from '@playwright/test';
 import { FONTS, useFont } from './wide-font.js';
 
 test.use({ viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
-
-const CID = 'sci8';
-
-async function openLab(page) {
-  await page.addInitScript(() => localStorage.setItem('fv-build-phoneLook', '1'));
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/login.html');
-  await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher-mobile\//);
-  await page.waitForFunction(() => getAssessments('sci8').length > 0);
-  const aid = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Light Refraction Lab').id);
-  await page.locator('.m-tab-item[data-tab="grade"]').click();
-  await page.locator('#m-grade-list .m-cell[data-aid="' + aid + '"]').click();
-  await expect(page.locator('#m-swiper')).toBeVisible();
-  return aid;
-}
-
-const title = page => page.locator('#m-nav-bar-grade-swiper .m-nav-title-text');
-
-/* Once the cards have stopped sliding, the index of the card on screen. A
-   jump slides the cards over several frames; the test waits for that rather
-   than reading straight after a tap (CI is slower than the Mac). */
-async function settled(page) {
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const s = document.getElementById('m-swiper');
-        return Math.abs(s.scrollLeft - MGrade.getCurrentIndex() * s.clientWidth) < 1;
-      }),
-    )
-    .toBe(true);
-  return page.evaluate(() => MGrade.getCurrentIndex());
-}
-
-// The class list, then one name on it. Returns that student's card.
-async function goTo(page, name) {
-  await title(page).click();
-  await page.locator('#m-sheet-container .m-roster-row', { hasText: name }).click();
-  await expect(title(page)).toHaveText(name);
-  await expect(page.locator('#m-sheet-container .m-roster')).toHaveCount(0);
-  return page.locator('#m-swiper .m-swiper-card').nth(await settled(page));
-}
-
-test('the bar names the card on screen, and its name opens the class list', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', e => errors.push(String(e)));
-  await openLab(page);
-  await expect(page.locator('html')).toHaveClass(/m-look/);
-  // A pair's card is named by its two students.
-  await expect(title(page)).toHaveText('Aiden and Olivia');
-  // The strip of circles is one thin line, a segment a card.
-  const strip = await page.evaluate(() =>
-    [...document.querySelectorAll('#m-thumb-strip .m-thumb')].map(t => t.getBoundingClientRect().height),
-  );
-  expect(strip.length).toBe(4);
-  strip.forEach(h => expect(h).toBeLessThanOrEqual(4));
-  // Competencies | Rubric and Unsubmit are not on the screen; they are under ⋯.
-  await expect(page.locator('#m-screen-grade-swiper > .m-grade-view-row')).toBeHidden();
-  await expect(page.locator('#m-swiper .m-work-unsubmit').first()).toBeHidden();
-
-  await title(page).click();
-  const rows = page.locator('#m-sheet-container .m-roster-row');
-  await expect(rows).toHaveText(['Aiden and Olivia', 'Ines Larsen', 'Marcus Lee', 'Sofia Petrov']);
-  await expect(rows.nth(0)).toHaveAttribute('aria-current', 'true');
-  // Every frame of the slide, from the moment Marcus is chosen: the index
-  // and the name in the bar are his, never a card the slide passes.
-  await page.evaluate(() => {
-    const w = /** @type {any} */ (window);
-    w.__frames = [];
-    const t0 = performance.now();
-    const tick = () => {
-      w.__frames.push([
-        MGrade.getCurrentIndex(),
-        document.querySelector('#m-nav-bar-grade-swiper .m-nav-title-text').textContent,
-      ]);
-      if (performance.now() - t0 < 2500) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  });
-  await rows.nth(2).click();
-  await expect(title(page)).toHaveText('Marcus Lee');
-  expect(await settled(page)).toBe(2);
-  await expect
-    .poll(() => page.evaluate(() => /** @type {any} */ (window).__frames.length), { timeout: 5000 })
-    .toBeGreaterThan(20);
-  const frames = await page.evaluate(() => /** @type {any} */ (window).__frames);
-  const from = frames.findIndex(f => f[0] === 2);
-  expect(from).toBeGreaterThanOrEqual(0);
-  expect(frames.slice(from).filter(f => f[0] !== 2 || f[1] !== 'Marcus Lee')).toEqual([]);
-  // Last, since Tab can move to another card: drawn as a line, the circles are out of the tab order and the screen reader's way.
-  await expect(page.locator('#m-thumb-strip')).toHaveAttribute('inert', '');
-  await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').focus();
-  for (let i = 0; i < 4; i++) {
-    await page.keyboard.press('Tab');
-    expect(await page.evaluate(() => !!document.activeElement.closest('#m-thumb-strip'))).toBe(false);
-  }
-  expect(errors).toEqual([]);
-});
-
-test('a level on the track, + beside the name, and Late from ⋯', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', e => errors.push(String(e)));
-  const aid = await openLab(page);
-  const card = await goTo(page, 'Marcus Lee');
-  const sid = await card.getAttribute('data-sid');
-  const crit = card.locator('.m-crit-group').first();
-
-  // − and + show once a level is chosen.
-  await expect(crit.locator('.m-score-mods')).toBeHidden();
-  const prf = crit.locator('.m-level-btn[data-score="3"]');
-  expect(await prf.evaluate(b => getComputedStyle(b, '::before').content)).toBe('"PRF"');
-  await prf.click();
-  await expect(prf).toHaveClass(/m-score-active/);
-  await expect(crit.locator('.m-score-mods')).toBeVisible();
-  await crit.locator('.m-mod-btn[data-mod="1"]').click();
-  await expect(prf).toHaveAttribute('data-code', 'PRF +');
-  const saved = await page.evaluate(
-    ([cid, sid, aid]) =>
-      (getScores(cid)[sid] || []).filter(e => e.assessmentId === aid).map(e => [e.score, e.mod || 0]),
-    [CID, sid, aid],
-  );
-  expect(saved.length).toBeGreaterThan(0);
-  saved.forEach(e => expect(e).toEqual([3, 1]));
-
-  // ⋯: the card's own status control, Competencies or Rubric, and Unsubmit.
-  await page.locator('.m-grade-more').click();
-  const more = page.locator('#m-sheet-container .m-more-sheet');
-  await expect(more.locator('.m-status-pill')).toHaveText(['Missing', 'Excused', 'Late']);
-  await expect(more.locator('.m-seg-btn')).toHaveText(['Competencies', 'Rubric']);
-  await expect(more.locator('.m-work-unsubmit')).toHaveText('Unsubmit');
-  await more.locator('.m-status-pill[data-val="LATE"]').click();
-  await expect(more).toHaveCount(0);
-  expect(await page.evaluate(([cid, sid, aid]) => getAssignmentStatus(cid, sid, aid), [CID, sid, aid])).toBe('LATE');
-  // On the card: the status that is set, as one chip.
-  const pills = card.locator('.m-grade-student-header .m-status-pill');
-  await expect(pills.filter({ hasText: 'Late' })).toBeVisible();
-  await expect(pills.filter({ hasText: 'Missing' })).toBeHidden();
-  await expect(pills.filter({ hasText: 'Excused' })).toBeHidden();
-  expect(errors).toEqual([]);
-});
-
-test('L3: Return and Next is held seven seconds, with Undo over the tab bar', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', e => errors.push(String(e)));
-  const aid = await openLab(page);
-  const drafts = sid =>
-    page.evaluate(([cid, aid, sid]) => GraderWork.draftsIn(cid, aid, [sid]).length, [CID, aid, sid]);
-  const score = async card => {
-    for (const i of [0, 1, 2])
-      await card.locator('.m-crit-group').nth(i).locator('.m-level-btn[data-score="3"]').click();
-  };
-  const ines = await goTo(page, 'Ines Larsen');
-  const inesId = await ines.getAttribute('data-sid');
-  await score(ines);
-  const next = page.locator('[data-action="m-grade-return-next"]');
-  await next.click();
-  await expect(title(page)).toHaveText('Marcus Lee');
-
-  // The toast: over the tab bar, clear of the bottom bar and the card.
-  const toast = page.locator('#m-toast .m-toast-item');
-  await expect(toast).toContainText('Returned to Ines');
-  const over = () =>
-    page.evaluate(() => {
-      const r = s => document.querySelector(s).getBoundingClientRect();
-      const t = r('#m-toast .m-toast-item');
-      const tabs = r('#m-tab-bar');
-      return t.top >= tabs.top && t.bottom <= tabs.bottom && t.top >= r('#m-grade-return-act').bottom;
-    });
-  // (Polled: with reduced motion the app's styles give every change a 0.01 ms
-  // transition, so the new place is reported on the next frame.)
-  await expect.poll(over).toBe(true);
-  // Nothing is sent yet, and Ines's card already reads Returned.
-  expect(await drafts(inesId)).toBeGreaterThan(0);
-  // Once the slide to the next card is over, back to hers from the class list.
-  await settled(page);
-  await goTo(page, 'Ines Larsen');
-  await expect(page.locator('#m-grade-return .m-returned-mark')).toHaveText('Returned');
-
-  // Undo: back on Ines, the grade still a draft, Return and Next there again.
-  await toast.locator('.m-toast-undo').click();
-  await expect(title(page)).toHaveText('Ines Larsen');
-  await expect(next).toBeEnabled();
-  expect(await drafts(inesId)).toBeGreaterThan(0);
-
-  // Left alone, it is sent when the seven seconds are up.
-  await next.click();
-  expect(await drafts(inesId)).toBeGreaterThan(0);
-  await expect.poll(() => drafts(inesId), { timeout: 9000 }).toBe(0);
-  await expect(toast).toHaveCount(0);
-
-  // Leaving the grading screen sends a held return at once.
-  await expect(title(page)).toHaveText('Marcus Lee');
-  const marcus = page.locator('#m-swiper .m-swiper-card').nth(await settled(page));
-  const marcusId = await marcus.getAttribute('data-sid');
-  await score(marcus);
-  await next.click();
-  expect(await drafts(marcusId)).toBeGreaterThan(0);
-  await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').click();
-  expect(await drafts(marcusId)).toBe(0);
-  expect(errors).toEqual([]);
-});
 
 test('L2b: Write a Bulletin has no Posts To line, and Let Students React is a row with its switch at the right', async ({
   page,
@@ -251,26 +46,13 @@ test('L2b: Write a Bulletin has no Posts To line, and Let Students React is a ro
   expect(await box.isChecked()).toBe(!was);
 });
 
-test('L2: the Grade list and Bulletins', async ({ page }) => {
+test('L2: Bulletins', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('fv-build-phoneLook', '1'));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
-  const aid = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Light Refraction Lab').id);
-
-  // A piece with work waiting: its name, what waits, the bar.
-  await page.locator('.m-tab-item[data-tab="grade"]').click();
-  const row = page.locator('#m-grade-list .m-cell[data-aid="' + aid + '"]');
-  await expect(row.locator('.m-tg-pill')).toBeVisible();
-  await expect(row.locator('.m-tg-notin')).toBeVisible();
-  await expect(row.locator('.m-cell-subtitle')).toBeHidden();
-  await expect(row.locator('.m-progress-bar')).toBeVisible();
-  // A piece with nothing waiting keeps its line of category and date.
-  await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
-  const done = page.locator('#m-grade-list .m-cell[data-tg="0"]').first();
-  await expect(done.locator('.m-cell-subtitle')).toBeVisible();
 
   // Bulletins: no large title; "8 Not Seen" is what the Seen line reads.
   await page.locator('.m-tab-item[data-tab="bulletins"]').click();
@@ -299,81 +81,6 @@ test('L2: the Grade list and Bulletins', async ({ page }) => {
     expect(out, font).toEqual([]);
   }
 });
-
-for (const width of [375, 320]) {
-  for (const font of FONTS) {
-    test(`a criterion's line and the bottom bar fit at ${width} px, ${font} font`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 667 });
-      await openLab(page);
-      const card = await goTo(page, 'Marcus Lee');
-      // One short name and one that runs long, both with a level chosen.
-      await card
-        .locator('.m-crit-name')
-        .first()
-        .evaluate(el => {
-          el.textContent = 'Uses evidence from the investigation to support a scientific explanation of results';
-        });
-      for (const i of [0, 1])
-        await card.locator('.m-crit-group').nth(i).locator('.m-level-btn[data-score="2"]').click();
-      await useFont(page, font);
-
-      const fit = await card.evaluate(el => {
-        const marks = el.querySelector('.m-grade-marks');
-        const box = marks.getBoundingClientRect();
-        const pad = parseFloat(getComputedStyle(marks).paddingLeft);
-        const out = [...marks.querySelectorAll('*')]
-          .filter(e => {
-            const r = e.getBoundingClientRect();
-            return r.width > 0 && (r.right > box.right - pad + 0.6 || r.left < box.left + pad - 0.6);
-          })
-          .map(e => String(e.className));
-        const hits = (a, b) =>
-          a.right > b.left + 0.6 && b.right > a.left + 0.6 && a.bottom > b.top + 0.6 && b.bottom > a.top + 0.6;
-        const overlaps = [...marks.querySelectorAll('.m-crit-group')].flatMap(g => {
-          const parts = [...g.querySelectorAll('.m-crit-name, .m-checks-btn, .m-mod-btn, .m-crit-comment-btn')]
-            .filter(e => e.getBoundingClientRect().width > 0)
-            .map(e => ({ name: String(e.className), r: e.getBoundingClientRect() }));
-          return parts.flatMap((a, i) =>
-            parts
-              .slice(i + 1)
-              .filter(b => hits(a.r, b.r))
-              .map(b => a.name + ' over ' + b.name),
-          );
-        });
-        // The track's four segments are one size, on one line.
-        const segs = [...marks.querySelector('.m-score-btns').querySelectorAll('.m-level-btn')].map(b =>
-          b.getBoundingClientRect(),
-        );
-        return {
-          out,
-          overlaps,
-          segWidths: [...new Set(segs.map(r => Math.round(r.width)))].length,
-          segTops: [...new Set(segs.map(r => Math.round(r.top)))].length,
-          page: document.documentElement.scrollWidth - window.innerWidth,
-        };
-      });
-      expect(fit.out).toEqual([]);
-      expect(fit.overlaps).toEqual([]);
-      expect(fit.segWidths).toBe(1);
-      expect(fit.segTops).toBe(1);
-      expect(fit.page).toBeLessThanOrEqual(0);
-
-      // For Revision and Return and Next: side by side, a line each.
-      const bar = await page.evaluate(() =>
-        [...document.querySelectorAll('#m-grade-return-act button')].map(b => {
-          const r = b.getBoundingClientRect();
-          return { text: b.textContent, top: Math.round(r.top), height: Math.round(r.height), right: r.right };
-        }),
-      );
-      expect(bar.map(b => b.text)).toEqual(['For Revision', 'Return and Next']);
-      expect(bar[0].top).toBe(bar[1].top);
-      bar.forEach(b => {
-        expect(b.height).toBeLessThanOrEqual(52);
-        expect(b.right).toBeLessThanOrEqual(width - 15.5);
-      });
-    });
-  }
-}
 
 /* L5 and L6: the Students card as the student's My Learning, and the
    profile with the student's own words first. */

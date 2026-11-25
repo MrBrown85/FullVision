@@ -90,6 +90,7 @@
     "teacher-mobile/tab-bar.js",
     "teacher-mobile/crit-own.js",
     "teacher-mobile/grade-look.js",
+    "teacher-mobile/grade-reader.js",
     "teacher-mobile/student-look.js",
     "teacher-mobile/level-sheet.js",
     "teacher-mobile/pull-refresh.js",

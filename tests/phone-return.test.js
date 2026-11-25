@@ -1,28 +1,18 @@
 /**
- * The phone's Draft and Returned: Return and Next in the grader, the Grade
- * tab's To Return list with Return N, and the student card's To Return list
- * (S1-F3, docs/plans/student-page-build-plan.md S1).
+ * Returning grades on the phone: Return and Next in the grader (held seven
+ * seconds for Undo), the Grade tab's To Return list with Return N, and the
+ * student card's To Return list (S1-F3, docs/plans/student-page-build-plan.md
+ * S1; the grader's new look, docs/plans/phone-look-plan.md).
  *
- * 1. With the build switch off, with Return Grades on As Soon As I Save, and
- *    for a signed-in teacher, the phone's HTML is byte for byte what it was
- *    before this change. tests/fixtures/phone-switch-off.json holds the
- *    phone as origin/main drew it (commit 2df6b0b9, before S1-F3): for a
- *    Proficiency class the Grade tab's list (Recent and All), every grading
- *    screen as it opens, the grading screen after a level, a + and a status,
- *    points, a rubric level and a tick, a Complete mark and pair work, the
- *    list after that grading and every student card; for a Both and a Letter
- *    class the list, the grading screens and the cards. A signed-in teacher's
- *    phone differs from Demo Mode's in one place, on main too: after a save
- *    the sync dot says Syncing. So the snapshot also holds, under "signed
- *    in › …", each picture that differs when the same walk is run signed in.
- *    It was written by this file's own walk, run in a checkout of
- *    origin/main with only this file added:
- *      UPDATE_PHONE_SNAPSHOT=1 npx vitest run tests/phone-return.test.js
- *    Run that only on code from before a change the phone is meant to keep
- *    out; never to make a failing comparison pass.
- * 2. With the switch on and When I Return Them: the grading screen's bar in
- *    each state a grade can be in, Return and Next, the To Return segment,
- *    its rows and their Return N with its question, and the card's list.
+ * 1. In a class that returns nothing (neither setting on, the student page
+ *    off, As Soon As I Save, or a signed-in teacher whose two settings on
+ *    this device are not the server's word) there is no Return on the phone:
+ *    the grader's button is Next Student, there is no Draft mark, no To
+ *    Return list, and nothing is sent. This holds what the phone does, not
+ *    the markup it draws it with.
+ * 2. With When I Return Them: the grading screen's bottom bar in each state
+ *    a grade can be in, Return and Next, the To Return segment, its rows and
+ *    their Return N with its question, and the card's list.
  *
  * Every count is read through GradeState.draftsIn, which asks
  * GradeState.stateOf: the function the desktop's grader, gradebook and
@@ -30,14 +20,9 @@
  * class on the gradebook and holds the phone's numbers and words to it.
  */
 import './setup-mobile.js';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { U, signIn, seedClass, clearClass, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
-
-const SNAPSHOT = join(new URL('.', import.meta.url).pathname, 'fixtures', 'phone-switch-off.json');
-const UPDATE = process.env.UPDATE_PHONE_SNAPSHOT === '1';
 
 const CID = U(1);
 const AVA = U(11);
@@ -227,53 +212,6 @@ const cardHtml = sid =>
     cardData(),
   );
 
-/* The walk the snapshot records. Returns { name: html }. */
-function walk(config) {
-  const out = {};
-  for (const system of ['proficiency', 'both', 'letter']) {
-    const name = what => system + ' › ' + what;
-    const whole = system === 'proficiency';
-    localStorage.clear();
-    seed({ config, system });
-    page();
-    openList();
-    out[name('Grade list')] = stack().innerHTML;
-    MGrade.filterAssessments(CID, 'all');
-    out[name('Grade list, All')] = stack().innerHTML;
-    getAssessments(CID).forEach(a => {
-      out[name('Grading ' + a.title)] = MGrade.renderSwiper(CID, a.id);
-    });
-    if (whole) {
-      openGrading(ESSAY);
-      MGrade.setScore(CID, BEN, ESSAY, QUESTION, 3);
-      MGrade.setScoreMod(CID, BEN, ESSAY, QUESTION, 1);
-      MGrade.setStatus(CID, DEV, ESSAY, 'EXC');
-      MGrade.jumpToStudent(1, true);
-      out[name('Grading Essay, after a level, a + and a status')] = stack().innerHTML;
-      openGrading(QUIZ);
-      MGrade.adjustPointsScore(CID, BEN, QUIZ, 1, 10);
-      out[name('Grading Quiz, after a point')] = stack().innerHTML;
-      openGrading(LAB);
-      MGrade.setCriterionScore(CID, BEN, LAB, SAFETY, 3);
-      MGrade.tickCheck(CID, BEN, LAB, SAFETY, GOGGLES, true);
-      out[name('Grading Lab, after a level and a tick')] = stack().innerHTML;
-      openGrading(EXIT);
-      MGrade.setCompletion(CID, BEN, EXIT, 'complete');
-      out[name('Grading Exit Ticket, after a mark')] = stack().innerHTML;
-      openGrading(TALK);
-      MGrade.setScore(CID, AVA, TALK, QUESTION, 4);
-      out[name('Grading Pair Talk, after a level')] = stack().innerHTML;
-      openList();
-      out[name('Grade list, after grading')] = stack().innerHTML;
-    }
-    EVERYONE.forEach(sid => {
-      out[name('Card ' + sid.slice(-2))] = cardHtml(sid);
-    });
-    clearClass(CID);
-  }
-  return out;
-}
-
 beforeEach(() => {
   stubDocument = globalThis.document;
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -287,119 +225,98 @@ afterEach(() => {
 });
 
 const BOTH_SETTINGS = { student_page_enabled: true, return_grades: 'on_return' };
-const SIGNED_IN = 'signed in › ';
+const NOT_HELD = [
+  ['a class with neither setting', {}],
+  ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
+  [
+    'a class whose student page is on, set to As Soon As I Save',
+    { student_page_enabled: true, return_grades: 'on_save' },
+  ],
+  ['a class whose student page is on with no choice made', { student_page_enabled: true }],
+];
 
-/* The walk as a signed-in teacher, who holds both settings on this device
-   unless `config` says otherwise. On their own they are not the server's
-   word and turn nothing on; `fromServer` says the server has said the
-   class's student page is on. `asked` is given every RPC the walk sent. */
-function walkSignedIn(config, asked, fromServer) {
-  const session = signIn();
-  if (fromServer) serverSaysStudentPageOn(CID);
-  try {
-    return walk(config || BOTH_SETTINGS);
-  } finally {
-    if (asked) session.sent().forEach(c => asked.push(c[0]));
-    serverSaysStudentPageOn(CID, false);
-    session.signOut();
-  }
-}
+describe('a class that returns nothing has no Return on the phone', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.advanceTimersByTime(1000);
+  });
+  const nextButton = () => document.querySelector('#m-grade-return-act .m-grade-return-btn');
+  // What the Grade tab's list drew, kept before the grading screen takes its place.
+  let listed;
+  const open = config => {
+    localStorage.clear();
+    seed({ config });
+    page();
+    openList();
+    listed = {
+      toReturnSegment: !!document.querySelector('.m-seg-btn[data-val="toreturn"]'),
+      toReturnList: !!document.getElementById('m-grade-to-return'),
+    };
+    openGrading(ESSAY);
+  };
 
-describe('with the build switch off the phone is what it was', () => {
-  if (UPDATE) {
-    it('writes the snapshot (run on the code from before the change)', () => {
-      const device = walk();
-      const signedIn = walkSignedIn();
-      const out = { ...device };
-      Object.keys(signedIn).forEach(name => {
-        if (signedIn[name] !== device[name]) out[SIGNED_IN + name] = signedIn[name];
-      });
-      writeFileSync(SNAPSHOT, JSON.stringify(out, null, 2) + '\n');
-    });
-    return;
-  }
-  const snapshot = existsSync(SNAPSHOT) ? JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) : {};
-  const before = {};
-  const beforeSignedIn = {};
-  Object.keys(snapshot)
-    .filter(name => name.indexOf(SIGNED_IN) !== 0)
-    .forEach(name => {
-      before[name] = snapshot[name];
-      beforeSignedIn[name] = SIGNED_IN + name in snapshot ? snapshot[SIGNED_IN + name] : snapshot[name];
-    });
-
-  it('the snapshot covers the list, the grading screens and the cards', () => {
-    // 15 a class (2 lists, 8 grading screens, 5 cards), and the Proficiency
-    // class's 6 pictures of a grading session.
-    expect(Object.keys(before).length).toBe(15 * 3 + 6);
-    Object.keys(before).forEach(name => expect(before[name].length, name).toBeGreaterThan(300));
-    // Signed in, main differs only on a grading screen after a save, and
-    // only in the sync dot.
-    const differs = Object.keys(before).filter(name => beforeSignedIn[name] !== before[name]);
-    expect(differs.length).toBe(5);
-    differs.forEach(name => {
-      expect(name).toMatch(/^proficiency › Grading .*, after /);
-      expect(
-        beforeSignedIn[name].replace(
-          'class="tb-sync-dot syncing" id="sync-indicator-dot" title="Syncing..." aria-label="Syncing..."',
-          'class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"',
-        ) === before[name],
-        name,
-      ).toBe(true);
-    });
-    // The walk leaves grades entered with the switch off, which are Returned.
-    expect(before['proficiency › Grade list, after grading']).not.toBe(before['proficiency › Grade list']);
-    expect(before['proficiency › Grading Essay, after a level, a + and a status']).toContain('m-score-active');
+  it.each(NOT_HELD)('%s: no To Return list, no Draft mark, and the button is Next Student', (_, config) => {
+    open(config);
+    expect(listed).toEqual({ toReturnSegment: false, toReturnList: false });
+    MGrade.jumpToStudent(1, true); // Ben: no grade yet
+    Grader.setLevel(CID, BEN, ESSAY, QUESTION, 3, 0);
+    expect(nextButton().textContent).toBe('Next Student');
+    expect(nextButton().getAttribute('data-action')).toBe('m-grade-next-student');
+    expect(document.getElementById('m-grade-return').textContent).not.toMatch(/Return|Draft|Saved/);
+    expect(stack().innerHTML).not.toMatch(/m-draft-mark|m-returned-mark|data-action="m-grade-return-next"/);
   });
 
-  it.each([
-    ['a class with neither setting', {}],
-    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    [
-      'a class whose student page is on, set to As Soon As I Save',
-      { student_page_enabled: true, return_grades: 'on_save' },
-    ],
-    ['a class whose student page is on with no choice made', { student_page_enabled: true }],
-  ])('byte for byte, in %s', (_, config) => {
-    const now = walk(config);
-    expect(Object.keys(now)).toEqual(Object.keys(before));
-    Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
+  it.each(NOT_HELD)('%s: Next Student moves on and returns nothing', (_, config) => {
+    open(config);
+    const returned = vi.spyOn(Grader, 'returnGrades');
+    expect(onCard()).toBe(0);
+    MGrade.nextStudent();
+    vi.advanceTimersByTime(600);
+    expect(onCard()).toBe(1);
+    MGrade.returnAndNext(); // nothing is held, so nothing is returned
+    expect(returned).not.toHaveBeenCalled();
+    expect(onCard()).toBe(1);
+    returned.mockRestore();
   });
 
-  // As before S0-W1: the two settings on this device alone are not the
-  // server's word (shared/data.js _serverSaysStudentPage), and draw nothing.
-  it('byte for byte for a signed-in teacher, even with both settings on this device', () => {
-    const now = walkSignedIn();
-    expect(Object.keys(now)).toEqual(Object.keys(before));
-    Object.keys(before).forEach(name => expect(now[name] === beforeSignedIn[name], name).toBe(true));
+  it('on the last card Next Student is Finish, and All Caught Up counts what was graded', () => {
+    open({});
+    const last = document.querySelectorAll('#m-swiper .m-swiper-card').length - 1;
+    MGrade.jumpToStudent(last, true);
+    expect(text(nextButton())).toBe('Finish');
+    MGrade.nextStudent();
+    const done = document.getElementById('m-grade-done');
+    expect(text(done.querySelector('.m-grade-done-title'))).toBe('All Caught Up');
+    expect(text(done.querySelector('.m-grade-done-line'))).toMatch(/^\d+ graded$/);
+    expect(done.querySelector('[data-action="m-back"]').textContent).toBe('Done');
   });
 
-  // And once the server has said the page is on (S0-W1), every class that
-  // still does not hold grades.
-  it.each([
-    ['a class with neither setting', {}],
-    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    [
-      'a class whose student page is on, set to As Soon As I Save',
-      { student_page_enabled: true, return_grades: 'on_save' },
-    ],
-    ['a class whose student page is on with no choice made', { student_page_enabled: true }],
-  ])('byte for byte for a signed-in teacher, in %s', (_, config) => {
-    const asked = [];
-    const now = walkSignedIn(config, asked, config.student_page_enabled === true);
-    expect(Object.keys(now)).toEqual(Object.keys(before));
-    Object.keys(before).forEach(name => expect(now[name] === beforeSignedIn[name], name).toBe(true));
-    // With the student page off, nothing is asked of the server about Draft
-    // and Returned or cards.
-    if (config.student_page_enabled !== true) {
-      expect(asked.filter(name => /grade_return|return_grades|student_card|draft_count/.test(name))).toEqual([]);
+  it('a signed-in teacher whose two settings are on this device alone is in a class that returns nothing', () => {
+    const session = signIn();
+    try {
+      open(BOTH_SETTINGS);
+      expect(text(nextButton())).toBe('Next Student');
+      expect(listed.toReturnSegment).toBe(false);
+    } finally {
+      session.signOut();
     }
   });
 
-  it('and the check can tell: a signed-in class the server says holds grades is not what main draws (S0-W1)', () => {
-    const now = walkSignedIn(BOTH_SETTINGS, null, true);
-    const changed = Object.keys(before).filter(name => now[name] !== beforeSignedIn[name]);
-    expect(changed.length).toBeGreaterThan(0);
+  it('once the server has said the student page is on, the class holds grades: Return and Next', () => {
+    const session = signIn();
+    serverSaysStudentPageOn(CID);
+    try {
+      open(BOTH_SETTINGS);
+      MGrade.jumpToStudent(1, true); // Ben: nothing in yet, so Return and Next is greyed out
+      expect(text(nextButton())).toBe('Return and Next');
+      expect(listed).toEqual({ toReturnSegment: true, toReturnList: true });
+    } finally {
+      serverSaysStudentPageOn(CID, false);
+      session.signOut();
+    }
   });
 });
 
@@ -498,7 +415,9 @@ describe('with the switch on and When I Return Them', () => {
     cardsRedrawn = 0;
   });
   afterEach(() => {
-    // Let a slide or a closing sheet finish before the next test.
+    // A return held for Undo is sent, as leaving the screen sends it; then a
+    // slide or a closing sheet finishes before the next test.
+    MGradeLook.flush();
     vi.advanceTimersByTime(1000);
     returned.mockRestore();
   });
@@ -527,21 +446,20 @@ describe('with the switch on and When I Return Them', () => {
       MGrade.jumpToStudent(2, true); // Cara: Missing
       expect(barState()).toBe('');
       expect(barButton()).toBe(null);
-      expect(bar().classList.contains('is-empty')).toBe(true);
     });
 
-    it('a level makes a draft: the Draft mark, the desktop’s words and Return and Next', () => {
+    it('a level makes a draft: Return and Next is ready, and no Draft mark or line says so', () => {
       held();
       openGrading(ESSAY);
       MGrade.jumpToStudent(1, true);
       MGrade.setScore(CID, BEN, ESSAY, QUESTION, 3);
       expect(isDraft(BEN, ESSAY)).toBe(true);
-      expect(text(bar().querySelector('.m-draft-mark'))).toBe('Draft');
-      expect(barState()).toBe('DraftSaved. Not returned yet.');
+      expect(bar().querySelector('.m-draft-mark')).toBeNull();
+      expect(bar().textContent).not.toContain('Saved. Not returned yet.');
+      expect(barState()).toBe('');
       expect(text(barButton())).toBe('Return and Next');
       expect(barButton().hasAttribute('disabled')).toBe(false);
-      expect(bar().classList.contains('is-empty')).toBe(false);
-      // The line that says where the grade stands is read out when it changes.
+      // What is said about where the grade stands is read out when it changes.
       expect(document.getElementById('m-grade-return-state').getAttribute('role')).toBe('status');
     });
 
@@ -553,7 +471,8 @@ describe('with the switch on and When I Return Them', () => {
       openGrading(ESSAY);
       change();
       expect(isDraft(AVA, ESSAY)).toBe(true);
-      expect(barState()).toBe('DraftSaved. Not returned yet.Ava still sees the grade you returned.');
+      expect(barState()).toBe('Ava still sees the grade you returned.');
+      expect(text(barButton())).toBe('Return and Next');
     });
 
     it('Late is a status, never a draft: the grade stays Returned', () => {
@@ -579,9 +498,10 @@ describe('with the switch on and When I Return Them', () => {
         openGrading(aid);
         MGrade.jumpToStudent(1, true); // Ben
         expect(barState(), aid).toBe('');
+        expect(barButton().hasAttribute('disabled'), aid).toBe(true);
         save();
         expect(isDraft(BEN, aid), aid).toBe(true);
-        expect(barState(), aid).toBe('DraftSaved. Not returned yet.');
+        expect(barButton().hasAttribute('disabled'), aid).toBe(false);
       });
     });
 
@@ -593,24 +513,31 @@ describe('with the switch on and When I Return Them', () => {
       box.value = 'Clear questions.';
       box.dispatchEvent(new win.Event('focusout', { bubbles: true }));
       expect(getScoreComment(CID, BEN, ESSAY)).toBe('Clear questions.');
-      expect(barState()).toBe('DraftSaved. Not returned yet.');
+      expect(barButton().hasAttribute('disabled')).toBe(false);
     });
 
-    it('Return and Next returns the one grade on screen in one tap and shows the next card', () => {
+    it('Return and Next returns the one grade on screen in one tap, shows the next card, and holds the return seven seconds', () => {
       held();
       grade(BEN, ESSAY, QUESTION, 3);
       grade(DEV, ESSAY, QUESTION, 2);
       openGrading(ESSAY);
       MGrade.jumpToStudent(1, true);
       tap(barButton());
-      // No question is asked, and only Ben's grade is returned.
+      // No question is asked; the card moves on at once.
       expect(sheet()).toBe(null);
+      expect(onCard()).toBe(2); // Cara, who is Missing: nothing to say
+      expect(barState()).toBe('');
+      // "Returned to Ben" and Undo, over the tab bar; nothing is sent yet.
+      expect(text(document.getElementById('m-toast'))).toBe('Returned to BenUndo');
+      expect(document.getElementById('m-toast').classList.contains('m-toast-low')).toBe(true);
+      expect(returned).not.toHaveBeenCalled();
+      expect(isDraft(BEN, ESSAY)).toBe(true);
+      // Seven seconds later only Ben's grade is returned.
+      vi.advanceTimersByTime(7000);
       expect(returned).toHaveBeenCalledTimes(1);
       expect(returned).toHaveBeenCalledWith(CID, ESSAY, [BEN]);
       expect(state(BEN, ESSAY)).toBe('returned');
       expect(isDraft(DEV, ESSAY)).toBe(true);
-      expect(onCard()).toBe(2); // Cara, who is Missing: nothing to say
-      expect(barState()).toBe('');
       // Back on Ben: Returned, with the day.
       slideDone();
       MGrade.jumpToStudent(1, true);
@@ -627,26 +554,37 @@ describe('with the switch on and When I Return Them', () => {
       expect(onCard()).toBe(1);
       expect(text(barButton())).toBe('Return and Next'); // Ben's, already showing
       tap(barButton());
-      expect(returned).toHaveBeenCalledTimes(1);
+      // Nothing held is sent or taken by the second tap, and Ben's grade is not held.
+      expect(returned).not.toHaveBeenCalled();
       expect(isDraft(BEN, QUIZ)).toBe(true);
       expect(onCard()).toBe(1);
-      // Once the card is on screen the tap counts.
+      // Once the card is on screen the tap counts: Ava's held return goes at
+      // once, and Ben's is held in its place.
       slideDone();
       tap(barButton());
+      expect(returned).toHaveBeenCalledTimes(1);
+      expect(returned).toHaveBeenCalledWith(CID, QUIZ, [AVA]);
+      expect(isDraft(BEN, QUIZ)).toBe(true);
+      expect(onCard()).toBe(2);
+      MGradeLook.flush();
       expect(returned).toHaveBeenCalledTimes(2);
       expect(state(BEN, QUIZ)).toBe('returned');
-      expect(onCard()).toBe(2);
     });
 
-    it('on the last card the button says Return, and the card stays', () => {
+    it('on the last card the button says Return and Finish, and All Caught Up follows', () => {
       held();
       grade(ELI, ESSAY, QUESTION, 2); // a change to Eli's returned grade
       openGrading(ESSAY);
       MGrade.jumpToStudent(4, true);
-      expect(text(barButton())).toBe('Return');
+      expect(text(barButton())).toBe('Return and Finish');
       tap(barButton());
-      expect(returned).toHaveBeenCalledWith(CID, ESSAY, [ELI]);
       expect(onCard()).toBe(4);
+      expect(text(document.querySelector('#m-grade-done .m-grade-done-title'))).toBe('All Caught Up');
+      expect(text(document.querySelector('#m-grade-done .m-grade-done-line'))).toMatch(/^\d+ returned/);
+      // Held, then sent.
+      expect(returned).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(7000);
+      expect(returned).toHaveBeenCalledWith(CID, ESSAY, [ELI]);
       expect(barState()).toBe('Returned Nov 10');
     });
 
@@ -658,7 +596,7 @@ describe('with the switch on and When I Return Them', () => {
       openGrading(ESSAY);
       MGrade.jumpToStudent(1, true);
       MGrade.setScore(CID, BEN, ESSAY, QUESTION, 4);
-      expect(barState()).toBe('DraftSaved. Not returned yet.Ben still sees the grade you returned Nov 10.');
+      expect(barState()).toBe('Ben still sees the grade you returned Nov 10.');
       // Put back to what was returned, it is not a draft.
       MGrade.setScore(CID, BEN, ESSAY, QUESTION, 3);
       expect(barState()).toBe('Returned Nov 10');
@@ -673,6 +611,7 @@ describe('with the switch on and When I Return Them', () => {
       document.getElementById('m-overall-' + BEN + '-' + ESSAY).value = 'Clear questions.';
       tap(barButton());
       expect(getScoreComment(CID, BEN, ESSAY)).toBe('Clear questions.');
+      MGradeLook.flush();
       expect(state(BEN, ESSAY)).toBe('returned');
       // The comment went with the grade: nothing waits behind it.
       vi.advanceTimersByTime(2000);
@@ -686,9 +625,10 @@ describe('with the switch on and When I Return Them', () => {
       expect(barState()).toBe('Returned');
       MGrade.setScore(CID, AVA, TALK, QUESTION, 4); // the pair's card: fills Ava and Ben
       expect(drafts(TALK)).toEqual([AVA, BEN]);
-      expect(barState()).toBe('DraftSaved. Not returned yet.Pair 1 still sees the grade you returned.');
+      expect(barState()).toBe('Pair 1 still sees the grade you returned.');
       tap(barButton());
       expect(sheet()).toBe(null);
+      MGradeLook.flush();
       expect(returned).toHaveBeenCalledWith(CID, TALK, [AVA, BEN]);
       expect(drafts(TALK)).toEqual([]);
     });
@@ -698,11 +638,11 @@ describe('with the switch on and When I Return Them', () => {
       openGrading(TALK);
       MGrade.jumpToStudent(1, true); // Cara
       MGrade.setScore(CID, CARA, TALK, QUESTION, 2);
-      expect(barState()).toBe('DraftSaved. Not returned yet.');
+      expect(barButton().hasAttribute('disabled')).toBe(false);
       // Late on group work draws every card again; Cara's is still on screen.
       MGrade.setStatus(CID, CARA, TALK, 'LATE');
       expect(onCard()).toBe(1);
-      expect(barState()).toBe('DraftSaved. Not returned yet.');
+      expect(barButton().hasAttribute('disabled')).toBe(false);
       // Ben graded separately gets a card of his own after the pair's: the
       // second card is now his, and his grade was returned.
       MGrade.gradeSeparately(CID, TALK, BEN);
@@ -717,7 +657,6 @@ describe('with the switch on and When I Return Them', () => {
       openGrading(BENCH);
       expect(barState()).toBe('');
       expect(barButton()).toBe(null);
-      expect(bar().classList.contains('is-empty')).toBe(true);
     });
 
     it('a To Return row opens the grading screen on the first draft', () => {
@@ -726,7 +665,7 @@ describe('with the switch on and When I Return Them', () => {
       openToReturn();
       tap(row(ESSAY).querySelector('.m-to-return-open'));
       expect(onCard()).toBe(3);
-      expect(barState()).toBe('DraftSaved. Not returned yet.');
+      expect(barButton().hasAttribute('disabled')).toBe(false);
     });
   });
 
@@ -1131,7 +1070,8 @@ describe('a class that stops holding grades has nothing to return on the phone',
     MGrade.filterAssessments(CID, 'toreturn');
     expect(document.querySelector('.m-seg-btn.m-seg-active').getAttribute('data-val')).toBe('recent');
     openGrading(ESSAY);
-    expect(bar()).toBe(null);
+    // The button is Next Student now, not a Return.
+    expect(text(barButton())).toBe('Next Student');
     MGrade.returnAndNext();
     MGrade.askReturnAll(CID, ESSAY, null);
     MGrade.returnFromCard(CID, ESSAY, BEN, null, () => {
@@ -1139,7 +1079,7 @@ describe('a class that stops holding grades has nothing to return on the phone',
     });
     expect(returned).not.toHaveBeenCalled();
     expect(MGrade.studentDrafts(CID, BEN)).toEqual([]);
-    expect(stack().innerHTML).not.toMatch(/m-grade-return|m-draft-mark|m-has-return|To Return/);
+    expect(stack().innerHTML).not.toMatch(/m-draft-mark|data-action="m-grade-return-next"|To Return/);
     expect(cardHtml(BEN)).not.toMatch(/m-scard-return|Draft/);
     returned.mockRestore();
   });
