@@ -8,7 +8,7 @@
  * Letter or Legal pages at Normal size, 2 at Compact, all time.
  */
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, gotoApp } from './helpers.js';
+import { mockAuth, seedCourse, seedStudents, gotoApp, clickToolbarItem } from './helpers.js';
 
 const STUDENTS = 27;
 
@@ -26,11 +26,11 @@ async function openDemoGradebook(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.evaluate(r => window.Router.navigate(r), '/gradebook');
-  await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+  await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
 }
 
 async function openDialog(page) {
-  await page.getByRole('button', { name: 'Print Grades' }).click();
+  await clickToolbarItem(page, 'more', 'printGrades');
   const dialog = page.getByRole('dialog', { name: 'Print Grades' });
   await expect(dialog).toBeVisible();
   return dialog;
@@ -89,13 +89,18 @@ async function pdfOfStaged(page) {
 test.describe('Print Grades', () => {
   test.setTimeout(90_000);
 
-  test('the button is on every gradebook view and the toolbar keeps New Assessment', async ({ page }) => {
+  test('Print Grades is in the ⋯ menu on every gradebook view and the toolbar keeps New Assessment', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1024, height: 800 });
     await openDemoGradebook(page);
     for (const mode of ['detailed', 'scores']) {
       await page.locator(`[data-action="setView"][data-mode="${mode}"]`).click();
-      await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+      await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
       await expect(page.getByRole('link', { name: '+ New Assessment' })).toBeInViewport();
+      await page.locator('[data-atb="more"]').click();
+      await expect(page.getByRole('menuitem', { name: 'Print Grades' })).toBeVisible();
+      await page.keyboard.press('Escape');
     }
   });
 
@@ -222,7 +227,7 @@ test.describe('Print Grades', () => {
     for (const box of pageBoxes(pdf)) expect(box).toEqual([612, 1008]);
 
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     dialog = await openDialog(page);
     await expect(dialog.getByRole('button', { name: /^Paper / })).toHaveText('Legal · 8.5 × 14 in');
     await choose(dialog, 'Paper', /^Letter/);

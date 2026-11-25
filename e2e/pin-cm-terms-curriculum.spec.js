@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoApp, clickAction, getText, openCompPicker, closeCompPicker } from './helpers.js';
+import { gotoApp, clickAction, clickToolbarItem, getText, openCompPicker, closeCompPicker } from './helpers.js';
 
 /* Pins what Class Settings' Reporting Terms and Competencies tabs do today
    in Demo Mode on Science 8 (S19 handoff review, before any split of
@@ -60,7 +60,7 @@ async function expectTiles(page, expected) {
 /* The gradebook's Print Grades dialog: its Term menu's choices. */
 async function printTermChoices(page) {
   await gotoApp(page, '/gradebook?course=sci8');
-  await page.getByRole('button', { name: 'Print Grades' }).click();
+  await clickToolbarItem(page, 'more', 'printGrades');
   const dialog = page.getByRole('dialog', { name: 'Print Grades' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: /^Term / }).click();

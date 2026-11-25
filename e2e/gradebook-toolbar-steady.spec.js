@@ -21,9 +21,9 @@ for (const width of [1440, 1024]) {
     await gotoApp(page, '/gradebook');
     await page.locator('[data-action="setView"][data-mode="scores"]').click();
     const scores = await positions(page);
-    await expect(page.locator('[data-action="exportScoresCSV"]')).toBeVisible();
+    await expect(page.locator('[data-atb="more"]')).toBeVisible();
     await page.locator('[data-action="setView"][data-mode="detailed"]').click();
-    await expect(page.locator('[data-action="exportScoresCSV"]')).toBeVisible();
+    await expect(page.locator('[data-atb="more"]')).toBeVisible();
     expect(await positions(page)).toEqual(scores);
     const tops = new Set(scores.map(p => p.split(',')[1]));
     expect(tops.size).toBe(1);
@@ -36,6 +36,6 @@ test('the gradebook toolbar has no term picker: it always shows the year so far'
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/\/dashboard/);
   await page.goto('/gradebook?course=sci8');
-  await expect(page.locator('[data-action="exportScoresCSV"]')).toBeVisible();
+  await expect(page.locator('[data-atb="more"]')).toBeVisible();
   await expect(page.locator('.gb-toolbar .term-select')).toHaveCount(0);
 });

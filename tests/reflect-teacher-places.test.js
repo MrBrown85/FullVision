@@ -206,18 +206,18 @@ describe('the gradebook: the Question Waiting mark', () => {
       expect(cell.getAttribute('aria-label')).toMatch(/, question waiting$/);
       // One dot only: Noor's was answered, Liam asked nothing.
       expect($$(doc, '.gb-scores-cell .gb-question').length).toBe(1);
-      expect(text($(doc, '.gb-questions-btn'))).toBe('1 question');
+      expect(text($(doc, '[data-show="questions"] .atb-badge'))).toBe('1');
       expect(text($(doc, '.gb-key'))).toContain('Question waiting');
     });
   });
 
   it('"1 question" pressed leaves only that student and that piece', () => {
     gradebookHtml(on, doc => {
-      click(doc, $(doc, '.gb-questions-btn'));
+      click(doc, $(doc, '[data-show="questions"]'));
       expect($$(doc, '#gb-data tr[data-sid]').map(tr => tr.dataset.sid)).toEqual([JORDAN]);
       expect([...new Set($$(doc, '.gb-scores-cell').map(td => td.dataset.aid))]).toEqual([LAB]);
-      expect($(doc, '.gb-questions-btn').getAttribute('aria-pressed')).toBe('true');
-      click(doc, $(doc, '.gb-questions-btn'));
+      expect($(doc, '[data-show="questions"]').getAttribute('aria-pressed')).toBe('true');
+      click(doc, $(doc, '[data-show="questions"]'));
       expect($$(doc, '#gb-data tr[data-sid]').length).toBeGreaterThan(1);
     });
   });
@@ -404,7 +404,7 @@ describe('one answer clears all three', () => {
     };
     gradebookHtml(answered, doc => {
       expect($$(doc, '.gb-scores-cell .gb-question').length).toBe(0);
-      expect($(doc, '.gb-questions-btn')).toBeNull();
+      expect($(doc, '[data-show="questions"]')).toBeNull();
     });
     dashboardHtml(answered, doc => expect($(doc, '#dash-questions')).toBeNull());
     profileHtml(answered, JORDAN, doc => {
@@ -435,7 +435,7 @@ describe('a student’s words are escaped on every screen', () => {
     });
     gradebookHtml(prep, doc => {
       expect($$(doc, '.gb-scores-cell .gb-question').length).toBe(2);
-      expect(text($(doc, '.gb-questions-btn'))).toBe('2 questions');
+      expect(text($(doc, '[data-show="questions"] .atb-badge'))).toBe('2');
     });
   });
 });

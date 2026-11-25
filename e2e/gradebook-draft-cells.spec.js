@@ -93,7 +93,7 @@ test('draft cells are dashed, counted and returned from their column; the filter
   expect(await page.evaluate(cid => setStudentPageSwitch(cid, true), at.cid)).toBe(true);
   await openGradebook(page);
   const [first, second, third] = at.sids;
-  const pill = page.locator('.gb-to-return');
+  const pill = page.locator('.atb-show [data-show="toreturn"]');
   const keyLine = page.locator('.gb-key .gb-key-item-draft');
 
   // Nothing waits yet: the key explains the mark, and there is no count.
@@ -112,7 +112,7 @@ test('draft cells are dashed, counted and returned from their column; the filter
   }
   await expect(cell(page, third)).not.toHaveClass(/gb-draft/);
   await expect(page.locator('#gb-data .gb-draft')).toHaveCount(2);
-  await expect(pill).toHaveText('2 to return');
+  await expect(pill.locator('.atb-badge')).toHaveText('2');
   await expect(pill).toHaveAttribute('aria-pressed', 'false');
 
   // Everything is in view at 1280×720 with no scrolling: the count, the
@@ -155,14 +155,14 @@ test('draft cells are dashed, counted and returned from their column; the filter
   // A third grade, and a change to a returned one: two drafts again.
   await grade(page, at, third, 4);
   await grade(page, at, first, 4);
-  await expect(pill).toHaveText('2 to return');
+  await expect(pill.locator('.atb-badge')).toHaveText('2');
   await expect(cell(page, first)).toHaveClass(/gb-draft/);
   await expect(cell(page, second)).not.toHaveClass(/gb-draft/);
 
   // The filter: only the students and the assessment with a draft.
   await pill.click();
   await expect(pill).toHaveAttribute('aria-pressed', 'true');
-  await expect(pill).toContainText('2 to return');
+  await expect(pill.locator('.atb-badge')).toHaveText('2');
   await expect(page.locator('#gb-data tr[data-sid]')).toHaveCount(2);
   await expect(page.locator('#gb-colheads .gb-grid-colhead[data-aid]')).toHaveCount(1);
   await expect(page.locator('#gb-rowheads .gb-grid-rowhead:not(.gb-grid-rowhead-stats)')).toHaveCount(2);
@@ -208,7 +208,7 @@ test('draft cells are dashed, counted and returned from their column; the filter
 
   // Reload: the drafts, the returned grade and the count are as they were.
   await openGradebook(page);
-  await expect(pill).toHaveText('2 to return');
+  await expect(pill.locator('.atb-badge')).toHaveText('2');
   await expect(cell(page, first)).toHaveClass(/gb-draft/);
   await expect(cell(page, third)).toHaveClass(/gb-draft/);
   await expect(cell(page, second)).not.toHaveClass(/gb-draft/);
@@ -246,7 +246,7 @@ test('draft cells are dashed, counted and returned from their column; the filter
   // Cancel: nothing is returned, and the button has the focus again.
   await dialog.locator('#confirm-cancel-btn').click();
   await expect(dialog).toHaveCount(0);
-  await expect(pill).toHaveText('2 to return');
+  await expect(pill.locator('.atb-badge')).toHaveText('2');
   await expect(page.locator('#gb-data td.gb-score.gb-draft')).toHaveCount(2);
   expect(await page.evaluate(a => a.sids.map(sid => GradeState.stateOf(a.cid, sid, 'e2e-draft')), at)).toEqual([
     'draft',
@@ -284,7 +284,7 @@ test('the marks follow the theme: dashed in dark mode too', async ({ page }) => 
   expect(
     await draft.evaluate(el => getComputedStyle(el, '::before').borderTopColor === getComputedStyle(el).color),
   ).toBe(true);
-  await expect(page.locator('.gb-to-return')).toHaveText('1 to return');
+  await expect(page.locator('.atb-show [data-show="toreturn"] .atb-badge')).toHaveText('1');
 
   // One draft, from the Competencies header: the dialog says Grade, not Grades.
   await page.locator('[data-action="setView"][data-mode="detailed"]').click();
@@ -294,6 +294,6 @@ test('the marks follow the theme: dashed in dark mode too', async ({ page }) => 
   await expect(dialog.locator('.confirm-message')).toHaveText('1 draft: ' + at.names[0] + ' can\u2019t see it yet.');
   await expect(dialog.locator('#confirm-ok-btn')).toHaveText('Return 1 Graded');
   await dialog.locator('#confirm-ok-btn').click();
-  await expect(page.locator('.gb-to-return')).toHaveCount(0);
+  await expect(page.locator('.atb-show [data-show="toreturn"]')).toHaveCount(0);
   await expect(page.locator('#gb-data .gb-draft')).toHaveCount(0);
 });

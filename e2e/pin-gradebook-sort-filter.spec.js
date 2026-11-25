@@ -4,7 +4,7 @@ import { gotoApp, clickAction, getText } from './helpers.js';
 /* Pins what the gradebook's sorting and filters do today, in Demo Mode on
    Science 8 (sci8), before any split of teacher/page-gradebook.js: the
    Student and Overall sort buttons, the sort kept across the Scores and
-   Competencies switch, the filter strip's chips and Clear All, the To Grade,
+   Competencies switch, the filter panel and its chips and Clear Filters, the To Grade,
    To Return and Questions filters, search with a sort, and the Rubric
    Columns picker remembered after a reload. Tests only: nothing in the app
    is changed. */
@@ -145,7 +145,7 @@ test.describe('Gradebook sorting and filters (pinned)', () => {
     expect(await rowIds(page)).toEqual(lowFirst);
   });
 
-  test('a category, a module and a section each narrow the columns and the filter count; Clear All restores them', async ({
+  test('a category, a module and a section each narrow the columns, with a chip each; Clear Filters restores them', async ({
     page,
   }) => {
     const CAT = 'sci8-cat-checks';
@@ -176,42 +176,49 @@ test.describe('Gradebook sorting and filters (pinned)', () => {
     expect(want.sec.length).toBeGreaterThan(0);
 
     await openGradebook(page);
-    const trigger = page.locator('.gb-filter-trigger');
-    const count = trigger.locator('.filter-count');
+    const trigger = page.locator('.atb-filter-btn');
+    const chips = page.locator('.atb-chip');
     const sorted = async () => (await colIds(page)).sort();
     expect(await sorted()).toEqual(want.all);
-    await expect(count).toHaveClass(/is-empty/);
-    await expect(trigger).toHaveAttribute('aria-label', 'Toggle filters');
-    await expect(page.locator('.gb-filter-clear')).toHaveCount(0);
+    await expect(trigger).not.toHaveClass(/has-filters/);
+    await expect(trigger).toHaveAttribute('aria-label', 'Filter');
+    await expect(chips).toHaveCount(0);
+    await expect(page.locator('.gbf-panel')).toHaveCount(0);
 
-    await clickAction(page, 'toggleFilterStrip');
-    await expect(page.locator('#gb-filter-strip')).toHaveClass(/open/);
+    await trigger.click();
+    await expect(page.locator('.gbf-panel')).toBeVisible();
+    await expect(page.locator('.gbf-clear')).toBeDisabled();
 
-    const chip = (attr, id) => page.locator('#gb-filter-strip .gb-filter-chip[' + attr + '="' + id + '"]');
+    // A competency sits in its folder: open the folder first.
+    const folder = await page.evaluate(sec => {
+      const g = getGroupedSections('sci8').groups.find(x => x.sections.some(s => s.id === sec));
+      return g ? g.group.id : null;
+    }, SEC);
+    if (folder) await page.locator('.gbf-chev[data-grpid="' + folder + '"]').click();
+
+    const row = (attr, id) => page.locator('.gbf-panel [' + attr + '="' + id + '"]');
     const steps = [
-      [chip('data-catid', CAT), want.cat, '1'],
-      [chip('data-moduleid', MOD), want.mod, '2'],
-      [chip('data-secid', SEC), want.sec, '3'],
+      [row('data-catid', CAT), want.cat, 1],
+      [row('data-moduleid', MOD), want.mod, 2],
+      [row('data-secid', SEC), want.sec, 3],
     ];
     for (const [c, ids, n] of steps) {
       await c.click();
-      await expect(c).toHaveClass(/active/);
-      await expect(count).toHaveText(n);
-      await expect(count).not.toHaveClass(/is-empty/);
+      await expect(c).toHaveAttribute('aria-checked', 'true');
+      await expect(chips).toHaveCount(n);
       await expect(trigger).toHaveClass(/has-filters/);
-      await expect(trigger).toHaveAttribute('aria-label', 'Toggle filters, ' + n + ' active');
       expect(await sorted()).toEqual(ids);
     }
-    // The strip stays open while the chips redraw it.
-    await expect(page.locator('#gb-filter-strip')).toHaveClass(/open/);
+    // The panel stays open while the page redraws, and the keyboard stays on the row.
+    await expect(page.locator('.gbf-panel')).toBeVisible();
+    await expect(row('data-secid', SEC)).toBeFocused();
 
-    await page.locator('.gb-filter-clear').click();
+    await page.locator('.gbf-clear').click();
     expect(await sorted()).toEqual(want.all);
-    await expect(count).toHaveClass(/is-empty/);
     await expect(trigger).not.toHaveClass(/has-filters/);
-    await expect(trigger).toHaveAttribute('aria-label', 'Toggle filters');
-    await expect(page.locator('#gb-filter-strip .gb-filter-chip.active')).toHaveCount(0);
-    await expect(page.locator('.gb-filter-clear')).toHaveCount(0);
+    await expect(page.locator('.gbf-panel [aria-checked="true"]')).toHaveCount(0);
+    await expect(chips).toHaveCount(0);
+    await expect(page.locator('.gbf-clear')).toBeDisabled();
   });
 
   test('search and sort work together', async ({ page }) => {
@@ -361,17 +368,18 @@ test.describe('Gradebook work filters (pinned)', () => {
 
     // Each filter: its button, the cells its mark is on, and what it leaves.
     const filters = [
-      ['.gb-to-grade-btn', '.gb-to-grade', / to grade$/, want.tograde],
-      ['.gb-to-return', '.gb-draft', / to return$/, want.toreturn],
-      ['.gb-questions-btn', '.gb-question', / questions?$/, want.questions],
+      ['tograde', '.gb-to-grade', 'To Grade', want.tograde],
+      ['toreturn', '.gb-draft', 'To Return', want.toreturn],
+      ['questions', '.gb-question', 'Questions', want.questions],
     ];
-    for (const [btn, mark, words, left] of filters) {
+    for (const [show, mark, label, left] of filters) {
+      const btn = '.atb-show [data-show="' + show + '"]';
       expect(left.sids.length).toBeGreaterThan(0);
       expect(left.sids.length).toBeLessThan(everyone.length);
       const pill = page.locator(btn);
       await expect(pill).toHaveAttribute('aria-pressed', 'false');
-      await expect(pill).toHaveText(words);
-      expect(Number((await getText(page, btn)).match(/^\d+/)[0])).toBeGreaterThan(0);
+      await expect(pill.locator('.atb-lab > span')).toHaveText(label);
+      expect(Number(await getText(page, btn + ' .atb-badge'))).toBeGreaterThan(0);
       // The cells that show the mark on screen, before the filter.
       const marked = await page
         .locator('#gb-data td.gb-scores-cell:has(' + mark + '), #gb-data td.gb-scores-cell' + mark)
@@ -380,7 +388,6 @@ test.describe('Gradebook work filters (pinned)', () => {
 
       await pill.click();
       await expect(page.locator(btn)).toHaveAttribute('aria-pressed', 'true');
-      await expect(page.locator(btn)).toHaveClass(/active/);
       await expect(page.locator(btn)).toBeFocused();
       const rows = await rowIds(page);
       expect(rows).toEqual(everyone.filter(id => left.sids.includes(id)));

@@ -7,6 +7,7 @@ import {
   gotoApp,
   TEST_ASSESSMENT,
   TEST_COURSE,
+  clickToolbarItem,
 } from './helpers.js';
 
 // The gradebook's Class Average, the printed grade sheet's and the CSV
@@ -87,7 +88,7 @@ test('the gradebook, the printed sheet and the CSV export show the same Class Av
   await page.locator('[data-action="setView"][data-mode="scores"]').click();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.locator('[data-action="exportScoresCSV"]').click(),
+    clickToolbarItem(page, 'more', 'exportScoresCSV'),
   ]);
   const csv = (await (await download.createReadStream()).toArray()).join('');
   const lines = csv

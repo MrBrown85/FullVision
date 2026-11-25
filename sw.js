@@ -316,6 +316,7 @@ const PRECACHE_URLS = [
   '/teacher/page-student.js',
   '/teacher/student-edit-dialog.js',
   '/teacher/student-groups.js',
+  '/teacher/gradebook-toolbar.js',
   '/teacher/page-gradebook.js',
   '/teacher/gradebook-chrome.js',
   '/teacher/gradebook-csv.js',

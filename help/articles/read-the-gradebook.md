@@ -35,8 +35,14 @@ labels:
   - Newest First
   - Student
   - Overall
-  - Filters
-  - Clear All
+  - Filter
+  - Clear Filters
+  - All
+  - To Grade
+  - To Return
+  - Questions
+  - More
+  - Print Grades
   - Export
 next:
   - score-a-student-from-the-gradebook
@@ -94,6 +100,7 @@ In the Competencies view, the menu in the grid's top-left corner sets the column
 - **Newest First** puts the latest assessments on the left. Turn it off to put the oldest first.
 - **Student** sorts by name. Each click moves to the next order: Last Name A–Z, Last Name Z–A, First Name A–Z, then First Name Z–A.
 - **Overall** sorts by overall grade, lowest first. A second click puts the highest first.
-- **Filters** shows a chip for each category and competency. Selected chips limit the columns to matching assessments. **Clear All** removes every filter.
+- **Filter**, at the right end of the search box, opens a panel over the grid with the class's categories, competencies and modules. A competency folder opens with the arrow at its right. Ticked choices limit the columns to matching assessments, and each shows as a chip beside the search box; select a chip's × to remove it. **Clear Filters** removes every filter.
 - The search box limits the rows to students whose names match.
-- **Export** downloads the scores as a CSV file.
+- **To Grade**, **To Return** and **Questions** appear beside the search box when work is waiting, each with its count. Select one to see only the students and assessments it counts, and select it again, or **All**, to see everything. Only one can be on at a time.
+- **More**, the three dots at the right of the toolbar, holds **Print Grades** and **Export**. **Export** downloads the scores as a CSV file.

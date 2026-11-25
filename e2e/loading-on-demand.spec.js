@@ -256,7 +256,7 @@ async function expectRubricBank(page) {
 }
 
 async function expectPrintGrades(page) {
-  await page.getByRole('button', { name: 'Print Grades' }).click();
+  await clickToolbarItem(page, 'more', 'printGrades');
   const dialog = page.getByRole('dialog', { name: 'Print Grades' });
   await expect(dialog).toBeVisible();
   await page.keyboard.press('Escape');
@@ -324,7 +324,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
 
     // Away and Back: no file is asked for twice, and nothing else is asked for.
     await page.evaluate(r => window.Router.navigate(r), '/gradebook');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     await page.goBack();
     await expect(page).toHaveURL(/\/assignments/);
     await expectRubricBank(page);
@@ -342,7 +342,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
     await page.reload();
     await expectRubricBank(page);
     await page.goto('/gradebook?course=sci8');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     await page.goBack();
     await expect(page).toHaveURL(/\/assignments/);
     await expectRubricBank(page);
@@ -355,7 +355,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
     const asked = watchScripts(page);
     await demoClass(page);
     await page.goto('/gradebook?course=sci8');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     await page.waitForLoadState('networkidle');
     expect(printAsked(asked)).toEqual([]);
     await expectPrintGrades(page);
@@ -424,7 +424,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
 
     // Print Grades.
     await page.evaluate(r => window.Router.navigate(r), '/gradebook');
-    await page.getByRole('button', { name: 'Print Grades' }).click();
+    await clickToolbarItem(page, 'more', 'printGrades');
     let ask = page.getByRole('dialog', { name: 'Print Grades Could Not Open' });
     await expect(ask).toContainText('Check your internet connection');
     expect(await page.evaluate(() => typeof window.GradesPrint)).toBe('undefined');
@@ -485,7 +485,7 @@ test.describe('Print, QR and the Rubric Bank, signed in', () => {
       );
     });
     await gotoApp(page, '/gradebook');
-    await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
+    await expect(page.locator('.gb-toolbar [data-atb="more"]')).toBeVisible();
     expect(printAsked(asked)).toEqual([]);
     await expectPrintGrades(page);
     await page.evaluate(r => window.Router.navigate(r), '/assignments');

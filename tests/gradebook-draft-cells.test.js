@@ -14,8 +14,13 @@
  *      UPDATE_GRADEBOOK_SNAPSHOT=1 npx vitest run tests/gradebook-draft-cells.test.js
  *    Run that only on code from before a change the gradebook is meant to
  *    keep out; never to make a failing comparison pass. Since then it was
- *    rewritten once for a change meant to show: Print Rubrics in the column
- *    menu (Nov 10), the one difference between the two files.
+ *    rewritten for changes meant to show: Print Rubrics in the column menu
+ *    (Nov 10), and the toolbar and filter panel of Nov 25 2026
+ *    (teacher/gradebook-toolbar.js, docs/DECISIONS.md), which replaced the
+ *    toolbar and the filter strip below it. That one was written by this
+ *    file's own walk on the new code, after checking that every byte before
+ *    the toolbar and after the strip is what it was: only the toolbar's
+ *    markup and the strip's differ, in every picture.
  * 2. With the switch on and When I Return Them: the dashed mark on every
  *    kind of work in both views, the words a screen reader hears, the key,
  *    the count on the "N to return" filter and on each column's Return N
@@ -352,7 +357,7 @@ describe('with the build switch off the gradebook is what it was', () => {
     mount(seedWith({ config: { student_page_enabled: true, return_grades: 'on_save' } }), { course: CID });
     Grader.setLevel(CID, BEN, ESSAY, QUESTION, 3, 0);
     PageGradebook.render();
-    expect(main()).not.toMatch(/gb-draft|gb-to-return|gb-return-drafts|gb-key-draft|Draft/);
+    expect(main()).not.toMatch(/gb-draft|data-show="toreturn"|gb-return-drafts|gb-key-draft|Draft/);
     expect(openColumnMenu(ESSAY).textContent).not.toMatch(/Return|draft/i);
   });
 });
@@ -363,8 +368,10 @@ const WORDS_HEARD = ', Draft, not returned yet';
 
 const open = more => mount(seedWith({ config: HELD, ...more }), { course: CID });
 const redraw = () => PageGradebook.render();
-const pill = () => document.querySelector('.gb-to-return');
-const pillCount = () => (pill() ? parseInt(pill().textContent, 10) : 0);
+// To Return on the toolbar's Show (teacher/gradebook-toolbar.js): its badge holds the drafts on screen.
+const pill = () => document.querySelector('.atb-show [data-show="toreturn"]');
+const pillCount = () => (pill() ? parseInt(pill().querySelector('.atb-badge').textContent, 10) : 0);
+const pillText = () => (pill() ? pillCount() + ' to return' : null);
 const label = cell => cell.getAttribute('aria-label');
 const isDashed = cell => cell.classList.contains('gb-draft');
 const rowIds = () =>
@@ -512,7 +519,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     expect(getGradeReturn(CID, DEV, ESSAY).is_draft).toBe(true);
     expect(isDashed(scoresCell(ESSAY, DEV))).toBe(false);
     expect(label(scoresCell(ESSAY, DEV))).toBe('Dev Dhillon, Essay: Missing');
-    expect(pill().textContent).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     expect(menuCount(ESSAY)).toBe(1);
   });
 
@@ -523,7 +530,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     redraw();
     expect(isDashed(scoresCell(ESSAY, AVA))).toBe(true);
     expect(label(scoresCell(ESSAY, AVA))).toContain(WORDS_HEARD);
-    expect(pill().textContent).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     // The student still has what was returned.
     expect(getGradeReturn(CID, AVA, ESSAY).returned_copy.tags[QUESTION].value).toBe(3);
     Grader.setLevel(CID, AVA, ESSAY, QUESTION, 3, 0);
@@ -565,11 +572,11 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     };
     const total = Object.values(expected).reduce((a, b) => a + b, 0);
     Object.keys(expected).forEach(aid => expect(menuCount(aid), aid).toBe(expected[aid]));
-    expect(pill().textContent).toBe(total + ' to return');
+    expect(pillText()).toBe(total + ' to return');
     expect(pill().getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelectorAll('#gb-data .gb-draft').length).toBe(total);
     showCompetencies();
-    expect(pill().textContent).toBe(total + ' to return');
+    expect(pillText()).toBe(total + ' to return');
     Object.keys(expected).forEach(aid => {
       const button = headerButton(aid);
       expect(button ? button.textContent : 'Return 0 Graded', aid).toBe('Return ' + expected[aid] + ' Graded');
@@ -613,7 +620,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     [BEN, CARA, DEV].forEach(sid => Grader.setLevel(CID, sid, LAB, SAFETY, 3, 0));
     Grader.setPoints(CID, BEN, QUIZ, 8);
     redraw();
-    expect(pill().textContent).toBe('4 to return');
+    expect(pillText()).toBe('4 to return');
     const returned = vi.spyOn(Grader, 'returnGrades');
     openColumnMenu(LAB);
     expect(returnItem().textContent).toBe('Return 3 Graded');
@@ -631,7 +638,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     });
     // The other column's draft waits.
     expect(isDashed(scoresCell(QUIZ, BEN))).toBe(true);
-    expect(pill().textContent).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     expect(menuCount(LAB)).toBe(0);
     // The column's title has the focus back.
     expect(document.activeElement.className).toBe('gb-grid-colhead-label');
@@ -693,7 +700,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     returned.mockRestore();
     expect(dialogDrafts(EXIT)).toEqual([CARA, DEV]);
     expect(main()).toBe(before);
-    expect(pill().textContent).toBe('2 to return');
+    expect(pillText()).toBe('2 to return');
     expect(document.activeElement).toBe(headerButton(EXIT));
     // Escape is Cancel too.
     click(headerButton(EXIT));
@@ -755,7 +762,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     // column's Return counts and names who it returns: the pair.
     search('ben');
     expect(rowIds()).toEqual([BEN]);
-    expect(pill().textContent).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     expect(document.querySelectorAll('#gb-data .gb-draft').length).toBe(1);
     const returned = vi.spyOn(Grader, 'returnGrades');
     let menu = openColumnMenu(TALK);
@@ -776,7 +783,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     Grader.setLevel(CID, BEN, TALK, QUESTION, 1, 0);
     search('ben');
     showCompetencies();
-    expect(pill().textContent).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     expect(headerButton(TALK).textContent).toBe('Return 2 Graded');
     expect(headerButton(TALK).getAttribute('title')).toBe('2 drafts: Ava and Ben can\u2019t see them yet.');
     click(headerButton(TALK));
@@ -839,8 +846,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     const whole = numbers();
     click(pill());
     expect(pill().getAttribute('aria-pressed')).toBe('true');
-    expect(pill().classList.contains('active')).toBe(true);
-    expect(pill().textContent).toBe('3 to return ×');
+    expect(pillText()).toBe('3 to return');
     expect(document.activeElement).toBe(pill());
     expect(rowIds()).toEqual([BEN, DEV]);
     // Newest first: the Exit Ticket, then the Quiz.
@@ -862,7 +868,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     // Off again: everything is back.
     click(pill());
     expect(pill().getAttribute('aria-pressed')).toBe('false');
-    expect(pill().textContent).toBe('3 to return');
+    expect(pillText()).toBe('3 to return');
     expect(rowIds()).toEqual(everyone);
     expect(columnIds()).toEqual(everyColumn);
   });
@@ -877,7 +883,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     openColumnMenu(QUIZ);
     click(returnItem());
     // One column and one student left.
-    expect(pill().textContent).toBe('1 to return ×');
+    expect(pillText()).toBe('1 to return');
     expect(columnIds()).toEqual([EXIT]);
     expect(rowIds()).toEqual([DEV]);
     openColumnMenu(EXIT);
@@ -892,14 +898,14 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     open();
     [BEN, CARA, DEV].forEach(sid => Grader.setPoints(CID, sid, EXIT, 1));
     redraw();
-    expect(pill().textContent).toBe('3 to return');
+    expect(pillText()).toBe('3 to return');
     search('dev');
-    expect(pill().textContent).toBe('1 to return');
+    expect(pillText()).toBe('1 to return');
     expect(menuCount(EXIT)).toBe(1);
     openColumnMenu(EXIT);
     click(returnItem());
     search('');
-    expect(pill().textContent).toBe('2 to return');
+    expect(pillText()).toBe('2 to return');
     expect(dialogDrafts(EXIT)).toEqual([BEN, CARA]);
   });
 
