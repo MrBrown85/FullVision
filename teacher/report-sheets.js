@@ -919,6 +919,13 @@ window.ReportSheets = (function () {
     };
   }
 
+  /* Ruled lines, one bordered element a line, in a layer that takes no
+     room: the box is as tall as the page gives it, and the lines past its
+     foot are clipped. Not a background pattern: Chrome's print engine
+     dropped most of its one-pixel stripes, and the lines did not print
+     (Colin, 2026-11-25). Enough lines for a whole Legal side. */
+  var RULED_LINES =
+    '<div class="report-ruled-lines">' + new Array(65).join('<div class="report-line"></div>') + '</div>';
   /* A comment box with ruled lines for a student with no comment yet. */
   function _emptyCommentBox(lines) {
     var n = Math.max(1, Number(lines) || BLOCKS['teacher-narrative'].lines);
@@ -926,12 +933,36 @@ window.ReportSheets = (function () {
       '<div class="report-block-box report-comment-box"><div class="report-block-title">Teacher Comment</div>' +
       '<div class="report-ruled report-ruled-fill report-ruled-empty" style="height:' +
       n * LINE_PX +
-      'px"></div></div>'
+      'px">' +
+      RULED_LINES +
+      '</div></div>'
     );
+  }
+  /* A copy issued before Nov 25 saved its writing boxes empty (the lines
+     were their background, and most did not print). Before it is shown or
+     printed again, each empty box gets its lines as elements: what the
+     copy says is unchanged. */
+  function ruleOldCopy(root) {
+    var lines = function (box, n) {
+      for (var i = 0; i < n; i++) {
+        var line = document.createElement('div');
+        line.className = 'report-line';
+        box.appendChild(line);
+      }
+      return box;
+    };
+    Array.prototype.forEach.call(root.querySelectorAll('.report-write-lines:empty'), function (box) {
+      lines(box, Math.max(1, Math.round((parseFloat(box.style.height) || 78) / 26)));
+    });
+    Array.prototype.forEach.call(root.querySelectorAll('.report-ruled:empty'), function (box) {
+      var layer = document.createElement('div');
+      layer.className = 'report-ruled-lines';
+      box.appendChild(lines(layer, 64));
+    });
   }
   /* Ruled lines into the room a text block leaves. */
   function _withRuled(html) {
-    return html.replace(/<\/div>\s*$/, '<div class="report-ruled report-ruled-fill"></div></div>');
+    return html.replace(/<\/div>\s*$/, '<div class="report-ruled report-ruled-fill">' + RULED_LINES + '</div></div>');
   }
 
   /* A cell's options with the registry's defaults filled in, plus its
@@ -1269,6 +1300,7 @@ window.ReportSheets = (function () {
     keptLayouts: keptLayouts,
     paperSize: paperSize,
     renderPreview: renderPreview,
+    ruleOldCopy: ruleOldCopy,
     clearPageStyle: clearPageStyle,
     setPageStyle: _setPageStyle,
     // One Report (report-one.js) lays its own cells out with these.
