@@ -3,7 +3,7 @@ title: Record Observations
 section: Observations
 order: 1
 summary: An observation is a short dated note about one or more students, marked as a strength, growth, concern or note. It can carry tags and a context, and be linked to an assessment or a competency.
-checked: 2026-11-05
+checked: 2026-11-24
 pages:
   - /observations
   - /observations/starters
@@ -35,6 +35,7 @@ labels:
   - Still Happening
   - Resolved
   - Save
+  - Not Observed in 3+ Weeks
 next:
   - score-a-student-from-the-gradebook
   - fill-in-the-term-questionnaire
@@ -70,9 +71,17 @@ A follow-up is a dated entry under an observation, such as a call home about a c
 2. Choose **Called Home**, **Spoke With Student**, **Still Happening** or **Resolved**, and type any details. Either one is enough.
 3. Choose **Save**, or press Enter.
 
-The card then shows how many follow-ups it has and the date of the last one; choose that line to show or hide them. Choose a follow-up to change or delete it. A concern with a **Resolved** follow-up is closed. The Observations card on the dashboard counts the open concerns, and each one opens its card here.
+The card then shows how many follow-ups it has and the date of the last one; choose that line to show or hide them. Choose a follow-up to change or delete it. A concern with a **Resolved** follow-up is closed. While a class has concerns that are not closed, a button at the start of the filters counts them, such as "2 Open Concerns"; choose it to list only those.
 
 Deleting an observation also deletes its follow-ups. The question before the delete says how many.
+
+## See Who Hasn't Been Observed
+
+The student list beside the page shows how many days ago each student was last observed. From three weeks it turns amber, and a student with no observations reads None.
+
+1. Choose **Not Observed in 3+ Weeks** above the student list. The list keeps only those students.
+2. Choose a student to start an observation for them. Once it is added, they leave the list when you choose the next student.
+3. Choose **Not Observed in 3+ Weeks** again to show everyone.
 
 ## Sentence Starters
 

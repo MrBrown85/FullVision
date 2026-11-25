@@ -1,6 +1,6 @@
 /**
  * Observation follow-ups (docs/DECISIONS.md, "Observation follow-ups") in
- * Demo Mode: the dashboard's open concerns, the card that opens to its
+ * Demo Mode: the Observations page's Open Concerns button, the card that opens to its
  * timeline, + Follow Up with its four choices, a Resolved follow-up closing
  * the concern, the edit window's list and its delete question, and the same
  * on the phone. Demo Mode's sample class has one concern with two
@@ -19,37 +19,54 @@ async function enterDemo(page, phone) {
 const openConcerns = page => page.evaluate(() => getOpenConcerns(getActiveCourse()).length);
 
 test.describe('Observation follow-ups on a computer', () => {
-  test('open concerns on the dashboard lead to the card, which opens to its follow-ups', async ({ page }) => {
+  test('Open Concerns on the Observations page lists only them, and a card opens to its follow-ups', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await enterDemo(page);
-    await page.goto('/dashboard?course=sci8');
-    const flag = page.locator('#dash-obs-card .dash-ob2-open-sum');
-    await expect(flag).toBeVisible();
+    await page.goto('/observations?course=sci8');
+    // Demo Mode seeds its sample class after the page opens.
+    await page.waitForFunction(() => getOpenConcerns('sci8').length > 0);
+    const btn = page.locator('.obs-concern-btn');
     const n = await openConcerns(page);
     expect(n).toBeGreaterThan(0);
-    await expect(flag).toHaveText(n + ' open concern' + (n === 1 ? '' : 's'));
-    await flag.click();
-    const item = page.locator('.dash-ob2-open-item[data-href*="ob=' + SEEDED + '"]');
-    await expect(item).toContainText('Ethan Dubois');
-    await expect(item).toContainText('Still Happening');
-    await item.click();
-    await page.waitForURL(/\/observations\?.*ob=qo_seed_st6_0/);
+    await expect(btn).toHaveText(n + ' Open Concern' + (n === 1 ? '' : 's'));
+    await expect(btn).toHaveAttribute('aria-pressed', 'false');
+    await btn.click();
+    await expect(btn).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.obs-card')).toHaveCount(n);
+    await expect(page.locator('.obs-card .obs-type')).toHaveText(Array(n).fill('Concern'));
 
     const card = page.locator('.obs-card[data-obid="' + SEEDED + '"]');
-    await expect(card).toBeInViewport();
+    await expect(card).toContainText('Ethan Dubois');
     const toggle = card.locator('.obs-fu-toggle');
     await expect(toggle).toHaveText(/^2 follow-ups · last /);
+    await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(card.locator('.obs-fu-item')).toHaveCount(2);
     await expect(card.locator('.obs-fu-kind')).toHaveText(['Called Home', 'Still Happening']);
     // Shut and open again in place; the strip never opens the edit window.
-    await toggle.click();
+    await card.locator('.obs-fu-toggle').click();
     await expect(card.locator('.obs-fu-list')).toHaveCount(0);
     await card.locator('.obs-fu-toggle').click();
     await expect(card.locator('.obs-fu-item')).toHaveCount(2);
     await expect(page.locator('#obs-focus-backdrop')).toHaveCount(0);
     // Follow-ups are never cards of their own.
     await expect(page.locator('.obs-card-text', { hasText: 'Spoke with his mom' })).toHaveCount(0);
+    // Pressed again, every observation is back.
+    await btn.click();
+    await expect(btn).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.locator('.obs-card').count()).toBeGreaterThan(n);
+  });
+
+  test('a ?ob= link opens that card with its follow-ups showing', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await enterDemo(page);
+    await page.goto('/observations?course=sci8&student=st6&ob=' + SEEDED);
+    const card = page.locator('.obs-card[data-obid="' + SEEDED + '"]');
+    await expect(card).toBeInViewport();
+    await expect(card.locator('.obs-fu-toggle')).toHaveAttribute('aria-expanded', 'true');
+    await expect(card.locator('.obs-fu-item')).toHaveCount(2);
   });
 
   test('+ Follow Up with Resolved closes the concern; the edit window lists them and asks before a delete', async ({
@@ -82,6 +99,11 @@ test.describe('Observation follow-ups on a computer', () => {
     await expect(card.locator('.obs-fu-closed')).toHaveText('Resolved');
     await expect(card.locator('.obs-fu-item').last()).toContainText('Met with Ethan and his mom');
     expect(await openConcerns(page)).toBe(before - 1);
+    // The Open Concerns button counts it at once, and goes at none.
+    const left = before - 1;
+    if (left)
+      await expect(page.locator('.obs-concern-btn')).toHaveText(left + ' Open Concern' + (left === 1 ? '' : 's'));
+    else await expect(page.locator('.obs-concern-btn')).toHaveCount(0);
 
     // Kept on the device.
     await page.reload();

@@ -372,7 +372,7 @@ describe('teacher-only: no report, Comment Bank, export or student page reader s
       'shared/seed-data.js',
       'teacher-mobile/shell.js', // the delete question
       'teacher-mobile/tab-observe.js',
-      'teacher/dash-observations.js', // open concerns
+      'teacher/obs-roster.js', // the Open Concerns count
       'teacher/page-assignments.js', // the delete question
       'teacher/page-observations.js',
       'teacher/student-evidence.js', // the delete question
@@ -449,13 +449,12 @@ describe('the pieces on screen', () => {
     }
   });
 
-  it("the dashboard's open concerns: how many, each a link to its card", () => {
-    expect(DashObservations.openConcernsHtml(CID)).toContain('<b>1</b> open concern<');
-    expect(DashObservations.openConcernsHtml(CID)).toContain(
-      'data-href="/observations?course=' + CID + '&student=' + E1 + '&ob=' + OB + '"',
-    );
+  it("the Observations page's open concerns: a Concern stays open until a Resolved follow-up", () => {
+    expect(getOpenConcerns(CID).map(o => o.id)).toEqual([OB]);
+    addObservationFollowUp(CID, OB, 'called_home', '');
+    expect(getOpenConcerns(CID)).toHaveLength(1);
     addObservationFollowUp(CID, OB, 'resolved', '');
-    expect(DashObservations.openConcernsHtml(CID)).toBe('');
+    expect(getOpenConcerns(CID)).toHaveLength(0);
   });
 });
 

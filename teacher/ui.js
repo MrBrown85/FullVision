@@ -2123,7 +2123,7 @@ function fillSidebarBadges(cid) {
 /* ── Roster annotations ──────────────────────────────────────
    A page may mark the roster for its own job: a line under each name, a
    mark in place of the grade, rows left out, and controls above the list
-   (the Term Questionnaire: Needs Approval, a tick, All · Not Ready). The
+   (Term Questionnaire: Needs Approval, All · Not Ready; Observations: days). The
    annotator is a function (sid) -> { sub, mark (HTML), hidden }, with an
    optional .top() giving the HTML above the list. Every drawing of the
    sidebar applies it, so a redraw (a score changed, the class switched)
@@ -2146,7 +2146,7 @@ function applySidebarAnnotations() {
       extra.id = 'gb-sidebar-extra';
       top.appendChild(extra);
     }
-    // html-safe: the only annotator (report-questionnaire.js syncRoster) returns fixed buttons with counts.
+    // html-safe: the annotators (report-questionnaire.js and obs-roster.js sync) return fixed buttons with counts.
     extra.innerHTML = a.top();
   } else if (extra) {
     extra.remove();
@@ -2165,7 +2165,7 @@ function applySidebarAnnotations() {
       sub.remove();
     }
     const cell = row.querySelector('.student-row-grades');
-    // html-safe: the only annotator (report-questionnaire.js syncRoster) returns fixed tick/flag spans.
+    // html-safe: the annotators (report-questionnaire.js and obs-roster.js sync) return fixed spans; the days' title is escaped.
     if (cell && a) cell.innerHTML = n.mark || '';
     row.classList.toggle('roster-hidden', !!n.hidden);
   });

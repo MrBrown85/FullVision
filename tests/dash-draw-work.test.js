@@ -7,9 +7,6 @@
  *  - getStudentQuickObs sorted the student's list in place on every call,
  *    several calls a student a draw. A list already in order is handed back
  *    as it is.
- *  - After every draw the Observations card was measured in the click,
- *    which lays the page out again. Drawn to the stored width, it is now
- *    measured in the next frame and drawn again only if the width moved.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -66,7 +63,7 @@ describe('getStudentQuickObs', () => {
 });
 
 describe('the Dashboard draw', () => {
-  let stub, doc, page, frames, measures, paneWidth;
+  let stub, doc, page, frames;
 
   beforeEach(() => {
     localStorage.clear();
@@ -78,7 +75,6 @@ describe('the Dashboard draw', () => {
       raf: globalThis.requestAnimationFrame,
       columnCode: DashInsights.columnCode,
       columnCodes: DashInsights.columnCodes,
-      renderCard: DashObservations.renderCard,
     };
     doc = parseHTML(
       '<!DOCTYPE html><html><body><div id="page-toolbar-mount"></div><div id="sidebar-mount"></div><main id="main"></main></body></html>',
@@ -94,17 +90,10 @@ describe('the Dashboard draw', () => {
       },
       configurable: true,
     });
-    // Widths: #main is 1000 wide; the Observations pane's width is counted.
-    measures = 0;
-    paneWidth = 900;
+    // #main is 1000 wide.
     Object.defineProperty(doc.defaultView.HTMLElement.prototype, 'clientWidth', {
       get() {
-        if (this.id === 'main') return 1000;
-        if (this.classList && this.classList.contains('dash-ob2-pane')) {
-          measures++;
-          return paneWidth;
-        }
-        return 0;
+        return this.id === 'main' ? 1000 : 0;
       },
       configurable: true,
     });
@@ -149,7 +138,6 @@ describe('the Dashboard draw', () => {
     StudentVoice.loaded = stub.voiceLoaded;
     DashInsights.columnCode = stub.columnCode;
     DashInsights.columnCodes = stub.columnCodes;
-    DashObservations.renderCard = stub.renderCard;
     delete COURSES[CID];
     delete _cache.learningMaps[CID];
   });
@@ -182,33 +170,5 @@ describe('the Dashboard draw', () => {
     const codes = stub.columnCodes(CID);
     const chip = doc.querySelector('.dash-card-seg[data-key]');
     expect(chip.textContent.startsWith(codes[chip.getAttribute('data-key')])).toBe(true);
-  });
-
-  it('measures the Observations card after the draw, not in it', () => {
-    let drawn = 0;
-    DashObservations.renderCard = function () {
-      drawn++;
-      return stub.renderCard.apply(this, arguments);
-    };
-    measures = 0;
-    page.render(); // a whole-page draw (a sort may draw the students alone)
-    expect(measures).toBe(0);
-    expect(drawn).toBe(1);
-    flush();
-    expect(measures).toBeGreaterThan(0);
-    // The width did not move: the card is not drawn again.
-    expect(drawn).toBe(1);
-  });
-
-  it('draws the Observations card again when the width moved', () => {
-    page.render();
-    let drawn = 0;
-    DashObservations.renderCard = function () {
-      drawn++;
-      return stub.renderCard.apply(this, arguments);
-    };
-    paneWidth = 300;
-    flush();
-    expect(drawn).toBeGreaterThan(0);
   });
 });

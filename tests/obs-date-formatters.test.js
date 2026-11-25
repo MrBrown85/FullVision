@@ -1,18 +1,15 @@
 /**
- * Dates on the Dashboard's Observations card and on observation cards are
- * written with formatters made once, not one per cell or card.
+ * Dates on observation cards are written with formatters made once, not
+ * one per card.
  *
  * Making a date formatter is slow (toLocaleDateString with options makes
- * one each call). The Observations card labelled every week of every
- * student, empty weeks included, before it knew the cell was empty: 240
- * formatters a draw on a class of 30. Each observation card made one or two.
+ * one each call). Each observation card made one or two.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const CID = 'c-obs-dates';
-const students = Array.from({ length: 30 }, (_, i) => ({ id: 's' + i, firstName: 'First' + i, lastName: 'Last' + i }));
-const stubbed = ['getTodayStr', 'getActiveTerm', 'getStudentQuickObs', 'getSections', 'getTagScores'];
+const stubbed = ['getTodayStr'];
 const originals = {};
 
 // Counts every date formatter made, directly or through toLocale*String.
@@ -51,30 +48,12 @@ describe('date formatters are made once', () => {
   beforeEach(() => {
     stubbed.forEach(k => (originals[k] = globalThis[k]));
     globalThis.getTodayStr = () => '2026-10-18';
-    globalThis.getActiveTerm = () => null;
-    // A few students observed, most weeks empty.
-    globalThis.getStudentQuickObs = (cid, sid) =>
-      Number(sid.slice(1)) % 5 === 0
-        ? [{ id: 'ob-' + sid, date: '2026-10-14', created: '2026-10-14T15:00:00Z', sentiment: 'strength', text: 'A' }]
-        : [];
-    globalThis.getSections = () => [];
-    globalThis.getTagScores = () => [];
     COURSES[CID] = { id: CID, name: 'Test', gradingSystem: 'proficiency' };
   });
   afterEach(() => {
     meterOff();
     stubbed.forEach(k => (globalThis[k] = originals[k]));
     delete COURSES[CID];
-  });
-
-  it('the Observations card makes no formatter per week cell', () => {
-    DashObservations.renderCard(CID, students, { tab: 'week' }); // first draw may make them
-    meterOn();
-    const html = DashObservations.renderCard(CID, students, { tab: 'week' });
-    DashObservations.renderCard(CID, students, { tab: 'week' });
-    meterOff();
-    expect(made).toBe(0);
-    expect(html).toContain('First0 Last0, week of Oct 12');
   });
 
   it('an observation card makes no formatter per card', () => {
