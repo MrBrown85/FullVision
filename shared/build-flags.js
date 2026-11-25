@@ -10,10 +10,14 @@
    asks for any of them any more. The names stay so a browser that still has
    'fv-build-dashRow', 'fv-build-bulletins', 'fv-build-quizzes' or
    'fv-build-inboxStacks' set, to '1' or '0', changes nothing: a default that
-   is on wins over what the device has. */
+   is on wins over what the device has.
+
+   phoneLook (the phone's new look, docs/plans/phone-look-plan.md) is off
+   until its last slice. On, the phone's <html> carries the class m-look and
+   teacher-mobile/look.css restyles what is already drawn. */
 (function () {
   /** @type {Record<string, boolean>} */
-  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true };
+  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true, phoneLook: false };
 
   /** @param {string} name */
   function on(name) {

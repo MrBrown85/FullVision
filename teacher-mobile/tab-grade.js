@@ -1449,15 +1449,20 @@ window.MGrade = (function () {
       _currentIdx = 0;
 
       var stuSt = _student ? students[0] : null;
+      // The new look (teacher-mobile/grade-look.js): the bar names the card
+      // on screen, and carries ⋯.
+      var look = MGradeLook.bar(cid, units, !!stuSt);
       var nav = MC.navBar({
         id: 'grade-swiper',
-        title: stuSt ? displayName(stuSt) : assessment.title,
-        subtitle: _subtitleText(0, students.length),
+        title: stuSt ? displayName(stuSt) : look.title || assessment.title,
+        titleAction: look.titleAction,
+        subtitle: look.title ? '' : _subtitleText(0, students.length),
         backLabel: stuSt ? displayNameFirst(stuSt) || displayName(stuSt) : 'Grade',
         // The sync dot is the only place sync problems show, so the grading
         // screen carries it too.
         rightHTML:
-          '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>',
+          '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+          look.more,
       });
 
       // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).
@@ -2230,7 +2235,9 @@ window.MGrade = (function () {
         '<div class="m-overall">' +
         '<label class="m-overall-label" for="' +
         commentId +
-        '">Overall Comment</label>' +
+        '">' +
+        MC.esc(MGradeLook.commentLabel(cid, st, unit) || 'Overall Comment') +
+        '</label>' +
         '<textarea class="m-overall-comment" id="' +
         commentId +
         '" rows="2" placeholder="Add an overall comment for ' +
@@ -2254,8 +2261,7 @@ window.MGrade = (function () {
         header +
         // The student's work, under who it is (teacher-mobile/grade-photos.js).
         MGradePhotos.cardHtml(cid, assessment, st, unit, { status: notInCard ? statusRow : '' }) +
-        tagGroups +
-        commentRow +
+        MGradeLook.marks(tagGroups + commentRow) +
         '</div></div>'
       );
     }
@@ -3409,6 +3415,7 @@ window.MGrade = (function () {
     }
 
     function _updateSubtitle(idx, total) {
+      MGradeLook.show(idx);
       var titleInline = document.querySelector('#m-nav-bar-grade-swiper .m-nav-bar-title-inline');
       if (titleInline) {
         var assessment = titleInline.textContent.split('\n')[0];
