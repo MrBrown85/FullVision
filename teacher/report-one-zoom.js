@@ -414,7 +414,8 @@ window.ReportOneZoom = (function () {
     var on = items.filter(function (it) {
       return it.getAttribute('aria-checked') === 'true';
     })[0];
-    if (on || items[0]) (on || items[0]).focus();
+    // The menu opens under its button: moving the focus into it never scrolls the pages.
+    if (on || items[0]) (on || items[0]).focus({ preventScroll: true });
   }
   /** @param {boolean} [refocus] */
   function _close(refocus) {

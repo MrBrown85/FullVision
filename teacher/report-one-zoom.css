@@ -111,6 +111,14 @@
 .studio-zoom-btn[aria-expanded='true'] {
   background: var(--seg-thumb);
 }
+/* The menu hangs from the Zoom button. This rule lived in dashboard.css
+   (.dash-view-wrap) until the Dashboard's view menus went (#1740, Nov 24);
+   without it the menu hung from the page area and opened at its foot,
+   scrolling the reports up out of sight (Colin, 2026-11-25). */
+.studio-zoom .dash-view-wrap {
+  position: relative;
+  display: inline-flex;
+}
 .studio-zoom-menu.dash-view-menu {
   width: 168px;
   top: calc(100% + 6px);
