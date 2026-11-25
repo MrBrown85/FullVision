@@ -21,6 +21,7 @@ labels:
   - + Competency
   - Save Rubric
   - Create Assessment
+  - More
   - Rubrics
   - Rubric Bank
   - + New Rubric
@@ -75,7 +76,7 @@ shots:
 
 ## Build a Rubric in the Rubric Bank
 
-1. On the Assignments page, choose **Rubrics**. The **Rubric Bank** lists the class's rubrics.
+1. On the Assignments page, open **More**, the three dots at the right of the toolbar, and choose **Rubrics**. The **Rubric Bank** lists the class's rubrics.
 2. Choose **+ New Rubric**, then **Standard Rubric**, **Advanced Rubric** or **Single-Point Rubric**.
 3. Enter the name. For each criterion, select its **Competencies assessed** and type the level descriptors. Add rows with **+ Add Criterion** or **+ From Competency**.
 4. Choose **Save Rubric**.

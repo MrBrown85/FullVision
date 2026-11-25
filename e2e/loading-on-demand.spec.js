@@ -18,7 +18,7 @@
  * offline after a first visit, and after a file that could not be fetched.
  */
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, gotoApp } from './helpers.js';
+import { mockAuth, seedCourse, seedStudents, gotoApp, clickToolbarItem } from './helpers.js';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -247,7 +247,7 @@ async function catchSheet(page) {
 }
 
 async function expectRubricBank(page) {
-  await page.locator('[data-action="openRubricBank"]').click();
+  await clickToolbarItem(page, 'more', 'openRubricBank');
   const bank = page.getByRole('dialog', { name: 'Rubric Bank' });
   await expect(bank).toBeVisible();
   await expect(bank.locator('.rb-row').first()).toBeVisible();

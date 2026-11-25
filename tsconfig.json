@@ -78,6 +78,7 @@
     "teacher/report-one-head.js",
     "teacher/work-rubric-card.js",
     "teacher/assign-show.js",
+    "teacher/assign-toolbar.js",
     "teacher/assign-list.js",
     "teacher/crit-comment.js",
     "teacher/add-from-class.js",

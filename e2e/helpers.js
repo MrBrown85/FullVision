@@ -1524,6 +1524,24 @@ export async function clickAction(page, action) {
   await page.locator(`[data-action="${action}"]`).first().click();
 }
 
+/* The Assignments toolbar's two menus (teacher/assign-toolbar.js): 'more' is
+   the ⋯, 'new' the ▾ beside + New Assessment. openToolbarMenu opens one (it is
+   left open if it already is) and returns it; toolbarItem returns an item. */
+export async function openToolbarMenu(page, which) {
+  const button = page.locator('[data-atb="' + which + '"]');
+  if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
+  return page.locator('.atb-' + which + '-wrap .assess-menu');
+}
+export async function toolbarItem(page, which, action) {
+  const menu = await openToolbarMenu(page, which);
+  // An action's name, or a selector of its own (Bulk Edit is [data-alv-view="list"]).
+  return menu.locator(action.startsWith('[') ? action : '[data-action="' + action + '"]');
+}
+/** Opens a menu and clicks one of its items by its action. */
+export async function clickToolbarItem(page, which, action) {
+  await (await toolbarItem(page, which, action)).click();
+}
+
 /* Signed in, saveRubrics re-keys the rubrics it was given in place: a new
    rubric and its criteria take the server's ids before it resolves, and
    through the outbox idMap comes back empty

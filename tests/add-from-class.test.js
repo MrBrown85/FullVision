@@ -252,9 +252,9 @@ describe('Add From Another Class', () => {
       expect(status()).toBe('7 assessments, 1 already here.');
       expect(addBtn().disabled).toBe(true);
       expect(addBtn().textContent).toBe('Add');
-      // The toolbar's button has the dialog's name.
-      const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
-      expect(src).toContain('data-action="addFromClass">Add From Another Class</button>');
+      // The toolbar's ▾ menu item has the dialog's name.
+      const src = readFileSync(new URL('../teacher/assign-toolbar.js', import.meta.url), 'utf-8');
+      expect(src).toContain("_item('addFromClass', 'Add From Another Class')");
     });
 
     it('shows a date as the app writes it, never 2026-11-04', async () => {

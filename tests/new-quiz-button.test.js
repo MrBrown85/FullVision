@@ -50,15 +50,16 @@ afterEach(() => {
 });
 
 describe('the + New Quiz button', () => {
-  it('sits just left of + New Assessment when quizzes are on', async () => {
+  it('is the first item of the ▾ beside + New Assessment when quizzes are on', async () => {
     openAssignments(seed({ student_page_enabled: true }), CID);
     await settled();
-    const btns = Array.from(document.querySelectorAll('.assess-toolbar-actions .tb-action-btn')).map(b =>
-      b.textContent.trim(),
-    );
-    expect(btns.slice(-2)).toEqual(['+ New Quiz', '+ New Assessment']);
-    // Secondary, like Rubrics: the page keeps one solid primary, + New Assessment (e2e/primary-actions.spec.js).
-    expect(quizBtn().className).toBe('tb-action-btn tb-action-secondary');
+    const items = Array.from(document.querySelectorAll('.atb-new .assess-menu-item')).map(b => b.textContent.trim());
+    expect(items[0]).toBe('New Quiz');
+    // + New Assessment is the page's one solid primary; the ▾ is joined to its right edge.
+    const [main, more] = document.querySelectorAll('.atb-new > .tb-action-btn, .atb-new .atb-new-more');
+    expect(main.textContent.trim()).toBe('+ New Assessment');
+    expect(more.getAttribute('aria-label')).toBe('More Ways to Add');
+    expect(quizBtn().classList.contains('assess-menu-item')).toBe(true);
   });
 
   it('is not there with the Student Page off, in the toolbar or the empty class', async () => {

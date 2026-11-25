@@ -2111,16 +2111,6 @@ body.af-comp-open #gb-tooltip {
 }
 
 /* ── Assignment toolbar ─────────────────────────────────────── */
-.assess-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.assess-seg-control {
-  margin-left: 4px;
-}
 /* Search — subtle pill, up to 220px, giving way first when the row is tight */
 .assess-search-wrap {
   position: relative;
@@ -6865,40 +6855,15 @@ button.grader-member-name {
 
 /* ── What is waiting to return (S1-F2) ────────────────────────
    In a class that returns grades When I Return Them: the toolbar's
-   "N to return", a card's chips and Return N Graded, a row's Draft or
+   To Return option on Show, a card's chips and Return N Graded, a row's Draft or
    Returned mark, Return under one student's grader, and the dialog's bar
    with Show and Return N Graded. Colours are the app's tokens, each with
    its dark pair: the Demo Mode pill's amber for a count that waits, the
    Proficient green for the Draft mark's dashes (as in the dialog), the
    app's blue for a button that returns. */
-.assess-to-return-slot,
 .assess-returns,
 .assess-return-slot {
   display: contents;
-}
-.assess-to-return-btn {
-  flex-shrink: 0;
-  height: var(--control-h);
-  padding: 0 12px;
-  border: none;
-  border-radius: 16px;
-  background: var(--demo-pill-bg);
-  color: var(--demo-pill-text);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.assess-to-return-btn:hover,
-.assess-to-return-btn.active {
-  box-shadow: inset 0 0 0 1.5px var(--demo-pill-text);
-}
-.assess-to-return-btn:focus-visible,
-.assess-return-btn:focus-visible,
-.grader-return-all:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
 }
 .assess-to-return {
   display: inline-flex;
@@ -7647,33 +7612,22 @@ button.grader-member-name {
   pointer-events: none;
 }
 
-/* Toolbar (Option A): one white row like the Dashboard and Gradebook.
-   Category filters and Ungraded Only live in the Filter menu. */
+/* Toolbar, option C "Three Things" (assign-toolbar.js): Search with Filter
+   in its end, Show, a chip for each filter, then ⋯ and + New Assessment
+   with its ▾. One row while it fits; a row that doesn't (a narrow window, a
+   wide font) wraps rather than push the buttons out of sight or scroll
+   sideways. Search gives way first (300 down to 180), then the chips. */
 .assess-toolbar {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* A row that doesn't fit (a narrow window, a wide font, every button on)
-   wraps rather than push the buttons out of sight or scroll sideways. */
 .assess-toolbar .seg,
 .assess-toolbar .tb-action-btn {
   flex-shrink: 0;
 }
-.assess-toolbar .assess-seg-control {
-  margin-left: 0;
-}
-.assess-toolbar .assess-toolbar-actions {
-  gap: 8px;
-}
 .assess-toolbar .tb-action-btn {
   padding: 0 12px;
   font-size: var(--text-sm);
-}
-/* Rubrics, Add From Another Class, New Assessment: 2px less at each side,
-   so the row is no wider with the middle button in Title Case (in a class
-   with a section toggle, a 1366-wide window has no room to spare). */
-.assess-toolbar .assess-toolbar-actions .tb-action-btn {
-  padding: 0 10px;
 }
 .assess-toolbar .tb-action-btn.tb-action-secondary {
   border: none;
@@ -7684,48 +7638,218 @@ button.grader-member-name {
   background: var(--active-light);
   filter: brightness(0.95);
 }
-.assess-filter-wrap {
+.atb-search {
   position: relative;
+  /* A large grow factor: Search takes the room first, up to 300. */
+  flex: 1000 1 180px;
+  min-width: 180px;
+  max-width: 300px;
+  height: var(--control-h);
+}
+/* The field: the search box and the Filter button side by side in one grey
+   shape, so the button sits in the box's right end without covering it. */
+.atb-field {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
+}
+.atb-field:focus-within {
+  background: var(--surface);
+  box-shadow:
+    inset 0 0 0 1px var(--active),
+    0 0 0 3px rgba(0, 122, 255, 0.12);
+}
+.atb-field .assess-search-input,
+.atb-field .assess-search-input:focus {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  padding-right: 4px;
+  border-radius: 8px 0 0 8px;
+  background: transparent;
+  /* The field draws the ring (above the app's own input ring, which is !important). */
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.atb-filter-btn {
+  flex-shrink: 0;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.atb-filter-btn:hover {
+  background: rgba(118, 118, 128, 0.16);
+}
+.atb-filter-btn.has-filters {
+  background: rgba(0, 122, 255, 0.14);
+  color: var(--link);
+}
+.atb-filter-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.atb-show-slot {
+  display: contents;
+}
+/* Show: a plain .seg. The label holds room for its bold, so pressing an
+   option moves nothing beside it. */
+.atb-show .seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+}
+.atb-lab {
+  display: inline-grid;
+}
+.atb-lab > span,
+.atb-lab::after {
+  grid-area: 1 / 1;
+}
+.atb-lab::after {
+  content: attr(data-t);
+  font-weight: 600;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+.atb-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.atb-badge-blue {
+  background: var(--active-fill);
+  color: #fff;
+}
+.atb-badge-amber {
+  /* Over the page's surface whatever the pressed segment is: in dark mode the
+     pill's amber is see-through, and over the segment's lighter thumb it reads 4.4:1. */
+  background: linear-gradient(var(--demo-pill-bg), var(--demo-pill-bg)), var(--surface);
+  color: var(--demo-pill-text);
+}
+/* To Grade holds its badge's room when there is nothing to grade. */
+.atb-badge-off {
+  visibility: hidden;
+}
+/* The chips take the room between Show and the buttons, and clip there. */
+.atb-chips {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+.atb-chip {
+  flex: 0 1 auto;
+  min-width: 40px;
+  height: var(--chip-h);
+  padding: 0 8px 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--link);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.atb-chip:hover {
+  background: rgba(0, 122, 255, 0.18);
+}
+.atb-chip:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.atb-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atb-chip svg {
   flex-shrink: 0;
 }
-.assess-filter-btn {
+.atb-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.atb-icon-btn {
+  width: var(--control-h);
   height: var(--control-h);
-  padding: 0 12px;
+  padding: 0;
   border: none;
   border-radius: 8px;
   background: rgba(118, 118, 128, 0.12);
   color: var(--text);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   cursor: pointer;
 }
-/* The label keeps room for "Filter · 8", so turning a filter on or off
-   doesn't move the search box beside it. */
-.assess-filter-label {
-  display: inline-grid;
+.atb-icon-btn:hover {
+  background: rgba(118, 118, 128, 0.2);
 }
-.assess-filter-label > span,
-.assess-filter-label::after {
-  grid-area: 1 / 1;
+.atb-icon-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
 }
-.assess-filter-label::after {
-  content: 'Filter · 8';
-  visibility: hidden;
+/* + New Assessment and its ▾, one button in two parts: 1px apart, the
+   inside corners square. */
+.atb-new {
+  display: flex;
+  gap: 1px;
+  flex-shrink: 0;
 }
-.assess-filter-btn.has-filters {
-  background: var(--active-light);
-  color: var(--link);
+.atb-split .atb-new-main {
+  border-radius: 8px 0 0 8px;
+}
+.assess-toolbar .atb-new-more {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 0 8px 8px 0;
+}
+.atb-new .assess-menu-wrap {
+  display: flex;
+}
+/* The menus open under their button, lined up with its right edge. */
+.assess-toolbar .assess-menu {
+  min-width: 200px;
 }
 .assess-filter-menu {
   display: none;
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  left: 30px;
   z-index: 50;
   width: 270px;
   padding: 6px;
@@ -7737,7 +7861,7 @@ button.grader-member-name {
   flex-direction: column;
   gap: 2px;
 }
-.assess-filter-wrap.open .assess-filter-menu {
+.atb-search.open .assess-filter-menu {
   display: flex;
 }
 .assess-filter-head {
@@ -7807,6 +7931,53 @@ button.grader-member-name {
   border-radius: 10px;
   font-size: var(--text-xs);
   font-weight: 600;
+}
+/* The category pill is a button on the Assignments page: it filters the
+   list to its category (the same switch as ticking it in Filter). It looks
+   as it did; pressed, a ring in its own colour. */
+.assess-meta button.type-badge {
+  border: none;
+  line-height: inherit;
+  cursor: pointer;
+}
+.assess-meta button.type-badge:hover {
+  filter: brightness(0.95);
+}
+.assess-meta button.type-badge[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.assess-meta button.type-badge:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+/* Point to preview: while the pointer or the keyboard rests on an
+   unpressed Submitted, To Grade, To Return or Not In, the cards it would
+   not keep dim. The delay keeps the list still as the pointer crosses the
+   bar. */
+.page-layout:has(.atb-show [data-show='submitted']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  .assess-card:not([data-has~='submitted']),
+.page-layout:has(.atb-show [data-show='tograde']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  .assess-card:not([data-has~='tograde']),
+.page-layout:has(.atb-show [data-show='toreturn']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  .assess-card:not([data-has~='toreturn']),
+.page-layout:has(.atb-show [data-show='notin']:is(:hover, :focus-visible):not([aria-pressed='true']))
+  .assess-card:not([data-has~='notin']) {
+  opacity: 0.4;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .assess-card {
+    transition: opacity 150ms ease;
+  }
+  .page-layout:has(.atb-show [data-show='submitted']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    .assess-card:not([data-has~='submitted']),
+  .page-layout:has(.atb-show [data-show='tograde']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    .assess-card:not([data-has~='tograde']),
+  .page-layout:has(.atb-show [data-show='toreturn']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    .assess-card:not([data-has~='toreturn']),
+  .page-layout:has(.atb-show [data-show='notin']:is(:hover, :focus-visible):not([aria-pressed='true']))
+    .assess-card:not([data-has~='notin']) {
+    transition: opacity 150ms ease 120ms;
+  }
 }
 .assess-meta .score-badge {
   display: inline-flex;
@@ -11288,9 +11459,6 @@ button.grader-member-name {
 /* ── List view (teacher/assign-list.js) ─────────────────────────────
    One row per assessment, its settings along the row. Mockup approved
    Nov 16 (https://claude.ai/artifact/QewmqUbXPfuuQcfAzSsRqJ). */
-.assess-view-seg {
-  margin-left: 4px;
-}
 .alv-page {
   padding: 12px 12px 24px;
 }

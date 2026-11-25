@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoApp, clickAction, getText } from './helpers.js';
+import { gotoApp, clickAction, getText, clickToolbarItem, openToolbarMenu } from './helpers.js';
 import { cardMenuItem } from './card-menu.js';
 
 /* Pins what the Assignments list does today with its own actions, in Demo
@@ -140,25 +140,24 @@ test.describe('Assignments list actions in Demo Mode', () => {
     expect(await cardIds(folder(page, CELLS))).toEqual(moved);
   });
 
-  test('Expand opens every card and Collapse closes them all', async ({ page }) => {
+  test('Expand All opens every card and Collapse All closes them all, from the ⋯ menu', async ({ page }) => {
     await openList(page);
-    const expand = page.locator('[data-action="expandAllAssess"]');
-    const collapse = page.locator('[data-action="collapseAllAssess"]');
+    const items = async () =>
+      (await (await openToolbarMenu(page, 'more')).getByRole('menuitem').allTextContents()).map(t => t.trim());
     const total = await page.evaluate(() => getAssessments('sci8').length);
     await expect(page.locator('.assess-card')).toHaveCount(total);
     await expect(page.locator('.assess-card.open')).toHaveCount(0);
-    await expect(collapse).toHaveAttribute('aria-pressed', 'true');
-    await expect(expand).toHaveAttribute('aria-pressed', 'false');
+    // Nothing is open: Collapse All is left out.
+    expect(await items()).toEqual(['Expand All', 'Bulk Edit', 'Rubrics']);
 
-    await clickAction(page, 'expandAllAssess');
+    await clickToolbarItem(page, 'more', 'expandAllAssess');
     await expect(page.locator('.assess-card.open')).toHaveCount(total);
-    await expect(page.locator('[data-action="expandAllAssess"]')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('[data-action="collapseAllAssess"]')).toHaveAttribute('aria-pressed', 'false');
+    // Every card is open: Expand All is left out.
+    expect(await items()).toEqual(['Collapse All', 'Bulk Edit', 'Rubrics']);
 
-    await clickAction(page, 'collapseAllAssess');
+    await clickToolbarItem(page, 'more', 'collapseAllAssess');
     await expect(page.locator('.assess-card.open')).toHaveCount(0);
-    await expect(page.locator('[data-action="collapseAllAssess"]')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('[data-action="expandAllAssess"]')).toHaveAttribute('aria-pressed', 'false');
+    expect(await items()).toEqual(['Expand All', 'Bulk Edit', 'Rubrics']);
   });
 
   test('Duplicate makes an open second card with the same scoring and no scores', async ({ page }) => {

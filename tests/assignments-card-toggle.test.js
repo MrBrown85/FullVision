@@ -150,11 +150,12 @@ describe('Assignments: one card opens and closes on its own', () => {
     // Nothing else was drawn again.
     expect(document.querySelector('#main .settings-grid') === list).toBe(true);
     expect([LAB, QUIZ, EXIT].every((aid, i) => card(aid) === others[i])).toBe(true);
-    expect(document.querySelector('[data-action="collapseAllAssess"]').getAttribute('aria-pressed')).toBe('false');
+    // A card is open now, so the ⋯ menu offers Collapse All.
+    expect(document.querySelector('.atb-more-wrap [data-action="collapseAllAssess"]')).not.toBeNull();
     sameAsRedraw();
   });
 
-  it('closing it empties the body and sets Collapse again', async () => {
+  it('closing it empties the body and leaves Collapse All out of the ⋯ menu', async () => {
     openAssignments(seed, CID, { open: ESSAY });
     await settled();
     const lab = card(LAB);
@@ -162,7 +163,8 @@ describe('Assignments: one card opens and closes on its own', () => {
     expect(isOpen(ESSAY)).toBe(false);
     expect(card(ESSAY).querySelector('.assess-body').innerHTML).toBe('');
     expect(card(LAB) === lab).toBe(true);
-    expect(document.querySelector('[data-action="collapseAllAssess"]').getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('.atb-more-wrap [data-action="collapseAllAssess"]')).toBeNull();
+    expect(document.querySelector('.atb-more-wrap [data-action="expandAllAssess"]')).not.toBeNull();
     sameAsRedraw();
   });
 

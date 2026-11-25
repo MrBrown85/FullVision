@@ -40,7 +40,7 @@ async function openDemo(page) {
     saveDemoStudentWork(cid, work);
   });
   await page.goto('/assignments');
-  await expect(page.locator('.assess-tograde-seg')).toBeVisible();
+  await expect(page.locator('.atb-show')).toBeVisible();
   // Per assessment, the students each mode counts, as GraderWork counts them on this page.
   return page.evaluate(() => {
     const cid = getActiveCourse();
@@ -83,8 +83,10 @@ test('Submitted shows only the work sent in, and a second click puts the page ba
   expect(sentIds.length).toBeGreaterThan(0);
   const total = sentIds.reduce((n, aid) => n + want[aid].length, 0);
 
-  const submitted = page.locator('.assess-tograde-seg [data-show="submitted"]');
-  await expect(submitted).toHaveText('Submitted ' + total);
+  const submitted = page.locator('.atb-show [data-show="submitted"]');
+  // Submitted carries no number: it lists the work sent in, and the cards say how much.
+  await expect(submitted).toHaveText('Submitted');
+  expect(total).toBeGreaterThan(0);
   await expect(submitted).toHaveAttribute('aria-pressed', 'false');
 
   // Before: one card with no work in open, the list scrolled.
@@ -112,7 +114,7 @@ test('Submitted shows only the work sent in, and a second click puts the page ba
   // Off: every card as the teacher left it, the scroll as it was.
   await submitted.click();
   await expect(submitted).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('.assess-tograde-seg [data-show="all"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.atb-show [data-show="all"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#' + quizId + ' .assess-body > *').first()).toBeVisible();
   expect((await openIds(page)).sort()).toEqual([quizId, ...sentIds.map(aid => 'ac-' + aid)].sort());
   expect(await scrollTop(page)).toBe(top);
@@ -124,7 +126,7 @@ test('To Grade and Not In list their cards, opened cards show only the students 
   page.on('pageerror', e => errors.push(String(e)));
   const want = await openDemo(page);
   for (const show of ['tograde', 'notin']) {
-    const btn = page.locator('.assess-tograde-seg [data-show="' + show + '"]');
+    const btn = page.locator('.atb-show [data-show="' + show + '"]');
     await btn.click();
     await expect(btn).toHaveAttribute('aria-pressed', 'true');
     const aids = Object.keys(want[show]);
@@ -136,7 +138,7 @@ test('To Grade and Not In list their cards, opened cards show only the students 
     for (const aid of aids) await openAndCheck(page, aid, want[show][aid]);
     await shot(page, 'assignments-' + show + '-on-1366');
   }
-  await page.locator('.assess-tograde-seg [data-show="notin"]').click();
-  await expect(page.locator('.assess-tograde-seg [data-show="all"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.atb-show [data-show="notin"]').click();
+  await expect(page.locator('.atb-show [data-show="all"]')).toHaveAttribute('aria-pressed', 'true');
   expect(errors).toEqual([]);
 });

@@ -32,6 +32,8 @@ async function solidPrimaries(page) {
         if (el.getAttribute('role') === 'switch') return false;
         // A report part's icon tile is its drag handle, not an action.
         if (el.classList.contains('one-tint')) return false;
+        // The ▾ joined to + New Assessment is the other half of that one button.
+        if (el.classList.contains('atb-new-more')) return false;
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0) return false;
         const cs = getComputedStyle(el);

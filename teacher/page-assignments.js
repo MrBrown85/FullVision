@@ -23,7 +23,6 @@ window.PageAssignments = (function () {
   // The drafts on screen, summed over the listed assessments at the last
   // render or refresh.
   var _toReturnTotal = 0;
-  var _filterMenuOpen = false;
   var rubricViewStates = {};
   // Advanced Rubric checklists open under their criterion rows, keyed
   // aid:sid:critId. In All mode every one is open except those closed.
@@ -197,7 +196,7 @@ window.PageAssignments = (function () {
     assessSearch = '';
     showUngraded = false;
     AssignShow.reset();
-    _filterMenuOpen = false;
+    AssignToolbar.reset();
     focusStudentId = null;
     collapsedModules = _loadClosedModules(cid);
     rubricViewStates = {};
@@ -471,139 +470,39 @@ window.PageAssignments = (function () {
   var _MODULE_TRASH =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
 
-  /* ── Filter menu ────────────────────────────────────────── */
-  /* One Filter button holds the category filters and Ungraded Only; it
-     reads "Filter · n" while any are on. Ticking keeps the menu open;
-     a click outside it or Escape closes it. */
-  var _FILTER_ICON =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
-  function _filterCount() {
-    return filterCategories.length + (showUngraded ? 1 : 0);
-  }
-  function _filterMenuHtml(cid) {
-    var n = _filterCount();
-    var cats = _getSortedCategories(cid);
-    function item(action, attrs, on, dot, label) {
-      return (
-        '<button type="button" class="assess-filter-item' +
-        (on ? ' is-on' : '') +
-        '" role="menuitemcheckbox" aria-checked="' +
-        on +
-        '" data-action="' +
-        action +
-        '"' +
-        attrs +
-        '><span class="assess-filter-box" aria-hidden="true"></span>' +
-        (dot ? '<span class="assess-filter-dot" style="background:' + dot + '"></span>' : '') +
-        '<span>' +
-        esc(label) +
-        '</span></button>'
-      );
-    }
-    return (
-      '<div class="assess-filter-wrap' +
-      (_filterMenuOpen ? ' open' : '') +
-      '">' +
-      '<button type="button" class="assess-filter-btn' +
-      (n ? ' has-filters' : '') +
-      '" data-action="toggleAssessFilterMenu" aria-haspopup="true" aria-expanded="' +
-      _filterMenuOpen +
-      '">' +
-      _FILTER_ICON +
-      '<span class="assess-filter-label"><span>Filter' +
-      (n ? ' · ' + n : '') +
-      '</span></span>' +
-      '</button>' +
-      '<div class="assess-filter-menu" role="menu" aria-label="Filter assessments">' +
-      (cats.length
-        ? '<span class="assess-filter-head">Category</span>' +
-          cats
-            .map(function (cat, i) {
-              var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
-              return item(
-                'toggleCategoryFilter',
-                ' data-catid="' + esc(cat.id) + '"',
-                filterCategories.indexOf(cat.id) >= 0,
-                t.fg,
-                cat.name,
-              );
-            })
-            .join('') +
-          '<span class="assess-filter-sep" aria-hidden="true"></span>'
-        : '') +
-      item('toggleUngraded', '', showUngraded, '', 'Ungraded Only') +
-      '<span class="assess-filter-sep" aria-hidden="true"></span>' +
-      '<button type="button" class="assess-filter-item assess-filter-clear" role="menuitem" data-action="clearFilterMenu"' +
-      (n ? '' : ' disabled') +
-      '>Clear Filters</button>' +
-      '</div>' +
-      '</div>'
-    );
-  }
-  function _setFilterMenu(open) {
-    _filterMenuOpen = open;
-    var wrap = document.querySelector('.assess-filter-wrap');
-    if (!wrap) return;
-    wrap.classList.toggle('open', open);
-    wrap.querySelector('.assess-filter-btn').setAttribute('aria-expanded', String(open));
-  }
-  // A tick redraws the page; keep the keyboard on the same menu item.
-  function _refocusFilterItem(selector) {
-    var item = document.querySelector('.assess-filter-menu ' + selector);
-    if (item) item.focus({ preventScroll: true });
-  }
-
   /* ── Toolbar ────────────────────────────────────────────── */
-  function renderAssessToolbar(cid, assessments) {
-    var seg = _expandSegOn();
-    var courseOptions = getPickerCourses(cid)
-      .map(function (c) {
-        return '<option value="' + c.id + '"' + (c.id === cid ? ' selected' : '') + '>' + esc(c.name) + '</option>';
-      })
-      .join('');
-
-    var toolbarHtml =
-      '<div class="page-toolbar assess-toolbar">' +
-      '<select class="class-picker assess-course-select" data-action="assessSwitchCourse" aria-label="Select course">' +
-      courseOptions +
-      '</select>' +
-      (window.AssessmentCopy ? AssessmentCopy.renderSiblingToggle(cid) : '') +
-      _filterMenuHtml(cid) +
-      '<div class="assess-search-wrap">' +
-      '<span class="assess-search-icon" aria-hidden="true">' +
-      LINE_ICONS.search +
-      '</span>' +
-      '<input class="assess-search-input" type="text" placeholder="Search\u2026" value="' +
-      esc(assessSearch) +
-      '" data-action-input="assessSearch" aria-label="Search assessments">' +
-      '</div>' +
-      (_holdsGrades(cid) ? '<span class="assess-to-return-slot">' + _toReturnPillHtml() + '</span>' : '') +
-      AssignShow.barHtml(cid) +
-      AssignList.switchHtml() +
-      // The List has no cards to open (assign-list.js).
-      (AssignList.on()
-        ? ''
-        : '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
-          '<button class="seg-btn assess-seg-btn"' +
-          segAttr(seg[0]) +
-          ' data-action="expandAllAssess">Expand</button>' +
-          '<button class="seg-btn assess-seg-btn"' +
-          segAttr(seg[1]) +
-          ' data-action="collapseAllAssess">Collapse</button>' +
-          '</div>') +
-      (focusStudentId
-        ? '<button class="tb-action-btn tb-show-all-btn" data-action="clearFocusStudent">Show All Students</button>'
-        : '') +
-      '<div class="assess-toolbar-actions">' +
-      '<button class="tb-action-btn tb-action-secondary" data-action="openRubricBank">Rubrics</button>' +
-      (window.AssessmentCopy &&
-      (AssessmentCopy.copyTargets(cid).sameCourse.length || AssessmentCopy.copyTargets(cid).other.length)
-        ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add From Another Class</button>'
-        : '') +
-      _newQuizBtn(cid) +
-      '<button class="tb-action-btn" data-action="showNewForm">+ New Assessment</button>' +
-      '</div>' +
-      '</div>';
+  // What the toolbar (assign-toolbar.js) draws, from the page's own state.
+  function _toolbarState(cid) {
+    var all = getAssessments(cid);
+    var open = _expandSegOn();
+    var targets = window.AssessmentCopy ? AssessmentCopy.copyTargets(cid) : null;
+    return {
+      cid: cid,
+      courses: getPickerCourses(cid),
+      search: assessSearch,
+      cats: _getSortedCategories(cid).map(function (cat, i) {
+        var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
+        return { id: cat.id, name: cat.name, color: t.fg, on: filterCategories.indexOf(cat.id) >= 0 };
+      }),
+      ungraded: showUngraded,
+      toReturn: _returnState(cid),
+      bulk: AssignList.on(),
+      focusStudent: !!focusStudentId,
+      cards: all.length,
+      allOpen: open[0],
+      noneOpen: open[1],
+      quiz: _quizOn(cid),
+      copy: !!targets && !!(targets.sameCourse.length || targets.other.length),
+    };
+  }
+  function _returnState(cid) {
+    return { holds: _holdsGrades(cid), total: _toReturnTotal, pressed: _toReturnOnly };
+  }
+  function renderAssessToolbar(cid) {
+    var toolbarHtml = AssignToolbar.html(
+      _toolbarState(cid),
+      window.AssessmentCopy ? AssessmentCopy.renderSiblingToggle(cid) : '',
+    );
 
     // Focus banner when grading a single student
     if (focusStudentId) {
@@ -1680,6 +1579,17 @@ window.PageAssignments = (function () {
     _drawnReturn('n' + a.id, meta + '|' + out.button);
     return out;
   }
+  // One word of a card's data-has, in the order a redraw writes them.
+  function _setHas(card, word, on) {
+    var has = (card.dataset.has || '').split(' ');
+    var words = ['submitted', 'tograde', 'toreturn', 'notin']
+      .filter(function (w) {
+        return w === word ? on : has.indexOf(w) >= 0;
+      })
+      .join(' ');
+    if (words) card.dataset.has = words;
+    else card.removeAttribute('data-has');
+  }
   function _refreshCardCounts(cid, byId, students, shownIds) {
     var classOn = GraderWork.workOnInClass(cid);
     var total = 0;
@@ -1687,8 +1597,13 @@ window.PageAssignments = (function () {
       var a = byId[card.id.slice(3)];
       var head = card.querySelector('.assess-header');
       if (!a || !head) return;
-      var tograde = classOn ? GraderWork.workCounts(cid, a.id, shownIds).tograde : undefined;
+      var wc = classOn ? GraderWork.workCounts(cid, a.id, shownIds) : null;
+      var tograde = wc ? wc.tograde : undefined;
       total += tograde || 0;
+      if (wc) {
+        _setHas(card, 'tograde', wc.tograde > 0);
+        _setHas(card, 'notin', wc.notin > 0);
+      }
       var c = _cardCounts(cid, a, students, shownIds, tograde);
       if (head._countsHtml === c.meta + '|' + c.button) return;
       head._countsHtml = c.meta + '|' + c.button;
@@ -1755,7 +1670,9 @@ window.PageAssignments = (function () {
         (a.isDraft ? ' is-draft' : '') +
         '" id="ac-' +
         a.id +
-        '" draggable="true"' +
+        '"' +
+        _cardHas(n) +
+        ' draggable="true"' +
         ' data-assess-drag="' +
         a.id +
         '"' +
@@ -1788,8 +1705,17 @@ window.PageAssignments = (function () {
             : -1;
           var t =
             typeof categoryTintByIndex === 'function' ? categoryTintByIndex(idx, categoryName) : { bg: '', fg: '' };
+          // With a category, the pill is a button: it filters the list to it.
           return (
-            '<span class="type-badge ' +
+            '<' +
+            (categoryId
+              ? 'button type="button" data-action="toggleCategoryFilter" data-catid="' +
+                esc(categoryId) +
+                '" aria-pressed="' +
+                (filterCategories.indexOf(categoryId) >= 0) +
+                '"'
+              : 'span') +
+            ' class="type-badge ' +
             (categoryId ? 'type-badge-s' : 'type-badge-f') +
             '"' +
             _chipTipAttrs(categoryName, _categoryChipTip(cid, categoryId)) +
@@ -1799,7 +1725,9 @@ window.PageAssignments = (function () {
             t.fg +
             '">' +
             esc(categoryName) +
-            '</span>'
+            '</' +
+            (categoryId ? 'button' : 'span') +
+            '>'
           );
         })() +
         (a.rubricId
@@ -2631,7 +2559,7 @@ window.PageAssignments = (function () {
     assessments = AssignShow.listed(cid, assessments, nums, shownIds);
 
     // Render toolbar
-    var result = renderAssessToolbar(cid, assessments);
+    var result = renderAssessToolbar(cid);
     // html-safe: renderAssessToolbar escapes course names, category names, search text and student names
     document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml;
 
@@ -6544,10 +6472,26 @@ window.PageAssignments = (function () {
       if (title) title.focus({ preventScroll: true });
     }
   }
-  // + New Quiz (Colin, Nov 24): shown with quizzes on, the builder loaded and the Student Page on.
+  // What a card would stay for under Show's options: point to preview dims the rest.
+  function _cardHas(n) {
+    var words = [
+      n.submitted > 0 ? 'submitted' : '',
+      n.tograde > 0 ? 'tograde' : '',
+      n.drafts > 0 ? 'toreturn' : '',
+      n.notin > 0 ? 'notin' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return words ? ' data-has="' + words + '"' : '';
+  }
+  // New Quiz (Colin, Nov 24): offered with quizzes on, the builder loaded and the Student Page on.
+  function _quizOn(cid) {
+    return !!(window.QuizBuilder && BuildFlags.on('quizzes') && _studentPageOn(cid));
+  }
   function _newQuizBtn(cid) {
-    var on = window.QuizBuilder && BuildFlags.on('quizzes') && _studentPageOn(cid);
-    return on ? '<button class="tb-action-btn tb-action-secondary" data-action="newQuiz">+ New Quiz</button>' : '';
+    return _quizOn(cid)
+      ? '<button class="tb-action-btn tb-action-secondary" data-action="newQuiz">+ New Quiz</button>'
+      : '';
   }
   function hideNewForm() {
     _hideAfTip();
@@ -7594,10 +7538,7 @@ window.PageAssignments = (function () {
       _afterCardsDrawn(body);
       if (motion && open && !wasOpen) motion.open(body);
     });
-    var on = _expandSegOn();
-    document.querySelectorAll('.assess-seg-control .seg-btn').forEach(function (btn, i) {
-      btn.setAttribute('aria-pressed', on[i] ? 'true' : 'false');
-    });
+    AssignToolbar.syncMore(_toolbarState(cid));
     return true;
   }
 
@@ -11646,7 +11587,7 @@ window.PageAssignments = (function () {
       kbFocusCell(null);
     }
 
-    if (_filterMenuOpen && !e.target.closest('.assess-filter-wrap')) _setFilterMenu(false);
+    if (AssignToolbar.filterOpen() && !AssignToolbar.inFilter(e.target)) AssignToolbar.setFilter(false);
 
     // Close menus on click outside
     if (
@@ -11891,24 +11832,32 @@ window.PageAssignments = (function () {
         );
       },
       toggleCategoryFilter: function () {
+        var key = AssignToolbar.focusKey(el);
         toggleCategoryFilter(el.dataset.catid);
-        _refocusFilterItem('[data-catid="' + el.dataset.catid + '"]');
+        AssignToolbar.refocus(key);
       },
       toggleUngraded: function () {
+        var key = AssignToolbar.focusKey(el);
         showUngraded = !showUngraded;
         render();
-        _refocusFilterItem('[data-action="toggleUngraded"]');
+        AssignToolbar.refocus(key);
       },
-      // What is waiting to return (S1-F2).
-      toggleToReturn: function () {
-        _toggleToReturn();
-      },
-      // The Show bar (assign-show.js).
+      // The Show bar (assign-show.js). To Return (S1-F2) is the page's own
+      // filter: it is not combined with another option, and a second click lets go.
       setToGradeShow: function () {
-        var show = AssignShow.choose(el.dataset.show);
+        var show = el.dataset.show;
+        if (show === 'toreturn') {
+          var letGo = _toReturnOnly;
+          AssignShow.choose('all');
+          _toReturnOnly = !letGo;
+          show = letGo ? 'all' : show;
+        } else {
+          _toReturnOnly = false;
+          show = AssignShow.choose(show);
+        }
         render();
         AssignShow.afterDraw();
-        var again = document.querySelector('.assess-tograde-seg [data-show="' + show + '"]');
+        var again = document.querySelector('.atb-show [data-show="' + show + '"]');
         if (again) again.focus({ preventScroll: true });
       },
       gradeSubmissions: function () {
@@ -11974,13 +11923,13 @@ window.PageAssignments = (function () {
         _returnOne(el.dataset.aid, el.dataset.sid, el);
       },
       toggleAssessFilterMenu: function () {
-        _setFilterMenu(!_filterMenuOpen);
+        AssignToolbar.setFilter(!AssignToolbar.filterOpen());
       },
       clearFilterMenu: function () {
         filterCategories = [];
         showUngraded = false;
         render();
-        _refocusFilterItem('[data-action="toggleUngraded"]');
+        AssignToolbar.refocus('.assess-filter-menu [data-action="toggleUngraded"]');
       },
       expandAllAssess: function () {
         expandAllAssess();
@@ -12504,10 +12453,10 @@ window.PageAssignments = (function () {
       _hideChipTip();
       if (focusedChip) return;
     }
-    if (_filterMenuOpen && e.key === 'Escape') {
+    if (AssignToolbar.filterOpen() && e.key === 'Escape') {
       e.preventDefault();
-      _setFilterMenu(false);
-      var trigger = document.querySelector('.assess-filter-btn');
+      AssignToolbar.setFilter(false);
+      var trigger = document.querySelector('.atb-filter-btn');
       if (trigger) trigger.focus();
       return;
     }
@@ -15067,34 +15016,6 @@ window.PageAssignments = (function () {
     });
   }
 
-  /* The toolbar's "N to return". Nothing is drawn when N is 0. */
-  // html-safe: a number and fixed words
-  function _toReturnPillHtml() {
-    if (!_toReturnTotal) return '';
-    return (
-      '<button type="button" class="assess-to-return-btn' +
-      (_toReturnOnly ? ' active' : '') +
-      '" data-action="toggleToReturn" aria-pressed="' +
-      _toReturnOnly +
-      '" title="' +
-      (_toReturnOnly
-        ? 'Showing only the assessments with a draft to return. Click to show everything.'
-        : 'Show only the assessments with a draft to return.') +
-      '">' +
-      _toReturnTotal +
-      ' to return' +
-      (_toReturnOnly ? ' <span aria-hidden="true">×</span>' : '') +
-      '</button>'
-    );
-  }
-
-  function _toggleToReturn() {
-    _toReturnOnly = !_toReturnOnly;
-    render();
-    var pill = document.querySelector('.assess-to-return-btn');
-    if (pill) pill.focus({ preventScroll: true });
-  }
-
   /* A card's chips: the drafts among the students on screen, and with the
      whole class on screen how many have their grade. */
   // `drafts`, when given, is the count render() worked out.
@@ -15276,6 +15197,7 @@ window.PageAssignments = (function () {
         var a = _assessmentById(cid, el.dataset.returnsAid);
         if (!a) return;
         el._drafts = GraderWork.draftsIn(cid, a.id, shownIds).length;
+        if (el.closest('.assess-card')) _setHas(el.closest('.assess-card'), 'toreturn', el._drafts > 0);
         set(el, _returnChipsHtml(cid, a, shownIds, el._drafts));
       }
       total += el._drafts || 0;
@@ -15298,9 +15220,7 @@ window.PageAssignments = (function () {
     _toReturnTotal = total;
     // The last draft is returned: the filter turns off and the list is whole again.
     if (!total && _toReturnOnly) return render();
-    var slot = document.querySelector('.assess-to-return-slot');
-    // html-safe: built by _toReturnPillHtml
-    if (slot) slot.innerHTML = _toReturnPillHtml();
+    AssignShow.syncReturn(activeCourse, _returnState(activeCourse));
   }
   function _returnsAfterEvent(scope) {
     if (_grader || !_holdsGrades(activeCourse)) return;
@@ -15361,7 +15281,7 @@ window.PageAssignments = (function () {
       _afterPageReturn();
       var card = document.getElementById('ac-' + aid);
       var next = card && card.querySelector('.assess-header-actions button');
-      if (!next) next = document.querySelector('.assess-to-return-btn, .assess-search-input');
+      if (!next) next = document.querySelector('.atb-show [data-show="toreturn"], .assess-search-input');
       if (next) next.focus({ preventScroll: true });
     });
   }
@@ -17582,7 +17502,7 @@ window.PageAssignments = (function () {
     // The dashboard's To Grade cell opens the page with To Grade on.
     AssignShow.reset(params && params.show);
     AssignList.reset();
-    _filterMenuOpen = false;
+    AssignToolbar.reset();
     rubricViewStates = {};
     _showingNewForm = false;
     _editingAssessId = null;
