@@ -187,8 +187,11 @@ window.MBulletins = (function () {
       : '<button type="button" class="m-bulletin-seen" data-m-bulletin="seen" data-id="' +
         esc(c.id) +
         '">' +
-        esc(c.seen.main) +
-        (c.seen.rest ? ' · <span class="m-bulletin-not-seen">' + esc(c.seen.rest) + '</span>' : '') +
+        // The phone's new look shows only "8 Not Seen"; "Seen by 19 of 27" is still read out (look.css).
+        (c.seen.rest && W.BuildFlags && W.BuildFlags.on('phoneLook')
+          ? '<span class="m-look-sr">' + esc(c.seen.main) + ' · </span>'
+          : esc(c.seen.main) + (c.seen.rest ? ' · ' : '')) +
+        (c.seen.rest ? '<span class="m-bulletin-not-seen">' + esc(c.seen.rest) + '</span>' : '') +
         '</button>';
     return {
       head:

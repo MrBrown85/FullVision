@@ -10,7 +10,9 @@
    THE GRADER (L1)
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Top bar: Back, who is on screen, the sync dot and ⋯ ─────── */
+/* Text the new look does not show but a screen reader still reads. */
+.m-look .m-look-sr,
+.m-look .m-mod-word,
 .m-look #m-nav-bar-grade-swiper .m-nav-bar-back span {
   position: absolute;
   width: 1px;
@@ -19,6 +21,8 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ── Top bar: Back, who is on screen, the sync dot and ⋯ ─────── */
 .m-look .m-nav-title-btn {
   display: inline-flex;
   align-items: center;
@@ -59,14 +63,17 @@
 }
 
 /* ── The strip of circles, drawn as one progress line ────────── */
-.m-look #m-screen-grade-swiper .m-thumb-strip {
+/* Each circle is a segment of the line. Its colour is drawn over it by
+   ::after, since the circle carries the student's colour inline. The strip
+   is inert (grade-look.js): nothing in it is a control. */
+.m-look .m-thumb-strip {
   gap: 4px;
   padding: 0 16px 8px;
   border-bottom: 0;
   overflow: hidden;
-  pointer-events: none;
 }
-.m-look #m-screen-grade-swiper .m-thumb {
+.m-look .m-thumb-strip .m-thumb {
+  position: relative;
   flex: 1 1 0;
   width: auto;
   min-width: 0;
@@ -74,93 +81,99 @@
   padding: 0;
   border: 0;
   border-radius: 2px;
-  background: var(--border) !important;
+  overflow: hidden;
   box-shadow: none;
-  font-size: 0;
+  color: transparent;
   transform: none;
 }
-.m-look #m-screen-grade-swiper .m-thumb::before,
-.m-look #m-screen-grade-swiper .m-thumb::after {
+.m-look .m-thumb-strip .m-thumb::before {
   content: none;
 }
-.m-look #m-screen-grade-swiper .m-thumb.m-thumb-graded {
-  background: var(--text) !important;
+.m-look .m-thumb-strip .m-thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: var(--border);
 }
-.m-look #m-screen-grade-swiper .m-thumb.m-thumb-current {
-  background: var(--active) !important;
+.m-look .m-thumb-strip .m-thumb.m-thumb-graded::after {
+  background: var(--text);
+}
+.m-look .m-thumb-strip .m-thumb.m-thumb-current::after {
+  background: var(--active);
 }
 
 /* Competencies or Rubric is under ⋯. */
-.m-look #m-screen-grade-swiper > .m-grade-view-row {
+.m-look .m-grade-view-row {
   display: none;
 }
 
 /* ── The card: the paper, then the marks, each a card ────────── */
-.m-look #m-swiper .m-swiper-card {
+.m-look .m-swiper .m-swiper-card {
   padding-top: 6px;
 }
-.m-look #m-swiper .m-grade-card-surface {
+.m-look .m-swiper .m-grade-card-surface {
   margin: 0;
   padding: 0;
+  border: 0;
   border-radius: 0;
   background: none;
   box-shadow: none;
 }
-.m-look #m-swiper .m-work,
-.m-look #m-swiper .m-grade-marks {
+.m-look .m-swiper .m-work,
+.m-look .m-swiper .m-grade-marks {
   border-radius: 20px;
   background: var(--surface);
   box-shadow:
     0 0 0 0.5px rgba(0, 0, 0, 0.06),
     0 2px 12px rgba(0, 0, 0, 0.06);
 }
-.m-look #m-swiper .m-work {
+.m-look .m-swiper .m-work {
   gap: 0;
   margin: 0 0 12px;
   overflow: hidden;
 }
-.m-look #m-swiper .m-grade-marks {
+.m-look .m-swiper .m-grade-marks {
   padding: 22px 18px 20px;
 }
 
 /* Who it is and when it came are in the bar; the card keeps only what is
    out of the ordinary: IEP, MOD or ELL, and a status that is set. */
-.m-look #m-swiper .m-grade-student-header {
+.m-look .m-swiper .m-grade-student-header {
   display: block;
   margin: 0;
 }
-.m-look #m-swiper .m-grade-avatar,
-.m-look #m-swiper .m-group-title,
-.m-look #m-swiper .m-grade-student-header .m-status-hint,
-.m-look #m-swiper .m-work-sent:not(.m-work-sent-notin) {
+.m-look .m-swiper .m-grade-avatar,
+.m-look .m-swiper .m-group-title,
+.m-look .m-swiper .m-grade-student-header .m-status-hint,
+.m-look .m-swiper .m-work-sent:not(.m-work-sent-notin) {
   display: none;
 }
-.m-look #m-swiper .m-grade-student-name {
-  font-size: 0;
-  line-height: 0;
-}
-.m-look #m-swiper .m-grade-student-name .m-badge {
+.m-look .m-swiper .m-grade-student-name .m-badge {
   margin: 0 6px 10px 0;
   font-size: 12px;
   line-height: 1.5;
 }
-.m-look #m-swiper .m-grade-student-header .m-status-row {
+.m-look .m-swiper .m-grade-student-header .m-status-row {
   display: none;
 }
-.m-look #m-swiper .m-grade-student-header .m-status-row:has(.m-status-active) {
+.m-look .m-swiper .m-grade-student-header .m-status-row:has(.m-status-active) {
   display: inline-flex;
   margin: 0 0 10px;
   padding: 0;
   background: none;
   pointer-events: none;
 }
-.m-look #m-swiper .m-grade-student-header .m-status-pill:not(.m-status-active),
-.m-look #m-swiper .m-group-member .m-status-pill:not(.m-status-active),
-.m-look #m-swiper .m-group-member .m-group-more {
+.m-look .m-swiper .m-grade-student-header .m-status-pill:not(.m-status-active),
+.m-look .m-swiper .m-group-member .m-status-pill:not(.m-status-active),
+.m-look .m-swiper .m-group-member .m-group-more {
   display: none;
 }
-.m-look #m-swiper .m-grade-student-header .m-status-pill.m-status-active,
-.m-look #m-swiper .m-group-member .m-status-pill.m-status-active {
+.m-look .m-swiper .m-grade-student-header .m-status-pill.m-status-active,
+.m-look .m-swiper .m-group-member .m-status-pill.m-status-active {
   min-height: 28px;
   padding: 0 12px;
   border-radius: 14px;
@@ -168,37 +181,37 @@
   pointer-events: none;
 }
 /* A pair or group: only a member with a status, or graded separately. */
-.m-look #m-swiper .m-group-member:not(:has(.m-status-active, .m-group-member-note)) {
+.m-look .m-swiper .m-group-member:not(:has(.m-status-active, .m-group-member-note)) {
   display: none;
 }
-.m-look #m-swiper .m-group-members:not(:has(.m-status-active, .m-group-member-note)) {
+.m-look .m-swiper .m-group-members:not(:has(.m-status-active, .m-group-member-note)) {
   display: none;
 }
 
 /* The paper: edge to edge, tall enough to read. */
-.m-look #m-swiper .m-work-pages {
+.m-look .m-swiper .m-work-pages {
   padding: 0;
   border-radius: 0;
   background: var(--surface-2);
 }
-.m-look #m-swiper .m-work-page {
+.m-look .m-swiper .m-work-page {
   height: auto;
   aspect-ratio: 3 / 4;
   border-radius: 0;
 }
-.m-look #m-swiper .m-work-page img {
+.m-look .m-swiper .m-work-page img {
   height: 100%;
   object-fit: cover;
   object-position: top;
 }
-.m-look #m-swiper .m-work-full {
+.m-look .m-swiper .m-work-full {
   right: 12px;
   bottom: 12px;
 }
-.m-look #m-swiper .m-work-dots {
+.m-look .m-swiper .m-work-dots {
   padding: 10px 0 0;
 }
-.m-look #m-swiper .m-work-note {
+.m-look .m-swiper .m-work-note {
   padding: 14px 18px 16px;
   border-radius: 0;
   background: none;
@@ -207,8 +220,8 @@
   font-size: 16px;
   line-height: 1.45;
 }
-.m-look #m-swiper .m-work-note svg,
-.m-look #m-swiper .m-work-foot {
+.m-look .m-swiper .m-work-note svg,
+.m-look .m-swiper .m-work-foot {
   display: none;
 }
 
@@ -318,6 +331,13 @@
 .m-look .m-grade-marks .m-score-btn.m-score-active[data-score='4'] {
   background: var(--score-4-dark);
 }
+/* Dark mode's level colours are bright: the chosen level's code reads in
+   near-black on them, not white. */
+@media (prefers-color-scheme: dark) {
+  .m-look .m-grade-marks .m-score-btns .m-score-btn.m-score-active {
+    color: #1c1c1e;
+  }
+}
 .m-look .m-grade-marks .m-score-btn.m-score-mixed {
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
@@ -340,7 +360,6 @@
   border-radius: 50%;
   background: var(--overlay-pressed);
   color: var(--text);
-  font-size: 0;
   gap: 0;
 }
 /* A finger's room around a 34 px button. */
@@ -388,7 +407,6 @@
   border: 0;
   background: none;
   color: var(--text-3);
-  font-size: 0;
 }
 .m-look .m-grade-marks .m-checks-btn svg {
   display: none;
@@ -491,10 +509,6 @@
   font-weight: 600;
 }
 .m-look .m-roster-graded {
-  font-size: 0;
-}
-.m-look .m-roster-graded::after {
-  content: '\2713';
   font-size: 17px;
   font-weight: 700;
   color: var(--score-3);
@@ -580,10 +594,10 @@
 }
 
 /* The dark bar that keeps the paper in reach: the card's width. */
-.m-look #m-swiper .m-work-pin {
+.m-look .m-swiper .m-work-pin {
   top: 0;
 }
-.m-look #m-swiper .m-work-pin-btn {
+.m-look .m-swiper .m-work-pin-btn {
   width: 100%;
   margin: 0;
   border-radius: 14px;
@@ -591,46 +605,46 @@
 
 /* A card with nothing handed in: Add Work, the status as one track, Grade
    From Paper. */
-.m-look #m-swiper .m-work.m-work-notin {
+.m-look .m-swiper .m-work.m-work-notin {
   gap: 12px;
   padding: 16px;
   overflow: visible;
 }
-.m-look #m-swiper .m-work-sent.m-work-sent-notin {
+.m-look .m-swiper .m-work-sent.m-work-sent-notin {
   margin: 0 4px 8px;
   color: var(--text);
 }
-.m-look #m-swiper .m-work-add {
+.m-look .m-swiper .m-work-add {
   min-height: 50px;
   border-radius: 14px;
   font-size: 17px;
 }
-.m-look #m-swiper .m-work-add-hint {
+.m-look .m-swiper .m-work-add-hint {
   display: none;
 }
-.m-look #m-swiper .m-work-notin-status .m-status-row {
+.m-look .m-swiper .m-work-notin-status .m-status-row {
   gap: 0;
   margin: 0;
   padding: 2px;
   border-radius: 9px;
   background: var(--overlay-pressed);
 }
-.m-look #m-swiper .m-work-notin-status .m-status-row .m-status-pill {
+.m-look .m-swiper .m-work-notin-status .m-status-row .m-status-pill {
   border: 0;
   border-radius: 7px;
 }
-.m-look #m-swiper .m-work-paper {
+.m-look .m-swiper .m-work-paper {
   margin-top: 0;
   padding-top: 12px;
 }
-.m-look #m-swiper .m-paper-crits {
+.m-look .m-swiper .m-paper-crits {
   margin-bottom: 20px;
 }
 
 /* A narrow phone: a little less room around the same pieces, so a
    criterion's name, its chevron and its three buttons still share a line. */
 @media (max-width: 359px) {
-  .m-look #m-swiper .m-grade-marks {
+  .m-look .m-swiper .m-grade-marks {
     padding: 20px 14px 18px;
   }
   .m-look .m-grade-marks .m-score-group {
@@ -713,16 +727,14 @@
 .m-look .m-bulletin-file-line {
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--overlay-hover);
   color: var(--text);
   font-size: 15px;
   font-weight: 600;
 }
-/* Who has not seen it is the part to act on: "8 Not Seen" as one button.
-   Seen by everyone, it says so. */
-.m-look .m-bulletin-seen:has(.m-bulletin-not-seen) {
-  font-size: 0;
-}
+/* Who has not seen it is the part to act on: "8 Not Seen" as one button
+   ("Seen by 19 of 27" is read out, tab-bulletins.js). Seen by everyone, it
+   says so. */
 .m-look .m-bulletin-seen .m-bulletin-not-seen {
   display: inline-block;
   padding: 7px 14px;

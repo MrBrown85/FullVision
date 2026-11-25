@@ -72,7 +72,8 @@ describe('with the switch off', () => {
   });
 
   it('grade-look.js answers with nothing', () => {
-    expect(MGradeLook.bar(CID, [], false)).toEqual({ title: '', titleAction: '', more: '' });
+    expect(MGradeLook.bar(CID, [], false)).toEqual({ title: '', titleAction: '', more: '', strip: '' });
+    expect(MGradeLook.quiet('Ines')).toBe('Ines');
     expect(MGradeLook.commentLabel(CID, getStudents(CID)[0], null)).toBe('');
     expect(MGradeLook.marks('<p>x</p>')).toBe('<p>x</p>');
   });
@@ -90,6 +91,14 @@ describe('with the switch on', () => {
     expect(screen.querySelector('.m-grade-more[data-action="m-grade-more"]').getAttribute('aria-label')).toBe('More');
     // The sync dot stays: it is the only place a sync problem shows.
     expect(screen.querySelector('#sync-indicator-dot')).toBeTruthy();
+    // The strip, drawn as a line, is out of the tab order.
+    expect(screen.querySelector('#m-thumb-strip').hasAttribute('inert')).toBe(true);
+  });
+
+  it('text the look does not show is still there for a screen reader', () => {
+    const card = draw().querySelector('.m-swiper-card[data-sid="stu2"]');
+    expect(card.querySelector('.m-grade-student-name .m-look-sr').textContent).toBe('Noor Khan');
+    expect([...card.querySelectorAll('.m-mod-word')].map(w => w.textContent)).toEqual(['Minus', 'Plus']);
   });
 
   it('the marks sit in a box of their own, with the comment named for the student', () => {

@@ -65,6 +65,13 @@ test('the bar names the card on screen, and its name opens the class list', asyn
   await rows.nth(2).click();
   await expect(title(page)).toHaveText('Marcus Lee');
   expect(await page.evaluate(() => MGrade.getCurrentIndex())).toBe(2);
+  // Last, since Tab can move to another card: drawn as a line, the circles are out of the tab order and the screen reader's way.
+  await expect(page.locator('#m-thumb-strip')).toHaveAttribute('inert', '');
+  await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').focus();
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => !!document.activeElement.closest('#m-thumb-strip'))).toBe(false);
+  }
   expect(errors).toEqual([]);
 });
 
@@ -137,12 +144,20 @@ test('L3: Return and Next is held seven seconds, with Undo over the tab bar', as
       const tabs = r('#m-tab-bar');
       return t.top >= tabs.top && t.bottom <= tabs.bottom && t.top >= r('#m-grade-return-act').bottom;
     });
-  // (Polled: with reduced motion the page's styles settle a moment after the toast is drawn.)
+  // (Polled: with reduced motion the app's styles give every change a 0.01 ms
+  // transition, so the new place is reported on the next frame.)
   await expect.poll(over).toBe(true);
   // Nothing is sent yet, and Ines's card already reads Returned.
   expect(await drafts(inesId)).toBeGreaterThan(0);
-  // (Once the slide to the next card is over, back to hers from the class list.)
-  await page.waitForTimeout(700);
+  // Once the slide to the next card is over, back to hers from the class list.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const s = document.getElementById('m-swiper');
+        return Math.abs(s.scrollLeft - MGrade.getCurrentIndex() * s.clientWidth) < 1;
+      }),
+    )
+    .toBe(true);
   await goTo(page, 'Ines Larsen');
   await expect(page.locator('#m-grade-return .m-returned-mark')).toHaveText('Returned');
 
@@ -235,7 +250,10 @@ test('L2: the Grade list and Bulletins', async ({ page }) => {
   await expect(page.locator('.m-bulletin-content > .m-title-large')).toBeHidden();
   const seen = feed.locator('.m-bulletin-seen', { has: page.locator('.m-bulletin-not-seen') }).first();
   await expect(seen.locator('.m-bulletin-not-seen')).toBeVisible();
-  expect(await seen.evaluate(el => getComputedStyle(el).fontSize)).toBe('0px');
+  // "Seen by 19 of 27" is not shown, and is still read out.
+  const quiet = seen.locator('.m-look-sr');
+  await expect(quiet).toHaveText(/^Seen by \d+ of \d+ · $/);
+  expect(await quiet.evaluate(el => el.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
   for (const font of FONTS) {
     await useFont(page, font);
     const out = await feed.evaluate(el =>
