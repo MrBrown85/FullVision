@@ -103,6 +103,14 @@ describe('the piece shown is the piece used', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-18T19:00:00Z'));
+    // The sample class is dated from the day it is seeded, so it is seeded
+    // again on the test's own day: seeded on the real day, its pieces were
+    // dated after Nov 18 once the real date passed Nov 24 (first in UTC,
+    // where CI runs), and none of them was taking work yet.
+    Object.keys(COURSES).forEach(cid => _clearCourseLocalState(cid));
+    localStorage.clear();
+    seedIfNeeded();
+    sendWorkOn();
   });
 
   for (const how of ['default', 'by hand']) {
