@@ -1,0 +1,278 @@
+/* The Inbox's Roll Call, redrawn (slice I2 of docs/plans/inbox-redesign-plan.md;
+   board Rev-RollCall). Row one: arrows, the assessment's title as a menu, and
+   the three marks as buttons. Below: the class in four columns read downward,
+   one 38 px button a student. To grade is bold on a tinted ground, returned has
+   a green tick, not in has a dashed outline; work in that is neither is solid. */
+.dash-inbox-rollcall {
+  position: relative;
+  container: dash-inbox-rc / inline-size;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.dash-inbox-rc-empty {
+  margin: 0;
+  padding: 10px 4px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dash-inbox-rc-bar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+}
+.dash-inbox-rc-nav,
+.dash-inbox-rc-title,
+.dash-inbox-rc-key {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  cursor: pointer;
+}
+.dash-inbox-rc-nav {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 8px;
+}
+.dash-inbox-rc-nav[aria-disabled='true'] {
+  color: var(--text-3);
+  cursor: default;
+}
+.dash-inbox-rc-title {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  border-radius: 8px;
+}
+.dash-inbox-rc-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-inbox-rc-title svg {
+  flex: 0 0 auto;
+}
+.dash-inbox-rc-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+.dash-inbox-rc-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 13px 5px 9px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 999px;
+}
+.dash-inbox-rc-key[aria-pressed='true'] {
+  background: var(--active-light);
+  border-color: var(--active);
+  color: var(--text);
+}
+.dash-inbox-rc-nav:hover:not([aria-disabled='true']),
+.dash-inbox-rc-title:hover,
+.dash-inbox-rc-key:hover {
+  border-color: var(--active);
+}
+.dash-inbox-rc-nav:focus-visible,
+.dash-inbox-rc-title:focus-visible,
+.dash-inbox-rc-key:focus-visible,
+.dash-inbox-rc-st:focus-visible,
+.dash-inbox-rc-opt:focus-visible,
+.dash-inbox-rc-item:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* The three marks, on the buttons and on each student. */
+.dash-inbox-rc-g {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 19px;
+  height: 25px;
+  border-radius: 3px;
+}
+.dash-inbox-rc-g.is-tograde {
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 4px, var(--active) 4px 5.5px);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 11px 17px;
+  border: 1.5px solid var(--active);
+}
+.dash-inbox-rc-g.is-returned {
+  color: var(--surface);
+  background: var(--score-3);
+}
+.dash-inbox-rc-g.is-notin {
+  border: 1.5px dashed var(--text-3);
+}
+.dash-inbox-rc-g.is-in {
+  background: var(--surface);
+  border: 1.5px solid var(--text-3);
+}
+
+/* The class: read down the columns. */
+.dash-inbox-rc-grid {
+  display: grid;
+  flex: 1 1 auto;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(var(--dash-inbox-rc-cols, 4), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--dash-inbox-rc-rows, 7), 38px);
+  align-content: start;
+  gap: 3px 10px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+.dash-inbox-rc-li {
+  display: flex;
+  min-width: 0;
+}
+.dash-inbox-rc-st {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 38px;
+  padding: 0 8px 0 7px;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.dash-inbox-rc-st.is-tograde {
+  font-weight: 700;
+  background: var(--active-light);
+}
+.dash-inbox-rc-st.is-notin {
+  background: var(--surface);
+  border: 1.5px dashed var(--text-3);
+}
+.dash-inbox-rc-st.is-open {
+  background: var(--surface);
+  border: 2px solid var(--active);
+}
+/* A state picked out: the others stay readable (text-2 is over 4.5:1 on both
+   grounds), just plainer: no bold, no tint, a quieter mark. */
+.dash-inbox-rc-st.is-plain {
+  font-weight: 400;
+  color: var(--text-2);
+  background: var(--bg);
+  border: 1px solid transparent;
+}
+.dash-inbox-rc-st.is-plain.is-notin {
+  background: var(--surface);
+  border: 1.5px dashed var(--divider-strong);
+}
+.dash-inbox-rc-st.is-plain .dash-inbox-rc-g {
+  opacity: 0.55;
+}
+.dash-inbox-rc-nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-inbox-rc-st:hover {
+  border-color: var(--active);
+}
+
+/* The piece list and the not-in menu. */
+.dash-inbox-rc-pop {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-radius: 11px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+}
+.dash-inbox-rc-pop.is-menu {
+  width: 214px;
+}
+.dash-inbox-rc-pop.is-list {
+  min-width: 260px;
+  max-width: calc(100% - 8px);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.dash-inbox-rc-item,
+.dash-inbox-rc-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.dash-inbox-rc-item:hover,
+.dash-inbox-rc-opt:hover,
+.dash-inbox-rc-item:focus-visible,
+.dash-inbox-rc-opt:focus-visible,
+.dash-inbox-rc-opt[aria-selected='true'] {
+  background: var(--active-light);
+}
+.dash-inbox-rc-opt-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-inbox-rc-opt-n {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
