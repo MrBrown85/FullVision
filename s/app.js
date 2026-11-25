@@ -1468,8 +1468,8 @@
     // Writing on the student's own form is activity too, though the form is not watched (showing): a
     // reflection opened from the page (S.back), Send My Work, Reflect on Feedback. It was not counted, so
     // a student who wrote for more than fifteen minutes was signed out, the answers deleted, on going back.
-    var own = S.screen === 'send' || S.screen === 'reflect' || !!S.back;
-    if (!session || S.demo || !(showing() || own)) return;
+    // (Asked only once there is a session: before the page starts there is no S to read.)
+    if (!session || S.demo || !(showing() || S.screen === 'send' || S.screen === 'reflect' || S.back)) return;
     var at = clock(now);
     if (at - (session.active || 0) < 1000) return;
     if (over(session, at)) {
@@ -2671,6 +2671,7 @@
       openCard: openCard,
       checkCard: checkCard,
       checkSession: checkSession,
+      active: active,
       tellSeen: tellSeen,
       loadForms: loadForms,
       formsOf: formsOf,
