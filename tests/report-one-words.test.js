@@ -11,6 +11,9 @@ import { runInThisContext } from 'vm';
 import { parseHTML } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+runInThisContext(readFileSync(resolve(__dirname, '../teacher/report-one-word-ops.js'), 'utf-8'), {
+  filename: 'teacher/report-one-word-ops.js',
+});
 runInThisContext(readFileSync(resolve(__dirname, '../teacher/report-one-words.js'), 'utf-8'), {
   filename: 'teacher/report-one-words.js',
 });

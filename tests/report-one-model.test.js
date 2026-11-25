@@ -332,4 +332,106 @@ describe('ReportSheets.pack for One Report', () => {
     expect(parts[0].start).toBe(0);
     expect(parts[0].end).toBeGreaterThan(1);
   });
+
+  /* A reflection: a heading and instructions over 12 rated rows, then 3
+     questions to write under. Its questions print with its last piece
+     only, so a piece is as tall as it is measured, not its rows plus one
+     figure for the rest. Teachers saw it start on the Back with the Front
+     a third empty, and stop half way down a side (Colin, 2026-11-25). */
+  const reflection = () => {
+    const rows = Array(12).fill(48).concat(Array(3).fill(104));
+    const measured = [];
+    const pieceH = (s, e) => {
+      measured.push(s + ':' + e);
+      // 70 over the first piece (heading, instructions, the scale), 45 over a later one.
+      return (s === 0 ? 70 : 45) + rows.slice(s, e).reduce((a, b) => a + b, 0);
+    };
+    // chrome as it was counted: everything that is not a rated row.
+    return { cell: c('reflect', pieceH(0, 15), { rows, chrome: 70 + 3 * 104, pieceH }), measured, pieceH };
+  };
+  const pieces = filled => {
+    const out = [];
+    filled.sides.forEach((sd, i) =>
+      sd.rows.forEach(r => r.cells.forEach(x => x.part && out.push({ side: i, y: r.y, h: r.h, ...x.part }))),
+    );
+    return out;
+  };
+
+  it('a reflection starts in the room left on the Front, though its questions would not fit there', () => {
+    const { cell } = reflection();
+    // 300px left on the Front: the questions alone are 312.
+    const got = pieces(P([[c('list', 996 - 300 - 12)], [cell]]));
+    expect(got[0]).toMatchObject({ side: 0, start: 0, end: 4 });
+    expect(got[1]).toMatchObject({ side: 1, start: 4, end: 15 });
+    expect(got).toHaveLength(2);
+  });
+
+  it('each piece takes the room it was measured at, so the side has no gap under it', () => {
+    const { cell, pieceH } = reflection();
+    const filled = P([[c('list', 996 - 300 - 12)], [cell], [c('after', 50)]]);
+    const got = pieces(filled);
+    got.forEach(p => expect(p.h).toBe(pieceH(p.start, p.end)));
+    // What follows the reflection sits right under its last piece.
+    const back = filled.sides[1].rows;
+    expect(back[1].cells[0].id).toBe('after');
+    expect(back[1].y).toBe(back[0].y + back[0].h + 12);
+    filled.sides.forEach(sd => sd.rows.forEach(r => expect(r.y + r.h).toBeLessThanOrEqual(H)));
+  });
+
+  it('a piece is found in a few measures, not one for every row', () => {
+    const { cell, measured } = reflection();
+    measured.length = 0;
+    P([[c('list', 996 - 300 - 12)], [cell]]);
+    expect(measured.length).toBeLessThanOrEqual(8);
+  });
+});
+
+describe('a reflection cut between pages', () => {
+  const html =
+    '<div class="report-block-box report-reflect"><div class="report-block-title">How I See Myself</div>' +
+    '<div class="report-habit-intro">Rate yourself.</div>' +
+    '<table class="report-ct report-reflect-tbl"><thead><tr><th></th><th>Rarely</th></tr></thead><tbody>' +
+    '<tr class="report-ct-group"><td>Dispositions</td></tr>' +
+    '<tr><td>Engagement</td></tr><tr><td>Curiosity</td></tr></tbody></table>' +
+    '<div class="report-reflect-checks">This term, I…</div>' +
+    '<div class="report-reflect-write"><div class="report-reflect-q">Strength</div>' +
+    '<div class="report-reflect-q">Work on</div></div></div>';
+  const piece = (start, end) => {
+    const stub = globalThis.document;
+    const { document: doc } = parseHTML('<!doctype html><html><body></body></html>');
+    globalThis.document = doc;
+    try {
+      const root = doc.createElement('div');
+      root.innerHTML = R.pieceHtml('student-reflection-habits', html, { start, end });
+      return root;
+    } finally {
+      globalThis.document = stub;
+    }
+  };
+  const text = root => root.textContent.replace(/\s+/g, ' ').trim();
+
+  it('the first piece keeps the instructions and only its rows', () => {
+    const p = piece(0, 2);
+    expect(text(p)).toBe('How I See MyselfRate yourself.RarelyDispositionsEngagement');
+    expect(p.querySelector('.report-reflect-write')).toBeNull();
+  });
+
+  it('a later piece is headed “(continued)” and drops the instructions', () => {
+    expect(text(piece(2, 4))).toBe('How I See Myself (continued)RarelyCuriosityThis term, I…');
+  });
+
+  it('the questions go on without the table when none of its rows are left', () => {
+    const p = piece(4, 6);
+    expect(p.querySelector('table')).toBeNull();
+    expect(text(p)).toBe('How I See Myself (continued)StrengthWork on');
+  });
+
+  it('a question is cut from the next', () => {
+    expect(text(piece(3, 5))).toBe('How I See Myself (continued)This term, I…Strength');
+    expect(text(piece(5, 6))).toBe('How I See Myself (continued)Work on');
+  });
+
+  it('the whole part in one piece is the part', () => {
+    expect(piece(0, 6).innerHTML).toBe(html);
+  });
 });
