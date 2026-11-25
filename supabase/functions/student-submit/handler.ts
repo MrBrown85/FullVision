@@ -1,15 +1,7 @@
 // The student-submit request handler (docs/STUDENT-VOICE-PLAN.md, PR 6).
 //
-// A student's phone posts here; nothing else does. Four routes for a slip:
-//   {route: 'open', code}             -> student_submit.open
-//   {route: 'verify', token, code?, birthday | student_number | password}
-//                                     -> student_submit.verify (questionnaires)
-//   {route: 'check', token, birthday} -> student_submit.check (phone reports)
-//   {route: 'submit', token, answers} -> student_submit.submit
-// open and verify turn a slip's code and password into tags, as a card's
-// are (slip-routes.ts, plan S3-S1).
-// and the student card's routes, in card-routes.ts: card, verify (with a
-// code in place of a token), add-card, page, seen and done; and the routes
+// A student's phone posts here; nothing else does. The student card's routes
+// are in card-routes.ts: card, verify (with the card's code), add-card, page, seen and done; and the routes
 // a student sends work through, in send-routes.ts: work, send-start,
 // replace, send-finish, unsend, file-links, the teacher's sweep, and the
 // database timer's scheduled-sweep; and a teacher's handout's pages, in
@@ -17,12 +9,13 @@
 // bulletin-routes.ts: bulletins, bulletin-seen, bulletin-react and
 // bulletin-files; and a quiz, in quiz-routes.ts: quiz, quiz-save, quiz-send,
 // quiz-list (which pieces are quizzes) and quiz-result (the returned view).
-// The SQL functions (migrations/20261025_student_submit.sql, and
-// migrations/2026110904_student_sessions_page.sql for a card) hold every
-// rule; this file only checks the request's shape, refuses to run outside
-// ca-central-1, turns the caller's IP into a keyed hash, turns a card's or
-// a slip's code into its tag (the database cannot read either), and
-// answers with what the database said.
+// The SQL functions (migrations/2026110904_student_sessions_page.sql for a
+// card, and the ones after) hold every rule; this file only checks the
+// request's shape, refuses to run outside ca-central-1, turns the caller's IP
+// into a keyed hash, turns a card's code into its tag (the database cannot
+// read it), and answers with what the database said. Slips and phone reports
+// are gone (migrations/2026112414): their routes answer bad_request, but for open and check, which answer
+// not_found until the released student page stops asking them.
 //
 // Kept free of Deno and database imports so the tests run it under Node
 // with stand-in database calls. index.ts wires the real ones.
@@ -33,7 +26,7 @@ import { SEND_ROUTES, makeRemoval, makeSendRoutes } from './send-routes.ts';
 // Batch C's routes (Mark Up, Reflect, Revisions, group work): feedback-routes.ts and revision-routes.ts.
 import { FEEDBACK_ROUTES, makeFeedbackRoutes } from './feedback-routes.ts';
 import { REVISION_ROUTES, makeRevisionRoutes } from './revision-routes.ts';
-// Batch E's: questionnaires and phone reports from a card (forms-routes.ts).
+// Batch E's: questionnaires from a card (forms-routes.ts).
 import { FORM_ROUTES, makeFormRoutes } from './forms-routes.ts';
 // Handouts and Links: a teacher's handout's pages, signed (handout-routes.ts).
 import { HANDOUT_ROUTES, makeHandoutRoutes } from './handout-routes.ts';
@@ -41,18 +34,13 @@ import { HANDOUT_ROUTES, makeHandoutRoutes } from './handout-routes.ts';
 import { BULLETIN_ROUTES, makeBulletinRoutes } from './bulletin-routes.ts';
 // Quizzes: list the quizzes, open one, save each answer, send the try, the returned view (quiz-routes.ts).
 import { QUIZ_ROUTES, makeQuizRoutes } from './quiz-routes.ts';
-// A slip's open and verify, with the key (plan S3-S1).
-import { openSlip, verifySlip } from './slip-routes.ts';
 
 export type Db = {
-  // A phone report's birthday check and a questionnaire's answers, each with the slip token's hash.
-  check: (token: string, birthday: string, ipHash: string) => Promise<Record<string, unknown>>;
-  submit: (token: string, answers: unknown, ipHash: string) => Promise<Record<string, unknown>>;
-  // One statement (card-routes.ts, slip-routes.ts) with its parameters. Gives back the function's reply.
+  // One statement (card-routes.ts and the other route files) with its parameters. Gives back the function's reply.
   call: (sql: string, params: Param[]) => Promise<unknown>;
 };
 
-// What the student typed to show the slip is theirs; any one may match.
+// What the student typed to show the card is theirs; any one may match.
 export type Identity = { birthday: string | null; studentNumber: string | null; password: string | null };
 
 export type Options = {
@@ -62,8 +50,7 @@ export type Options = {
   // error and asks the database nothing, since each one counts against a per-address limit.
   ipKey: string | null;
   // STUDENT_CARD_KEY as readCardKey gives it: null or absent when it is missing or malformed. card, a card's
-  // verify, add-card and a slip's open need it: without it they answer a server error. A slip's verify uses it
-  // when it is there. Every other route carries on without it.
+  // verify and add-card need it: without it they answer a server error. Every other route carries on without it.
   cardKey?: CardKey | null;
   // The student-photos bucket with the service key, for send-routes.ts. Without it those routes answer a
   // server error and ask the database nothing; every other route carries on.
@@ -71,8 +58,7 @@ export type Options = {
   // Who a teacher's sign-in token belongs to (Supabase Auth), for sweep.
   whoIs?: ((token: string) => Promise<string | null>) | null;
   now?: () => number;
-  // Makes a new session's token for verify and add-card, and a slip's for open; the database is given only its
-  // hash. Tests fix it.
+  // Makes a new session's token for verify and add-card; the database is given only its hash. Tests fix it.
   sessionToken?: () => string;
   // Runs the removal worker after the answer (EdgeRuntime.waitUntil in index.ts); absent, before it.
   defer?: ((work: Promise<void>) => void) | null;
@@ -300,19 +286,8 @@ export function makeHandler(opts: Options) {
     if (typeof body.session === 'string' && body.session.length > 0 && body.session.length <= 128) {
       body.session = await sha256Hex(body.session);
     }
-    // A slip's token, the same way (2026112403): verify, check and submit send its SHA-256.
-    if (typeof body.token === 'string' && body.token.length > 0 && body.token.length <= 128) {
-      body.token = await sha256Hex(body.token);
-    }
-
     const route = body.route;
-    // A verify with a token is a slip's, as it always was; with a code and no token, a card's.
-    const card =
-      typeof route === 'string' &&
-      Object.hasOwn(CARD_ROUTES, route) &&
-      (route !== 'verify' || (body.token == null && body.code != null))
-        ? CARD_ROUTES[route]
-        : null;
+    const card = typeof route === 'string' && Object.hasOwn(CARD_ROUTES, route) ? CARD_ROUTES[route] : null;
     const send =
       typeof route !== 'string'
         ? null
@@ -363,39 +338,10 @@ export function makeHandler(opts: Options) {
         } else {
           result = cardReply(card, await opts.db.call(card.sql, [...params, hash]));
         }
-      } else if (route === 'open') {
-        if (typeof body.code !== 'string' || body.code.length > 32) {
-          return reply(400, { ok: false, error: 'bad_request' }, origin);
-        }
-        // A slip's code goes to the database as its tag: no key, no slip.
-        if (!opts.cardKey) {
-          log({ route, outcome: 'no_card_key', ms: Date.now() - started });
-          return reply(500, { ok: false, error: 'server' }, origin);
-        }
-        // A new slip token is made here; the database is given only its hash.
-        const token = (opts.sessionToken || randomSessionToken)();
-        result = await openSlip(opts.db, opts.cardKey, body.code, hash, token, await sha256Hex(token));
-      } else if (route === 'verify') {
-        const who = identity(body);
-        if (typeof body.token !== 'string' || body.token.length > 128 || !who) {
-          return reply(400, { ok: false, error: 'bad_request' }, origin);
-        }
-        result = await verifySlip(opts.db, opts.cardKey || null, body, body.token, who, hash);
-      } else if (route === 'check') {
-        if (
-          typeof body.token !== 'string' ||
-          body.token.length > 128 ||
-          typeof body.birthday !== 'string' ||
-          !/^\d{4}-\d{2}-\d{2}$/.test(body.birthday)
-        ) {
-          return reply(400, { ok: false, error: 'bad_request' }, origin);
-        }
-        result = await opts.db.check(body.token, body.birthday, hash);
-      } else if (route === 'submit') {
-        if (typeof body.token !== 'string' || body.token.length > 128 || body.answers == null) {
-          return reply(400, { ok: false, error: 'bad_request' }, origin);
-        }
-        result = await opts.db.submit(body.token, body.answers, hash);
+      } else if (route === 'open' || route === 'check') {
+        // The released student page (until the release after 2026112414) tries a slip when a code is no card,
+        // and reads not_found as "That code didn't work". Slips are gone: say so, and ask the database nothing.
+        result = { ok: false, error: 'not_found' };
       } else {
         return reply(400, { ok: false, error: 'bad_request' }, origin);
       }

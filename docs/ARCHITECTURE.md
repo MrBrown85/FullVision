@@ -30,7 +30,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- Teachers are the only accounts. Students have no logins: they open the student page (`s/index.html`) with a code, either from a questionnaire or report slip or from a printed student card, through the `student-submit` Supabase edge function. See Student page below. There is no parent portal.
+- Teachers are the only accounts. Students have no logins: they open the student page (`s/index.html`) with a code from a printed student card, through the `student-submit` Supabase edge function. See Student page below. There is no parent portal.
 
 ### Desktop SPA
 
@@ -66,12 +66,12 @@ The mobile experience reuses the same shared auth, data, queue, and calculation 
 
 ### Student page
 
-- Entry point: `s/index.html`. A student reaches it with a code from a slip (one questionnaire or one phone report) or from a printed student card (the student's page for a class). The server answers every request through the `student-submit` edge function (`supabase/functions/student-submit/`); a teacher's browser has slips and cards made through the `teacher-cards` edge function (`supabase/functions/teacher-cards/`), which draws each code once and keeps nothing.
-- A slip is `s/student.js` (the shell), then `s/questionnaire.js` and `s/report.js`, with `shared/phone-report-view.js`.
+- Entry point: `s/index.html`. A student reaches it with a code from a printed student card (the student's page for a class). The server answers every request through the `student-submit` edge function (`supabase/functions/student-submit/`); a teacher's browser has cards made through the `teacher-cards` edge function (`supabase/functions/teacher-cards/`), which draws each code once and keeps nothing.
+- `s/student.js` is the shell; `s/questionnaire.js` draws a reflection's questions. Questionnaire slips and phone report links are gone (`migrations/2026112414`).
 - A card is `s/app.js` (the card, Is This You?, After Done, Switching Classes, the page's frame and its four tabs) and `s/assignments.js` (To Do, Sent, Back and All Assignments). Both draw from `shared/student-view.js`, the one builder the student page and Preview as Student share, and from `s/page-view.js`, the one drawing of a class's page (a pure function of the view, with its look in `s/page-view.css`), which Preview as Student loads too.
 - Card screens that come with a piece of work: `s/send.js` (Check and Send: photographing and sending work, Unsend or Replace), `s/feedback.js` (See Your Work, with the teacher's marks and Show Marks), `s/handouts.js` (a teacher's handout, one page at a time) and `s/reflect.js` (Reflect on Feedback and the teacher's answer).
 - `s/student-data.js` turns the student's page reply into the shape `shared/calc.js` reads, so a result on the student page is worked out by the same code as the teacher's gradebook cell. `calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them.
-- A real card asks the student-submit routes: `card-routes.ts` (card, verify, add-card, page, seen, done), `forms-routes.ts` (the Questionnaires and My Reports tabs), `send-routes.ts`, `feedback-routes.ts`, `handout-routes.ts` and `revision-routes.ts`; a slip uses `slip-routes.ts` and `handler.ts`. Demo Mode (`/s/#demo-card`, with variants such as `#demo-card-send`) answers the same routes on the device and sends nothing. Send Work, Reflect on Feedback and the rest of the page sit behind the per-class build switch (`course.student_page_enabled`) described below, and a class's page is drawn exactly as before when they are off.
+- A real card asks the student-submit routes: `card-routes.ts` (card, verify, add-card, page, seen, done), `forms-routes.ts` (Reflect's questionnaires), `send-routes.ts`, `feedback-routes.ts`, `handout-routes.ts` and `revision-routes.ts`. Demo Mode (`/s/#demo-card`, with variants such as `#demo-card-send`) answers the same routes on the device and sends nothing. Send Work, Reflect on Feedback and the rest of the page sit behind the per-class build switch (`course.student_page_enabled`) described below, and a class's page is drawn exactly as before when they are off.
 
 ## Shared client architecture
 
@@ -93,7 +93,7 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 10. `shared/reporting-term-presets.js`
 11. `shared/data-utilities.js` (the small helpers every file uses: student names, dates, colours, ids and RPC results)
 12. `shared/data.js`
-13. `shared/data-rpc-wrappers.js` (the `window.v2` server calls: one small wrapper per RPC, from subjects and categories to reports, slips, phone reports and the assessment detail; `shared/data.js` makes `window.v2` and the plumbing they call)
+13. `shared/data-rpc-wrappers.js` (the `window.v2` server calls: one small wrapper per RPC, from subjects and categories to reports and the assessment detail; `shared/data.js` makes `window.v2` and the plumbing they call)
 14. `shared/data-learning-map.js` (the learning map: its sections, tags and competency groups, removed sections, and its save to the server)
 15. `shared/data-categories.js` (categories: an assessment's category, the save to the server, the category write guard and Class Settings' category draft)
 16. `shared/data-rubrics.js` (rubrics: the save to the server, Advanced Rubric checkboxes, printed rubrics and competency descriptors)
@@ -284,7 +284,7 @@ Behind a per-class switch (`course.student_page_enabled`, off for every class un
 - **The rows** (one per student per assessment: Draft or Returned, and what the student was last given) are kept by database triggers (`grade_return`). The client reads them with `list_course_grade_returns` after the class loads, after a change from another device, and once its own writes have landed, into the `gradeReturns` cache Demo Mode also uses. Between a save and that read the row is the one `shared/grade-state.js` works out: the same rule as the triggers, held to them by `tests/fixtures/grade-state-cases.json`. Rows read from before a newer local change are never applied. A DIBELS benchmark has no row on either side.
 - **Return** (`Grader.returnGrades`) is optimistic on the device and goes to the server as `return_grades`, one call for each student, through the outbox under the cell's key (`cell:<student>:<assessment>`), so it follows that cell's score writes; the outbox also holds it behind any queued write to the whole student or the whole piece of work, and such a write behind it.
 - **A refused write** of a Return or of either setting has the class read again whole (settings and rows), and that read is retried like any failed class load, so the device converges on the server. So does an ask of the server that fails or goes unanswered (a change that starts holding, the count of drafts): the server may have made the change and only its answer been lost.
-- **Student cards** (`teacher/student-cards.js`): `issue_student_cards` and `list_student_cards` are asked for online with the teacher waiting, as slip codes are; `mark_student_cards_printed` goes through the outbox. A signed-in teacher's card codes are held in memory only, and are read only while the Student Cards list is on the page. Cards print on the questionnaire slips' sheet (`QrSlips.printSheet`).
+- **Student cards** (`teacher/student-cards.js`): `issue_student_cards` and `list_student_cards` are asked for online with the teacher waiting; `mark_student_cards_printed` goes through the outbox. A signed-in teacher's card codes are held in memory only, and are read only while the Student Cards list is on the page. Cards print on the eight-to-a-page sheet in `teacher/qr-slips.js` (`QrSlips.printSheet`).
 - **Demo Mode** runs all of it on the device (`gb-grade-returns-<cid>`, `gb-student-cards-<cid>`) and sends nothing.
 
 ### Cross-tab behavior
@@ -305,7 +305,7 @@ FullVision is organized around a teacher-owned data model:
 - term/report artifacts (`term_rating`: the comment as plain text, the six work habits, approval, attendance totals)
 - preferences and report configuration
 
-The app is designed around teacher-owned classroom workflows. Students have no logins and there is no parent portal: a student opens the student page with a printed card or a slip, and sees only what the teacher has returned.
+The app is designed around teacher-owned classroom workflows. Students have no logins and there is no parent portal: a student opens the student page with a printed card, and sees only what the teacher has returned.
 
 ### Grading model
 

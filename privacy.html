@@ -120,58 +120,24 @@
       <h2>Who uses it</h2>
       <p>
         Only teachers have accounts. Students and parents do not, and FullVision never emails or messages them. A
-        student opens their own page with a printed card, or a questionnaire or a report with a slip, as described
-        below. Teachers enter student information themselves, so each teacher decides what goes in. Before entering
-        student information, a teacher should confirm that their school district allows it.
+        student opens their own page with a printed card, as described below. Teachers enter student information
+        themselves, so each teacher decides what goes in. Before entering student information, a teacher should confirm
+        that their school district allows it.
       </p>
 
       <h2>Student questionnaires</h2>
       <p>
-        A teacher can turn on short questionnaires, such as About Me or a Core Competency reflection, and print a slip
-        for each student. The student scans the slip's code with a phone and answers there, without an account.
+        A teacher can turn on short questionnaires, such as About Me or a Core Competency reflection. The student opens
+        them from their own page, after signing in with their card, and answers there, without an account.
       </p>
       <ul>
         <li>
-          The phone shows only the student's first name, the class name and the questions. It never shows marks,
+          The questionnaire shows only the student's first name, the class name and the questions. It never shows marks,
           designations, notes or another student's information.
-        </li>
-        <li>
-          Each code works once, only for that student, and only while the questionnaire is open. FullVision does not
-          keep a slip's code. The database keeps only a keyed fingerprint of it, as for a student card, made with a key
-          the database never holds, so a copy of the database cannot be used to work the codes out. A slip printed
-          before this change is changed over to a fingerprint the first time it is scanned; one never scanned stops
-          working after June 30, 2027.
-        </li>
-        <li>
-          Before the questions open, the student shows the slip is theirs: their birthday or student number, checked
-          against what the teacher entered, or, for a student with neither, a four-digit password FullVision prints on
-          the slip and keeps only as a keyed fingerprint, like the code. After five wrong tries the slip stops working.
         </li>
         <li>
           The answers go to the teacher's gradebook and nowhere else. A question the teacher marks as private, such as
           "Is there anything else you want me to know?", is seen only by the teacher and never printed on a report.
-        </li>
-        <li>
-          To stop people guessing codes, FullVision blocks a network after repeated wrong codes. For this it keeps a
-          scrambled form of the phone's network address with each attempt for 30 days. The address itself is not stored.
-        </li>
-      </ul>
-
-      <h2>Reports on students' phones</h2>
-      <p>
-        A teacher can send a student's progress report to the student's phone. The student opens it with the code on
-        their slip and their birthday. The report is for reading; there is nothing to send back.
-      </p>
-      <ul>
-        <li>
-          The phone shows a copy the teacher made when they sent it: the student's levels, the teacher's comment, the
-          student's own goal and self-assessment, and attendance. It never shows designations, notes, observations or
-          private answers. The teacher can update the copy or close the link at any time.
-        </li>
-        <li>
-          The link works until the date the teacher sets. FullVision checks the birthday against the date of birth the
-          teacher entered. After five wrong birthdays the page stops; scanning the code again starts over, but the link
-          takes no more than ten wrong birthdays in 15 minutes. Students can open their report as often as they like.
         </li>
       </ul>
 
@@ -188,9 +154,8 @@
         </li>
         <li>
           Before the page opens, the student shows the card is theirs: their birthday or student number, checked against
-          what the teacher entered, or, for a student with neither, a four-digit password printed on the card. A card's
-          password is its own, not the one on the student's slips. Five wrong tries in a row, or 15 in a week, lock the
-          card until the teacher unlocks it.
+          what the teacher entered, or, for a student with neither, a four-digit password printed on the card. Five
+          wrong tries in a row, or 15 in a week, lock the card until the teacher unlocks it.
         </li>
         <li>
           FullVision does not keep a card's code or its password. The database keeps only a keyed fingerprint of each: a
@@ -213,8 +178,8 @@
         <li>
           For each card FullVision records its card number, when it was made, printed and last opened, its wrong tries,
           whether it is locked or replaced, and the last day it works. The teacher sees these in Student Cards. Each try
-          at a code is logged with the time and the result, with the same scrambled network address as for slips, and
-          kept for 30 days.
+          at a code is logged with the time and the result, with a scrambled form of the network address (the address
+          itself is not stored), and kept for 30 days.
         </li>
         <li>
           When a student opens a returned piece of work, FullVision records the time, so the page can mark the grade
@@ -307,9 +272,7 @@
             <td>
               Name, preferred name, pronouns, student number, email address, date of birth, learning designations (such
               as an IEP), and parents' or guardians' email addresses. Only a first name is required; the teacher chooses
-              whether to add the rest. For a student with no birthday or student number, a questionnaire slip password
-              printed before this change is kept as printed until no unscanned slip from before the change needs it (at
-              the latest June 30, 2027); every slip password since is kept only as a keyed fingerprint, with its slip.
+              whether to add the rest.
             </td>
           </tr>
           <tr>
@@ -322,8 +285,8 @@
           <tr>
             <td>Student answers</td>
             <td>
-              What students write in their teacher's questionnaires and in replies to their reports, and their Core
-              Competency self-assessments. Each answer is saved with the time it was sent.
+              What students write in their teacher's questionnaires, and their Core Competency self-assessments. Each
+              answer is saved with the time it was sent.
             </td>
           </tr>
           <tr>
@@ -365,10 +328,6 @@
               and cannot open their student page. The teacher's own browser reads it from a scanned page to find whose
               paper it is; the scan itself is not uploaded, only each student's own pages.
             </td>
-          </tr>
-          <tr>
-            <td>Reports sent to phones</td>
-            <td>The copy of each student's report the teacher sent to phones, and when the student opened it.</td>
           </tr>
           <tr>
             <td>Classes</td>
@@ -421,8 +380,8 @@
         <li>
           <strong>You.</strong> Each teacher sees only their own classes and students. The database enforces this on
           every request; signed-in teachers cannot read another teacher's data, and people who are not signed in cannot
-          read anything but their own: a student can answer a questionnaire, or open their own report, with the code on
-          their slip, and open their own page with their card.
+          read anything but their own: a student can open their own page, and answer its questionnaires, with their
+          card.
         </li>
         <li>
           <strong>The operator.</strong> Colin Brown has administrator access to the database. He uses it only to keep
@@ -470,7 +429,7 @@
           class is deleted. Deleting a bulletin deletes its files and every student's seen mark and reaction on it. A
           student's seen marks and reactions are deleted with the student.
         </li>
-        <li>The record of tries at slip and card codes is kept for 30 days.</li>
+        <li>The record of tries at card codes is kept for 30 days.</li>
         <li>
           <strong>Backups.</strong> Supabase makes a daily backup of the database and keeps each one for 7 days. A
           deleted item can remain in backups for up to 7 days after it is deleted.
@@ -485,9 +444,7 @@
         <li>Database rules restrict every request to the signed-in teacher's own data.</li>
         <li>
           Student card codes and passwords are kept only as keyed fingerprints, made with a key the database never
-          holds. Slip codes and passwords are kept the same way; a slip printed before this change is changed over when
-          it is first scanned, and one never scanned stops working after June 30, 2027. Every code is blocked after
-          repeated wrong tries.
+          holds. Every code is blocked after repeated wrong tries.
         </li>
         <li>The pages only run scripts from FullVision itself and from Sentry's error-reporting service.</li>
       </ul>

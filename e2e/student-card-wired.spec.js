@@ -208,7 +208,7 @@ test.describe('a real card: the keyboard alone', () => {
     await serve(page, fn);
     await page.goto('/s/');
     await page.keyboard.press('Tab');
-    await expect(page.getByLabel('Type the code on your slip')).toBeFocused();
+    await expect(page.getByLabel('Type the code on your card')).toBeFocused();
     await page.keyboard.type('p3r8-wdk4');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
@@ -333,20 +333,17 @@ test.describe('a real card: what stops it, and what each one says', () => {
     expect(routes(posts)).toEqual(['card']);
   });
 
-  test('a code that opens nothing, typed on the card’s screen and on the slip’s', async ({ page }) => {
+  test('a code that opens nothing, typed on the start screen and on the card’s', async ({ page }) => {
     const fn = school();
     const posts = await serve(page, fn);
-    // On the slip's screen: the slip's words, as before.
+    // On the start screen.
     await page.goto('/s/');
-    await page.getByLabel('Type the code on your slip').fill('ABC-234');
+    await page.getByLabel('Type the code on your card').fill('ABC-234');
     await page.getByRole('button', { name: 'Open' }).tap();
     await expect(page.getByRole('alert')).toContainText(
-      "That code didn't work. Check the letters and numbers on your slip.",
+      "That code didn't work. Check the letters and numbers on your card.",
     );
-    expect(posts.map(p => p.body)).toEqual([
-      { route: 'card', code: 'ABC234' },
-      { route: 'open', code: 'ABC234' },
-    ]);
+    expect(posts.map(p => p.body)).toEqual([{ route: 'card', code: 'ABC234' }]);
     // On the card's screen (after Log Out): the card's words.
     await signIn(page);
     await logOut(page);
@@ -367,7 +364,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     const posts = await serve(page, fn);
     await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByRole('alert')).toHaveText('Too many tries. Wait 15 minutes and try again.');
-    expect(routes(posts)).toEqual(['card', 'open']);
+    expect(routes(posts)).toEqual(['card']);
     await shot(page, '10-too-many-tries');
   });
 
@@ -644,74 +641,5 @@ test.describe('a real card: a shared Chromebook', () => {
     await expect(page.getByLabel('Card Code')).toBeVisible();
     expect(routes(posts)).toEqual([]);
     expect((await stored(page)).local[KEY]).toBeUndefined();
-  });
-});
-
-test.describe('a slip is as it was', () => {
-  test.use(PHONE);
-
-  const SLIP = {
-    ok: true,
-    token: 'a'.repeat(64),
-    student: { first_name: 'Cece' },
-    course: { name: 'Science 8', block: 'B' },
-    preview: [{ title: 'November Reflection', count: 1 }],
-    check: 'identity',
-  };
-
-  test('with the card’s routes deployed: card says it is no card, then open and verify as before', async ({ page }) => {
-    const fn = school(null, { slips: { K7M4QX: SLIP } });
-    const posts = await serve(page, fn);
-    await page.goto('/s/#K7M-4QX');
-    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    await expect(page).toHaveTitle(/Student Questions/);
-    // A slip's code stays in the address until it is used, as before.
-    await expect(page).toHaveURL(/\/s\/#K7M-4QX$/);
-    await page.getByLabel('Student Number').fill('0123456');
-    await page.getByRole('button', { name: 'Yes, Start' }).tap();
-    await expect(page.getByText('How did it go?')).toBeVisible();
-    expect(posts.map(p => p.body)).toEqual([
-      { route: 'card', code: 'K7M4QX' },
-      { route: 'open', code: 'K7M4QX' },
-      // The slip's code goes with its verify, so the function checks it against the slip's keyed tag (S3-S1).
-      // The token is the one the function made for open (2026112403).
-      {
-        route: 'verify',
-        token: expect.stringMatching(/^[0-9a-f]{64}$/),
-        code: 'K7M4QX',
-        birthday: null,
-        student_number: '0123456',
-        password: null,
-      },
-    ]);
-    // Six characters is no card's code, so the function answers `card` without asking the database; and it sent
-    // the token's verify to the slip's function, not the card's.
-    expect(fn.sql.map(q => q.fn)).toEqual(['open', 'verify']);
-    expect((await stored(page)).local).toEqual({});
-  });
-
-  test('against the function deployed today, which has no card route', async ({ page }) => {
-    const fn = school(null, { slips: { K7M4QX: SLIP } });
-    const posts = [];
-    await page.route('**/functions/v1/student-submit**', async route => {
-      const req = route.request();
-      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
-      const body = JSON.parse(req.postData() || '{}');
-      posts.push(body.route);
-      // What the deployed handler answers to a route it does not know.
-      const reply = body.route === 'card' ? { status: 400, json: { ok: false, error: 'bad_request' } } : null;
-      const { status, json } = reply || (await fn.respond(body));
-      return route.fulfill({
-        status,
-        headers: { ...CORS, 'content-type': 'application/json' },
-        body: JSON.stringify(json),
-      });
-    });
-    await page.goto('/s/#K7M-4QX');
-    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    await page.getByLabel('Student Number').fill('0123456');
-    await page.getByRole('button', { name: 'Yes, Start' }).tap();
-    await expect(page.getByText('How did it go?')).toBeVisible();
-    expect(posts).toEqual(['card', 'open', 'verify']);
   });
 });

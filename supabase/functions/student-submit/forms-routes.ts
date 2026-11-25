@@ -1,19 +1,13 @@
-// Questionnaires and phone reports from the student's card (Batch E, E2;
-// plan S4-F4). The database side is migrations/2026111150_student_page_
-// last_changes.sql. A slip's own routes (open, verify, check, submit in
-// handler.ts) are not changed: a printed slip works as before.
+// Questionnaires from the student's card (Batch E, E2; plan S4-F4). The
+// database side is migrations/2026111150_student_page_last_changes.sql.
+// Slips and phone reports are gone (migrations/2026112414).
 //
 //   {route: 'forms', session, enrollment_id}
-//        -> student_submit.forms. The Questionnaires and My Reports tabs'
-//           lists, read-only.
+//        -> student_submit.forms. The questionnaires' list, read-only.
 //   {route: 'form', session, enrollment_id, questionnaire_id}
-//        -> student_submit.form. The questionnaire to answer, as a slip's
-//           verify gives it, read-only.
+//        -> student_submit.form. The questionnaire to answer, read-only.
 //   {route: 'answer', session, enrollment_id, questionnaire_id, answers}
 //        -> student_submit.answer. Once.
-//   {route: 'report', session, enrollment_id, report_id}
-//        -> student_submit.report. The phone report, as a slip's check
-//           gives it once the birthday matches.
 //
 // The rules are send-routes.ts's and feedback-routes.ts's: the session
 // checked by the database first and who the student is taken only from
@@ -23,11 +17,8 @@
 // any other answered not_found; a log line with nothing about the student
 // (handler.ts).
 //
-// Two answers are passed on whole, as the slip's routes pass them: a
-// question's `options` (the teacher's own choices and labels, whose shape
-// is the question kind's) and the phone report (the teacher's copy for
-// this student, written when it was sent; s/report.js reads it as it reads
-// a slip's).
+// One thing is passed on whole: a question's `options` (the teacher's own
+// choices and labels, whose shape is the question kind's).
 //
 // Kept free of Deno and database imports, as handler.ts is.
 import {
@@ -52,7 +43,6 @@ export const FORM_ROUTES: Record<string, true> = {
   forms: true,
   form: true,
   answer: true,
-  report: true,
 };
 
 // ── The statements ──────────────────────────────────────────────────────────
@@ -61,16 +51,14 @@ export const SQL = {
   forms: 'select student_submit.forms($1::text, $2::uuid, $3::text) as r',
   form: 'select student_submit.form($1::text, $2::uuid, $3::uuid, $4::text) as r',
   answer: 'select student_submit.answer($1::text, $2::uuid, $3::uuid, $4::text::jsonb, $5::text) as r',
-  report: 'select student_submit.report($1::text, $2::uuid, $3::uuid, $4::text) as r',
 };
 
 // ── What each route passes on ───────────────────────────────────────────────
-// form and answer use _send_session (card_locked); forms and report may be read by a locked card.
+// form and answer use _send_session (card_locked); forms may be read by a locked card.
 const ERRORS = {
   forms: SESSION_ERRORS,
   form: [...CHANGE_ERRORS, 'already_sent', 'closed', 'not_open_yet'],
   answer: [...CHANGE_ERRORS, 'already_sent', 'closed', 'not_open_yet', 'invalid', 'empty', 'too_many'],
-  report: [...SESSION_ERRORS, 'report_closed'],
 } as const;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -127,14 +115,6 @@ function forms(r: Json): Json {
     questionnaires: list(r.questionnaires).map(q =>
       pick(q, ['id', 'title', 'description', 'minutes', 'state', 'opens_on', 'closes_on', 'sent_at']),
     ),
-    reports: list(r.reports).map(x => {
-      const y = isObject(x) ? x : {};
-      return {
-        ...pick(y, ['id', 'title', 'issued_at', 'expires_on', 'opened_at']),
-        overall: isObject(y.overall) ? pick(y.overall, ['word', 'text', 'level']) : null,
-        comment: typeof y.comment === 'string' ? y.comment : Array.isArray(y.comment) ? texts(y.comment) : null,
-      };
-    }),
   };
 }
 
@@ -190,15 +170,6 @@ const ROUTES: Record<string, Route> = {
     },
     errors: ERRORS.answer,
     reply: r => ({ ok: true, ...pick(r, ['submitted_at']) }),
-  },
-  report: {
-    sql: SQL.report,
-    params: (body, s, e) => {
-      const id = uuid(body.report_id);
-      return id ? [s, e, id] : null;
-    },
-    errors: ERRORS.report,
-    reply: r => ({ ok: true, report: isObject(r.report) ? r.report : {} }),
   },
 };
 

@@ -10,8 +10,8 @@
  *     as typed, on card, verify and add-card;
  *   - no log line holds a code, a tag, the key, a password or a token;
  *   - with the key missing, short or not hex, those three routes answer a
- *     plain server error and ask the database nothing, while the four slip
- *     routes, page, seen and done are exactly as they are with a key;
+ *     plain server error and ask the database nothing, while page, seen and
+ *     done are exactly as they are with a key;
  *   - a code that is not eight characters is no card's: not_found, and the
  *     database is not asked;
  *   - a replaced card answers card_stopped.
@@ -80,16 +80,9 @@ function setup(cardKey, answers) {
       page: () => ({ ok: true, v: 1, expires_at: VERIFIED.expires_at, tags: {}, rubrics: [] }),
       seen: () => ({ ok: true, seen: 1 }),
       done: () => ({ ok: true }),
-      // A slip's open and verify, with tags since plan S3-S1 (slip-routes.ts).
-      open: () => ({ ok: true, parts: [], slip: 'open' }),
-      verify: () => ({ ok: true, parts: [], slip: 'verify' }),
     },
     answers,
   );
-  const slip = name => async (first, second, third) => {
-    asked.push({ fn: name, params: [first, second, third] });
-    return { ok: true, parts: [], slip: name };
-  };
   const handle = makeHandler({
     region: 'ca-central-1',
     ipKey: 'test-key',
@@ -99,8 +92,6 @@ function setup(cardKey, answers) {
     sessionToken: () => 'f'.repeat(64),
     log: entry => logs.push(entry),
     db: {
-      check: slip('check'),
-      submit: slip('submit'),
       async call(text, params) {
         const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
         asked.push({ fn, sql: text, params });
@@ -131,11 +122,7 @@ const CODE_ROUTES = {
   verify: { route: 'verify', code: CODE, password: '4821' },
   'add-card': { route: 'add-card', code: CODE, password: '4821', session: SESSION },
 };
-// A slip's open needs the key since plan S3-S1: it is tested on its own below.
 const OTHER_ROUTES = {
-  'verify (a slip’s)': { route: 'verify', token: SESSION, student_number: '0123456' },
-  check: { route: 'check', token: SESSION, birthday: '2012-05-15' },
-  submit: { route: 'submit', token: SESSION, answers: { q1: 'a' } },
   page: { route: 'page', session: SESSION, enrollment_id: ENROLLMENT },
   seen: { route: 'seen', session: SESSION, enrollment_id: ENROLLMENT, assessment_ids: [WORK] },
   done: { route: 'done', session: SESSION },
@@ -368,21 +355,6 @@ describe('student-submit: with no card key', () => {
     },
   );
 
-  it('a slip’s open answers a plain server error too (its code goes as a tag since plan S3-S1), and asks nothing', async () => {
-    for (const [name, value] of Object.entries(NO_KEY)) {
-      const h = setup(await readCardKey(value));
-      expect(await send(h, { route: 'open', code: 'K7M4QX' }), name).toEqual({
-        status: 500,
-        body: { ok: false, error: 'server' },
-      });
-      expect(h.asked, name).toEqual([]);
-      expect(
-        h.logs.map(l => [l.route, l.outcome]),
-        name,
-      ).toEqual([['open', 'no_card_key']]);
-    }
-  });
-
   it.each(Object.keys(OTHER_ROUTES))('%s carries on exactly as it does with a key', async route => {
     const withKey = setup(KEY);
     const expected = await send(withKey, OTHER_ROUTES[route]);
@@ -478,7 +450,7 @@ describe('student-submit: no log line holds a secret', () => {
 
   it('across every outcome: route, outcome, time, and the kind of an error', async () => {
     const logs = await everything();
-    expect(logs.length).toBeGreaterThan(60);
+    expect(logs.length).toBeGreaterThan(40);
     const text = JSON.stringify(logs);
     for (const secret of [
       CODE,
@@ -611,10 +583,9 @@ describe('the stand-in function the student page’s tests use (tests/helpers/fa
   });
 
   it('a replaced card says so, a six-character code is no card, and an unknown one is not found', async () => {
-    const fn = fakeStudentSubmit({ cards: [card8()], slips: { K7M4QX: { ok: true, token: 't' } } });
+    const fn = fakeStudentSubmit({ cards: [card8()] });
     expect(await fn.handle({ route: 'card', code: 'K7M-4QX' })).toEqual({ ok: false, error: 'not_found' });
     expect(fn.sql).toEqual([]);
-    expect((await fn.handle({ route: 'open', code: 'K7M-4QX' })).ok).toBe(true);
     expect(await fn.handle({ route: 'card', code: 'ZZZZ-ZZZZ' })).toEqual({ ok: false, error: 'not_found' });
     fn.state.cards.P3R8WD4K.stopped = true;
     expect(await fn.handle({ route: 'card', code: CODE })).toEqual({ ok: false, error: 'card_stopped' });
@@ -622,24 +593,6 @@ describe('the stand-in function the student page’s tests use (tests/helpers/fa
       ok: false,
       error: 'card_stopped',
     });
-  });
-
-  it('with no key the card routes fail, and since plan S3-S1 so does a slip’s open; with it a slip opens', async () => {
-    for (const cardKey of [null, 'not a key']) {
-      const fn = fakeStudentSubmit({ cards: [card8()], slips: { K7M4QX: { ok: true, token: 't' } }, cardKey });
-      expect(await fn.respond({ route: 'card', code: CODE })).toEqual({
-        status: 500,
-        json: { ok: false, error: 'server' },
-      });
-      expect(await fn.respond({ route: 'open', code: 'K7M4QX' })).toEqual({
-        status: 500,
-        json: { ok: false, error: 'server' },
-      });
-      expect(fn.sql).toEqual([]);
-    }
-    const fn = fakeStudentSubmit({ cards: [card8()], slips: { K7M4QX: { ok: true, token: 't' } } });
-    expect((await fn.handle({ route: 'open', code: 'K7M4QX' })).ok).toBe(true);
-    expect(fn.sql.map(q => q.fn)).toEqual(['open']);
   });
 
   it('its sample card is eight characters, and it holds no card of any other length', async () => {

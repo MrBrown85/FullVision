@@ -617,49 +617,6 @@ window.v2.deleteQuestionnaire = function (id) {
   if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
   return _rpcOrNoop('delete_questionnaire', { p_id: id });
 };
-/* New slips: [{ enrollment_id, code, password? }], every enrolled student
-   when enrollmentIds is empty. teacher-cards makes them (plan S3-S1): it
-   draws each code (and, for a student with no birthday or student number,
-   a password), and the database keeps only their keyed tags. Online only
-   and never through the outbox: the codes come back once, and nothing here
-   keeps them. A reply lost on the way (a replay, which carries no codes)
-   is asked for once more under a new request id: those slips are made
-   again, which takes back the ones nobody printed. A reprint always has a
-   new code, and a new password where there is one. */
-function _issueSlips(kind, id, enrollmentIds) {
-  if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
-  var sb = getSupabase();
-  if (!sb || _isDemoSession()) return Promise.resolve({ data: null, error: null });
-  var ids = (enrollmentIds || []).filter(_isUuid);
-  var ask = function () {
-    return _teacherCardsAsk({
-      route: 'slips',
-      kind: kind,
-      id: id,
-      enrollment_ids: ids.length ? ids : null,
-      request_id: _newEntryId(),
-    });
-  };
-  return _trackPendingSync(
-    (async function () {
-      var got = await ask();
-      if (got.data && got.data.replayed) got = await ask();
-      if (!got.data) return { data: null, error: got.error };
-      var rows = [];
-      got.data.results.forEach(function (r) {
-        if (!r || r.result !== 'made' || typeof r.code !== 'string') return;
-        var row = { enrollment_id: r.enrollment_id, code: r.code };
-        if (typeof r.password === 'string') row.password = r.password;
-        rows.push(row);
-      });
-      return { data: rows, error: null };
-    })(),
-  );
-}
-window.v2.issueAccessCodes = function (questionnaireId, enrollmentIds) {
-  return _issueSlips('questionnaire', questionnaireId, enrollmentIds);
-};
-
 /* Teacher preferences: a patch of only the keys that changed; the server
    leaves every other key as it holds it, and merges dashboard_prefs key by
    key (migration 2026112404). A patch that changes nothing sends nothing.

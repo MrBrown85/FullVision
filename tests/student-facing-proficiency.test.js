@@ -58,7 +58,6 @@ const STUDENT_FACING = [
   'teacher/report-feedback.js',
   'teacher/report-feedback-cards.js',
   'teacher/rubric-print.js',
-  'shared/phone-report-view.js',
   'shared/student-view.js',
 ].concat(
   readdirSync(join(ROOT, 's'))

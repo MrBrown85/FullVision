@@ -63,7 +63,7 @@ for (const size of [
       const posts = await serve(page, fn);
       // The slip's box, on the page with no code.
       await page.goto('/s/');
-      await page.getByLabel('Type the code on your slip').fill('p3r8wdk4');
+      await page.getByLabel('Type the code on your card').fill('p3r8wdk4');
       await codeFits(page);
       await page.getByRole('button', { name: 'Open' }).click();
       await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
@@ -104,42 +104,17 @@ for (const size of [
   });
 }
 
-test.describe('a six-character slip on a phone', () => {
+test.describe('a code that is not eight characters, on a phone', () => {
   test.use(PHONE);
-
-  test('still opens as before', async ({ page }) => {
-    const fn = school(null, {
-      slips: {
-        K7M4QX: {
-          ok: true,
-          token: 'a'.repeat(64),
-          student: { first_name: 'Cece' },
-          course: { name: 'Science 8', block: 'B' },
-          preview: [{ title: 'November Reflection', count: 1 }],
-          check: 'identity',
-        },
-      },
-    });
-    const posts = await serve(page, fn);
-    await page.goto('/s/');
-    await page.getByLabel('Type the code on your slip').fill('k7m4qx');
-    await page.getByRole('button', { name: 'Open' }).click();
-    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    await page.getByLabel('Student Number').fill('0123456');
-    await page.getByRole('button', { name: 'Yes, Start' }).tap();
-    await expect(page.getByText('How did it go?')).toBeVisible();
-    expect(posts.map(p => p.body.route)).toEqual(['card', 'open', 'verify']);
-    expect(posts[1].body.code).toBe('K7M4QX');
-  });
 
   test('a seven-character code is refused at once, and nothing is asked', async ({ page }) => {
     const fn = school();
     const posts = await serve(page, fn);
     await page.goto('/s/');
-    await page.getByLabel('Type the code on your slip').fill('K7M4QX2');
+    await page.getByLabel('Type the code on your card').fill('K7M4QX2');
     await page.getByRole('button', { name: 'Open' }).click();
     await expect(page.getByRole('alert')).toContainText("That code didn't work.");
-    await expect(page.getByLabel('Type the code on your slip')).toHaveValue('K7M4QX2');
+    await expect(page.getByLabel('Type the code on your card')).toHaveValue('K7M4QX2');
     expect(routes(posts)).toEqual([]);
   });
 });

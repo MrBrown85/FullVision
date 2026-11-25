@@ -14,7 +14,7 @@ Production is deployed at [fullvision.ca](https://fullvision.ca). For engineerin
 
 ## Product scope
 
-FullVision is a teacher-owned workflow. Students have no accounts: they open their own page (`s/`) with a printed card or slip. There is no parent portal.
+FullVision is a teacher-owned workflow. Students have no accounts: they open their own page (`s/`) with a printed card. There is no parent portal.
 
 Core capabilities include:
 
@@ -28,8 +28,8 @@ Core capabilities include:
 - roster and course-management tools
 - mobile speed-grading and observation capture
 - offline-aware client behavior with queued retry
-- the student page (`s/`): assignments, feedback, My Learning, questionnaires and phone reports (behind a per-class build switch)
-- student cards and slips, printed from Class Settings › Student Page (behind a per-class build switch)
+- the student page (`s/`): assignments, feedback, My Learning and questionnaires (behind a per-class build switch)
+- student cards, printed from Class Settings › Student Page (behind a per-class build switch)
 - Send Work: students send photos or PDFs of their work (behind a per-class build switch)
 - Mark Up: the teacher draws on a student's work, on desktop and phone (behind a per-class build switch)
 - Preview as Student: the teacher sees what a student's page shows (behind a per-class build switch)
@@ -73,7 +73,7 @@ Platform model:
 - static site deployment on Netlify
 - runtime environment injection through `netlify/edge-functions/inject-env.js`
 - Supabase Auth, Postgres, RLS, and public RPC surface for persistence
-- two Supabase edge functions, `supabase/functions/student-submit` (the student page's server) and `supabase/functions/teacher-cards` (makes student cards and slips); they deploy separately from Netlify
+- two Supabase edge functions, `supabase/functions/student-submit` (the student page's server) and `supabase/functions/teacher-cards` (makes student cards); they deploy separately from Netlify
 - local cache plus `localStorage` fallback for responsiveness and offline safety
 - retry queue via `window.v2Queue`
 
@@ -214,7 +214,7 @@ Additional references:
 
 - Production availability can be affected by Netlify quota exhaustion.
 - Open work is in [docs/ROADMAP.md](docs/ROADMAP.md).
-- Teachers sign in. Students have no accounts: they answer questionnaires and read phone reports on the student page (`s/`) with a printed card or slip. There is no parent portal.
+- Teachers sign in. Students have no accounts: they answer questionnaires on the student page (`s/`) with a printed card. There is no parent portal.
 
 ## License
 

@@ -1,11 +1,9 @@
-// student-submit: where a student's phone opens a questionnaire and sends
-// its answers (docs/STUDENT-VOICE-PLAN.md, PR 6), and where a student's card
-// opens their page (docs/plans/student-page-build-plan.md 1.8). Deployed
-// with verify_jwt off, since the phone holds no key; the slip's or the
-// card's code is the credential. Each is turned into a tag here with
+// student-submit: where a student's card opens their page
+// (docs/plans/student-page-build-plan.md 1.8) and a student reads, answers
+// and sends. Deployed with verify_jwt off, since the phone holds no key; the
+// card's code is the credential. It is turned into a tag here with
 // STUDENT_CARD_KEY and the tag is checked in SQL: the database never has
-// the key, and sees a slip's plain code only once, to convert a slip
-// printed before it could be tagged (slip-routes.ts).
+// the key or a plain code.
 //
 // The phone calls it with ?forceFunctionRegion=ca-central-1 so it runs
 // beside gradebook-prod; handler.ts refuses anywhere else. It reaches the
@@ -70,16 +68,7 @@ const handle = makeHandler({
   sweepSecret: photoSweepSecret,
   ipKey,
   db: {
-    async check(token, birthday, ipHash) {
-      const [row] = await sql()`select student_submit.check(${token}, ${birthday}, ${ipHash}) as r`;
-      return row.r;
-    },
-    async submit(token, answers, ipHash) {
-      const [row] = await sql()`select student_submit.submit(${token}, ${sql().json(answers)}, ${ipHash}) as r`;
-      return row.r;
-    },
-    // The card routes and a slip's open and verify: one statement each, written in card-routes.ts and
-    // slip-routes.ts.
+    // Every route: one statement, written in its own route file.
     async call(text, params) {
       const [row] = await sql().unsafe(text, params);
       return row.r;

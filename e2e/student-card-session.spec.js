@@ -42,16 +42,6 @@ async function signIn(page) {
   await openLearning(page);
 }
 const MIN = 60 * 1000;
-const SLIP = {
-  ok: true,
-  token: 'a'.repeat(64),
-  student: { first_name: 'Cece' },
-  course: { name: 'Science 8', block: 'B' },
-  preview: [{ title: 'November Reflection', count: 1 }],
-  check: 'identity',
-  also_password: false,
-};
-
 const omar = more =>
   sampleCard(TODAY, {
     code: 'ABCDEFGH',
@@ -142,8 +132,8 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
     });
   }
 
-  test('a slip or a mistyped code is no card: Cece stays signed in', async ({ page }) => {
-    const fn = school(null, { slips: { K7M4QX: SLIP } });
+  test('a mistyped code is no card: Cece stays signed in', async ({ page }) => {
+    const fn = school();
     await serve(page, fn);
     await signIn(page);
     const kept = (await stored(page)).local[KEY];
@@ -152,46 +142,10 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
     await tab.goto('/s/#XYZ-234');
     await expect(tab.getByRole('alert')).toContainText("That code didn't work.");
     expect(JSON.parse((await stored(tab)).local[KEY]).t).toBe(JSON.parse(kept).t);
-    await tab.goto('/login.html');
-    await tab.goto('/s/#K7M-4QX');
-    await expect(tab.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    expect(JSON.parse((await stored(tab)).local[KEY]).t).toBe(JSON.parse(kept).t);
-  });
-
-  test('a questionnaire opened in the tab that was signed in is not taken down by Log Out elsewhere', async ({
-    page,
-  }) => {
-    const fn = school(null, { slips: { K7M4QX: SLIP } });
-    await serve(page, fn);
-    await signIn(page);
-    await page.evaluate(() => (location.hash = '#K7M-4QX'));
-    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    await page.getByLabel('Student Number').fill('0123456');
-    await page.getByRole('button', { name: 'Yes, Start' }).click();
-    await expect(page.getByText('How did it go?')).toBeVisible();
-    await page.getByLabel('How did it go?').fill('Half way through my answer');
-
-    // Log Out in another tab on the device.
-    const tab = await page.context().newPage();
-    await serve(tab, fn);
-    await tab.goto('/s/');
-    await logOut(tab);
-    await expect(tab.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
-    await tab.close();
-
-    await page.bringToFront();
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event('focus'));
-      window.dispatchEvent(new Event('pageshow'));
-      document.dispatchEvent(new Event('visibilitychange'));
-    });
-    await page.waitForTimeout(300);
-    await expect(page.getByLabel('How did it go?')).toHaveValue('Half way through my answer');
-    expect(await page.locator('body').innerText()).not.toContain('signed out');
   });
 });
 
-test.describe('before the page knows whether a code is a card or a slip', () => {
+test.describe('before the page knows whether a code is a card', () => {
   /* No service worker: a tab here visits /login.html, which registers /sw.js, and in WebKit
      Playwright's routes do not see the requests of a page that worker controls (as in
      student-card-wired.spec.js, a shared Chromebook). */
@@ -207,8 +161,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     expect(await page.locator('#app').innerText()).not.toMatch(/slip|card|answers|Student Questions|Student Page/i);
     await expect(page.getByRole('button', { name: 'Try Again' })).toBeFocused();
     await expect(page.locator('#sp-code')).toHaveCount(0);
-    // The card route did not answer, so the slip route was asked too.
-    expect(routes(posts)).toEqual(['card', 'open']);
+    expect(routes(posts)).toEqual(['card']);
     await fits(page);
     await named(page);
     await contrast(page);
@@ -216,7 +169,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     down = false;
     await page.getByRole('button', { name: 'Try Again' }).tap();
     await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
-    expect(routes(posts)).toEqual(['card', 'open', 'card']);
+    expect(routes(posts)).toEqual(['card', 'card']);
   });
 
   test('a server error on a real card is not "That code didn’t work"', async ({ page }) => {
@@ -228,44 +181,10 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByRole('alert')).toHaveText(UNREACHED);
     expect(await page.locator('#app').innerText()).not.toMatch(/didn't work|slip/i);
-    expect(routes(posts)).toEqual(['card', 'open']);
+    expect(routes(posts)).toEqual(['card']);
     broken = false;
     await page.getByRole('button', { name: 'Try Again' }).tap();
     await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
-  });
-
-  /* A slip opens whenever the slip route is healthy, whatever the card
-     route does. This is the function after it is deployed with the card
-     route failing. */
-  test('the card route answers a server error and the slip route is healthy: a slip opens, scanned and typed', async ({
-    page,
-  }) => {
-    const fn = school(null, { slips: { K7M4QX: SLIP } });
-    const posts = await serve(page, fn, {
-      answer: body => (body.route === 'card' ? { status: 500, json: { ok: false, error: 'server' } } : null),
-    });
-    await page.goto('/s/#K7M-4QX');
-    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    await page.getByLabel('Student Number').fill('0123456');
-    await page.getByRole('button', { name: 'Yes, Start' }).tap();
-    await expect(page.getByText('How did it go?')).toBeVisible();
-    expect(routes(posts)).toEqual(['card', 'open', 'verify']);
-    // Typed on the slip's first screen.
-    posts.length = 0;
-    await page.goto('/login.html');
-    await page.goto('/s/');
-    await page.getByLabel('Type the code on your slip').fill('K7M-4QX');
-    await page.getByRole('button', { name: 'Open' }).tap();
-    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    expect(routes(posts)).toEqual(['card', 'open']);
-  });
-
-  test('the card route times out and the slip route is healthy: a slip still opens', async ({ page }) => {
-    const fn = school(null, { slips: { K7M4QX: SLIP } });
-    const posts = await serve(page, fn, { fail: body => body.route === 'card' });
-    await page.goto('/s/#K7M-4QX');
-    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
-    expect(routes(posts)).toEqual(['card', 'open']);
   });
 
   test('Is This You? opens with the first field in focus, and a wrong answer is read out from it', async ({ page }) => {

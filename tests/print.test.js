@@ -117,8 +117,8 @@ describe('print-sheet', () => {
   /**
    * The eight-to-a-page print sheet in teacher/qr-slips.js
    * (docs/plans/student-page-build-plan.md, S3-T1): sheetPages lays any list
-   * out as letter pages of eight cells, printSheet prints them, and the QR
-   * slips are drawn through both. Student cards will be the second caller.
+   * out as letter pages of eight cells, printSheet prints them, and student
+   * cards are drawn through both.
    */
 
   function parse(html) {
@@ -142,17 +142,6 @@ describe('print-sheet', () => {
     var items = [];
     for (var i = 1; i <= n; i++) items.push({ label: 'Item ' + i });
     return items;
-  }
-
-  function roster(n) {
-    var students = [];
-    var codes = [];
-    for (var i = 0; i < n; i++) {
-      var last = String.fromCharCode(65 + (i % 26)) + (i >= 26 ? 'z' : '');
-      students.push({ id: 'e' + i, firstName: 'Student', lastName: last });
-      codes.push({ enrollment_id: 'e' + i, code: 'AAA-' + (200 + i) });
-    }
-    return { students, codes };
   }
 
   describe('the print sheet: sheetPages', () => {
@@ -181,25 +170,6 @@ describe('print-sheet', () => {
           '<div class="qs-slip"><b class="mine">Item 3</b></div>' +
           '</div>',
       );
-    });
-  });
-
-  describe('the print sheet: slips are drawn through it', () => {
-    it.each([1, 8, 9, 27])('%i slips fill the same pages and cells as the sheet lays out', n => {
-      var r = roster(n);
-      var slips = QrSlips.buildSlips(r.students, r.codes, 'https://fullvision.ca');
-      expect(slips).toHaveLength(n);
-      var asSlips = parse(QrSlips.buildPages(slips, { title: 'About Me' }, 'Science 8', () => ''));
-      var asSheet = layout(QrSlips.sheetPages(slips, s => esc(s.name)));
-      var names = Array.from(asSlips.querySelectorAll('.qs-page')).map(page =>
-        Array.from(page.children).map(cell => {
-          expect(cell.className).toBe('qs-slip');
-          expect(cell.querySelectorAll('.qs-name')).toHaveLength(1);
-          return cell.querySelector('.qs-name').textContent;
-        }),
-      );
-      expect(names).toEqual(asSheet);
-      expect(names).toHaveLength(Math.ceil(n / 8));
     });
   });
 
@@ -268,26 +238,6 @@ describe('print-sheet', () => {
       expect(again.shot.roots).toBe(1);
       expect(layout(again.shot.html)).toEqual([['Item 1', 'Item 2']]);
       vi.runAllTimers();
-    });
-
-    it('QrSlips.print sends the slips through it and returns how many', () => {
-      var r = roster(9);
-      globalThis.getStudents = () => r.students;
-      var q = { title: 'About Me', closes_on: '2026-11-14' };
-      var { shot, returned } = whilePrinting(() => QrSlips.print('no-such-course', q, r.codes));
-      expect(returned).toBe(9);
-      // Read back from the page, so compared as the page writes it (<rect/> comes back <rect></rect>).
-      var built = QrSlips.buildPages(QrSlips.buildSlips(r.students, r.codes), q, '');
-      expect(shot.html).toBe(parse(built).innerHTML);
-      expect(parse(shot.html).querySelectorAll('.qs-page')).toHaveLength(2);
-      expect(parse(shot.html).querySelectorAll('.qs-slip .qs-qr svg')).toHaveLength(9);
-      vi.runAllTimers();
-      expect(doc.getElementById('qr-slips-root').innerHTML).toBe('');
-
-      // Nothing to print: no dialog.
-      var none = whilePrinting(() => QrSlips.print('no-such-course', q, []));
-      expect(none.returned).toBe(0);
-      expect(none.shot).toBe(null);
     });
   });
 });
@@ -421,11 +371,8 @@ describe('print-file-names', () => {
       );
     });
 
-    it('questionnaire slips and student cards', () => {
+    it('student cards', () => {
       const items = [{ name: 'Cece Ahn' }, { name: 'Dev Bains' }];
-      expect(
-        printFileName(QrSlips.sheetTitle('Questionnaire Slip', items, 'Term 1 Check-In', 'Science 8 Block B')),
-      ).toBe(['Questionnaire Slips', 'Term 1 Check-In', 'Science 8 Block B'].join(DASH));
       expect(printFileName(QrSlips.sheetTitle('Student Card', items, '', 'Science 8 Block B'))).toBe(
         ['Student Cards', 'Science 8 Block B'].join(DASH),
       );
@@ -434,11 +381,8 @@ describe('print-file-names', () => {
       );
     });
 
-    it('questionnaire slips and student cards pass their names to the print', () => {
+    it('student cards pass their names to the print', () => {
       const slips = readFileSync('teacher/qr-slips.js', 'utf-8');
-      expect(slips).toMatch(
-        /sheetTitle\('Questionnaire Slip', slips, q\.title \|\| 'Questionnaire', printClassName\(course\)\)/,
-      );
       expect(slips).toMatch(/\}, titleParts\);/);
       expect(readFileSync('teacher/student-cards.js', 'utf-8')).toMatch(
         /QrSlips\.sheetTitle\('Student Card', items, '', printClassName\(course\)\)/,

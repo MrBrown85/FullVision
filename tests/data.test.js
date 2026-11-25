@@ -6,7 +6,6 @@
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PdtDate, runnerLocalDay } from './helpers/pdt-date.js';
-import { signedIn, slipsFetch } from './helpers/teacher-cards-slips-fetch.js';
 
 describe('data-active-course-placeholder', () => {
   /**
@@ -1823,7 +1822,6 @@ describe('data-idempotency-keys', () => {
       // remove_section / restore_section from
       // migrations/20261022_soft_remove_competency.sql, the four questionnaire
       // ones from migrations/20261025_questionnaires_tables_and_functions.sql,
-      // the four phone-report ones from migrations/20261025_phone_reports.sql,
       // save_score_report_note from migrations/20261031_score_report_note.sql,
       // and save_comment_template / delete_comment_template from
       // migrations/20261031_comment_template.sql, live once it is applied),
@@ -1832,13 +1830,11 @@ describe('data-idempotency-keys', () => {
       // and submit_support_report from migrations/20261105_support_report.sql.
       // Keep in lockstep with the database.
       expect(Object.keys(FV_IDEMPOTENT_RPCS).sort()).toEqual([
-        'close_phone_report',
         'create_assessment',
         'create_course',
         'create_custom_tag',
         'create_observation',
         'create_observation_follow_up',
-        'create_phone_report',
         'create_report_issue',
         'create_student_and_enroll',
         'delete_comment_template',
@@ -1864,7 +1860,6 @@ describe('data-idempotency-keys', () => {
         'set_rubric_printed',
         'submit_support_report',
         'update_observation_follow_up',
-        'update_phone_report',
         'upsert_category',
         'upsert_competency_group',
         'upsert_guardian',
@@ -4038,11 +4033,9 @@ describe('data-questionnaires-v2-dispatch', () => {
    *
    *   listQuestionnaireTemplates / listCourseQuestionnaires / listCourseResponses
    *   upsertQuestionnaire / setQuestionnaireOn / deleteQuestionnaire
-   *   issueAccessCodes
    *
    * Each sends the RPC the migration defines with the parameters it expects,
-   * every write carries an idempotency key, lists come back as arrays, and
-   * slip codes come from teacher-cards (plan S3-S1), never through the outbox.
+   * every write carries an idempotency key, and lists come back as arrays.
    */
 
   const CID = '11111111-1111-4111-8111-111111111111';
@@ -4129,44 +4122,6 @@ describe('data-questionnaires-v2-dispatch', () => {
       expect((await window.v2.listQuestionnaireTemplates()).data).toEqual([{ id: 'about-me' }]);
       expect((await window.v2.listCourseQuestionnaires(CID)).data).toEqual([{ id: QID, questions: [] }]);
       expect((await window.v2.listCourseResponses(CID)).data).toEqual({ [QID]: { [ENR]: [] } });
-    });
-
-    // Since plan S3-S1 slips are made by teacher-cards: the database keeps only their tags.
-    it('issueAccessCodes asks teacher-cards for the named students, with only server ids, and nothing is queued', async () => {
-      const fake = slipsFetch({ passwords: { [ENR]: '4821' } });
-      globalThis.getSupabase = () => signedIn(client);
-      try {
-        var res = await window.v2.issueAccessCodes(QID, [ENR, 'local-id']);
-        expect(res.data).toEqual([{ enrollment_id: ENR, code: 'K7M-4QX', password: '4821' }]);
-        expect(fake.bodies).toHaveLength(1);
-        expect(fake.bodies[0].url).toContain('/functions/v1/teacher-cards?forceFunctionRegion=ca-central-1');
-        expect(fake.bodies[0].body).toMatchObject({
-          route: 'slips',
-          kind: 'questionnaire',
-          id: QID,
-          enrollment_ids: [ENR],
-        });
-        expect(fake.bodies[0].body.request_id).toBeTruthy();
-        expect(client.calls).toEqual([]);
-        var queued = localStorage.getItem('fv-outbox') || '';
-        expect(queued).not.toContain('K7M');
-      } finally {
-        fake.restore();
-      }
-    });
-
-    it('issueAccessCodes asks for every student when none are named, and asks again after a lost reply', async () => {
-      const fake = slipsFetch({ roster: [ENR], replayFirst: true });
-      globalThis.getSupabase = () => signedIn(client);
-      try {
-        var res = await window.v2.issueAccessCodes(QID);
-        expect(fake.bodies[0].body.enrollment_ids).toBeNull();
-        expect(fake.bodies).toHaveLength(2);
-        expect(fake.bodies[1].body.request_id).not.toBe(fake.bodies[0].body.request_id);
-        expect(res.data).toEqual([{ enrollment_id: ENR, code: 'K7M-4QX' }]);
-      } finally {
-        fake.restore();
-      }
     });
   });
 });
