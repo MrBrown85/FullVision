@@ -79,6 +79,7 @@ window.MCardStack = (function () {
     }
 
     function _updateCounter() {
+      if (opts.counter === false) return; // the cards say their own place
       // opts.counterEl puts "N of M" in the caller's own element.
       if (opts.counterEl) {
         opts.counterEl.textContent = _idx + 1 + ' of ' + _cards.length;
@@ -263,6 +264,9 @@ window.MCardStack = (function () {
         _animateExit('left');
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
+        // The card behind holds the next student until a drag says which way:
+        // without this, ← brought the next student up, not the one before.
+        _updateBehindCard('right');
         _animateExit('right');
       }
     }

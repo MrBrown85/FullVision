@@ -35,7 +35,7 @@ for (const row of [0, 3]) {
     await page.locator('#demo-mode-btn').click();
     await page.waitForURL(/teacher-mobile\//);
     await page.locator('.m-tab-item[data-tab="students"]').click();
-    await page.locator('.m-card-all[data-action="m-all-students"]').click();
+    await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click();
     await page.locator('[data-action="m-jump-student"]').nth(row).click();
     await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
     const detail = page.locator('#m-screen-student-detail');
@@ -84,7 +84,7 @@ test('Grade on a student page on Group work opens their group card, or their own
 
   const openGrade = async row => {
     await page.locator('.m-tab-item[data-tab="students"]').click();
-    await page.locator('.m-card-all[data-action="m-all-students"]').click();
+    await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click();
     await page.locator('[data-action="m-jump-student"]').nth(row).click();
     await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
     const detail = page.locator('#m-screen-student-detail');
@@ -134,7 +134,7 @@ test('Grade on a student page with a grading screen open on the Grade tab opens 
   await page.waitForTimeout(500);
 
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('.m-card-all[data-action="m-all-students"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click();
   await page.locator('[data-action="m-jump-student"]').nth(3).click();
   await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-profile').click();
   const detail = page.locator('#m-screen-student-detail');

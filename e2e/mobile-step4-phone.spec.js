@@ -21,7 +21,7 @@ async function openPhone(page) {
 // Group 2 #31: search finds a student by legal first or last name.
 test('All Students search finds a student by last name', async ({ page }) => {
   await openPhone(page);
-  await page.locator('.m-card-all[data-action="m-all-students"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click();
   const search = page.locator('[data-action="m-student-search"]');
   await search.fill('Adeyemi');
   const shown = page.locator('#m-student-list .m-cell:visible');
@@ -178,7 +178,7 @@ test('All Students keeps the IEP badge in view on a long name', async ({ page })
     st.preferred = 'Maximiliano-Bartholomew Alexandrovich';
     return st.id;
   });
-  await page.locator('.m-card-all[data-action="m-all-students"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-who').click();
   const cell = page.locator('#m-student-list .m-cell[data-sid="' + sid + '"]');
   await cell.scrollIntoViewIfNeeded();
   const badge = cell.locator('.m-badge-iep');
@@ -312,14 +312,17 @@ test('grading screen works as soon as it opens', async ({ page }) => {
 // buttons; each points box names its student.
 test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
   await openPhone(page);
-  const count = page.locator('#m-student-card-count');
+  const count = page.locator('.m-card-stack-item[data-depth="0"] .m-sc-place');
   await expect(count).toContainText('1 of');
+  const first = await page.locator('.m-card-stack-item[data-depth="0"] .m-sc-name').innerText();
   await page.locator('.m-card-stack').focus();
   await page.keyboard.press('ArrowRight');
   await expect(count).toContainText('2 of');
   await page.waitForTimeout(400); // the card's exit animation
   await page.keyboard.press('ArrowLeft');
   await expect(count).toContainText('1 of');
+  // And it is the first student's card again, not the third's.
+  await expect(page.locator('.m-card-stack-item[data-depth="0"] .m-sc-name')).toHaveText(first);
   await page.waitForTimeout(400);
 
   // Dragged from the level, not the name (a button, which a mouse press never drags).
