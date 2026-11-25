@@ -296,6 +296,26 @@
     height: 40px;
   }
 
+  /* ── Class Settings: the class list, class header and Students bar ── */
+
+  /* Buttons, the ⋯ and the search field a finger can hit; the header and
+     the bar wrap rather than squeeze (e2e/class-settings-bars.spec.js). */
+  html.fv-tablet .cm-bar .tb-action-btn,
+  html.fv-tablet .cm-bar .atb-icon-btn {
+    min-width: 44px;
+  }
+  html.fv-tablet .cm-bar .tb-action-btn,
+  html.fv-tablet .cm-bar .atb-icon-btn,
+  html.fv-tablet .cm-bar .atb-search {
+    min-height: 44px;
+  }
+  html.fv-tablet .cm-bar .atb-search {
+    height: 44px;
+  }
+  html.fv-tablet .cm-bar .atb-field > input {
+    height: 42px;
+  }
+
   /* ── Class Settings › Student Page: Students ───────────────────── */
 
   /* A finger-sized box to tick, name to open, and panel and bar buttons
