@@ -79,7 +79,7 @@ window.MCardStack = (function () {
     }
 
     function _updateCounter() {
-      if (opts.counter === false) return; // the cards say their own place
+      if (opts.counter === false) return; // the Students cards show no count
       // opts.counterEl puts "N of M" in the caller's own element.
       if (opts.counterEl) {
         opts.counterEl.textContent = _idx + 1 + ' of ' + _cards.length;

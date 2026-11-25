@@ -14,9 +14,8 @@
   height: 100%;
   padding: 16px;
 }
-/* The name row is the chooser: a filled row the width of the card, the
-   student's place in the class and a chooser's two chevrons at its right.
-   A tap opens the class list. */
+/* The name row is the chooser: a filled row the width of the card with a
+   chooser's two chevrons at its right. A tap opens the class list. */
 .m-sc-who {
   display: flex;
   align-items: center;
@@ -44,18 +43,6 @@
 .m-sc-who svg {
   flex: none;
   color: var(--text-2);
-}
-.m-sc-place {
-  flex: none;
-  font-size: 15px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-/* A phone 320 px wide has no room for it beside a name. */
-@media (max-width: 359px) {
-  .m-sc-place {
-    display: none;
-  }
 }
 .m-sc-avatar,
 .m-sp-avatar {

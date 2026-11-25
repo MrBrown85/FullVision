@@ -151,8 +151,7 @@
   /* The card. */
   // html-safe: names, titles and results go through esc; ids are escaped; the To Grade box is built (escaped) by grade-photos.js
   /** @param {any} st @param {string} cid */
-  // `place` is the card's place in the class ("6 of 30"), said in the name row.
-  function render(st, cid, place) {
+  function render(st, cid) {
     var pieces = _pieces(cid, st.id);
     var page = getReturnSettings(cid).student_page;
     var unopened = page
@@ -194,7 +193,6 @@
       '</span><span class="m-sc-name">' +
       esc(displayName(st)) +
       '</span>' +
-      (place ? '<span class="m-sc-place">' + esc(place) + '</span>' : '') +
       '<svg width="12" height="18" viewBox="0 0 12 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6.5l4-4 4 4M2 11.5l4 4 4-4"/></svg></button>' +
       _levelHtml(cid, st.id) +
       '<div class="m-sc-acts"><button type="button" class="m-sc-observe" data-action="m-obs-quick-menu" data-sid="' +
