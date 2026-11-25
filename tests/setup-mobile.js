@@ -124,19 +124,6 @@ load('shared/photo-shrink.js');
 load('shared/photo-queue.js');
 // The PDF reader (pdf.js is fetched only when a PDF is opened).
 load('shared/photo-readers.js');
-/* The phone's new look (phoneLook) is on for everyone. The unit tests see
-   it as a device used to: on only where a test sets
-   localStorage['fv-build-phoneLook'] = '1' (tests/phone-look.test.js,
-   tests/student-look.test.js). The rest go on checking the old layout's
-   code, which stays until L8 deletes it, and the browser tests (e2e/) run
-   the phone as it ships. */
-(function () {
-  const real = globalThis.BuildFlags.on;
-  globalThis.BuildFlags.on = function (name) {
-    if (name === 'phoneLook') return localStorage.getItem('fv-build-phoneLook') === '1';
-    return real(name);
-  };
-})();
 load('teacher-mobile/components.js');
 load('teacher-mobile/card-stack.js');
 load('teacher-mobile/student-card.js');

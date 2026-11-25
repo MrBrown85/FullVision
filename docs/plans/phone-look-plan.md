@@ -1,22 +1,14 @@
 # The phone's new look (2026-11-24)
 
-**Status.** On for everyone since Nov 25 (Colin: "Deal with it"): L1, L2, L5, L6, Undo after a return (the first part of L3) and the Write a Bulletin sheet (the first part of L2b). Not built: the rest of L2b, L3, L4 and L7. L8's cleanup is still to do: the old layout's code and styles are not deleted yet, and the help pictures show the old screens.
+**Status.** Built and on for everyone (Nov 25): the phone draws the new look and nothing else. Colin, Nov 25, after the first release carried it switched off and layered over the old screens: "Go back and do it all properly now… Rewrite the tests. Think big picture." So it was rebuilt natively in three PRs: the grader and the Grade list (#1756), the Students card and the profile (#1755), Observe, Bulletins and the tabs' top bar (#1754); then the switch, the `m-look` class and the unit tests' switch shim went (this PR). Not built: Remind These 8 (needs a server change), the board photo squared up (needs a new library), a student card made on the spot (needs a security review). The help pictures still show the old screens.
 
 **Why.** Colin, Nov 24: the phone's grading view is cluttered, and a teacher who is not a software user would be overwhelmed by it. The phone is a tool to be used in the moment: grade, observe, post. One strong control for each decision, the rest behind one tap, no grey lines of explanation.
 
 **Board.** "Phone Grader, Redesigned" (https://claude.ai/artifact/9183YbyUHWKjotWVWo2Guq). Rows: the grader, its stress tests, three gaps filled, the same tabs tweaked with the profile, the profile's stress tests, and Pleasant Surprises.
 
-**Switch.** `phoneLook` in `shared/build-flags.js`, on for everyone. With it on, `<html>` carries the class `m-look`. Turning it back off (its default to false) is the way back if something is wrong.
+**How it is built.** Each screen draws the new markup itself; the old markup, its styles and its tests are gone. Styles: `teacher-mobile/grade.css` (the grader and the Grade list), `students.css` (the card and the profile), `tabs.css` (Observe, Bulletins and the top bar), on top of `styles.css`. Code: `tab-grade.js` with `grade-look.js` (the top bar's name, the class list, ⋯, the held return) and `grade-reader.js` (Full Screen); `student-card.js` and `student-detail.js`; `tab-observe.js` and `tab-bulletins.js`; `MC.tabBar` in `components.js`. Browser tests reach a student through the class list and Competencies or Rubric through ⋯ (`e2e/phone-jump.js`). `phoneLook` stays in `shared/build-flags.js`, on, asked by nothing.
 
-## The method: write as little as the board needs
-
-The phone already does almost everything the board shows: the four levels, + and −, a criterion's checklist and comment, the Overall Comment, Return and Next, For Revision, Missing, Excused and Late, the photos full screen. The board changes how they look and where they sit, not what they do.
-
-1. **The same markup, the same actions, the same tests.** The look is one stylesheet, `teacher-mobile/look.css`, and every rule in it starts with `.m-look`. With the switch off, nothing on the phone changes: the byte-for-byte walk in `tests/phone-return.test.js` holds it.
-2. **JavaScript changes only where a style cannot do it,** and then it adds an attribute or a wrapper to what is already drawn. No second way of drawing a screen, no copy of a handler. A screen's additions live in a small file of their own (`grade-look.js` for the grader), which answers with nothing while the switch is off; the screen's own file only asks it.
-3. **Something moved behind ⋯ is the same piece of markup shown in a sheet,** with the action it already had.
-4. **Nothing changes a grade, a saved value or the database** until a slice below says so.
-5. **Old styles are deleted once,** in the last slice, when the switch turns on.
+The first version (Nov 24) was a stylesheet over the old markup behind a switch, to write less code. It left the old screens' code and tests in place and needed hacks to hide old pieces; Colin had it redone. See DECISIONS, "The phone's new look".
 
 ## Slices
 
