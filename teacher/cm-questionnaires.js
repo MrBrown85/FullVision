@@ -605,7 +605,11 @@ var CmQuestionnaires = (function () {
       Questionnaires.load(cid, function (loadedCid) {
         if (loadedCid === cid) _rerender();
       });
-      return false;
+      // Demo Mode reads the class's own copy at once, without a callback:
+      // draw it now. (It used to be read already by the Dashboard's old Core
+      // card, so the tab never waited; since #1740 nothing reads it first,
+      // and the tab stayed on Loading.)
+      if (!Questionnaires.loaded(cid)) return false;
     }
     // Answers sent since the last read show when the tab opens again,
     // redrawn only when who has answered changed.

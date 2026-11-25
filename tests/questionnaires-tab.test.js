@@ -171,6 +171,14 @@ describe('Questionnaires tab', () => {
     DashClassManager.renderClassManager = originals.rerender;
   });
 
+  it('in Demo Mode the tab draws its list on the first draw, with nothing read before it (Nov 25: it stayed on Loading)', () => {
+    Questionnaires._reset();
+    expect(Questionnaires.loaded(CID)).toBe(false);
+    mount();
+    expect(root.textContent).not.toContain('Loading reflections');
+    expect(root.querySelector('[data-action="sqNew"]').textContent).toBe('New Reflection');
+  });
+
   it('shows About Me and this period’s reflection, both off, under Reflections', () => {
     mount();
     expect(root.querySelector('.cm-section-title').textContent).toBe('Reflections');
