@@ -227,6 +227,8 @@ describe('student-submit: the hashed address', () => {
     expect(calls).toHaveLength(12);
     expect(new Set(calls.map(c => c.hash)).size).toBe(1);
     expect(calls[0].hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(JSON.stringify(calls)).not.toContain('2001');
+    // A hash is hex and never has a colon, so a colon-joined piece of the address can only be the address.
+    // (A bare '2001' can turn up inside a random token's hash by chance.)
+    expect(JSON.stringify(calls)).not.toMatch(/2001:|:db8:|:aaaa:|:dddd/i);
   });
 });
