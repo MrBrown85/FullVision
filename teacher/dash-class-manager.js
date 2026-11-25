@@ -3590,14 +3590,14 @@ window.DashClassManager = (function () {
     // Preserve scroll position of the detail pane across re-renders
     var detailEl = document.querySelector('.cm-detail');
     var scrollTop = detailEl ? detailEl.scrollTop : 0;
-    var openMenu = CmKeepMenu.mark([cmSelectedCourse, cmTab, cmMode].join('|'));
+    var kept = CmKeepMenu.mark([cmSelectedCourse, cmTab, cmMode].join('|'));
     document.getElementById('main').innerHTML = html;
     if (scrollTop > 0) {
       var newDetail = document.querySelector('.cm-detail');
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
     _cmRosterScrollCue();
-    CmKeepMenu.reopen(openMenu, [cmSelectedCourse, cmTab, cmMode].join('|'), _cmFloatOverScroll);
+    CmKeepMenu.restore(kept, [cmSelectedCourse, cmTab, cmMode].join('|'), _cmFloatOverScroll);
     _cmRestoreKeptFocus();
   }
 

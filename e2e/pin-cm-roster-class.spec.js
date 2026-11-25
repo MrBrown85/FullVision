@@ -329,6 +329,26 @@ test.describe('Class Settings roster and class actions in Demo Mode', () => {
     expect(backup.assessments.map(a => a.id)).toEqual(inApp.assessments);
     expect(Object.keys(backup.scores).sort()).toEqual(inApp.scores);
   });
+  /* A draw while the teacher types in Find a Student took the focus off the
+     box (Nov 25, 2026). The box is drawn with what the page has kept of the
+     search, and the cursor goes back where it was. */
+  test('Find a Student keeps the focus and the cursor when Class Settings is drawn again', async ({ page }) => {
+    const search = page.locator('.cm-rs-search input');
+    const shown = page.locator('.cm-rs-row:not([hidden])');
+    const all = await shown.count();
+    await search.click();
+    await page.keyboard.type('an');
+    const some = await shown.count();
+    expect(some).toBeGreaterThan(0);
+    expect(some).toBeLessThan(all);
+    await page.keyboard.press('ArrowLeft');
+    await page.evaluate(() => DashClassManager.renderClassManager());
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue('an');
+    await expect(shown).toHaveCount(some);
+    await page.keyboard.press('Backspace');
+    await expect(search).toHaveValue('n');
+  });
 });
 
 /* Signed in, the same two class actions go to the server: archive_course,
@@ -473,4 +493,65 @@ test('Signed in, a menu that is open when Class Settings is drawn again stays op
   await redraw();
   await expect(menu).toBeHidden();
   await expect(button).toHaveAttribute('aria-expanded', 'false');
+});
+
+/* The same draw took the focus off the box a teacher was typing in, and in
+   Safari and Firefox it threw the typing away too: "Lab" typed in a
+   competency's title went back to the saved title (Nov 25, 2026). Chrome
+   saves a box as the draw removes it; the others do not. */
+test('Signed in, what a teacher is typing when Class Settings is drawn again stays, with the cursor where it was', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAuth(page);
+  await seedTwoClasses(page);
+  await gotoApp(page, '/dashboard?manage=details');
+  const desc = page.locator('#cm-desc');
+  await expect(desc).toBeVisible();
+  const saved = () => page.evaluate(cid => COURSES[cid].description || '', CID_A);
+  const changes = () => page.evaluate(() => window.__e2eChanges);
+  // The draw puts a new box in place of the old one, which carries a mark here. Changes are counted from the
+  // draw on, on the new box.
+  const redraw = () =>
+    page.evaluate(() => {
+      document.getElementById('cm-desc').__before = true;
+      DashClassManager.renderClassManager();
+      window.__e2eChanges = 0;
+    });
+  await page.evaluate(() => {
+    document.addEventListener('change', e => {
+      if (e.target.id === 'cm-desc') window.__e2eChanges++;
+    });
+  });
+
+  await desc.click();
+  await page.keyboard.type('Bring a calculator');
+  for (let i = 0; i < 'calculator'.length; i++) await page.keyboard.press('ArrowLeft');
+  await redraw();
+  expect(await desc.evaluate(el => el.__before)).toBeUndefined();
+  await expect(desc).toHaveValue('Bring a calculator');
+  await expect(desc).toBeFocused();
+  // The cursor is where it was, so the next keys go in the same place.
+  await page.keyboard.type('graphing ');
+  await expect(desc).toHaveValue('Bring a graphing calculator');
+  await page.keyboard.press('Tab');
+  await expect.poll(saved).toBe('Bring a graphing calculator');
+  expect(await changes()).toBe(1);
+
+  // Typing put back by a draw is saved when the teacher leaves the box without typing more, and the page is
+  // told the box changed, once.
+  await desc.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' every day');
+  await redraw();
+  await expect(desc).toHaveValue('Bring a graphing calculator every day');
+  await expect(desc).toBeFocused();
+  await page.locator('.cm-head-title').click();
+  await expect.poll(saved).toBe('Bring a graphing calculator every day');
+  expect(await changes()).toBe(1);
+
+  // A box the teacher has left is not given the focus back.
+  await redraw();
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await expect(desc).toHaveValue('Bring a graphing calculator every day');
 });
