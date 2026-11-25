@@ -183,9 +183,10 @@ window.DashInboxDrop = (function () {
   }
 
   /** Whether the piece is still one the tile may add to, now.
-   * @param {string} cid @param {string} aid */
-  function stillOffered(cid, aid) {
-    return choices(cid).some(function (c) {
+   * @param {string} cid @param {string} aid
+   * @param {number} [limit] how many the caller lists (the targets list more than the box's three) */
+  function stillOffered(cid, aid, limit) {
+    return choices(cid, limit).some(function (c) {
       return c.aid === aid;
     });
   }
