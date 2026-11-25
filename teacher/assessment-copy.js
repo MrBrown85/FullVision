@@ -552,7 +552,7 @@ window.AssessmentCopy = (function () {
 
   /* ── Dialogs ───────────────────────────────────────────────── */
   function _dialog(opts) {
-    var triggerEl = document.activeElement;
+    var focusBack = FocusBack.from(document.activeElement);
     var overlay = document.createElement('div');
     overlay.className = 'confirm-overlay copy-dialog';
     overlay.setAttribute('role', 'dialog');
@@ -579,11 +579,7 @@ window.AssessmentCopy = (function () {
     function close() {
       overlay.remove();
       document.removeEventListener('keydown', keyHandler);
-      try {
-        if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
-      } catch (e) {
-        /* trigger may be gone */
-      }
+      focusBack();
     }
     function keyHandler(e) {
       if (e.key === 'Escape') {

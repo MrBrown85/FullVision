@@ -74,9 +74,10 @@ var CmQuestionnaires = (function () {
     });
   }
 
-  /* How many reflections students can see now, for the tab's count (null until
+  /* How many reflections students can see now (null until
      read). Asks for the class's reflections when they have not been read:
-     the Dashboard's old Core card used to read them first (removed in #1740). */
+     the Dashboard's old Core card used to read them first (removed in #1740).
+     The tab no longer shows it. */
   function countOn(cid) {
     if (!cid) return null;
     if (!Questionnaires.loaded(cid)) {
@@ -94,25 +95,13 @@ var CmQuestionnaires = (function () {
 
   /* The class's reflections arrived after Class Settings was drawn. On the
      Reflect tab the panel is drawn again, since it was showing Loading (or
-     who has answered changed). On any other tab only the tab's count is
-     filled in: drawing all of Class Settings again there closed a menu the
-     teacher had just opened (Class Actions, a student's row menu) a moment
-     after they opened it. */
+     who has answered changed). On any other tab nothing is drawn: drawing
+     all of Class Settings again there closed a menu the teacher had just
+     opened (Class Actions, a student's row menu) a moment after they opened
+     it. */
   function _arrived(cid) {
     var tab = typeof document !== 'undefined' ? document.getElementById('cm-tab-questionnaires') : null;
-    if (!tab || tab.classList.contains('active')) return _rerender();
-    var picked = document.querySelector('.cm-class-item.selected');
-    if (!picked || picked.dataset.cid !== cid) return; // another class is on screen now
-    var n = countOn(cid);
-    if (n == null) return;
-    var count = tab.querySelector('.cm-tab-count');
-    if (!count) {
-      count = document.createElement('span');
-      count.className = 'cm-tab-count';
-      tab.appendChild(document.createTextNode(' '));
-      tab.appendChild(count);
-    }
-    count.textContent = String(n);
+    if (!tab || tab.classList.contains('active')) _rerender();
   }
 
   /* On, as the switch shows it: on and not past its closing date. */

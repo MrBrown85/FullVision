@@ -171,6 +171,7 @@ const PRECACHE_URLS = [
   '/shared/handout-out.css',
   '/teacher/grades-print.css',
   '/teacher/print-legal.css',
+  '/teacher/focus-back.js',
   '/teacher/ui.js',
   '/teacher/report-scores.js',
   '/teacher/drafts-before-print.js',
