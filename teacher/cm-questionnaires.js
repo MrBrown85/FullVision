@@ -81,7 +81,7 @@ var CmQuestionnaires = (function () {
     if (!cid) return null;
     if (!Questionnaires.loaded(cid)) {
       Questionnaires.load(cid, function (loadedCid) {
-        if (loadedCid === cid) _rerender();
+        if (loadedCid === cid) _arrived(cid);
       });
       // Demo Mode reads them at once.
       if (!Questionnaires.loaded(cid)) return null;
@@ -90,6 +90,29 @@ var CmQuestionnaires = (function () {
     return Questionnaires.list(cid).filter(function (q) {
       return !q.parent_id && Questionnaires.visible(q, today);
     }).length;
+  }
+
+  /* The class's reflections arrived after Class Settings was drawn. On the
+     Reflect tab the panel is drawn again, since it was showing Loading (or
+     who has answered changed). On any other tab only the tab's count is
+     filled in: drawing all of Class Settings again there closed a menu the
+     teacher had just opened (Class Actions, a student's row menu) a moment
+     after they opened it. */
+  function _arrived(cid) {
+    var tab = typeof document !== 'undefined' ? document.getElementById('cm-tab-questionnaires') : null;
+    if (!tab || tab.classList.contains('active')) return _rerender();
+    var picked = document.querySelector('.cm-class-item.selected');
+    if (!picked || picked.dataset.cid !== cid) return; // another class is on screen now
+    var n = countOn(cid);
+    if (n == null) return;
+    var count = tab.querySelector('.cm-tab-count');
+    if (!count) {
+      count = document.createElement('span');
+      count.className = 'cm-tab-count';
+      tab.appendChild(document.createTextNode(' '));
+      tab.appendChild(count);
+    }
+    count.textContent = String(n);
   }
 
   /* On, as the switch shows it: on and not past its closing date. */
@@ -612,7 +635,7 @@ var CmQuestionnaires = (function () {
   function prepare(cid) {
     if (!Questionnaires.loaded(cid)) {
       Questionnaires.load(cid, function (loadedCid) {
-        if (loadedCid === cid) _rerender();
+        if (loadedCid === cid) _arrived(cid);
       });
       // Demo Mode reads the class's own copy at once, without a callback:
       // draw it now. (It used to be read already by the Dashboard's old Core
@@ -631,7 +654,7 @@ var CmQuestionnaires = (function () {
     };
     var was = answeredSig();
     Questionnaires.refreshIfStale(cid, FRESH_MS, function (loadedCid) {
-      if (loadedCid === cid && answeredSig() !== was) _rerender();
+      if (loadedCid === cid && answeredSig() !== was) _arrived(cid);
     });
     return true;
   }

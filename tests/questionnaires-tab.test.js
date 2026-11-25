@@ -443,6 +443,71 @@ describe('Questionnaires tab', () => {
     }
   });
 
+  it('on another tab, reflections that arrive fill in the tab count and draw nothing again', async () => {
+    var stubV2 = window.v2;
+    var redraws = 0;
+    var holder = document.createElement('div');
+    try {
+      globalThis.isDemoMode = () => false;
+      Questionnaires._reset();
+      window.v2 = Object.assign({}, stubV2, {
+        listCourseQuestionnaires: () =>
+          Promise.resolve({
+            data: [
+              {
+                id: '22222222-2222-2222-2222-222222222222',
+                course_id: CID,
+                kind: 'about_me',
+                title: 'About Me',
+                template_id: 'about-me',
+                is_on: true,
+                opens_on: '2000-01-01',
+                closes_on: '2999-01-01',
+                questions: [],
+              },
+            ],
+          }),
+        listQuestionnaireTemplates: () => Promise.resolve({ data: null }),
+      });
+      DashClassManager.renderClassManager = () => {
+        redraws++;
+      };
+      // Class Settings on the Students tab, as it is drawn before the reflections are read.
+      holder.innerHTML =
+        '<div class="cm-class-item selected" data-cid="' +
+        CID +
+        '"></div><button class="cm-tab active" id="cm-tab-students">Students</button>' +
+        '<button class="cm-tab" id="cm-tab-questionnaires">Reflect</button>';
+      document.body.appendChild(holder);
+      var tab = document.getElementById('cm-tab-questionnaires');
+
+      expect(CmQuestionnaires.countOn(CID)).toBe(null);
+      await tick();
+      expect(redraws).toBe(0);
+      expect(tab.querySelector('.cm-tab-count').textContent).toBe('1');
+      expect(tab.textContent).toBe('Reflect 1');
+
+      // Another class on screen by the time they arrive: its tab is left alone.
+      Questionnaires._reset();
+      tab.querySelector('.cm-tab-count').textContent = '7';
+      holder.querySelector('.cm-class-item').dataset.cid = 'another-class';
+      expect(CmQuestionnaires.countOn(CID)).toBe(null);
+      await tick();
+      expect(redraws).toBe(0);
+      expect(tab.querySelector('.cm-tab-count').textContent).toBe('7');
+
+      // On the Reflect tab itself, which shows Loading until then, the panel is drawn again.
+      Questionnaires._reset();
+      tab.classList.add('active');
+      expect(CmQuestionnaires.countOn(CID)).toBe(null);
+      await tick();
+      expect(redraws).toBe(1);
+    } finally {
+      holder.remove();
+      window.v2 = stubV2;
+    }
+  });
+
   it('one optional closing date: set, refused when past, cleared', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     mount();
