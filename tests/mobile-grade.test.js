@@ -747,12 +747,12 @@ describe('MGrade filter sheet', () => {
     MGrade.renderPicker(CID);
     MGrade.openFilterSheet(CID);
 
-    expect(capturedHtml).toContain('m-filter-sheet-title">Category');
-    expect(capturedHtml).toContain('m-filter-sheet-title">Date');
-    expect(capturedHtml).toContain('m-filter-sheet-title">Status');
+    expect(capturedHtml).toContain('aria-label="Category"');
+    expect(capturedHtml).toContain('aria-label="Date"');
+    expect(capturedHtml).toContain('aria-label="Status"');
     expect(capturedHtml).toContain('Labs'); // the one category chip
     expect(capturedHtml).toContain('No Category');
-    expect(capturedHtml).not.toContain('m-filter-sheet-title">Module'); // Module section hidden
+    expect(capturedHtml).not.toContain('aria-label="Module"'); // Module section hidden
     expect(capturedHtml).toContain('data-action="m-grade-filter-done"');
     expect(capturedHtml).toContain('data-action="m-grade-filter-clear"');
 
@@ -773,7 +773,7 @@ describe('MGrade filter sheet', () => {
     MGrade.renderPicker(CID);
     MGrade.openFilterSheet(CID);
 
-    expect(capturedHtml).toContain('m-filter-sheet-title">Module');
+    expect(capturedHtml).toContain('aria-label="Module"');
     expect(capturedHtml).toContain('Unit 1');
 
     window.MComponents.presentSheet = origPresent;

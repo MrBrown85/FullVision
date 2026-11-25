@@ -81,7 +81,7 @@ function dateOptions(html) {
    (the filter that applies as you tap: a chip tapped again lets go). */
 function activeDateOption(html) {
   const m = html.match(
-    /m-filter-pill m-filter-active" data-action="m-grade-filter-seg" data-kind="dateRange" data-val="([^"]*)"/,
+    /m-filter-row m-filter-active" data-action="m-grade-filter-seg" data-kind="dateRange" data-val="([^"]*)"/,
   );
   return m ? m[1] : null;
 }
@@ -142,8 +142,8 @@ describe('date range options', () => {
     MGrade.renderPicker(CID);
     const html = sheetHtml();
     expect(dateOptions(html)).toEqual(['week', '30d', 'term:1', 'term:2']);
-    expect(html).toContain('>Term 1</button>');
-    expect(html).toContain('>Term 2</button>');
+    expect(html).toContain('>Term 1</span>');
+    expect(html).toContain('>Term 2</span>');
     expect(html).not.toContain('Last term');
   });
 
