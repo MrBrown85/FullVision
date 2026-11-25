@@ -2,6 +2,13 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Slips and phone report links are removed (2026-11-24)
+
+Colin: "get rid of it. no students actually got them." Reflect reaches questionnaires from the card sign-in with no slips (Nov 16), and phone reports left the student page on Nov 14.
+
+1. **Gone from the database and the code.** The printed questionnaire slip, the phone report link and everything that served them: the `phone_report`, `phone_report_student`, `student_access_code` and `student_submit.session` tables, their functions, the edge functions' slip and report routes, and the student page's slip screens. `migrations/2026112414_remove_slips_phone_reports.sql` deletes their rows (1 report, 30 report copies, 126 codes) and cannot be undone.
+2. **Cards and Reflect are untouched.** A card's sign-in, its session, a questionnaire's list, form and answer, Bulletins, Send Work and quizzes work as before. A six-character code now answers "That code didn't work."
+
 ## Per-student options on the Student Page (2026-11-17)
 
 Colin: "More options in 'manage cards' for teachers. As of now, they have none. … i should be able to show/hide grades for individual students, thiings like that." He chose Layout A, Student List and Side Panel, from the mockup (https://claude.ai/artifact/QdCnUwwVGYb4ncaq4Y9UKL). The contract is `docs/plans/per-student-options-plan.md`. Built in `teacher/student-page-students.js`, `teacher/student-cards.js`, `teacher/cm-student-page.js`, the data layer's per-student options in `shared/data-reflect.js`, and `migrations/2026111720_student_page_per_student.sql` (not applied until Colin's OK).

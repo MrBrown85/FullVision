@@ -1,8 +1,6 @@
 // teacher-cards: where a signed-in teacher's browser has student cards made
-// (the card-codes design, section 2), and questionnaire and phone-report
-// slips (slips.ts, plan S3-S1). handler.ts and slips.ts hold every rule;
-// this file only wires the real database, the real Supabase Auth and the
-// key.
+// (the card-codes design, section 2). handler.ts holds every rule; this file
+// only wires the real database, the real Supabase Auth and the key.
 //
 // The database cannot read a card's code. This function draws each code,
 // hands the database its tag (made with STUDENT_CARD_KEY, which the
@@ -19,9 +17,8 @@
 // The browser calls it with ?forceFunctionRegion=ca-central-1 so it runs
 // beside gradebook-prod; handler.ts refuses anywhere else. It reaches the
 // database over its own login, fv_teacher_cards (TEACHER_CARDS_DB_URL,
-// ../_shared/db-login.ts), which can run only issue_cards, slip_roster and
-// issue_slips, so the student_submit schema never has to be exposed through
-// the API.
+// ../_shared/db-login.ts), which can run only issue_cards, so the
+// student_submit schema never has to be exposed through the API.
 import { loadCardKey } from '../_shared/card-key.ts';
 import { dbLogin } from '../_shared/db-login.ts';
 import { authUser, makeHandler } from './handler.ts';
@@ -44,18 +41,6 @@ const handle = makeHandler({
       const [row] = await sql()`
         select student_submit.issue_cards(
           ${teacherId}::uuid, ${courseId}::uuid, ${sql().json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`;
-      return row.r;
-    },
-    // A slip request's two statements: the students, when the teacher names none; then the slips. Tags and ids only.
-    async roster(teacherId, kind, targetId) {
-      const [row] = await sql()`
-        select student_submit.slip_roster(${teacherId}::uuid, ${kind}::text, ${targetId}::uuid) as r`;
-      return row.r;
-    },
-    async slips(teacherId, kind, targetId, items, keyId, requestId) {
-      const [row] = await sql()`
-        select student_submit.issue_slips(
-          ${teacherId}::uuid, ${kind}::text, ${targetId}::uuid, ${sql().json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`;
       return row.r;
     },
   },

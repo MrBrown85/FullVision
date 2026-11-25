@@ -198,12 +198,12 @@ describe('Demo Mode sends nothing from the student page', () => {
   );
 
   it('the other demo addresses still call nothing', async () => {
-    for (const hash of ['#demo', '#demo-about', '#demo-report']) {
+    for (const hash of ['#demo', '#demo-about']) {
       const page = openStudentPage();
       await page.start(hash);
       expect(page.calls, hash).toEqual([]);
       // Demo Mode's questions come from the site's own templates file.
-      expect(page.fetched, hash).toEqual(hash === '#demo-report' ? [] : ['../shared/questionnaire-templates.js']);
+      expect(page.fetched, hash).toEqual(['../shared/questionnaire-templates.js']);
     }
   });
 });

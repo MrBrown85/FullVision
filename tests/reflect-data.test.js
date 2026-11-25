@@ -336,7 +336,7 @@ describe('only the teacher reads them', () => {
     const family = readdirSync('teacher')
       .filter(f => /^(report|page-reports|qr-slips|myed)/.test(f) && f.endsWith('.js'))
       .map(f => 'teacher/' + f)
-      .concat(['shared/phone-report-view.js', 'shared/student-view.js']);
+      .concat(['shared/student-view.js']);
     const teacherOnly = /\b(getCourseFeedback|getQuestionsWaiting|getStudentReflections|answerReflection)\b/;
     const reflections = /\b(getStudentFeedback|getStudentLastPlan|sendStudentReflection)\b/;
     family.forEach(f => {

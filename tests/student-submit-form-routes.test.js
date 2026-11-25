@@ -1,7 +1,7 @@
 /**
- * Questionnaires and phone reports from the student's card (Batch E, E2;
- * supabase/functions/student-submit/forms-routes.ts): forms, form, answer
- * and report, through the whole handler with a stand-in database. The rules
+ * Questionnaires from the student's card (Batch E, E2;
+ * supabase/functions/student-submit/forms-routes.ts): forms, form and answer,
+ * through the whole handler with a stand-in database. The rules
  * are in SQL (migrations/2026111150_student_page_last_changes.sql, proved
  * by migrations/local-test/batch_e.py). This checks what the function
  * adds: the session and the request's shape first, the hashed address
@@ -22,7 +22,6 @@ const CECE = 'e1e1e1e1-0000-4000-8000-000000000001';
 const Q = 'b1b1b1b1-0000-4000-8000-000000000001';
 const Q2 = 'b2b2b2b2-0000-4000-8000-000000000002';
 const QUESTION = 'c1c1c1c1-0000-4000-8000-000000000001';
-const REPORT = 'd1d1d1d1-0000-4000-8000-000000000001';
 const BY_SQL = Object.fromEntries(Object.entries(SQL).map(([k, v]) => [v, k]));
 
 const FORMS = {
@@ -40,18 +39,6 @@ const FORMS = {
       closes_on: '2026-11-20',
       sent_at: null,
       template_id: 'core-8-1',
-    },
-  ],
-  reports: [
-    {
-      id: REPORT,
-      title: 'Report 1',
-      issued_at: '2026-11-10T20:00:00Z',
-      expires_on: '2026-12-10',
-      opened_at: null,
-      overall: { word: 'Proficient', text: 'Steady.', level: 3, draft: 4 },
-      comment: ['Keep reading.', 7],
-      data: { name: 'Cece Learner' },
     },
   ],
 };
@@ -101,7 +88,6 @@ function setup(answers = {}) {
           forms: FORMS,
           form: FORM,
           answer: { ok: true, submitted_at: 'now' },
-          report: { ok: true, report: { overall: { word: 'Proficient' } } },
         }[name];
       },
     },
@@ -125,7 +111,6 @@ const ROUTES = {
   forms: { route: 'forms', ...BASE },
   form: { route: 'form', ...BASE, questionnaire_id: Q },
   answer: { route: 'answer', ...BASE, questionnaire_id: Q, answers: { [QUESTION]: 'I listened more.' } },
-  report: { route: 'report', ...BASE, report_id: REPORT },
 };
 
 describe('every route', () => {
@@ -179,7 +164,7 @@ describe('every route', () => {
 });
 
 describe('forms', () => {
-  it('copies the two lists field by field: no teacher name, no other field of the report', async () => {
+  it('copies the list field by field: no teacher name, no other field', async () => {
     const t = setup();
     const r = await t.send(ROUTES.forms);
     expect(r.body).toEqual({
@@ -195,17 +180,6 @@ describe('forms', () => {
           opens_on: '2026-11-01',
           closes_on: '2026-11-20',
           sent_at: null,
-        },
-      ],
-      reports: [
-        {
-          id: REPORT,
-          title: 'Report 1',
-          issued_at: '2026-11-10T20:00:00Z',
-          expires_on: '2026-12-10',
-          opened_at: null,
-          overall: { word: 'Proficient', text: 'Steady.', level: 3 },
-          comment: ['Keep reading.'],
         },
       ],
     });
@@ -339,35 +313,13 @@ describe('answer', () => {
   });
 });
 
-describe('report', () => {
-  it("passes the student's report on whole, as the slip's check does", async () => {
-    const data = {
-      name: 'Cece Learner',
-      overall: { word: 'Proficient', text: 'Steady.', level: 3 },
-      comment: ['Keep reading.'],
-    };
-    const t = setup({ report: () => ({ ok: true, report: data, enrollment_id: CECE }) });
-    expect((await t.send(ROUTES.report)).body).toEqual({ ok: true, report: data });
-    expect(t.calls[0][1].slice(0, 3)).toEqual([PHONE, CECE, REPORT]);
-  });
-
-  it('passes on report_closed; a report id of the wrong shape asks nothing', async () => {
-    const t = setup({ report: () => ({ ok: false, error: 'report_closed' }) });
-    expect((await t.send(ROUTES.report)).body).toEqual({ ok: false, error: 'report_closed' });
-    const u = setup();
-    expect((await u.send({ ...ROUTES.report, report_id: 'R1' })).status).toBe(400);
-    expect(u.calls).toEqual([]);
-  });
-});
-
 describe('the logs', () => {
-  it('a run of every route logs no token, id, word a student wrote, or report', async () => {
+  it('a run of every route logs no token, id or word a student wrote', async () => {
     const t = setup();
     for (const body of Object.values(ROUTES)) await t.send(body);
     await t.send({ ...ROUTES.form, questionnaire_id: Q2 });
     const text = JSON.stringify(t.logs);
-    for (const v of [PHONE, CECE, Q, Q2, QUESTION, REPORT, 'listened', 'Proficient', 'Reflection'])
-      expect(text, v).not.toContain(v);
+    for (const v of [PHONE, CECE, Q, Q2, QUESTION, 'listened', 'Reflection']) expect(text, v).not.toContain(v);
     expect(t.logs.every(l => Object.keys(l).every(k => ['route', 'outcome', 'ms', 'kind'].includes(k)))).toBe(true);
   });
 });

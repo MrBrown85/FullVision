@@ -49,7 +49,6 @@ const REPORT_FILES = readdirSync(resolve(ROOT, 'teacher'))
   .filter(name => REPORT_FILE.test(name))
   .map(name => 'teacher/' + name)
   .filter(file => file !== SEAM)
-  .concat(['shared/phone-report-view.js'])
   .sort();
 
 /* The data layer's readers of a score, a status, a comment, a note, a tick
@@ -319,7 +318,6 @@ describe('report files read scores only through ReportScores', () => {
       'teacher/report-issues.js',
       'teacher/report-feedback-cards.js',
       'teacher/comment-personal.js',
-      'shared/phone-report-view.js',
     ].forEach(file => expect(REPORT_FILES, file).toContain(file));
     expect(REPORT_FILES).not.toContain(SEAM);
   });

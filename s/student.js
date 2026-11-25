@@ -21,7 +21,7 @@
 
    This file is the shell: the code box, the identity check, the edge
    function, drafts, Demo Mode, and which screen shows. The questionnaire's
-   screens are in questionnaire.js and the phone report's in report.js; a
+   screens are in questionnaire.js; a
    student card's are in app.js (the card, Is This You?) and assignments.js
    (the Assignments list). They load after this file and hand their screens
    to StudentPage.addScreens.
@@ -37,7 +37,7 @@ var StudentPage = (function () {
 
   var MESSAGES = {
     not_found:
-      "That code didn't work. Check the letters and numbers on your slip. If you have a newer slip, use that one. If not, ask your teacher for a new slip.",
+      "That code didn't work. Check the letters and numbers on your card. If you have a newer card, use that one. If not, ask your teacher for a new card.",
     used: 'This slip has already been used. Ask your teacher for a new slip if you need to change something.',
     closed: 'These questions are closed now. Ask your teacher if you still need to answer.',
     not_open_yet: 'These questions are not open yet.',
@@ -46,8 +46,6 @@ var StudentPage = (function () {
     invalid: "Part of your answer couldn't be saved. Check your answers and try again.",
     empty: 'Answer at least one question before you send.',
     network: "Couldn't reach FullVision. Check your internet and try again. Your answers are still here.",
-    report_closed: 'This report link has closed. Your official report card is in MyEd.',
-    no_birthday: "Your teacher hasn't added your birthday yet, so this report can't open. Ask your teacher.",
     wrong_birthday: "That birthday doesn't match. Check the month, day and year.",
     wrong_identity: "That doesn't match. Check your birthday or student number.",
     wrong_password: "That password doesn't match. Check the password on your slip.",
@@ -85,7 +83,7 @@ var StudentPage = (function () {
 
   function freshState() {
     return {
-      screen: 'start', // start | loading | confirm | notme | part | sent; reports: rcheck | report
+      screen: 'start', // start | loading | confirm | notme | part | sent
       code: '',
       typed: '',
       data: null, // {token, student, course, parts, context}
@@ -113,7 +111,6 @@ var StudentPage = (function () {
       ident: null, // what matched on a questionnaire slip, kept to open again if the session runs out
       number: '', // the student number or slip password as typed
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
-      report: null, // the report as the teacher sent it
       page: null, // a card's page for one class, as student-data.js reads it
       heading: '', // the loading screen's title when it is not a slip's: a card's page, or a code not yet known
       again: false, // a card's page couldn't be reached: offer Try Again
@@ -139,8 +136,8 @@ var StudentPage = (function () {
       handoutMenu: false, // the handout: Save or Print, the sheet, is open (s/handouts.js)
       handoutPages: null, // the handout: the pages fetched, { id, state, pages, asked } (s/handouts.js)
       form: '', // Reflections: the one picked on a Chromebook
-      back: '', // a questionnaire or report opened from a card's page: the tab to go back to
-      realForms: null, // a real card: { student, questionnaires, reports }, the `forms` reply (app.js)
+      back: '', // a questionnaire opened from a card's page: the tab to go back to
+      realForms: null, // a real card: { student, questionnaires }, the `forms` reply (app.js)
       cardForm: null, // a questionnaire opened from a real card's page: { student, id } (app.js)
     };
   }
@@ -216,8 +213,8 @@ var StudentPage = (function () {
       header('Student Questions', 'FullVision') +
       '<main class="sp-main sp-main-center">' +
       '<section class="sp-card sp-hello"><h1 class="sp-big">Answer Your Teacher\u2019s Questions</h1>' +
-      '<p class="sp-lead">Scan the QR code on your slip with your phone camera, or type the code below.</p></section>' +
-      codeBox(state, 'Type the code on your slip', true) +
+      '<p class="sp-lead">Scan the QR code on your card with your phone camera, or type the code below.</p></section>' +
+      codeBox(state, 'Type the code on your card', true) +
       '</main>'
     );
   }
@@ -391,14 +388,14 @@ var StudentPage = (function () {
       '<section class="sp-card sp-hello"><p class="sp-lead" role="alert">' +
       esc(state.message) +
       '</p></section>' +
-      codeBox(Object.assign({}, state, { message: '' }), 'Type the code on your slip', true) +
+      codeBox(Object.assign({}, state, { message: '' }), 'Type the code on your card', true) +
       '</main>'
     );
   }
 
   /* ── The screen files ──────────────────────────────────────── */
 
-  /* questionnaire.js, report.js, app.js and assignments.js each hand over
+  /* questionnaire.js, app.js and assignments.js each hand over
        {file, render: {screen name: function}, click, input, submit, start,
         share, test}.
      render joins the screens below. click(act, el), input(el) and
@@ -621,43 +618,6 @@ var StudentPage = (function () {
     };
   }
 
-  /* Demo Mode's phone report: Cece's Report 1, as a teacher would send it. */
-  function demoReport() {
-    return {
-      v: 1,
-      name: 'Cece Adeyemi',
-      initials: 'CA',
-      first: 'Cece',
-      course: 'Science 8',
-      report: 'Report 1',
-      issued: new Date().toISOString(),
-      overall: { mode: 'proficiency', text: '3.0', level: 3, word: 'Proficient' },
-      skills: [
-        { name: 'Questioning and Predicting', line: 'I can ask questions I can test.', word: 'Proficient', level: 3 },
-        { name: 'Planning and Conducting', line: 'I can plan a fair investigation.', word: 'Proficient', level: 3 },
-        { name: 'Processing and Analyzing Data', line: 'I can make sense of data.', word: 'Extending', level: 4 },
-        { name: 'Communicating', line: 'I can share ideas and results.', word: 'Developing', level: 2 },
-      ],
-      comment: [
-        'Cece is working at a proficient level in Science 8, and her data work went further: her Energy Transfer Investigation was extending.',
-        'Her next step is handing in labs on time, a goal she set herself. You can help by asking her each week how her goal is going.',
-      ],
-      goal: {
-        text: 'Hand in labs on time by finishing my data table in class.',
-        status: 'Working On It',
-        at: new Date().toISOString(),
-      },
-      self: {
-        at: new Date().toISOString(),
-        items: [
-          { name: 'Personal Awareness & Responsibility', step: 2, why: 'I set goals but I forget to check on them.' },
-          { name: 'Personal & Cultural Identity', step: 3, why: 'My family and my culture matter a lot to me.' },
-        ],
-      },
-      attendance: { absent: 3, late: 2 },
-    };
-  }
-
   function loadDemoTemplates(done) {
     if (typeof QUESTIONNAIRE_TEMPLATES !== 'undefined') return done();
     var s = document.createElement('script');
@@ -673,7 +633,7 @@ var StudentPage = (function () {
 
   function paint(focusSel) {
     if (!root) return;
-    // html-safe: the page's render (the name is shared), over this file's screens and the ones questionnaire.js, report.js, app.js and assignments.js add: every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report; a result on the Assignments list is calc.js's text, escaped.
+    // html-safe: the page's render (the name is shared), over this file's screens and the ones questionnaire.js, app.js and assignments.js add: every screen escapes server and typed text with esc; q.id is a question uuid; a result on the Assignments list is calc.js's text, escaped.
     root.innerHTML = render(S);
     if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
     growAll(root.querySelectorAll('textarea.sp-text'));
@@ -738,13 +698,6 @@ var StudentPage = (function () {
   function lockKey(code) {
     return 'fv-s-locked-' + code;
   }
-  function slipLockedHere(code) {
-    try {
-      return !!localStorage.getItem(lockKey(code));
-    } catch (e) {
-      return false;
-    }
-  }
   function markSlipLocked(code) {
     try {
       localStorage.setItem(lockKey(code), '1');
@@ -763,9 +716,8 @@ var StudentPage = (function () {
     return ' ' + n + ' tries left.';
   }
 
-  /* A typed or scanned code. It is put to the card's screens first
-     (app.js's `card`, which asks the function's `card` route), and then,
-     unless that said it is a card, to the slip route, as it always was.
+  /* A typed or scanned code. It is put to the card's screens
+     (app.js's `card`, which asks the function's `card` route).
      `card(code)` gives a promise of
        true         a card: its screen is drawn;
        false        not a card: the function said so (or is the one deployed
@@ -773,10 +725,7 @@ var StudentPage = (function () {
        'locked'     this address has made too many wrong tries on cards;
        'unreached'  no answer the page can use (no internet, a server
                     error, a timeout).
-     A slip opens whenever the slip route is healthy, whatever the card
-     route does: after 'locked' and 'unreached' the slip route is still
-     asked. What differs is what "nothing opened" then means. After false,
-     the code is no card and no slip: "That code didn't work." After the
+     After false, the code is no card: "That code didn't work." After the
      other two it is not known what the code is, so the page speaks as
      neither (`unreached`).
      `from` is 'card' when the code was typed on one of the card's screens:
@@ -806,7 +755,7 @@ var StudentPage = (function () {
     var onCard = from === 'card' ? cards : null;
     return (cards ? cards.card(c) : Promise.resolve(false)).then(function (said) {
       if (said === true) return undefined;
-      return openSlip(c, said, onCard);
+      return notACard(said, onCard);
     });
   }
 
@@ -823,46 +772,21 @@ var StudentPage = (function () {
     paint('[data-act="code-retry"]');
   }
 
-  // What the slip route says only of a slip: it is one, whatever the card route said.
-  var A_SLIP = { used: 1, closed: 1, not_open_yet: 1 };
-
-  /* `cardSaid` is false, 'locked' or 'unreached' (openCode). */
-  function openSlip(c, cardSaid, cards) {
-    return call({ route: 'open', code: c }).then(function (res) {
-      var e = res && res.ok ? '' : (res && res.error) || 'network';
-      if (cardSaid !== false && e && !Object.prototype.hasOwnProperty.call(A_SLIP, e)) {
-        // The card route did not say what the code is and the slip route has not opened it.
-        unreached(cards, cardSaid === 'locked' && e === 'not_found' ? 'locked' : e);
-        return;
-      }
-      // Typed on a card's screen and it opened nothing: that screen answers.
-      if (cards && e && cards.refused(res)) return;
-      // A slip typed on a card's screen: the tab is named for the slip's page again.
-      if (cards && typeof document !== 'undefined') document.title = 'Student Questions — FullVision';
-      if (res && res.ok && res.kind === 'report') {
-        S.data = res;
-        S.screen = 'rcheck';
-        S.message = '';
-        paint();
-      } else if (res && res.ok && res.check && slipLockedHere(c)) {
-        // Locked on this phone already: say so now, not after another try.
-        S.message = MESSAGES.slip_locked;
-        S.screen = 'message';
-        paint();
-      } else if (res && res.ok) {
-        S.data = res;
-        S.part = 0;
-        S.answers = {};
-        if (res.parts) loadDraft();
-        S.screen = 'confirm';
-        S.message = '';
-        paint();
-      } else {
-        S.message = messageFor(res);
-        S.screen = 'message';
-        paint();
-      }
-    });
+  /* A code the card route did not recognise. Slips are gone (migration
+     2026112414), so a code that is no card is a code that didn't work.
+     `cardSaid` is false, 'locked' or 'unreached' (openCode); after the last
+     two it is not known what the code is, so the page speaks as neither. */
+  function notACard(cardSaid, cards) {
+    if (cardSaid !== false) {
+      unreached(cards, cardSaid === 'locked' ? 'locked' : 'network');
+      return;
+    }
+    var res = { ok: false, error: 'not_found' };
+    // Typed on a card's screen and it opened nothing: that screen answers.
+    if (cards && cards.refused(res)) return;
+    S.message = messageFor(res);
+    S.screen = 'message';
+    paint();
   }
 
   /* The focus has gone back to a box that holds the answer that was wrong.
@@ -963,21 +887,7 @@ var StudentPage = (function () {
     if (S.demo) {
       return Promise.resolve(done({ ok: true, parts: S.demoParts, context: S.demoContext }));
     }
-    S.sending = true;
-    paint();
-    // The code goes with the token, so the function can check a password by its tag (plan S3-S1).
-    return call(Object.assign({ route: 'verify', token: S.data.token, code: S.code }, ident))
-      .then(function (res) {
-        if (res && res.error === 'expired') {
-          return call({ route: 'open', code: S.code }).then(function (again) {
-            if (!again || !again.ok) return again;
-            S.data.token = again.token;
-            return call(Object.assign({ route: 'verify', token: again.token, code: S.code }, ident));
-          });
-        }
-        return res;
-      })
-      .then(done);
+    return Promise.resolve();
   }
 
   /* A clean state, handed to every screen file. */
@@ -1100,22 +1010,6 @@ var StudentPage = (function () {
       return !!(f.start && f.start(h));
     });
     if (theirs) return;
-    if (/^demo-report$/i.test(h)) {
-      S.demo = true;
-      var until = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
-      S.data = {
-        ok: true,
-        kind: 'report',
-        token: 'demo',
-        student: { first_name: 'Cece' },
-        course: { name: 'Science 8', block: 'B' },
-        report: { title: 'Report 1', expires_on: until },
-        has_birthday: true,
-      };
-      S.screen = 'rcheck';
-      paint();
-      return;
-    }
     if (/^demo(-about)?$/i.test(h)) {
       S.demo = true;
       S.screen = 'loading';
@@ -1150,7 +1044,7 @@ var StudentPage = (function () {
      assignments.js: a screen file that hasn't joined is fetched here. */
   function whenScreensAreIn(done) {
     function fetchMissing() {
-      var missing = ['questionnaire', 'report', 'app', 'assignments'].filter(function (name) {
+      var missing = ['questionnaire', 'app', 'assignments'].filter(function (name) {
         return !files.some(function (f) {
           return f.file === name;
         });
@@ -1223,7 +1117,6 @@ var StudentPage = (function () {
     loadDraft: loadDraft,
     clearDraft: clearDraft,
     wipeCardDrafts: wipeCardDrafts,
-    demoReport: demoReport,
     demoData: demoData,
     loadDemoTemplates: loadDemoTemplates,
     paint: paint,

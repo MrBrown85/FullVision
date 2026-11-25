@@ -56,7 +56,7 @@ begin
                 bval := p_b::text;
             else
                 -- One of B's records of this kind, from the table that holds them.
-                home := 'public.' || case base when 'access_code' then 'student_access_code' else base end;
+                home := 'public.' || base;
                 execute format('select id::text from %s where fv_private.teacher_of(%L, id) = $1 limit 1', home, base)
                    into bval using p_b;
             end if;

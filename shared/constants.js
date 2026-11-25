@@ -1041,13 +1041,11 @@ const TB_PAGES = [
    (queued writes replayed on reconnect). */
 const FV_IDEMPOTENT_RPCS = {
   move_rubric_scores: true,
-  close_phone_report: true,
   create_assessment: true,
   create_course: true,
   create_custom_tag: true,
   create_observation: true,
   create_observation_follow_up: true,
-  create_phone_report: true,
   create_report_issue: true,
   create_student_and_enroll: true,
   delete_comment_template: true,
@@ -1072,7 +1070,6 @@ const FV_IDEMPOTENT_RPCS = {
   set_rubric_printed: true,
   submit_support_report: true,
   update_observation_follow_up: true,
-  update_phone_report: true,
   upsert_category: true,
   upsert_competency_group: true,
   upsert_guardian: true,

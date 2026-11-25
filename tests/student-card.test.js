@@ -78,7 +78,6 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     expect(studentPageScripts()).toEqual([
       'shared/html.js',
       'shared/build-flags.js',
-      'shared/phone-report-view.js',
       'shared/loading-screen.js',
       's/student-data.js',
       // Six-Point rubrics' scores, for Your Result and Your Feedback (Nov 19).
@@ -96,7 +95,6 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/quiz-model.js',
       's/quiz-view.js',
       's/questionnaire.js',
-      's/report.js',
       // Settings (the gear): Text Size's words and the keys over its sheets; nothing stored or sent.
       's/settings.js',
       // What the student has looked at, the rule returned work and bulletins share.
@@ -130,42 +128,11 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     );
   });
 
-  it.each(['', '#demo', '#demo-about', '#demo-report'])('a slip page (%s) fetches neither', async hash => {
+  it.each(['', '#demo', '#demo-about'])('a slip page (%s) fetches neither', async hash => {
     const page = openStudentPage();
     await page.start(hash);
     expect(page.fetched.filter(src => /calc|constants|student-data/.test(src))).toEqual([]);
     expect(page.run(GRADES_IN)).toBe('undefined undefined undefined');
-  });
-
-  it('a real slip, opened and answered to the identity check, fetches nothing', async () => {
-    const page = openStudentPage();
-    page.replies.push({
-      ok: true,
-      token: 'a'.repeat(64),
-      student: { first_name: 'Cece' },
-      course: { name: 'Science 8', block: 'B' },
-      preview: [{ title: 'November Reflection', count: 1 }],
-      check: 'identity',
-    });
-    await page.start('#k7m-4qx');
-    page.replies.push({
-      ok: true,
-      parts: [
-        {
-          id: 'p1',
-          kind: 'core_reflection',
-          title: 'November Reflection',
-          questions: [{ id: 'q1', kind: 'text', prompt: 'How did it go?', options: {}, core_ids: [] }],
-        },
-      ],
-      context: {},
-    });
-    page.type('#sp-ident', '1234567');
-    await page.click('[data-act="start"]');
-    expect(page.calls.map(c => c.body.route)).toEqual(['open', 'verify']);
-    expect(page.root().textContent).toContain('How did it go?');
-    expect(page.fetched).toEqual([]);
-    expect(preloads(page)).toBe('');
   });
 
   it('Is This You? on a card fetches both ahead and runs neither; the sign-in runs them (speed, B1)', async () => {
@@ -1060,69 +1027,12 @@ describe('calc.js on the student page reads only what student-data.js gives it',
   );
 });
 
-describe('student card: slips still open as before', () => {
-  const OPEN = {
-    ok: true,
-    token: 'a'.repeat(64),
-    student: { first_name: 'Cece' },
-    course: { name: 'Science 8', block: 'B' },
-    parts: [
-      {
-        id: 'p1',
-        kind: 'core_reflection',
-        title: 'November Reflection',
-        questions: [{ id: 'q1', kind: 'text', prompt: 'How did it go?', options: {}, core_ids: [] }],
-      },
-    ],
-    context: {},
-  };
-
-  it('a slip code goes to open and asks if it is them, as it did', async () => {
-    const page = openStudentPage();
-    page.replies.push(OPEN);
-    await page.start('#k7m-4qx');
-    expect(page.calls).toHaveLength(1);
-    expect(page.calls[0].body).toEqual({ route: 'open', code: 'K7M4QX' });
-    expect(page.root().querySelector('.sp-big').textContent).toBe('Hi Cece!');
-    expect(page.root().querySelector('.sp-head-sub').textContent).toBe('Student Questions');
-    expect(page.root().querySelector('[data-act="start"]').textContent).toBe('Yes, Start');
-  });
-
-  it('the page with no code is still the slip screen', async () => {
+describe('student card: the start screen', () => {
+  it('the page with no code is still the start screen', async () => {
     const page = openStudentPage();
     await page.start('');
     expect(page.root().querySelector('.sp-big').textContent).toBe('Answer Your Teacher’s Questions');
-    expect(page.root().querySelector('form[data-form="code"] label').textContent).toBe('Type the code on your slip');
-    expect(page.root().textContent).not.toContain('card');
-  });
-
-  it('a card’s code typed today gets what an unknown code gets: one open, then "didn’t work"', async () => {
-    const page = openStudentPage();
-    await page.start('');
-    page.replies.push({ ok: false, error: 'not_found' });
-    page.type('#sp-code', 'P3R-8WD');
-    await page.submit('form[data-form="code"]');
-    expect(page.calls.map(c => c.body)).toEqual([{ route: 'open', code: 'P3R8WD' }]);
-    expect(page.root().textContent).toContain(
-      "That code didn't work. Check the letters and numbers on your slip. If you have a newer slip, use that one. If not, ask your teacher for a new slip.",
-    );
-    expect(page.root().querySelector('[data-act="card-yes"]')).toBeNull();
-    expect(page.T.state().page).toBeNull();
-  });
-
-  it('a slip’s identity check keeps the slip’s words', async () => {
-    const page = openStudentPage();
-    page.replies.push(
-      Object.assign({}, OPEN, { parts: undefined, preview: [{ title: 'Q', count: 1 }], check: 'password' }),
-    );
-    await page.start('#k7m-4qx');
-    expect(page.root().textContent).toContain('type the password printed on your slip.');
-    page.replies.push({ ok: false, error: 'wrong_identity', tries_left: 1 });
-    page.type('#sp-ident', '1111');
-    await page.click('[data-act="start"]');
-    expect(page.root().querySelector('.sp-msg').textContent).toBe(
-      "That password doesn't match. Check the password on your slip. 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.",
-    );
-    expect(page.calls[1].body).toMatchObject({ route: 'verify', password: '1111' });
+    expect(page.root().querySelector('form[data-form="code"] label').textContent).toBe('Type the code on your card');
+    expect(page.root().textContent).not.toContain('slip');
   });
 });

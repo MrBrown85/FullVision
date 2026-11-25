@@ -1907,8 +1907,7 @@
   /* ── A real card's questionnaires (S4-F4) ──────────
      The routes of supabase/functions/student-submit/forms-routes.ts, through
      askClass: `forms` once the page is up (Reflections' list), `form` to
-     open one, `answer` to send (questionnaire.js). `forms` also lists phone
-     reports; the student page no longer shows them (Colin, 2026-11-14).
+     open one, `answer` to send (questionnaire.js).
      What `forms` answers is kept on the page's state with the student it is for, so
      Done, another student or another class leaves nothing behind. A
      function without these routes (bad_request) or a failed ask leaves the
@@ -2065,7 +2064,7 @@
       S.screen = 'formmessage';
       paint('[data-act="page-back"]');
       // The list may have changed under it (sent elsewhere, closed, taken back).
-      if (/^(already_sent|closed|not_found|report_closed)$/.test(refused.error)) loadForms();
+      if (/^(already_sent|closed|not_found)$/.test(refused.error)) loadForms();
     });
   }
 
@@ -2076,7 +2075,6 @@
     S.tab = S.back;
     S.back = '';
     S.data = null;
-    S.report = null;
     S.cardForm = null;
     S.answers = {};
     S.part = 0;

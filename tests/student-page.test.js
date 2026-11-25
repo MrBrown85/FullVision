@@ -13,10 +13,9 @@ import { parseHTML } from 'linkedom';
 
 const ROOT = resolve(__dirname, '..');
 // tests/setup.js (the global setup file) has loaded shared/questionnaire-templates.js.
-['s/student.js', 's/question-kinds.js', 's/questionnaire.js', 's/report.js'].forEach(f =>
+['s/student.js', 's/question-kinds.js', 's/questionnaire.js'].forEach(f =>
   runInThisContext(readFileSync(resolve(ROOT, f), 'utf8')),
 );
-// shared/phone-report-view.js is loaded by tests/setup.js too.
 const T = globalThis.StudentPage._test;
 
 const PARTS = [
@@ -118,46 +117,23 @@ const type = (sel, value) => {
   el.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
 };
 
+/* The questions on screen, as a student's card hands them over (a real card's `form`, or here Demo Mode's
+   start with the parts swapped for these): the page's own screens, with nothing asked of a server. */
+async function openParts(data) {
+  T.start(root, '#demo-about');
+  await tick();
+  const st = T.state();
+  st.data = JSON.parse(JSON.stringify(data));
+  st.answers = {};
+  st.part = 0;
+}
+
 describe('student page', () => {
   beforeEach(setup);
   afterEach(() => Object.assign(globalThis, originals));
 
-  it('opens the code from the address, pinned to Canada, and asks if it is them', async () => {
-    replies.push(OPEN);
-    T.start(root, '#k7m-4qx');
-    await tick();
-    expect(calls[0].url).toBe('https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1');
-    expect(calls[0].body).toEqual({ route: 'open', code: 'K7M4QX' });
-    expect(root.querySelector('.sp-big').textContent).toBe('Hi Cece!');
-    expect(root.querySelector('.sp-head-title').textContent).toBe('Science 8 · Block B');
-    expect(root.textContent).toContain('November Reflection and Goal Check-In');
-    expect(root.textContent).toContain('6 questions');
-  });
-
-  it('a malformed code never leaves the phone; a refused one says why', async () => {
-    T.start(root, '');
-    type('#sp-code', 'HELLO');
-    root.querySelector('form').dispatchEvent(new globalThis.window.Event('submit', { bubbles: true }));
-    await tick();
-    expect(calls).toHaveLength(0);
-    expect(root.querySelector('.sp-msg').textContent).toContain("didn't work");
-    replies.push({ ok: false, error: 'used' });
-    type('#sp-code', 'abc-234');
-    root.querySelector('form').dispatchEvent(new globalThis.window.Event('submit', { bubbles: true }));
-    await tick();
-    expect(calls[0].body.code).toBe('ABC234');
-    expect(root.textContent).toContain('already been used');
-    replies.push({ ok: false, error: 'not_open_yet', opens_on: '2026-11-03' });
-    type('#sp-code', 'abc-234');
-    root.querySelector('form').dispatchEvent(new globalThis.window.Event('submit', { bubbles: true }));
-    await tick();
-    expect(root.textContent).toContain('These questions open on November 3.');
-  });
-
   it('renders each question type and collects answers the way submit takes them', async () => {
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
+    await openParts(OPEN);
     click('[data-act="start"]');
     expect(root.querySelector('.sp-kicker').textContent).toBe('Personal & Social · Grade 8');
     expect(root.textContent).toContain('How can these help you in Science 8?');
@@ -179,20 +155,10 @@ describe('student page', () => {
       g1: 'Working On It',
       g3: 'COL',
     });
-    replies.push({ ok: true, submitted_at: '2026-11-04T10:00:00Z' });
-    click('[data-act="send"]');
-    await tick();
-    await tick();
-    expect(calls[1].body).toMatchObject({ route: 'submit', token: 'a'.repeat(64) });
-    expect(calls[1].body.answers.g3).toBe('COL');
-    expect(root.querySelector('.sp-big').textContent).toBe('Sent to Your Teacher');
-    expect(root.textContent).toContain('It will be part of your report.');
   });
 
   it('with no course goal written, the check-in says so instead of asking how the goal is going', async () => {
-    replies.push(Object.assign({}, OPEN, { context: {} }));
-    T.start(root, '#K7M4QX');
-    await tick();
+    await openParts(Object.assign({}, OPEN, { context: {} }));
     click('[data-act="start"]');
     expect(root.querySelector('#sp-count').textContent).toBe('0 of 4 answered');
     click('[data-act="next"]');
@@ -205,9 +171,7 @@ describe('student page', () => {
   });
 
   it('a set of choices is one Tab stop, and the arrow keys choose within it', async () => {
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
+    await openParts(OPEN);
     click('[data-act="start"]');
     const steps = () => Array.from(root.querySelectorAll('[data-act="step"][data-core="PAR"]'));
     expect(steps().map(b => b.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
@@ -224,51 +188,6 @@ describe('student page', () => {
     expect(T.collect(T.state()).q3.levels.PAR).toBe(4);
     key(steps()[3], 'ArrowRight');
     expect(T.collect(T.state()).q3.levels.PAR).toBe(1);
-  });
-
-  it('a token that ran out is renewed once with the same code, then the answers go', async () => {
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    click('[data-act="start"]');
-    type('[data-q="q2"][data-kind="text"]', 'Something');
-    click('[data-act="next"]');
-    replies.push({ ok: false, error: 'expired' }, Object.assign({}, OPEN, { token: 'b'.repeat(64) }), { ok: true });
-    click('[data-act="send"]');
-    for (let i = 0; i < 6; i++) await tick();
-    expect(calls.map(c => c.body.route)).toEqual(['open', 'submit', 'open', 'submit']);
-    expect(calls[3].body.token).toBe('b'.repeat(64));
-    expect(root.querySelector('.sp-big').textContent).toBe('Sent to Your Teacher');
-  });
-
-  it('nothing answered is caught before sending; a network failure keeps the answers', async () => {
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    click('[data-act="start"]');
-    click('[data-act="next"]');
-    click('[data-act="send"]');
-    await tick();
-    expect(calls).toHaveLength(1);
-    expect(root.querySelector('.sp-msg').textContent).toBe('Answer at least one question before you send.');
-    click('[data-act="back"]');
-    type('[data-q="q2"][data-kind="text"]', 'Kept');
-    click('[data-act="next"]');
-    globalThis.fetch = async () => {
-      throw new Error('offline');
-    };
-    click('[data-act="send"]');
-    for (let i = 0; i < 4; i++) await tick();
-    expect(root.querySelector('.sp-msg').textContent).toContain('Your answers are still here.');
-    expect(T.state().answers.q2).toBe('Kept');
-  });
-
-  it('No, That’s Not Me tells them to give the slip back', async () => {
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    click('[data-act="notme"]');
-    expect(root.textContent).toContain('Give This Slip Back');
   });
 
   it('Demo Mode builds the questions from the templates and never calls the function', async () => {
@@ -289,67 +208,11 @@ describe('student page', () => {
     expect(root.textContent).toContain('This was Demo Mode. Nothing was sent.');
     expect(T.state().answers[Object.keys(T.state().answers)[0]]).toEqual(['English', 'Igbo']);
   });
-
-  it('a draft survives a reload in the same tab and is cleared once sent', async () => {
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    click('[data-act="start"]');
-    type('[data-q="q2"][data-kind="text"]', 'Half written');
-    await new Promise(r => setTimeout(r, 450)); // the draft is kept once the student pauses
-    expect(sessionStorage.getItem('fv-s-draft-K7M4QX')).toContain('Half written');
-    const fresh = root.cloneNode(false);
-    root.replaceWith(fresh);
-    root = fresh;
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    click('[data-act="start"]');
-    expect(root.querySelector('[data-q="q2"][data-kind="text"]').value).toBe('Half written');
-    click('[data-act="next"]');
-    click('[data-act="send"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(sessionStorage.getItem('fv-s-draft-K7M4QX')).toBeNull();
-  });
 });
 
 describe('typing an answer (speed)', () => {
   beforeEach(setup);
   afterEach(() => Object.assign(globalThis, originals));
-
-  it('keeps the draft once the student pauses, not on every key, and never after it is cleared', async () => {
-    replies.push(OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    click('[data-act="start"]');
-    const saves = [];
-    const set = sessionStorage.setItem;
-    sessionStorage.setItem = function (k, v) {
-      if (k === 'fv-s-draft-K7M4QX') saves.push(v);
-      return set.call(this, k, v);
-    };
-    try {
-      const words = 'Twenty keys, one by one';
-      for (let i = 1; i <= 20; i++) type('[data-q="q2"][data-kind="text"]', words.slice(0, i));
-      expect(saves).toHaveLength(0); // was 20, one a key
-      await new Promise(r => setTimeout(r, 450));
-      expect(saves).toHaveLength(1);
-      expect(saves[0]).toContain(words.slice(0, 20));
-      // A key, then the answers cleared before the pause ends: nothing is written after.
-      type('[data-q="q2"][data-kind="text"]', 'One more');
-      StudentPage.clearDraft();
-      await new Promise(r => setTimeout(r, 450));
-      expect(saves).toHaveLength(1);
-      expect(sessionStorage.getItem('fv-s-draft-K7M4QX')).toBeNull();
-      // Next (any other keep) keeps at once what was typed.
-      type('[data-q="q2"][data-kind="text"]', 'Kept on Next');
-      click('[data-act="next"]');
-      expect(saves).toHaveLength(2);
-      expect(saves[1]).toContain('Kept on Next');
-    } finally {
-      sessionStorage.setItem = set;
-    }
-  });
 
   it('sets every box’s height after reading them all: one layout, not one a box', () => {
     const log = [];
@@ -367,288 +230,5 @@ describe('typing an answer (speed)', () => {
     StudentPage._test.growAll([box('a'), box('b'), box('c')]);
     // Before: set a, read a, set a, set b, read b, set b... (a layout forced at each read after a set).
     expect(log).toEqual(['set a', 'set b', 'set c', 'read a', 'read b', 'read c', 'set a', 'set b', 'set c']);
-  });
-});
-
-describe('student page: who are you? (a questionnaire slip)', () => {
-  beforeEach(setup);
-  afterEach(() => Object.assign(globalThis, originals));
-
-  const CHECK = {
-    ok: true,
-    kind: 'questionnaire',
-    token: 'a'.repeat(64),
-    student: { first_name: 'Cece' },
-    course: { name: 'Science 8', block: 'B' },
-    check: 'identity',
-    preview: [
-      { title: 'November Reflection', count: 3 },
-      { title: 'Goal Check-In', count: 3 },
-    ],
-  };
-  const choose = (sel, value) => {
-    root.querySelectorAll(sel + ' option').forEach(o => o.removeAttribute('selected'));
-    if (value !== '') root.querySelector(sel + ' option[value="' + value + '"]').setAttribute('selected', '');
-  };
-
-  it('asks for a birthday or student number before the questions, and shows what they are called', async () => {
-    replies.push(CHECK);
-    T.start(root, '#K7M4QX');
-    await tick();
-    expect(root.querySelector('.sp-big').textContent).toBe('Hi Cece!');
-    expect(root.textContent).toContain('November Reflection and Goal Check-In');
-    expect(root.textContent).toContain('6 questions');
-    expect(root.textContent).toContain('enter your birthday or your student number');
-    expect(root.querySelector('#sp-bm')).toBeTruthy();
-    expect(root.querySelector('#sp-ident')).toBeTruthy();
-    click('[data-act="start"]');
-    await tick();
-    expect(calls).toHaveLength(1);
-    expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
-      'Choose your birthday or type your student number.',
-    );
-  });
-
-  it('a wrong answer says so with the tries left; a student number hands over the questions', async () => {
-    replies.push(CHECK);
-    T.start(root, '#K7M4QX');
-    await tick();
-    choose('#sp-bm', 5);
-    choose('#sp-bd', 16);
-    choose('#sp-by', 2012);
-    replies.push({ ok: false, error: 'wrong_identity', tries_left: 4 });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    // The slip's code goes with its verify, so a password can be checked by its tag (plan S3-S1).
-    expect(calls[1].body).toEqual({
-      route: 'verify',
-      token: 'a'.repeat(64),
-      code: 'K7M4QX',
-      birthday: '2012-05-16',
-      student_number: null,
-      password: null,
-    });
-    expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
-      "That doesn't match. Check your birthday or student number. 4 tries left.",
-    );
-    choose('#sp-bm', '');
-    choose('#sp-bd', '');
-    choose('#sp-by', '');
-    type('#sp-ident', ' 0123456 ');
-    replies.push({ ok: true, parts: PARTS, context: OPEN.context });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(calls[2].body).toMatchObject({ route: 'verify', birthday: null, student_number: '0123456', password: null });
-    expect(root.querySelector('.sp-kicker').textContent).toBe('Personal & Social · Grade 8');
-    click('[data-act="back"]');
-    expect(root.querySelector('#sp-ident')).toBeNull();
-    expect(root.querySelector('[data-act="start"]').textContent).toBe('Yes, Start');
-  });
-
-  it('the last try warns it will lock; a locked slip says so straight away when opened again', async () => {
-    replies.push(CHECK);
-    T.start(root, '#K7M4QX');
-    await tick();
-    type('#sp-ident', '999');
-    replies.push({ ok: false, error: 'wrong_identity', tries_left: 1 });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
-      "That doesn't match. Check your birthday or student number. 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.",
-    );
-    replies.push({ ok: false, error: 'slip_locked' });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
-
-    // The page opened again on this phone: the lock shows, not the form.
-    replies.push(CHECK);
-    T.start(root, '#K7M4QX');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(root.querySelector('#sp-ident')).toBeNull();
-    expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
-  });
-
-  it('a slip with a password asks for the password', async () => {
-    replies.push(Object.assign({}, CHECK, { check: 'password' }));
-    T.start(root, '#K7M4QX');
-    await tick();
-    expect(root.textContent).toContain('type the password printed on your slip');
-    expect(root.querySelector('#sp-bm')).toBeNull();
-    type('#sp-ident', '4821');
-    replies.push({ ok: false, error: 'wrong_identity', tries_left: 1 });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(calls[1].body).toMatchObject({ route: 'verify', password: '4821', birthday: null, student_number: null });
-    expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
-      "That password doesn't match. Check the password on your slip. 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.",
-    );
-    replies.push({ ok: false, error: 'slip_locked' });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
-  });
-
-  it('a password printed before a birthday or number was added is offered in the same box', async () => {
-    replies.push(Object.assign({}, CHECK, { also_password: true }));
-    T.start(root, '#K7M4QX');
-    await tick();
-    expect(root.textContent).toContain('or the password on your slip');
-    expect(root.querySelector('label[for="sp-ident"]').textContent).toBe('Student Number or Password');
-    type('#sp-ident', '4821');
-    replies.push({ ok: true, parts: PARTS, context: {} });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(calls[1].body).toMatchObject({ route: 'verify', student_number: '4821', password: '4821', birthday: null });
-  });
-
-  it('without one, the box asks for the student number only', async () => {
-    replies.push(CHECK);
-    T.start(root, '#K7M4QX');
-    await tick();
-    expect(root.textContent).not.toContain('password');
-    type('#sp-ident', '0123456');
-    replies.push({ ok: false, error: 'slip_locked' });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(calls[1].body.password).toBeNull();
-    expect(root.textContent).toContain('Ask your teacher for a new slip.');
-  });
-
-  it('a slip printed before passwords says to ask for a new one', async () => {
-    replies.push({ ok: false, error: 'reprint' });
-    T.start(root, '#K7M4QX');
-    await tick();
-    expect(root.textContent).toContain('This slip needs to be printed again.');
-  });
-
-  it('a session that ran out while they wrote opens again, checks again with what matched, then sends', async () => {
-    replies.push(CHECK);
-    T.start(root, '#K7M4QX');
-    await tick();
-    type('#sp-ident', '0123456');
-    replies.push({ ok: true, parts: PARTS, context: OPEN.context });
-    click('[data-act="start"]');
-    for (let i = 0; i < 3; i++) await tick();
-    type('[data-q="q2"][data-kind="text"]', 'Something');
-    click('[data-act="next"]');
-    replies.push(
-      { ok: false, error: 'expired' },
-      Object.assign({}, CHECK, { token: 'b'.repeat(64) }),
-      { ok: true, parts: PARTS },
-      { ok: true },
-    );
-    click('[data-act="send"]');
-    for (let i = 0; i < 8; i++) await tick();
-    expect(calls.map(c => c.body.route)).toEqual(['open', 'verify', 'submit', 'open', 'verify', 'submit']);
-    expect(calls[4].body).toMatchObject({ token: 'b'.repeat(64), student_number: '0123456' });
-    expect(calls[5].body.token).toBe('b'.repeat(64));
-    expect(root.querySelector('.sp-big').textContent).toBe('Sent to Your Teacher');
-  });
-
-  it('Demo Mode asks who you are, takes any answer and calls nothing', async () => {
-    T.start(root, '#demo');
-    await tick();
-    expect(root.textContent).toContain('enter your birthday or your student number');
-    type('#sp-ident', '1');
-    click('[data-act="start"]');
-    await tick();
-    expect(calls).toHaveLength(0);
-    expect(root.querySelector('#sp-count')).toBeTruthy();
-  });
-});
-
-describe('student page: a report on the phone', () => {
-  const REPORT_OPEN = {
-    ok: true,
-    kind: 'report',
-    token: 'a'.repeat(64),
-    student: { first_name: 'Cece' },
-    course: { name: 'Science 8', block: 'B' },
-    report: { title: 'Report 1', expires_on: '2027-01-31' },
-    has_birthday: true,
-  };
-  const COPY = {
-    name: 'Cece Okafor',
-    first: 'Cece',
-    course: 'Science 8',
-    report: 'Report 1',
-    overall: { mode: 'proficiency', text: '3.0', level: 3, word: 'Proficient' },
-    goal: { text: 'Hand in labs on time.', status: 'Working On It' },
-  };
-  beforeEach(setup);
-  afterEach(() => Object.assign(globalThis, originals));
-  const pickBirthday = () => {
-    root.querySelector('#sp-bm option[value="5"]').setAttribute('selected', '');
-    root.querySelector('#sp-bd option[value="15"]').setAttribute('selected', '');
-    root.querySelector('#sp-by option[value="2012"]').setAttribute('selected', '');
-  };
-
-  it('a report code asks for the birthday first, and says how long the link works', async () => {
-    replies.push(REPORT_OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    expect(root.querySelector('.sp-big').textContent).toBe('Your report is ready, Cece');
-    expect(root.querySelector('.sp-head-title').textContent).toBe('Science 8 · Block B');
-    expect(root.querySelector('.sp-fine').textContent).toBe(
-      'This link works until Jan 31. Keep your slip private, like a password.',
-    );
-    expect(root.querySelectorAll('.sp-bday select')).toHaveLength(3);
-  });
-
-  it('no birthday on file: no pickers, just what to do', async () => {
-    replies.push(Object.assign({}, REPORT_OPEN, { has_birthday: false }));
-    T.start(root, '#K7M4QX');
-    await tick();
-    expect(root.querySelector('.sp-bday')).toBeNull();
-    expect(root.textContent).toContain('Ask your teacher.');
-    expect(root.querySelector('[data-act="rcheck"]')).toBeNull();
-  });
-
-  it('a wrong birthday says so with the tries left; the right one opens the report as sent', async () => {
-    replies.push(REPORT_OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    click('[data-act="rcheck"]');
-    await tick();
-    expect(calls).toHaveLength(1);
-    expect(root.querySelector('.sp-msg').textContent).toBe('Choose the month, day and year you were born.');
-    pickBirthday();
-    replies.push({ ok: false, error: 'wrong_birthday', tries_left: 3 });
-    click('[data-act="rcheck"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(calls[1].body).toEqual({ route: 'check', token: 'a'.repeat(64), birthday: '2012-05-15' });
-    expect(root.querySelector('.sp-msg').textContent).toBe(
-      "That birthday doesn't match. Check the month, day and year. 3 tries left.",
-    );
-    expect(root.querySelector('#sp-bm').value).toBe('5');
-    replies.push({ ok: true, report: COPY });
-    click('[data-act="rcheck"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(root.querySelector('.pr-big').textContent).toBe('Proficient');
-  });
-
-  it('a report is for reading: nothing on it to send back', async () => {
-    replies.push(REPORT_OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    pickBirthday();
-    replies.push({ ok: true, report: COPY });
-    click('[data-act="rcheck"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(root.querySelector('.pr-big').textContent).toBe('Proficient');
-    expect(root.querySelector('[data-act="send"]')).toBeNull();
-    expect(root.textContent).not.toMatch(/reply/i);
-  });
-
-  it('Demo Mode shows a sample report with no request', async () => {
-    T.start(root, '#demo-report');
-    await tick();
-    pickBirthday();
-    click('[data-act="rcheck"]');
-    await tick();
-    expect(root.querySelector('.pr-name').textContent).toBe('Cece Adeyemi');
-    expect(root.querySelector('[data-act="send"]')).toBeNull();
-    expect(calls).toHaveLength(0);
   });
 });

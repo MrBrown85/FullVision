@@ -19,10 +19,10 @@ declare
     _r      jsonb;
     c uuid; subj uuid; st1 uuid; st2 uuid; e1 uuid; e2 uuid; cat uuid; md uuid; cg uuid; sec uuid; tg uuid;
     rub uuid; crit uuid; chk uuid; a_pts uuid; a_prof uuid; a_rub uuid; a_dib uuid; ctag uuid; otpl uuid;
-    obs uuid; tr uuid; q uuid; qq uuid; resp uuid; pr uuid; ri uuid; gu uuid; ct uuid; rt uuid; res uuid;
+    obs uuid; tr uuid; q uuid; qq uuid; resp uuid; ri uuid; gu uuid; ct uuid; rt uuid; res uuid;
     sec2 uuid; ho uuid; sub2 uuid; sf2 uuid; qz uuid; qa uuid;
     fup uuid; bl uuid; blf uuid;
-    sub uuid; sf uuid; card uuid; code uuid; rr uuid; sc uuid; nt uuid; ds uuid; fr uuid;
+    sub uuid; sf uuid; card uuid; rr uuid; sc uuid; nt uuid; ds uuid; fr uuid;
     a_grp uuid := gen_random_uuid();
     r_grp uuid := gen_random_uuid();
     hex64 text := encode(sha256(convert_to(p_mark, 'utf8')), 'hex');
@@ -108,10 +108,6 @@ begin
     perform public.save_competency_descriptors(jsonb_build_array(
         jsonb_build_object('key', p_mark || ' competency', 'level', 3, 'text', p_mark || ' Descriptor')));
     perform public.submit_support_report('gradebook', p_mark || ' Help', 'test browser', '1', gen_random_uuid());
-    _r := public.create_phone_report(c, 1, p_mark || ' Term 1', current_date + 30,
-            jsonb_build_array(jsonb_build_object('enrollment_id', e1, 'data', jsonb_build_object('note', p_mark || ' Phone'))),
-            gen_random_uuid());
-    select id into pr from public.phone_report where course_id = c;
     _r := public.create_report_issue(c, 1, p_mark || ' Term 1', 'letter', jsonb_build_object('front', '[]'::jsonb),
             jsonb_build_array(jsonb_build_object('enrollment_id', e1, 'html', p_mark || ' Report html')),
             gen_random_uuid());
@@ -137,10 +133,6 @@ begin
     insert into public.student_card (enrollment_id, code_hmac, pw_hmac, key_id, seq, works_until)
     values (e1, hex64, encode(sha256(convert_to(p_mark || 'pw', 'utf8')), 'hex'), '0000000a', 1, current_date + 30)
     returning id into card;
-    -- A keyed slip, as every slip is since 2026112406.
-    insert into public.student_access_code (enrollment_id, questionnaire_id, code_hmac, key_id, expires_at)
-    values (e1, q, encode(sha256(convert_to(p_mark || 'code', 'utf8')), 'hex'), '0000000a', now() + interval '30 days')
-    returning id into code;
     insert into public.response (questionnaire_id, enrollment_id, via) values (q, e1, 'link') returning id into resp;
     insert into public.answer (response_id, question_id, value_text) values (resp, qq, p_mark || ' Answer');
     insert into public.submission (course_id, assessment_id, enrollment_id, version, state, intent, sent_by, note, sent_at)
@@ -212,13 +204,12 @@ begin
     end if;
     insert into public.submission_file_removal (bucket, path, course_id, reason, link_dies_at)
     values ('student-photos', c || '/' || p_mark || '-gone.jpg', c, 'test', now());
-    insert into student_submit.attempt (route, outcome, ip_hash, code_id, course_id) values ('card', 'ok', p_mark, code, c);
+    insert into student_submit.attempt (route, outcome, ip_hash, code_id, course_id) values ('card', 'ok', p_mark, null, c);
     insert into student_submit.device_session (token_hash, expires_at) values (md5(p_mark || 'device'), now() + interval '1 day')
     returning id into ds;
     insert into student_submit.device_session_enrollment (session_id, enrollment_id, card_id) values (ds, e1, card);
     insert into student_submit.send_log (card_id) values (card);
     insert into student_submit.write_log (card_id, kind) values (card, 'reflect');
-    insert into student_submit.session (token_hash, code_id, expires_at) values (md5(p_mark || 'session'), code, now() + interval '1 day');
 
     return _ids || jsonb_build_object(
         'course', c, 'subject', subj, 'student', st1, 'student2', st2, 'enrollment', e1, 'enrollment2', e2,
@@ -227,8 +218,8 @@ begin
         'assessment_rubric', a_rub, 'assessment_dibels', a_dib, 'score', sc, 'custom_tag', ctag,
         'observation_template', otpl, 'observation', obs, 'observation_follow_up', fup, 'term_rating', tr, 'note', nt, 'guardian', gu,
         'questionnaire', q, 'question', qq, 'response', resp, 'comment_template', ct, 'report_template', rt,
-        'phone_report', pr, 'report_issue', ri, 'resource', res, 'submission', sub, 'submission_file', sf,
-        'student_card', card, 'access_code', code, 'revision_request', rr, 'feedback_reflection', fr,
+        'report_issue', ri, 'resource', res, 'submission', sub, 'submission_file', sf,
+        'student_card', card, 'revision_request', rr, 'feedback_reflection', fr,
         'device_session', ds, 'assessment_copy_group', a_grp, 'rubric_copy_group', r_grp,
         'removed_section', sec2, 'handout', ho, 'enrollment2_submission', sub2, 'sending_file', sf2,
         'custom_tag_label', p_mark || ' Custom',

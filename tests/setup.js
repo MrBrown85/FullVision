@@ -330,7 +330,6 @@ load('teacher/preview-student.js');
 load('teacher/cm-student-page.js');
 load('shared/student-voice.js');
 load('teacher/learner-profile.js');
-load('shared/phone-report-view.js');
 load('shared/loading-screen.js');
 load('shared/backup-restore.js');
 load('teacher/cm-roster-file.js');

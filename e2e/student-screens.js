@@ -66,48 +66,6 @@ async function blurryJpeg(page) {
   return Buffer.from(b64, 'base64');
 }
 
-// A phone report's slip, answered here in the student-submit function's shapes.
-async function mockReport(page) {
-  await page.route('**/functions/v1/student-submit**', async route => {
-    const req = route.request();
-    const cors = {
-      'access-control-allow-origin': '*',
-      'access-control-allow-headers': 'content-type',
-      'access-control-allow-methods': 'POST, OPTIONS',
-    };
-    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    const body = JSON.parse(req.postData() || '{}');
-    const replies = {
-      card: { ok: false, error: 'not_found' },
-      open: {
-        ok: true,
-        kind: 'report',
-        token: 'c'.repeat(64),
-        student: { first_name: 'Cece' },
-        course: { name: 'Science 8', block: 'B' },
-        report: { title: 'Report 1', expires_on: '2027-01-31' },
-        has_birthday: true,
-      },
-      check: {
-        ok: true,
-        report: {
-          name: 'Cece Okafor',
-          first: 'Cece',
-          course: 'Science 8',
-          report: 'Report 1',
-          overall: { mode: 'proficiency', text: '3.0', level: 3, word: 'Proficient' },
-          comment: ['Cece is curious. She asks good questions in every lab and checks her work with a partner.'],
-        },
-      },
-    };
-    return route.fulfill({
-      status: 200,
-      headers: { ...cors, 'content-type': 'application/json' },
-      body: JSON.stringify(replies[body.route]),
-    });
-  });
-}
-
 async function yourFeedback(p, c) {
   await openDemo(p, c, 'demo-card-send');
   await tab(p, 'learning');
@@ -299,20 +257,6 @@ export const SCREENS = [
       await openAddCard(p);
       await p.locator('#sp-code').fill('ABCD-EFGH');
       await p.getByRole('button', { name: 'Continue' }).click();
-    },
-  },
-  {
-    name: 'phone report',
-    marker: '.pr-big',
-    sized: false, // a slip's page: no Settings, so no Text Size
-    go: async (p, c) => {
-      await mockReport(p);
-      await p.goto('about:blank');
-      await p.goto((c.base || '') + '/s/#K7M-4QX');
-      await p.getByLabel('Month').selectOption('5');
-      await p.getByLabel('Day').selectOption('15');
-      await p.getByLabel('Year').selectOption('2012');
-      await p.getByRole('button', { name: 'Open My Report' }).click();
     },
   },
   {
