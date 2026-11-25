@@ -185,6 +185,11 @@
   min-width: 180px;
   max-width: none;
 }
+/* Every row is the panel's 34px, in a short column and in a list that
+   scrolls alike: the Gradebook's rows grow across a row, not down a column. */
+.obp-col .assess-filter-item {
+  flex: 0 0 auto;
+}
 .obp-find {
   display: block;
   width: calc(100% - 8px);

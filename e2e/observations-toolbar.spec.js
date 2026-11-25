@@ -302,6 +302,16 @@ test.describe('the filter panel', () => {
     const p = await panel(page).boundingBox();
     expect(p.x).toBeCloseTo(s.x, 0);
     expect(p.y).toBeGreaterThan(s.y + s.height);
+    // Every row is 34px, in a short column and in a list that scrolls alike:
+    // not stretched to fill a column, nor squeezed to fit one.
+    const heights = await page.evaluate(() => [
+      ...new Set(
+        [...document.querySelectorAll('.obp-panel .assess-filter-item')]
+          .filter(el => el.getBoundingClientRect().width > 0 && !el.closest('.gbf-foot'))
+          .map(el => Math.round(el.getBoundingClientRect().height)),
+      ),
+    ]);
+    expect(heights).toEqual([34]);
     await page.keyboard.press('Escape');
     await expect(panel(page)).toHaveCount(0);
     await expect(filterBtn(page)).toBeFocused();
