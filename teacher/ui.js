@@ -2514,7 +2514,7 @@ function scoreStatusMarker(status, cid, assessment) {
 
 /* ── Confirm Modal ────────────────────────────────────────── */
 function showConfirm(title, message, okLabel, okStyle, onConfirm, cancelLabel) {
-  var triggerEl = document.activeElement;
+  var focusBack = FocusBack.from(document.activeElement);
   const overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
   overlay.setAttribute('role', 'dialog');
@@ -2536,11 +2536,7 @@ function showConfirm(title, message, okLabel, okStyle, onConfirm, cancelLabel) {
     overlay.remove();
     document.removeEventListener('keydown', escHandler);
     document.removeEventListener('keydown', trapHandler);
-    try {
-      if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
-    } catch (e) {
-      /* trigger may have been removed */
-    }
+    focusBack();
   }
   overlay.querySelector('#confirm-ok-btn').onclick = () => {
     closeOverlay();

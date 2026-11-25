@@ -8203,7 +8203,7 @@ window.DashClassManager = (function () {
      in another class changes (shared/backup-restore.js). */
   // html-safe: fixed markup; the backup's class name and counts go in through esc().
   function cmRestoreBackup() {
-    var triggerEl = document.activeElement;
+    var focusBack = FocusBack.from(document.activeElement);
     var backup = null;
     var overlay = document.createElement('div');
     overlay.className = 'confirm-overlay';
@@ -8239,11 +8239,7 @@ window.DashClassManager = (function () {
     function close() {
       overlay.remove();
       document.removeEventListener('keydown', onKey, true);
-      try {
-        if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
-      } catch (e) {
-        /* the trigger may be gone after a re-render */
-      }
+      focusBack();
     }
     function onKey(e) {
       if (e.key === 'Escape') {
@@ -8328,7 +8324,7 @@ window.DashClassManager = (function () {
   function cmDuplicateCourse(sourceCid) {
     var src = COURSES[sourceCid];
     if (!src) return;
-    var triggerEl = document.activeElement;
+    var focusBack = FocusBack.from(document.activeElement);
     var overlay = document.createElement('div');
     overlay.className = 'confirm-overlay';
     overlay.setAttribute('role', 'dialog');
@@ -8351,11 +8347,7 @@ window.DashClassManager = (function () {
     function close() {
       overlay.remove();
       document.removeEventListener('keydown', onKey, true);
-      try {
-        if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
-      } catch (e) {
-        /* the trigger may be gone after a re-render */
-      }
+      focusBack();
     }
     function onKey(e) {
       if (e.key === 'Escape') {

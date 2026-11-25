@@ -17,6 +17,9 @@ async function enterDemo(page) {
 async function openCompetencies(page) {
   await page.locator('[data-action="openClassManager"]').first().click();
   await page.locator('[data-action="cmSetTab"][data-tab="competencies"]').click();
+  // The tab draws once more when its level wording has loaded. A key pressed and let go across that draw
+  // reaches two different buttons and does nothing, which is not what these tests check, so they start after it.
+  await page.waitForFunction(() => !!window.BANK_PROFICIENCY);
 }
 
 test('select mode: Space ticks a row and focus stays on it, so the next row is one Tab away', async ({ page }) => {
@@ -118,6 +121,80 @@ test('How Folders Count keeps the focus after Space, through its question, and a
   const confirm = page.locator('#confirm-ok-btn');
   if (await confirm.isVisible().catch(() => false)) await confirm.click();
   await expect(page.locator('#cm-recent-limit')).toBeFocused();
+});
+
+/* Class Settings can be drawn again while a question is open: the Competencies tab draws once more when its
+   level wording has loaded, and any tab does when the class's data arrives. The question then gave the focus
+   back to a choice no longer on the page, and Cancel left it nowhere: the test above failed 18 times in 160,
+   eight at a time (Nov 25, 2026). */
+test('A question gives the focus back to the choice that opened it when Class Settings was drawn again under it', async ({
+  page,
+}) => {
+  await enterDemo(page);
+  await openCompetencies(page);
+  const each = () => page.locator('.cm-fc-seg[data-value="each"]').first();
+  const cancel = page.locator('#confirm-cancel-btn');
+  const redraw = () => page.evaluate(() => DashClassManager.renderClassManager());
+  await expect(each()).toHaveAttribute('aria-checked', 'false');
+
+  // Cancel with Enter.
+  await each().focus();
+  await page.keyboard.press('Space');
+  await expect(cancel).toBeFocused();
+  await redraw();
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(cancel).toHaveCount(0);
+  await expect(each()).toBeFocused();
+  await expect(each()).toHaveAttribute('aria-checked', 'false');
+
+  // Escape.
+  await page.keyboard.press('Space');
+  await expect(cancel).toBeFocused();
+  await redraw();
+  await page.keyboard.press('Escape');
+  await expect(cancel).toHaveCount(0);
+  await expect(each()).toBeFocused();
+
+  // Change: the choice is made and keeps the focus.
+  await page.keyboard.press('Space');
+  await expect(cancel).toBeFocused();
+  await redraw();
+  await page.locator('#confirm-ok-btn').click();
+  await expect(each()).toHaveAttribute('aria-checked', 'true');
+  await expect(each()).toBeFocused();
+});
+
+/* The same draw took the focus off whatever had it, so the next key went nowhere: Space pressed on a choice
+   just after the Competencies tab opened did nothing (4 runs in 120 of the test above, Nov 25, 2026). */
+test('A choice and a tab keep the focus when Class Settings is drawn again, so the next key reaches them', async ({
+  page,
+}) => {
+  await enterDemo(page);
+  await openCompetencies(page);
+  const each = () => page.locator('.cm-fc-seg[data-value="each"]').first();
+  // The draw puts a new control in place of the old one, which carries a mark here.
+  const redraw = () =>
+    page.evaluate(() => {
+      document.activeElement.__before = true;
+      DashClassManager.renderClassManager();
+    });
+  const isNew = async () => expect(await page.evaluate(() => document.activeElement.__before)).toBeUndefined();
+
+  await each().focus();
+  await redraw();
+  await expect(each()).toBeFocused();
+  await isNew();
+  await page.keyboard.press('Space');
+  await expect(page.locator('#confirm-cancel-btn')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(each()).toBeFocused();
+
+  const tab = page.locator('#cm-tab-competencies');
+  await tab.focus();
+  await redraw();
+  await expect(tab).toBeFocused();
+  await isNew();
 });
 
 test('Re-link with no changes shows Apply Changes greyed out', async ({ page }) => {

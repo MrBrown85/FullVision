@@ -110,6 +110,7 @@ interface Window {
   ReportQnVoiceObservations: unknown;
   CmStdHelp: unknown;
   CmKeepMenu: unknown;
+  FocusBack: { from(el: Element | null): () => void };
   CmTerms: unknown;
   DashCompetencies: unknown;
   DashRecent: unknown;
@@ -372,6 +373,8 @@ declare var PhotoExpiry: any; // shared/photo-expiry.js, for shared/data-courses
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
 declare var GraderWork: { workShown(cid: string, a: unknown): boolean };
+// A dialog gives the focus back to what opened it (teacher/focus-back.js).
+declare var FocusBack: { from(el: Element | null): () => void };
 declare function showConfirm(
   title: string,
   message: string,
