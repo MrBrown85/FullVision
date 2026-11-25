@@ -22,9 +22,10 @@
    handle (or press ↑ ↓ on the handle), or sort by a column and press Keep
    This Order. Sorting alone changes nothing.
 
-   PageAssignments asks on() while it draws, puts switchHtml() on its
-   toolbar and html() in #main, then calls afterDraw(); its init adds
-   listen()'s listeners. Changes here draw the page again through
+   PageAssignments asks on() while it draws, puts html() in #main, then calls
+   afterDraw(); its init adds listen()'s listeners. The way in and out is on
+   the toolbar (assign-toolbar.js): Bulk Edit in the ⋯ menu, Done Editing
+   beside it; both carry data-alv-view, which _onClick answers. Changes here draw the page again through
    PageAssignments.render(). */
 /** @type {any} */ (window).AssignList = (function () {
   'use strict';
@@ -369,22 +370,6 @@
   /** @param {string} value @param {string} label @param {boolean} [on] */
   function _opt(value, label, on) {
     return '<option value="' + G.esc(value) + '"' + (on ? ' selected' : '') + '>' + G.esc(label) + '</option>';
-  }
-
-  // The Grade | Bulk Edit switch on the toolbar (Colin, Nov 18: "List is confusing"): the cards are
-  // where work is graded, the list where settings are changed for many pieces at once.
-  // html-safe: fixed words
-  function switchHtml() {
-    return (
-      '<div class="seg assess-view-seg" role="group" aria-label="View">' +
-      '<button type="button" class="seg-btn"' +
-      G.segAttr(!_on) +
-      ' data-alv-view="cards">Grade</button>' +
-      '<button type="button" class="seg-btn"' +
-      G.segAttr(_on) +
-      ' data-alv-view="list">Bulk Edit</button>' +
-      '</div>'
-    );
   }
 
   /** @param {string} cid @param {any[]} modules @param {any[]} terms @param {number} shown @param {number} total */
@@ -1177,7 +1162,6 @@
     listen: listen,
     reset: reset,
     setView: setView,
-    switchHtml: switchHtml,
     html: html,
     afterDraw: afterDraw,
     // For tests and the page: what a row reads and what a change writes.

@@ -156,20 +156,29 @@ afterEach(() => {
 });
 
 describe('Grade | Bulk Edit', () => {
-  it('List draws one row per assessment in the class order, without Expand and Collapse', () => {
+  const moreItems = () =>
+    Array.from(document.querySelectorAll('.atb-more-wrap .assess-menu-item')).map(b => b.textContent.trim());
+
+  it('List draws one row per assessment in the class order, with Done Editing and no Expand or Collapse', () => {
     AssignList.setView(false);
     openAssignments(seed, CID, {});
-    expect(document.querySelector('.assess-view-seg')).not.toBeNull();
-    expect(document.querySelector('.assess-seg-control')).not.toBeNull();
+    // Bulk Edit is an item of the ⋯ menu, beside Expand All and Collapse All.
+    expect(moreItems()).toEqual(expect.arrayContaining(['Bulk Edit', 'Rubrics']));
+    expect(document.querySelector('.atb-more-wrap [data-alv-view="list"]')).not.toBeNull();
+    expect(document.querySelector('.assess-view-seg, .assess-seg-control')).toBeNull();
+    expect(document.querySelector('.assess-toolbar [data-alv-view="cards"]')).toBeNull();
     click(document.querySelector('[data-alv-view="list"]'));
     expect(AssignList.on()).toBe(true);
     expect(rowIds()).toEqual([LAB, QUIZ, TEST, HUNT]);
-    expect(document.querySelector('.assess-seg-control')).toBeNull();
+    // In Bulk Edit the ⋯ menu holds Rubrics alone, and Done Editing goes back.
+    expect(moreItems()).toEqual(['Rubrics']);
+    expect(document.querySelector('.atb-end > [data-alv-view="cards"]').textContent).toBe('Done Editing');
     expect(main().querySelector('.assess-card')).toBeNull();
     // Scoring is shown, not changed.
     expect(ctl(QUIZ, 'title').closest('tr').querySelector('.alv-scoring').textContent).toBe('10 Points');
     click(document.querySelector('[data-alv-view="cards"]'));
     expect(main().querySelector('.assess-card')).not.toBeNull();
+    expect(document.querySelector('.atb-end > [data-alv-view="cards"]')).toBeNull();
   });
 
   it('Open puts the assessment form above the List', () => {

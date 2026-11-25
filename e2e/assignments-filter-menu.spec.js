@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
-// The Assignments toolbar is one row: category filters and Ungraded Only
-// sit in a Filter menu whose button counts what is on.
+// The Assignments toolbar: category filters and Ungraded Only sit in the
+// Filter menu, whose button is inside the search box; each filter that is on
+// has a chip in the bar with an × that removes it.
 const CATEGORIES = [
   { id: 'cat-labs', name: 'Labs', weight: 50, displayOrder: 0 },
   { id: 'cat-quiz', name: 'Quizzes', weight: 50, displayOrder: 1 },
@@ -42,8 +43,11 @@ test('the Filter menu filters by category and clears', async ({ page }) => {
   await gotoApp(page, '/assignments');
 
   const toolbar = page.locator('.assess-toolbar');
-  const button = toolbar.locator('.assess-filter-btn');
-  await expect(button).toHaveText('Filter');
+  const button = toolbar.locator('.atb-filter-btn');
+  await expect(button).toHaveAccessibleName('Filter');
+  await expect(button).toHaveAttribute('title', 'Filter');
+  await expect(button).not.toHaveClass(/has-filters/);
+  await expect(toolbar.locator('.atb-chip')).toHaveCount(0);
   await expect(page.locator('.assess-card')).toHaveCount(2);
 
   await button.click();
@@ -54,16 +58,29 @@ test('the Filter menu filters by category and clears', async ({ page }) => {
   await menu.locator('[data-catid="cat-labs"]').click();
   await expect(menu).toBeVisible();
   await expect(menu.locator('[data-catid="cat-labs"]')).toHaveAttribute('aria-checked', 'true');
-  await expect(button).toHaveText('Filter · 1');
+  await expect(button).toHaveClass(/has-filters/);
+  await expect(toolbar.locator('.atb-chip')).toHaveText(['Labs']);
   await expect(page.locator('.assess-card')).toHaveCount(1);
   await expect(page.locator('.assess-card')).toContainText('Density Lab');
 
+  // Escape closes the menu and gives the focus back to the Filter button.
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
+  await expect(button).toBeFocused();
+
+  // A chip's × removes its filter, and the focus goes to the Filter button.
+  await toolbar.locator('.atb-chip').click();
+  await expect(toolbar.locator('.atb-chip')).toHaveCount(0);
+  await expect(page.locator('.assess-card')).toHaveCount(2);
+  await expect(button).not.toHaveClass(/has-filters/);
+  await expect(button).toBeFocused();
 
   await button.click();
+  await menu.locator('[data-catid="cat-quiz"]').click();
+  await expect(toolbar.locator('.atb-chip')).toHaveText(['Quizzes']);
+
   await menu.locator('[data-action="clearFilterMenu"]').click();
-  await expect(button).toHaveText('Filter');
+  await expect(toolbar.locator('.atb-chip')).toHaveCount(0);
   await expect(page.locator('.assess-card')).toHaveCount(2);
 
   await page.locator('.assess-card').first().locator('.assess-header').click();

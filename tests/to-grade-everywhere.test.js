@@ -237,7 +237,7 @@ describe('the Assignments page', () => {
     // Done: the page is back, and still answers a click.
     click(overlay.querySelector('[data-grader="close"]'));
     expect(document.getElementById('grader-overlay')).toBeNull();
-    click(document.querySelector('.assess-tograde-seg [data-show="all"]'));
+    click(document.querySelector('.atb-show [data-show="all"]'));
     expect(document.querySelectorAll('.assess-card').length).toBe(3);
   });
 

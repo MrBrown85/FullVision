@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { demoStudentPageOff } from './demo-student-page-off.js';
 import { useFont } from './wide-font.js';
+import { openToolbarMenu } from './helpers.js';
 
 /* The Quiz card on the assessment form (docs/plans/quizzes-plan.md, slice
    Q2b; board "Quizzes Artboard", Board 1), in Demo Mode with the quizzes
@@ -515,10 +516,12 @@ test.describe('+ New Quiz', () => {
     test('opens the form with the Quiz card open and the title Quiz (' + font + ' font)', async ({ page }) => {
       await demo(page, true);
       await useFont(page, font);
-      const btns = await page.locator('.assess-toolbar-actions .tb-action-btn').allTextContents();
-      expect(btns.slice(-2).map(t => t.trim())).toEqual(['+ New Quiz', '+ New Assessment']);
-      const toolbar = page.locator('.assess-toolbar-actions');
+      // New Quiz is the first item of the ▾ joined to + New Assessment.
+      const toolbar = page.locator('.atb-end');
+      await expect(page.locator('.atb-new .tb-action-btn').first()).toHaveText('+ New Assessment');
       expect(await toolbar.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      const menu = await openToolbarMenu(page, 'new');
+      await expect(menu.getByRole('menuitem').first()).toHaveText('New Quiz');
       if (SHOTS && font === 'page')
         await page.screenshot({
           path: SHOTS + '/new-quiz-toolbar.png',
@@ -527,7 +530,7 @@ test.describe('+ New Quiz', () => {
             return { x: r.x, y: r.y, width: r.width, height: r.height };
           }),
         });
-      await page.locator('[data-action="newQuiz"]').click();
+      await menu.locator('[data-action="newQuiz"]').click();
       await expect(page.locator('#af-title')).toHaveValue('Quiz');
       await expect(page.locator('#quiz-mount .quiz-edit')).toBeVisible();
       await expect(page.locator('#quiz-mount .quiz-prompt')).toBeVisible();

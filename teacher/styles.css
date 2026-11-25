@@ -3360,7 +3360,7 @@ body.offline-active #app-dock {
   }
   /* Menus: fade and drop 4px. */
   .tb-user-menu.open .tb-user-dropdown,
-  .assess-filter-wrap.open .assess-filter-menu,
+  .atb-search.open .assess-filter-menu,
   .sb-sort-menu:not([hidden]),
   .gb-ctx-menu,
   .grader-member-menu,

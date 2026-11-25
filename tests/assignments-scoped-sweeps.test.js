@@ -69,9 +69,10 @@ const mark = (aid, sid) => {
   const el = card(aid).querySelector('.ret-mark[data-ret-sids*="' + sid + '"]');
   return el ? el.textContent.trim() : null;
 };
+// The Show bar's To Return, as the count it carries.
 const pill = () => {
-  const el = document.querySelector('.assess-to-return-btn');
-  return el ? el.textContent.trim() : '';
+  const el = document.querySelector('.atb-show [data-show="toreturn"] .atb-badge');
+  return el ? el.textContent.trim() + ' to return' : '';
 };
 const settled = () => new Promise(r => setTimeout(r, 10));
 const allStatusButtons = () => document.querySelectorAll('[data-action="toggleStudentStatus"]').length;

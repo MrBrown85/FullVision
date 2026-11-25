@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, gotoApp } from './helpers.js';
+import { mockAuth, seedCourse, seedStudents, gotoApp, clickToolbarItem } from './helpers.js';
 
 // Nov 3 sweep (step 4 group 3 #16): "New Rubric" and "Criterion 2" are real
 // names with the caret at the start, so typing gave "Lab Report RubricNew
@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 
 test('the Bank New Rubric opens with its name box ready, and a clicked Criterion 1 is replaced', async ({ page }) => {
   await gotoApp(page, '/assignments');
-  await page.locator('[data-action="openRubricBank"]').click();
+  await clickToolbarItem(page, 'more', 'openRubricBank');
   await page.getByRole('dialog', { name: 'Rubric Bank' }).locator('[data-rb="new"]').first().click();
   const editor = page.locator('#rubric-modal');
   const name = editor.locator('#af-ge-name');
