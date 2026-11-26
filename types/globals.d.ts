@@ -390,6 +390,8 @@ declare var GraderWork: {
   workOnInClass(cid: string): boolean;
   workCounts(cid: string, aid: string, shownIds: unknown): any;
   draftsReturned(...args: any[]): any;
+  // The rest of shared/grader-work.js's members, which the Assignments pieces call.
+  [member: string]: any;
 };
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };
@@ -583,3 +585,4 @@ declare var MarkUp: any;
 interface Window {
   MarkUp?: any;
 }
+declare var CardMenu: any;
