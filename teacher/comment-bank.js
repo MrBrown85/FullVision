@@ -2741,12 +2741,14 @@ window.CommentBank = (function () {
       // today (mention_assessments, strength_tags).
       bestPickId: (rating.mentionAssessments || [])[0] || null,
       strengthPickId: (rating.strengths || [])[0] || null,
-      // This term's absences and lates; the year's totals when an earlier
-      // report's attendance is blank (attendanceYear: no "this term"
-      // sentence is offered then; Colin, 2026-11-03).
-      absent: att.termUnknown ? att.absences : att.absencesThisTerm,
-      late: att.termUnknown ? att.lates : att.latesThisTerm,
-      attendanceYear: !!att.termUnknown,
+      // The year's totals, as the teacher typed them (Colin, 2026-11-25: "the
+      // year's total", "so far this year"). absentTerm and lateTerm are this
+      // term's share, which only a retired "this term" sentence is checked
+      // against (_failed).
+      absent: att.absences,
+      late: att.lates,
+      absentTerm: att.termUnknown ? att.absences : att.absencesThisTerm,
+      lateTerm: att.termUnknown ? att.lates : att.latesThisTerm,
       habits: rating.habits || {},
       enrolled: day(student.enrolledDate),
       classStart: classStart || '',
@@ -4760,10 +4762,13 @@ window.CommentBank = (function () {
       if (!story && STORY_SLOTS.indexOf(needs[i]) >= 0) continue;
       if (!ctx[needs[i]]) return false;
     }
-    // The year's attendance (an earlier report's is blank): no attendance
-    // sentence that says "this term", the bank's or the teacher's own
-    // (Colin, 2026-11-03).
-    if (ctx._f && ctx._f.attendanceYear && (s.claims || []).indexOf('attendance') >= 0 && /\bthis term\b/i.test(s.text))
+    // The attendance figures are the year's totals: no attendance sentence that
+    // says "this term", the bank's or the teacher's own (Colin, 2026-11-25).
+    // A saved one is still checked (verify passes story: false).
+    if (!(opts && opts.story === false) && (s.claims || []).indexOf('attendance') >= 0 && /\bthis term\b/i.test(s.text))
+      return false;
+    // "Since the last report": not before Report 1, when there is none.
+    if (!(opts && opts.story === false) && ctx._f && !ctx._f.lastReport && /\bsince the last report\b/i.test(s.text))
       return false;
     // Missing work is counted so far this year: with a piece from outside
     // the term, no missing-work sentence that says "this term".
@@ -6036,7 +6041,9 @@ window.CommentBank = (function () {
     return n;
   }
 
-  var SO_FAR = /\bso far\b/i;
+  // "So far this year" is its own phrase, not the comment's one "so far", or the
+  // grade sentence's would keep attendance out of nearly every draft (Nov 26).
+  var SO_FAR = /\bso far\b(?! this year)/i;
   /* The course-set sentences Generate may draft for this student. */
   function _draftExtra(ctx) {
     return ((ctx && ctx._extra) || []).filter(function (s) {
@@ -7695,6 +7702,11 @@ window.CommentBank = (function () {
   function _failed(s, pv, f, ctx) {
     var own = Object.prototype.hasOwnProperty;
     var out = [];
+    // A sentence that says "this term" was written from this term's share.
+    if ((s.claims || []).indexOf('attendance') >= 0 && /\bthis term\b/i.test(s.text) && f.absentTerm !== undefined) {
+      f = Object.assign({}, f, { absent: f.absentTerm, late: f.lateTerm });
+      ctx = context(f, ctx._picks);
+    }
     ctx = ctxFor(s, _asNamed(pv, ctx));
     if (_tooLongFor(s, fill(s, ctx))) out.push('length');
     var stale =
@@ -7758,6 +7770,14 @@ window.CommentBank = (function () {
     return _has(pv, 'habitsExcellent') && (eff || {}).completes === CONSISTENTLY;
   }
 
+  /* Retired sentences that make a claim (Nov 26: the missing-work and attendance
+     frames): found by id and checked like the rest, never offered. */
+  function _retiredClaiming(bank) {
+    return ((bank && bank.retired) || []).filter(function (s) {
+      return Array.isArray(s.claims);
+    });
+  }
+
   /* fn() as if the course-set file had not loaded: the cluster wording. */
   function _withoutSets(fn) {
     var saved = window.BANK_SETS;
@@ -7773,9 +7793,11 @@ window.CommentBank = (function () {
     var bank = opts.bank || COMMENT_BANK;
     var ctx = context(f, picks);
     var byId = {};
-    bank.sentences.concat(ctx._extra || []).forEach(function (s) {
-      byId[s.id] = s;
-    });
+    _retiredClaiming(bank)
+      .concat(bank.sentences, ctx._extra || [])
+      .forEach(function (s) {
+        byId[s.id] = s;
+      });
     var used = {};
     var prov = (d && d.provenance) || [];
     prov.forEach(function (pv) {
@@ -7998,9 +8020,22 @@ window.CommentBank = (function () {
       overall: f.overall || 0,
       letter: f.letter || '',
       grade: [g.mode, g.letter, g.pct, g.basis, g.ieDeadline || '', g.marked || null],
-      attendance: [f.absent == null ? null : f.absent, f.late == null ? null : f.late],
+      attendance: _attendanceFacts(f),
     });
     return 'h' + seedFor(text).toString(16) + '.' + seedFor(text.split('').reverse().join('')).toString(16);
+  }
+
+  /* The attendance in the facts' hash: this term's share (as before the year's
+     totals), and the year's totals too when they differ. */
+  function _attendanceFacts(f) {
+    var nn = function (v) {
+      return v == null ? null : v;
+    };
+    var term = f.absentTerm === undefined ? [f.absent, f.late] : [f.absentTerm, f.lateTerm];
+    var out = [nn(term[0]), nn(term[1])];
+    if (f.absentTerm !== undefined && (nn(f.absent) !== out[0] || nn(f.late) !== out[1]))
+      out.push(nn(f.absent), nn(f.late));
+    return out;
   }
 
   function _clone(v) {
@@ -8017,7 +8052,7 @@ window.CommentBank = (function () {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
     var inBank = {};
-    bank.sentences.forEach(function (s) {
+    bank.sentences.concat(_retiredClaiming(bank)).forEach(function (s) {
       inBank[s.id] = true;
     });
     var sentences = [];
@@ -8209,7 +8244,7 @@ window.CommentBank = (function () {
     var hash = factsHash(f);
     var moved = !!meta.facts_hash && meta.facts_hash !== hash;
     var byId = {};
-    bank.sentences.forEach(function (s) {
+    bank.sentences.concat(_retiredClaiming(bank)).forEach(function (s) {
       byId[s.id] = s;
     });
     var at = {};

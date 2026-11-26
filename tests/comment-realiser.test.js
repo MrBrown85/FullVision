@@ -263,9 +263,9 @@ describe('numbers', () => {
     expect(CommentBank.attendanceText(1, null)).toBe('missed one class');
     expect(CommentBank.attendanceText(0, 2)).toBe('been late twice');
     expect(CommentBank.attendanceText(0, 0)).toBe('');
-    const h60 = COMMENT_BANK.sentences.find(s => s.id === 'h60');
+    const h60 = COMMENT_BANK.sentences.find(s => s.id === 'h79');
     const ctx = { _p: HE, name: 'Jack', attendance: CommentBank.attendanceText(3, 1) };
-    expect(CommentBank.fill(h60, ctx)).toBe('He has missed three classes and been late once this term.');
+    expect(CommentBank.fill(h60, ctx)).toBe('So far this year, he has missed three classes and been late once.');
   });
 });
 

@@ -141,8 +141,8 @@ describe('the draft', () => {
   it('leaves the support, closing and late-work lines out when the class has none', () => {
     const d = draftOf(facts({ notHandedIn: { count: 1, titles: ['Assessing the Treaty of Versailles'], groups: [] } }));
     ['support', 'closer', 'lateWork'].forEach(k => expect(stepText(d, k), k).toBeUndefined());
-    // One of the one-title Not Handed In frames (m01-m06): the title, quoted.
-    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in/);
+    // One of the one-title Not Handed In frames (m01, m27): the title, quoted.
+    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in|to hand in/);
     expect(stepText(d, 'notHandedIn')).toMatch(/“Assessing the Treaty of Versailles\.?”/);
   });
 
@@ -165,8 +165,8 @@ describe('the draft', () => {
     });
     const d = draftOf(f);
     const steps = d.sentences.map(s => s.step);
-    // One of the two-title Not Handed In frames (m01, m07-m11): both titles.
-    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in/);
+    // One of the two-title Not Handed In frames (m01, m28): both titles.
+    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in|to hand in/);
     expect(stepText(d, 'notHandedIn')).toMatch(
       /“Assessing the Treaty of Versailles” and “Current Events: Week of October 13\.?”/,
     );

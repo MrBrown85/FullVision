@@ -2,7 +2,7 @@
  * The habits-part frames grown 2026-11-01 (Colin: "too little variation"):
  * Work Habits (hs16-hs37, replaced Nov 4 by the habits part for families,
  * hf01-hf38), Strong Habits (hs13, hs15), Attendance
- * (h61-h78) and Not Handed In (m02-m21). Every frame of a case is
+ * (h61-h90) and Not Handed In (m22-m28; m02-m21 retired Nov 26). Every frame of a case is
  * reachable (selection picks each one for some seed), fills with no slot
  * left, holds the exact facts, verifies against them and fails verify()
  * once they change; absences-only and lates-only frames never fit when
@@ -121,36 +121,40 @@ describe('Not Handed In frames', () => {
     [{ name: 'Current Events', count: 6 }],
   );
 
-  it('one title: m01-m06, the title quoted with the lesson number dropped', () => {
-    const got = expectReachable(one, 'notHandedIn', ids(1, 6, 'm'));
+  it('one title: m01 and m27, the title quoted with the lesson number dropped', () => {
+    const got = expectReachable(one, 'notHandedIn', ['m01', 'm27']);
+    expect(got.m27).toBe('He still needs to hand in “Map Quiz.”');
     Object.values(got).forEach(t => {
-      expect(t).toMatch(/not handed in/);
       expect(t).toMatch(/“Map Quiz\.?”/);
       expect(t).not.toMatch(/4\.2/);
     });
   });
 
-  it('two titles: m01, m07-m11, both titles joined with "and"', () => {
-    const got = expectReachable(two, 'notHandedIn', ['m01'].concat(ids(7, 11, 'm')));
+  it('two titles: m01 and m28, both titles joined with "and"', () => {
+    const got = expectReachable(two, 'notHandedIn', ['m01', 'm28']);
+    expect(got.m28).toBe('He still needs to hand in “Map Quiz” and “Poster.”');
     Object.values(got).forEach(t => expect(t).toMatch(/“Map Quiz” and “Poster\.?”/));
   });
 
-  it('three or more with no group: m01, m12-m16, the count only', () => {
-    const got = expectReachable(many, 'notHandedIn', ['m01'].concat(ids(12, 16, 'm')));
+  it('three or more with no group: m01, m22-m24, the count only', () => {
+    const got = expectReachable(many, 'notHandedIn', ['m01'].concat(ids(22, 24, 'm')));
     Object.values(got).forEach(t => {
       expect(t).toMatch(/\b(Four|four)\b/);
       expect(t).not.toMatch(/“|including/);
     });
+    expect(got.m22).toBe('He has four assignments still to hand in.');
+    expect(got.m23).toBe('He still needs to hand in four assignments.');
+    expect(got.m24).toBe('He has not yet handed in four assignments.');
   });
 
-  it('the count and a group: m01, m17-m21, numerals inside a sentence and words at its start', () => {
-    const got = expectReachable(group, 'notHandedIn', ['m01'].concat(ids(17, 21, 'm')));
+  it('the count and a group: m01, m25, m26, the count and the group', () => {
+    const got = expectReachable(group, 'notHandedIn', ['m01', 'm25', 'm26']);
     Object.values(got).forEach(t => {
       expect(t).toMatch(/\bFifteen\b|\b15\b/);
       expect(t).toMatch(/six Current Events assignments/);
     });
-    expect(got.m17).toMatch(/^This term, 15 assignments/);
-    expect(got.m20).toMatch(/the 15 assignments/);
+    expect(got.m25).toBe('He has 15 assignments still to hand in, including six Current Events assignments.');
+    expect(got.m26).toBe('He still needs to hand in 15 assignments, including six Current Events assignments.');
   });
 
   it('a frame fails verify() once the work it names changes', () => {
@@ -179,8 +183,8 @@ describe('Not Handed In frames', () => {
 describe('Attendance frames', { timeout: 20000 }, () => {
   const att = (absent, late) => facts({ absent, late });
 
-  it('absences only: h60 (its late half left out) and h62-h66, the classes missed, singular for one', () => {
-    const got = expectReachable(att(3, 0), 'attendance', ['h60'].concat(ids(62, 66, 'h')));
+  it('absences only: h79 (its late half left out), h63 and h80-h83, the classes missed, singular for one', () => {
+    const got = expectReachable(att(3, 0), 'attendance', ['h79', 'h63'].concat(ids(80, 83, 'h')));
     Object.values(got).forEach(t => {
       expect(t).toMatch(/three classes/);
       expect(t).not.toMatch(/late/);
@@ -189,8 +193,8 @@ describe('Attendance frames', { timeout: 20000 }, () => {
     Object.values(oneClass).forEach(t => expect(t).toMatch(/one class\b/));
   });
 
-  it('lates only: h60 (its absent half left out) and h68-h72, once, twice, then times', () => {
-    const got = expectReachable(att(0, 2), 'attendance', ['h60'].concat(ids(68, 72, 'h')));
+  it('lates only: h79 (its absent half left out), h69 and h84-h87, once, twice, then times', () => {
+    const got = expectReachable(att(0, 2), 'attendance', ['h79', 'h69'].concat(ids(84, 87, 'h')));
     Object.values(got).forEach(t => {
       expect(t).toMatch(/\btwice\b/);
       expect(t).not.toMatch(/missed|away|absent/);
@@ -199,13 +203,13 @@ describe('Attendance frames', { timeout: 20000 }, () => {
     Object.values(picks(att(null, 12), 'attendance')).forEach(t => expect(t).toMatch(/\b12 times\b/));
   });
 
-  it('both counts: h60, h74-h78, both halves said and the exact counts', () => {
-    const got = expectReachable(att(4, 1), 'attendance', ['h60'].concat(ids(74, 78, 'h')));
+  it('both counts: h79, h74, h75 and h88-h90, both halves said and the exact counts', () => {
+    const got = expectReachable(att(4, 1), 'attendance', ['h79', 'h74', 'h75'].concat(ids(88, 90, 'h')));
     Object.values(got).forEach(t => {
       expect(t).toMatch(/four classes/);
       expect(t).toMatch(/\bonce\b/);
     });
-    expect(got.h60).toBe('He has missed four classes and been late once this term.');
+    expect(got.h79).toBe('So far this year, he has missed four classes and been late once.');
   });
 
   it('a frame fails verify() once the counts change, and an absences-only one once a late is entered', () => {
@@ -357,9 +361,9 @@ describe('the frames and the lint', () => {
   it('every new frame is in its part and group, claims its fact and needs only slots the context builds', () => {
     const ctx = ctxOf(facts({ absent: 2, late: 1, habits: { ...all(4), part: 2 } }));
     const mine = COMMENT_BANK.sentences.filter(s =>
-      /^(hs(1[3-9]|[23]\d)|hf\d\d|h(6[1-9]|7\d)|m(0[2-9]|1\d|2[01]))$/.test(s.id),
+      /^(hs(1[3-9]|[23]\d)|hf\d\d|h(6[1-9]|7\d|8\d|90)|m(2[2-8]))$/.test(s.id),
     );
-    expect(mine).toHaveLength(73);
+    expect(mine).toHaveLength(61);
     mine.forEach(s => {
       expect(s.part, s.id).toBe('habits');
       expect(
@@ -385,7 +389,11 @@ describe('the frames and the lint', () => {
       ]);
       (s.needs || []).forEach(k => expect(Object.prototype.hasOwnProperty.call(ctx, k), s.id + ' ' + k).toBe(true));
       expect(CommentLint.findings(s.text), s.id).toEqual([]);
-      expect(s.text, s.id).not.toMatch(/\b(still|again|only|finally|at least|unfortunately)\b/i);
+      // Colin's own missing-work wording (Nov 26) says "still to hand in" and
+      // "still needs to hand in"; no other frame says "still".
+      expect(s.text.replace(/still (\[needs\|need\]|needs?|to) (to )?hand in/g, 'hand in'), s.id).not.toMatch(
+        /\b(still|again|only|finally|at least|unfortunately)\b/i,
+      );
     });
   });
 

@@ -330,7 +330,7 @@ describe('the per-skill frames under a tie', () => {
 
   it('when every frame of the top tier runs past 20 words, the next tier is tried before nothing', () => {
     // A newcomer whose strongest skill has a twelve-word wording: both
-    // newcomer frames (n442, n443) run past 20 words with it, so the
+    // newcomer frames (n1032, n443) run past 20 words with it, so the
     // per-skill frames one tier down fill the strengths step.
     const f = facts([comp('a', 'Relationships and Consent', 4), comp('b', 'Fitness', 3), comp('c', 'Safety', 3)], {
       cid: 'c-tier-down',
@@ -343,7 +343,7 @@ describe('the per-skill frames under a tie', () => {
     const ctx = CommentBank.context(f, {});
     expect(ctx._strongSkill).toBe('relationships');
     const story = COMMENT_BANK.sentences.filter(s => s.story === 'newcomer' && s.group === 'Overall' && !s.subjects);
-    expect(story.map(s => s.id).sort()).toEqual(['n442', 'n443']);
+    expect(story.map(s => s.id).sort()).toEqual(['n1032', 'n443']);
     story.forEach(s => {
       expect(CommentBank.fits(s, ctx), s.id).toBe(true);
       expect(CommentRealiser.tooLong(CommentBank.fill(s, ctx)), s.id).toBe(true);
