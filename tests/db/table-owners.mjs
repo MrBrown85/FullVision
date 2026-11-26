@@ -111,6 +111,11 @@ export const NO_TEACHER = {
     read: 'all',
     reason: 'The shared list of term questionnaire templates. Every teacher reads it; no teacher may change it.',
   },
+  'fv_private.owner': {
+    read: 'none',
+    reason:
+      'The accounts allowed to read the site-wide counts on fullvision.ca/health (fv_owner_health). Only the database owner reads or changes it.',
+  },
   'student_submit.card_key': {
     read: 'none',
     reason: 'One row: the id of the key the student cards are signed with. Only the student page server uses it.',
@@ -120,4 +125,4 @@ export const NO_TEACHER = {
 /* Tables that a file in migrations/ adds and live does not have yet. Each is tested only when it is
    there (FV_DB_TEST_APPLY naming that file); until then it is expected to be missing. Take the line
    out once the file is applied and migrations/baseline/ is refreshed. */
-export const NOT_YET_APPLIED = {};
+export const NOT_YET_APPLIED = { 'fv_private.owner': 'migrations/2026112603_owner_health.sql' };

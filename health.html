@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en-CA">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>FullVision Health</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/teacher/styles.css?v=3" />
+    <style>
+      /* The owner's page (migrations/2026112603_owner_health.sql, shared/health.js):
+         is it safe to release, is main's testing green, and who uses FullVision. */
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-base);
+      }
+      .hl {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding-block: 28px 48px;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        display: grid;
+        gap: 28px;
+      }
+      .hl-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px 16px;
+      }
+      .hl h1 {
+        margin: 0;
+        font-size: var(--text-2xl);
+        letter-spacing: -0.02em;
+      }
+      .hl h2 {
+        margin: 0;
+        font-size: var(--text-lg);
+      }
+      .hl-when {
+        color: var(--text-2);
+        font-size: var(--text-sm);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .hl-when button {
+        font: inherit;
+        color: var(--link);
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .hl-lede {
+        margin: 6px 0 0;
+        color: var(--text-2);
+        max-width: 70ch;
+      }
+      .hl section {
+        display: grid;
+        gap: 12px;
+      }
+      .hl-tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 12px;
+      }
+      .hl-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px;
+        display: grid;
+        gap: 4px;
+        align-content: start;
+        min-width: 0;
+      }
+      .hl-label,
+      .hl-sub {
+        font-size: var(--text-sm);
+        color: var(--text-2);
+      }
+      .hl-big {
+        font-size: var(--text-3xl);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .hl-pill {
+        justify-self: start;
+        white-space: nowrap;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        padding: 2px 12px;
+        font-weight: 600;
+        font-size: var(--text-sm);
+      }
+      .hl-pill[data-tone='ok'] {
+        color: var(--ok-text);
+        background: var(--ok-bg);
+      }
+      .hl-pill[data-tone='warn'] {
+        color: var(--text);
+        background: var(--surface-2);
+      }
+      .hl-pill[data-tone='bad'] {
+        color: var(--danger);
+      }
+      .hl-wrap {
+        overflow-x: auto;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .hl table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--text-base);
+      }
+      .hl th,
+      .hl td {
+        text-align: left;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .hl tr:last-child td {
+        border-bottom: 0;
+      }
+      .hl th {
+        font-size: var(--text-sm);
+        color: var(--text-2);
+        font-weight: 600;
+      }
+      .hl a {
+        color: var(--link);
+      }
+      .hl-two {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 12px;
+      }
+      .hl-bars {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        align-items: end;
+        gap: 6px;
+        height: 160px;
+        padding-top: 18px;
+      }
+      .hl-bar {
+        display: grid;
+        align-content: end;
+        justify-items: center;
+        gap: 4px;
+        height: 100%;
+        min-width: 0;
+        font-size: var(--text-2xs);
+        color: var(--text-2);
+        font-variant-numeric: tabular-nums;
+      }
+      .hl-bar span:nth-child(2) {
+        width: 100%;
+        background: var(--active-fill);
+        border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+        min-height: 1px;
+      }
+      .hl-note {
+        margin: 0;
+        color: var(--text-2);
+        font-size: var(--text-sm);
+      }
+      .hl-gate {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+      }
+      @media (max-width: 520px) {
+        .hl-bar b {
+          display: none;
+        }
+      }
+    </style>
+    <script src="/shared/sentry-init.js"></script>
+  </head>
+  <body>
+    <main class="hl" id="health">
+      <div class="hl-head">
+        <div>
+          <h1>FullVision Health</h1>
+          <p class="hl-lede" id="hl-lede">Loading…</p>
+        </div>
+        <div class="hl-when">
+          <span id="hl-updated"></span>
+          <button type="button" id="hl-refresh">Refresh</button>
+        </div>
+      </div>
+
+      <div class="hl-gate" id="hl-gate" hidden>
+        <p id="hl-gate-text"></p>
+        <p><a href="/login.html">Sign In</a></p>
+      </div>
+
+      <section id="hl-release" aria-labelledby="hl-release-h">
+        <h2 id="hl-release-h">Release</h2>
+        <div class="hl-tiles">
+          <div class="hl-card">
+            <span class="hl-label">Safe to Release Now?</span>
+            <span class="hl-pill" id="hl-ready">—</span>
+            <span class="hl-sub" id="hl-ready-why"></span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-label">On Main, Not Yet Live</span>
+            <span class="hl-big" id="hl-waiting">—</span>
+            <span class="hl-sub" id="hl-waiting-sub"></span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-label">Last Release</span>
+            <span class="hl-big" id="hl-last">—</span>
+            <span class="hl-sub" id="hl-last-sub"></span>
+          </div>
+        </div>
+        <div class="hl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>PR</th>
+                <th>Change</th>
+                <th>Merged</th>
+              </tr>
+            </thead>
+            <tbody id="hl-unreleased"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="hl-health" aria-labelledby="hl-health-h">
+        <h2 id="hl-health-h">App Health</h2>
+        <div class="hl-two">
+          <div class="hl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Run on Main</th>
+                  <th>After</th>
+                  <th>Browser Tests</th>
+                </tr>
+              </thead>
+              <tbody id="hl-runs"></tbody>
+            </table>
+          </div>
+          <div class="hl-card">
+            <span class="hl-label">Errors Teachers Hit</span>
+            <p class="hl-note">
+              Sentry keeps the errors from fullvision.ca. This page holds no Sentry key, so it links there instead.
+            </p>
+            <p class="hl-note">
+              <a
+                href="https://colinbrown.sentry.io/issues/?environment=production&amp;statsPeriod=14d"
+                target="_blank"
+                rel="noopener"
+                >Open the Last 14 Days in Sentry</a
+              >
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="hl-usage" aria-labelledby="hl-usage-h">
+        <h2 id="hl-usage-h">Who Uses It</h2>
+        <div class="hl-tiles">
+          <div class="hl-card">
+            <span class="hl-label">Teachers With Students</span>
+            <span class="hl-big" id="hl-teachers">—</span>
+            <span class="hl-sub" id="hl-accounts"></span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-label">Opened a Class, Last 7 Days</span>
+            <span class="hl-big" id="hl-opened">—</span>
+            <span class="hl-sub" id="hl-opened-sub"></span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-label">Classes</span>
+            <span class="hl-big" id="hl-classes">—</span>
+            <span class="hl-sub">Not archived or deleted</span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-label">Students</span>
+            <span class="hl-big" id="hl-students">—</span>
+            <span class="hl-sub">Enrolled, not withdrawn</span>
+          </div>
+        </div>
+        <div class="hl-card">
+          <span class="hl-label">Student Work Assessed Each Week (Weeks Start Monday)</span>
+          <div class="hl-bars" id="hl-weekly" role="img" aria-label="Student work assessed each week"></div>
+        </div>
+        <p class="hl-note">
+          One piece is one student on one assessment given a score, a competency level or a rubric row that week. Counts
+          only: no names, grades or comments leave the database.
+        </p>
+      </section>
+    </main>
+    <script>
+      window.__ENV = {
+        SUPABASE_URL: '__SUPABASE_URL__',
+        SUPABASE_KEY: '__SUPABASE_KEY__',
+      };
+    </script>
+    <script src="/vendor/supabase.min.js"></script>
+    <script src="/shared/supabase.js"></script>
+    <script src="/shared/health.js"></script>
+  </body>
+</html>

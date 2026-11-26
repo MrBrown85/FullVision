@@ -444,6 +444,15 @@ create table grade_return_repair_log (                              -- what a ni
 -- serves schema public only): restore_grade_returns (import_json_restore),
 -- grade_return_remap (move_rubric_scores).
 -- docs/schema.generated.sql does not list this schema.
+--
+-- fv_private.owner (2026112603_owner_health): the accounts allowed to read the
+-- site-wide counts on fullvision.ca/health. RLS on, no policy, no grant.
+--   teacher_id uuid primary key references teacher(id) on delete cascade,
+--   added_at   timestamptz not null default now()
+-- public.fv_owner_health() returns jsonb, SECURITY DEFINER, authenticated
+-- only: counts across every class (teachers, classes, students, classes
+-- opened in 7 days, ten weeks of work assessed) for an account in
+-- fv_private.owner; error 42501 for anyone else. No name, id or grade.
 
 -- Row security on score, tag_score, rubric_score, rubric_check_score and
 -- dibels_score (2026110901_score_rows_same_class): the caller owns the
