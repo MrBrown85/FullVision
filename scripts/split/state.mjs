@@ -25,17 +25,43 @@ const POSITION = new Set(['start', 'end', 'loc', 'range', 'parent', 'raw']);
 function load(src) {
   const { ast } = parse(src);
   setParents(ast, null);
-  const manager = scopes(ast, { ecmaVersion: 2022, sourceType: 'script', range: true });
+  const manager = scopes(ast, { ecmaVersion: 2026, sourceType: 'script', range: true });
   const closure = closureOf(ast, src);
   if (!closure) throw new Error('this file is not one closure (window.Name = (function () { … })();)');
   return { src, ast, manager, closure, body: closure.fn.body.body, scope: manager.acquire(closure.fn) };
 }
+
+const isCalled = id =>
+  !!id.parent &&
+  ((id.parent.type === 'CallExpression' && id.parent.callee === id) ||
+    (id.parent.type === 'TaggedTemplateExpression' && id.parent.tag === id));
 
 const topOf = (m, node) => {
   let n = node;
   while (n.parent && n.parent !== m.closure.fn.body) n = n.parent;
   return n.parent === m.closure.fn.body ? n : null;
 };
+
+/* What must hold of the old file before any variable can move.
+   - The closure is in strict mode. In sloppy code `delete x`, `with` and
+     `eval` can tell a variable from a property.
+   - The holder's name is not used anywhere, as a variable or a global. */
+export function guard(m, name) {
+  const first = m.body[0];
+  if (!first || first.directive !== 'use strict') throw new Error("the closure does not start with 'use strict'");
+  for (const s of m.manager.scopes) {
+    if (s.variables.some(v => v.name === name)) throw new Error(`the name "${name}" is already used in this file`);
+  }
+  for (const r of m.manager.globalScope.through) {
+    const n = r.identifier.name;
+    if (n === name) throw new Error(`the name "${name}" is already read as a global in this file`);
+    if (n === 'eval') throw new Error(`eval is used at line ${r.identifier.loc.start.line}`);
+  }
+}
+
+/* A name every object already has would read as that, not as undefined,
+   before its first assignment; `__proto__` would not store a value at all. */
+const TAKEN = new Set([...Object.getOwnPropertyNames(Object.prototype), '__proto__']);
 
 /* The variables that move: declared by a top-level `var`/`let` of the
    closure, by a plain name, and assigned somewhere after that. */
@@ -69,6 +95,15 @@ export function pick(m) {
       problems.push(`${v.name} is declared by unpacking (${where})`);
       continue;
     }
+    if (decl.kind !== 'var') {
+      // Reading a `let` before its line throws; a property would give undefined.
+      problems.push(`${v.name} is declared with ${decl.kind}, not var (${where}); left as it is`);
+      continue;
+    }
+    if (TAKEN.has(v.name)) {
+      problems.push(`${v.name} is a name every object already has (${where}); left as it is`);
+      continue;
+    }
     moved.push(v);
   }
   return { moved, problems };
@@ -77,11 +112,7 @@ export function pick(m) {
 export function rewrite(src, name) {
   const m = load(src);
   const { moved, problems } = pick(m);
-  for (const s of m.manager.scopes) {
-    if (s.variables.some(v => v.name === name)) throw new Error(`the name "${name}" is already used in this file`);
-  }
-  if (m.manager.globalScope.through.some(r => r.identifier.name === name))
-    throw new Error(`the name "${name}" is already read as a global in this file`);
+  guard(m, name);
   const movedSet = new Set(moved);
   const edits = [];
   const fail = (what, node) => {
@@ -102,6 +133,10 @@ export function rewrite(src, name) {
         p.left === id
       ) {
         fail(`{ ${v.name} = … } unpacks into a moved variable`, id);
+      } else if (isCalled(id)) {
+        /* `x()` runs x with no `this`; `state.x()` would hand it `state`.
+           `(0, state.x)()` runs it with no `this`, as before. */
+        edits.push({ start: id.start, end: id.end, text: `(0, ${name}.${v.name})` });
       } else {
         edits.push({ start: id.start, end: id.end, text: `${name}.${v.name}` });
       }
@@ -159,6 +194,7 @@ export function rewrite(src, name) {
 export function prove(before, after, name) {
   const A = load(before);
   const B = load(after);
+  guard(A, name);
   const { moved } = pick(A);
   const stillThere = new Set(B.scope.variables.map(v => v.name));
   const gone = moved.filter(v => !stillThere.has(v.name));
@@ -201,7 +237,17 @@ export function prove(before, after, name) {
     }
     const line = a.loc ? ` (old line ${a.loc.start.line})` : '';
     if (a.type === 'Identifier' && a.virtual !== 'plain' && (uses.has(a.start) || a.virtual === 'moved')) {
-      if (!isState(b, a.name)) throw new Error(`${path}${line}: ${a.name} should have become ${name}.${a.name}`);
+      if (isCalled(a)) {
+        const ok =
+          b.type === 'SequenceExpression' &&
+          b.expressions.length === 2 &&
+          b.expressions[0].type === 'Literal' &&
+          b.expressions[0].value === 0 &&
+          isState(b.expressions[1], a.name);
+        if (!ok) throw new Error(`${path}${line}: the call ${a.name}() should have become (0, ${name}.${a.name})()`);
+      } else if (!isState(b, a.name)) {
+        throw new Error(`${path}${line}: ${a.name} should have become ${name}.${a.name}`);
+      }
       count++;
       return;
     }
@@ -270,6 +316,8 @@ export function prove(before, after, name) {
     st.declarations[0].init.properties.length === 0;
   const holders = B.body.filter(isHolder);
   if (holders.length !== 1) throw new Error(`expected one "var ${name} = {};" line, found ${holders.length}`);
+  if (B.body[0].directive !== 'use strict' || B.body[1] !== holders[0])
+    throw new Error(`"var ${name} = {};" must be the first line after 'use strict', before anything that runs`);
   const actual = B.body.filter(st => !isHolder(st));
 
   /* Everything outside the closure's body must be untouched. */
@@ -300,6 +348,7 @@ export function prove(before, after, name) {
   }
   const expectedUses =
     gone.reduce((sum, v) => sum + v.references.length, 0) + gone.filter(v => !v.defs[0].node.init).length;
+  if (count !== expectedUses) throw new Error(`${expectedUses} uses were expected to change and ${count} did`);
   return {
     moved: gone.map(v => v.name),
     uses: count,

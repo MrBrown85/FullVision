@@ -110,7 +110,7 @@ export function analyzeFile(file) {
 export function analyzeSource(src, file = '') {
   const { ast, comments } = parse(src);
   setParents(ast, null);
-  const manager = scopes(ast, { ecmaVersion: 2022, sourceType: 'script', range: true });
+  const manager = scopes(ast, { ecmaVersion: 2026, sourceType: 'script', range: true });
   const closure = closureOf(ast, src);
   const moduleNode = closure ? closure.fn : ast;
   const body = closure ? closure.fn.body.body : ast.body;

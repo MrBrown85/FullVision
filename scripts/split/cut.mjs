@@ -216,7 +216,7 @@ function load(src) {
   setParents(ast, null);
   const closure = closureOf(ast, src);
   if (!closure) throw new Error('not one closure');
-  const manager = scopes(ast, { ecmaVersion: 2022, sourceType: 'script', range: true });
+  const manager = scopes(ast, { ecmaVersion: 2026, sourceType: 'script', range: true });
   return { ast, closure, body: closure.fn.body.body, manager, scope: manager.acquire(closure.fn) };
 }
 const line = n => (n.loc ? n.loc.start.line : '?');
