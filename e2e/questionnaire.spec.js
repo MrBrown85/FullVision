@@ -1384,9 +1384,8 @@ test('Write Your Own: saved from Browse Sentences, shown as Yours, used, and sti
   await expect(sheet.locator('.qn-browse-group .qn-browse-add')).toHaveCount(0);
   await sheet.locator('#tq-browse-write').click();
   await expect(box.locator('#tq-own-input')).toBeFocused();
-  await expect(box.locator('.qn-own-hint')).toHaveText(
-    'Write it for this student. In the saved sentence, the words in brackets change for each student.',
-  );
+  // No grey line under the box (Colin, Nov 26).
+  await expect(box.locator('.qn-own-hint')).toHaveCount(0);
   await expect(box.locator('#tq-own-part')).toHaveValue('habits');
   // The first group shown is a case of hers, so the sentence goes under it.
   const firstGroup = await sheet.locator('.qn-browse-group').first().getAttribute('data-case');

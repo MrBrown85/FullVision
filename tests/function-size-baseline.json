@@ -695,7 +695,7 @@
   "teacher/report-questionnaire.js :: _glanceHtml": 91,
   "teacher/report-questionnaire.js :: _obsDrawerHtml": 70,
   "teacher/report-questionnaire.js :: _openBrowse": 52,
-  "teacher/report-questionnaire.js :: _ownBoxHtml": 60,
+  "teacher/report-questionnaire.js :: _ownBoxHtml": 59,
   "teacher/report-questionnaire.js :: _ownOpen": 53,
   "teacher/report-questionnaire.js :: _ownSave": 54,
   "teacher/report-questionnaire.js :: _pickHtml": 55,

@@ -6957,7 +6957,6 @@ window.ReportQuestionnaire = (function () {
     var ok = !!c && !!c.template && !c.blocked;
     return `<div class="qn-own" id="tq-own" role="group" aria-label="A sentence of your own">
       <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. Return saves it.">${esc(o.text)}</textarea>
-      <span class="qn-own-hint">Write it for this student. In the saved sentence, the words in brackets change for each student.</span>
       ${picker}
       <div class="qn-own-out" id="tq-own-out">${_ownOutHtml(c)}</div>
       ${_ownActionsHtml(o, ok)}
