@@ -144,9 +144,10 @@ test('a release with one changed file downloads only it, sw.js and the pages, an
   expect(state.complete['fullvision-b']).toBe(true);
   expect(await cachedText(page, '/' + CHANGED)).toBe(changedBody('b'));
   expect(await cachedText(page, '/shared/calc.js')).toBe(readFileSync(join(DIST, 'shared/calc.js'), 'utf-8'));
-  expect(await cachedText(page, '/shared/seed-data.js?v=46')).toBe(
-    readFileSync(join(DIST, 'shared/seed-data.js'), 'utf-8'),
-  );
+  // The seed file's address carries a version (sw.js bumps it when the sample class changes).
+  const seedUrl = URLS.find(u => u.startsWith('/shared/seed-data.js'));
+  expect(seedUrl).toBeTruthy();
+  expect(await cachedText(page, seedUrl)).toBe(readFileSync(join(DIST, 'shared/seed-data.js'), 'utf-8'));
 
   // Nothing changes but the cache name: copies of copies are kept too.
   const c = await update(page, 'c', { [CHANGED]: changedBody('b') });
