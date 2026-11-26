@@ -402,6 +402,10 @@ table public.criterion (rls on)
   updated_at timestamp with time zone not null default now()
   level_5_descriptor text
   level_6_descriptor text
+  comments jsonb not null default '[]'::jsonb
+  constraint criterion_comments_is_list CHECK ((jsonb_typeof(comments) = 'array'::text))
+  constraint criterion_comments_rule CHECK ((public._rubric_comment_list(comments, true) = comments))
+  constraint criterion_comments_size CHECK (((jsonb_array_length(comments) <= 40) AND (octet_length((comments)::text) <= 121040)))
   constraint criterion_pkey PRIMARY KEY (id)
   constraint criterion_rubric_id_fkey FOREIGN KEY (rubric_id) REFERENCES public.rubric(id) ON DELETE CASCADE
   constraint criterion_weight_check CHECK ((weight >= (0)::numeric))
@@ -1170,7 +1174,11 @@ table public.rubric (rls on)
   copy_group uuid
   style text not null default 'standard'::text
   scale jsonb
+  overall_comments jsonb not null default '[]'::jsonb
   constraint rubric_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
+  constraint rubric_overall_comments_is_list CHECK ((jsonb_typeof(overall_comments) = 'array'::text))
+  constraint rubric_overall_comments_rule CHECK ((public._rubric_comment_list(overall_comments, false) = overall_comments))
+  constraint rubric_overall_comments_size CHECK (((jsonb_array_length(overall_comments) <= 40) AND (octet_length((overall_comments)::text) <= 120160)))
   constraint rubric_pkey PRIMARY KEY (id)
   constraint rubric_scale_check CHECK (((scale IS NULL) OR ((jsonb_typeof(scale) = 'array'::text) AND ((jsonb_array_length(scale) >= 2) AND (jsonb_array_length(scale) <= 6)))))
   constraint rubric_style_check CHECK ((style = ANY (ARRAY['standard'::text, 'advanced'::text, 'single_point'::text])))
@@ -1848,6 +1856,7 @@ function public._revision_gone() returns trigger security definer
 function public._revision_json(p_request_id uuid) returns jsonb security definer
 function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned boolean) returns integer security definer
 function public._revision_state(p_request_id uuid) returns jsonb security definer
+function public._rubric_comment_list(p_list jsonb, p_criterion boolean) returns jsonb
 function public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) returns void security definer
 function public._student_card_json(p_card_id uuid) returns jsonb security definer
 function public._submission_file_removed() returns trigger security definer
@@ -1877,6 +1886,8 @@ function public._work_object(p_path text) returns TABLE(bytes bigint, mimetype t
 function public._work_settle_files(p_submission_id uuid, p_files jsonb) returns integer security definer
 function public._work_upload_json(p_submission_id uuid) returns jsonb security definer
 function public.add_assessment_link(p_assessment_id uuid, p_url text, p_title text, p_idempotency_key uuid) returns jsonb security definer
+function public.add_criterion_comment(p_criterion_id uuid, p_level smallint, p_text text, p_idempotency_key uuid) returns jsonb
+function public.add_rubric_overall_comment(p_rubric_id uuid, p_text text, p_idempotency_key uuid) returns jsonb
 function public.answer_reflection(p_reflection_id uuid, p_answer text, p_idempotency_key uuid, p_only_me boolean) returns jsonb security definer
 function public.apply_report_preset(p_course_id uuid, p_preset text) returns void
 function public.archive_course(p_course_id uuid, p_archived boolean) returns void
@@ -2076,7 +2087,7 @@ function public.upsert_note(p_enrollment_id uuid, p_body text, p_idempotency_key
 function public.upsert_observation_template(p_id uuid, p_course_id uuid, p_body text, p_default_sentiment text, p_default_context_type text, p_display_order integer, p_idempotency_key uuid, p_default_dims text[]) returns uuid
 function public.upsert_questionnaire(p_course_id uuid, p_kind text, p_title text, p_template_id text, p_theme text, p_report_period integer, p_parent_id uuid, p_opens_on date, p_closes_on date, p_is_on boolean, p_myed_comment text, p_questions jsonb, p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) returns uuid
-function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb) returns uuid
+function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb, p_scale jsonb, p_overall_comments jsonb) returns uuid
 function public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text, p_own_comment text) returns uuid
 function public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) returns uuid
 function public.upsert_section(p_id uuid, p_subject_id uuid, p_name text, p_color text, p_competency_group_id uuid, p_display_order integer, p_idempotency_key uuid) returns uuid

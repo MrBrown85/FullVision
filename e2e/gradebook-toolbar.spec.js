@@ -98,16 +98,19 @@ async function fits(page) {
   });
 }
 
-// Opens the panel and ticks every row of every column that is drawn (folders open to their competencies).
+/* Opens the panel and turns on every filter it has: each category, each
+   module and each folder's box, which ticks every competency in it (Science 8
+   has no competency outside a folder). That gives the same 14 chips as
+   ticking all 41 rows one by one, in 14 clicks. Each click draws the page
+   again, about 0.3 s on GitHub's runners, and 41 clicks at each of two widths
+   in one test ran past its 30 s (Nov 25). */
 async function tickEverything(page) {
   await filterBtn(page).click();
-  for (const c of await page.locator('.gbf-chev').all()) await c.click();
   const rows = page.locator(
-    '.gbf-panel .assess-filter-item[data-catid], .gbf-panel .assess-filter-item[data-moduleid]',
+    '.gbf-panel .assess-filter-item[data-catid], .gbf-panel .assess-filter-item[data-moduleid], .gbf-panel [data-action="toggleFolderFilter"]',
   );
   for (let i = 0; i < (await rows.count()); i++) await rows.nth(i).click();
-  const kids = page.locator('.gbf-panel .gbf-kid');
-  for (let i = 0; i < (await kids.count()); i++) await kids.nth(i).click();
+  await expect(page.locator('.gbf-panel .gbf-kid[aria-checked="false"]')).toHaveCount(0);
   await page.keyboard.press('Escape');
 }
 
@@ -151,10 +154,10 @@ test.describe('layout', () => {
         expect(r.x + r.width).toBeLessThanOrEqual(1024);
       }
     });
-    test(`with more filters on than fit, every chip on screen shows its full label (${font} font)`, async ({
-      page,
-    }) => {
-      for (const width of [1280, 1440]) {
+    for (const width of [1280, 1440]) {
+      test(`with more filters on than fit at ${width} wide, every chip on screen shows its full label (${font} font)`, async ({
+        page,
+      }) => {
         await openDemo(page, width);
         await useFont(page, font);
         await tickEverything(page);
@@ -170,8 +173,8 @@ test.describe('layout', () => {
         // The right-hand buttons are where they were.
         const end = await page.locator('.atb-end').boundingBox();
         expect(end.x + end.width).toBeLessThanOrEqual(width);
-      }
-    });
+      });
+    }
   }
 
   test('a chip wider than the room is left off, not cut', async ({ page }) => {
