@@ -547,3 +547,4 @@ declare var RubricLibrary: any;
 interface Window {
   RubricLibrary?: any;
 }
+declare var AssignCompPicker: any;
