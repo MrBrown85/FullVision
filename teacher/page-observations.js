@@ -118,7 +118,7 @@ window.PageObservations = (function () {
     if (!(await switchActiveCourse(cid))) return;
     // The roster's grades are the year so far, as on the Gradebook.
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid);
+    SidebarKeep.draw(renderSidebar(cid));
     refreshStudentCache();
     resetFilters();
     makeCapture([]);
@@ -1026,7 +1026,7 @@ window.PageObservations = (function () {
     document.getElementById('sidebar-mount').style.display = '';
     document.getElementById('page-layout').classList.remove('sidebar-hidden');
     if (typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse);
+    SidebarKeep.draw(renderSidebar(activeCourse));
     initSidebarToggle();
 
     window._pageSwitchCourse = switchCourse;
