@@ -18,8 +18,8 @@
    others.
 
    commentBank (the Comment Bank per rubric, docs/plans/comment-bank-plan.md)
-   is on since Nov 25 2026 and nothing asks for it any more. The name stays
-   for the same reason as the others. */
+   is on since Nov 25 2026; the rubric editor and the grader still ask for
+   it. */
 (function () {
   /** @type {Record<string, boolean>} */
   var DEFAULTS = {

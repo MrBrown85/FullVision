@@ -99,5 +99,5 @@ A rubric can hold comments to reuse: feedback written once, given to many studen
 
 1. In the rubric editor, choose **+ Comments** under a criterion. Each level gets a box; type a comment under the level it fits and add as many as you like. To keep comments about the whole piece of work, choose **+ Overall Comments** at the foot of the editor.
 2. Type `[Name]` where the student's name belongs. It is filled with the student's first name when the comment is given.
-3. While assessing, open a criterion's **Comment**. A Bank row under the box offers the comments kept for that criterion at the level the student has. Choose one to put it in the box, and edit it there if needed. Under the box, **Last Time** shows the student's earlier comment on the same competency.
+3. While assessing, open a criterion's **Comment**. A Bank row under the box offers the comments kept for that criterion at the level the student has. Choose one to put it in the box, and edit it there if needed. Above the box, **Last Time** shows the student's earlier comment on the same competency.
 4. To keep a comment you have just written, choose **Add to Bank**. Only a comment kept this way joins the bank; nothing is added on its own. A small count beside a comment shows how many students have had it.
