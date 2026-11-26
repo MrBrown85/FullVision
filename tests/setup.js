@@ -411,6 +411,7 @@ load('teacher/assign-show.js');
 load('teacher/assign-toolbar.js');
 load('teacher/grade-change.js');
 load('teacher/assign-list.js');
+load('teacher/assign-rubric-editor.js');
 load('teacher/assign-rubric-criteria.js');
 load('teacher/assign-past.js');
 load('teacher/assign-crud.js');
