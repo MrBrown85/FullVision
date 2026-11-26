@@ -52,6 +52,7 @@ const PRECACHE_URLS = [
   // Shared modules
   '/shared/sentry-init.js',
   '/shared/html.js',
+  '/shared/seg-glide.js',
   '/shared/build-flags.js',
   '/shared/link-nav.js',
   '/shared/supabase.js',

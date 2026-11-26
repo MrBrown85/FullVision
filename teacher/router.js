@@ -184,10 +184,10 @@ window.Router = (function () {
     if (on && seg.scrollWidth > seg.clientWidth) {
       seg.scrollLeft = on.offsetLeft - seg.offsetLeft - (seg.clientWidth - on.offsetWidth) / 2;
     }
-    // The lit tab's pill glides over from the tab just left (ui.js, _segGlide).
-    if (was && on && was.href !== on.getAttribute('data-href') && typeof _segGlide === 'function' && _panelMotionOK()) {
+    // The lit tab's pill glides over from the tab just left (shared/seg-glide.js).
+    if (was && on && was.href !== on.getAttribute('data-href') && window.SegGlide) {
       var from = { left: seg.getBoundingClientRect().left + was.x - seg.scrollLeft, width: was.width };
-      _segGlide(seg, from, on.getBoundingClientRect(), 220);
+      SegGlide.run(seg, from, on.getBoundingClientRect());
     }
     if (typeof _populateDockUser === 'function') _populateDockUser();
     if (window.UI && typeof window.UI.refreshSyncStatusUI === 'function') window.UI.refreshSyncStatusUI();

@@ -3,7 +3,8 @@
  * are pressed, and the page beside them takes its new width at once, as the
  * slide starts. They end fully open or fully closed, even when pressed again
  * mid-slide. The top tabs' lit pill glides from the page left to the page
- * opened. With reduced motion there is no slide or glide: the change is
+ * opened, and so does every other slider's, here and on the phone, even one
+ * drawn again on the click. With reduced motion there is no slide or glide: the change is
  * complete at once.
  */
 import { test, expect } from '@playwright/test';
@@ -220,6 +221,77 @@ test.describe('with motion', () => {
   });
 });
 
+/* Every frame from a click on `go`: the glide's place, and the lit button's
+   name and pill colour in `track`. */
+async function glideFrames(page, track, go, ms = 700) {
+  const frames = page.evaluate(
+    ([track, ms]) =>
+      new Promise(resolve => {
+        const out = [];
+        const start = performance.now();
+        const tick = () => {
+          const glide = document.querySelector('.seg-glide');
+          const t = document.querySelector(track);
+          const on = t && SegGlide.lit(t);
+          out.push([
+            glide ? glide.getBoundingClientRect().left : null,
+            on ? on.textContent.trim() : '',
+            on ? getComputedStyle(on).backgroundColor : '',
+          ]);
+          if (performance.now() - start < ms) requestAnimationFrame(tick);
+          else resolve(out);
+        };
+        requestAnimationFrame(tick);
+      }),
+    [track, ms],
+  );
+  await page.locator(go).click();
+  return frames;
+}
+
+/* The glide ran, and once its pill was gone the lit button's own pill was
+   there in full: no frame with neither, no fade back in. */
+function glidedAndLanded(seen, name, thumb) {
+  const first = seen.findIndex(([x]) => x !== null);
+  expect(first).toBeGreaterThanOrEqual(0);
+  const after = seen.slice(first).filter(([x]) => x === null);
+  expect(after.length).toBeGreaterThan(0);
+  expect(after.every(([, lit, bg]) => lit.startsWith(name) && bg === thumb)).toBe(true);
+}
+
+test.describe('every slider', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  test('a slider drawn again on a click glides and lands (Assignments: Show)', async ({ page }) => {
+    await openDemo(page);
+    const track = '.atb-show:not(.dash-show)';
+    const thumb = await page.evaluate(
+      t => getComputedStyle(SegGlide.lit(document.querySelector(t))).backgroundColor,
+      track,
+    );
+    const seen = await glideFrames(page, track, track + ' .seg-btn:nth-child(2)');
+    glidedAndLanded(seen, 'Submitted', thumb);
+    await expect(page.locator('.seg-glide')).toHaveCount(0);
+    await expect(page.locator('.seg-gliding')).toHaveCount(0);
+  });
+
+  test("the phone's sliders glide too (Grade: To Return)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/login.html');
+    await page.locator('#demo-mode-btn').click();
+    await page.waitForURL(/teacher-mobile\//);
+    await page.locator('.m-tab-item[data-tab="observe"]').click();
+    const track = '.m-obs-track';
+    await page.locator(track).waitFor();
+    const thumb = await page.evaluate(
+      t => getComputedStyle(SegGlide.lit(document.querySelector(t))).backgroundColor,
+      track,
+    );
+    const seen = await glideFrames(page, track, track + ' .m-seg-btn:nth-child(2)');
+    glidedAndLanded(seen, 'Strength', thumb);
+  });
+});
+
 test.describe('with reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 
@@ -241,6 +313,13 @@ test.describe('with reduced motion', () => {
     await page.click('.tb-seg-link[data-href="/reports"]');
     await expect(page.locator('.tb-seg-active')).toHaveText('Reporting');
     await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0);
+  });
+
+  test('a slider drawn again changes at once', async ({ page }) => {
+    await openDemo(page);
+    const seen = await glideFrames(page, '.atb-show', '.atb-show .seg-btn:nth-child(2)', 300);
+    expect(seen.every(([x]) => x === null)).toBe(true);
+    await expect(page.locator('.atb-show .seg-btn:nth-child(2)')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
