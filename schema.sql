@@ -242,7 +242,8 @@ create table enrollment (
   updated_at      timestamptz not null default now(),
   show_overall_grade boolean,                                         -- Show Overall Grade for this student: null follows the class (course.show_my_learning), true shown, false hidden (2026111720)
   page_paused_at  timestamptz,                                        -- set: the student page is paused for this student since then, every card scan and session route answers closed; null: open (2026111720)
-  unique (student_id, course_id)
+  unique (student_id, course_id),
+  unique (id, course_id)                                             -- enrollment_id_course_uk: what the score tables' keys point at (2026112602, not applied)
 );
 -- Per-student options (2026111720_student_page_per_student). No reason is
 -- stored for either. Teachers: set_student_page_options(course, ids,
@@ -282,7 +283,8 @@ create table assessment (
   students_see_factored boolean not null default false,             -- points work: students see the score times the Factor (20 / 24 for 5 / 6 at 4x); display only (2026111808_factored_score, applied Nov 18)
   display_order  integer     not null default 0,
   created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now()
+  updated_at     timestamptz not null default now(),
+  unique (id, course_id)                                            -- assessment_id_course_uk: what the score tables' keys point at (2026112602, not applied)
 );
 
 -- A teacher's reminder to one student about one bulletin (2026111809, applied Nov 18): the student page
@@ -303,41 +305,50 @@ create table assessment_tag (
 -- Scoring
 create table score (
   id            uuid        not null primary key,
-  enrollment_id uuid        not null references enrollment(id) on delete cascade,
-  assessment_id uuid        not null references assessment(id) on delete cascade,
+  enrollment_id uuid        not null,
+  assessment_id uuid        not null,
+  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602, not applied)
   value         numeric,
   status        text,                                                -- null | 'NS' | 'EXC' | 'LATE' | 'ABS' …
   comment       text,
   report_note   text        check (report_note is null or char_length(report_note) between 1 and 300), -- Note for the Report: one line about what the student did, for the comment's best-piece sentence; null = none, 1..300 chars (20261031_score_report_note)
   scored_at     timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
-  unique (enrollment_id, assessment_id)
+  unique (enrollment_id, assessment_id),
+  foreign key (enrollment_id, course_id) references enrollment(id, course_id) match full on delete cascade,
+  foreign key (assessment_id, course_id) references assessment(id, course_id) match full on delete cascade
 );
 
 create table tag_score (
   id            uuid        not null primary key,
-  enrollment_id uuid        not null references enrollment(id) on delete cascade,
-  assessment_id uuid        not null references assessment(id) on delete cascade,
-  tag_id        uuid        not null references tag(id)        on delete cascade,
+  enrollment_id uuid        not null,
+  assessment_id uuid        not null,
+  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602, not applied)
+  tag_id        uuid        not null references tag(id)        on delete cascade,  -- in the row's class (trigger tag_score_class_parent)
   value         integer,                                             -- proficiency 1..4; null = no level yet, the row holds only its comment (20261027_score_comments)
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, a third of a level; no 1− or 4+ (20261013_proficiency_plus_minus)
   comment       text,                                                -- the teacher's feedback on this competency (20261027_score_comments)
   updated_at    timestamptz not null default now(),
-  unique (enrollment_id, assessment_id, tag_id)
+  unique (enrollment_id, assessment_id, tag_id),
+  foreign key (enrollment_id, course_id) references enrollment(id, course_id) match full on delete cascade,
+  foreign key (assessment_id, course_id) references assessment(id, course_id) match full on delete cascade
 );
 
 create table rubric_score (
   id            uuid        not null primary key,
-  enrollment_id uuid        not null references enrollment(id) on delete cascade,
-  assessment_id uuid        not null references assessment(id) on delete cascade,
-  criterion_id  uuid        not null references criterion(id)  on delete cascade,
+  enrollment_id uuid        not null,
+  assessment_id uuid        not null,
+  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602, not applied)
+  criterion_id  uuid        not null references criterion(id)  on delete cascade,  -- in the row's class (trigger rubric_score_class_parent)
   value         integer,                                             -- 1..4; null = no level yet, the row holds only its comment (20261027_score_comments)
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, as tag_score (20261013_proficiency_plus_minus)
   comment       text,                                                -- the teacher's note on this criterion, printed on the rubric handout (20261018_rubric_score_comment); Work On on a single-point rubric
   beyond        text,                                                -- Went Beyond, single-point rubrics (20261027_single_point_rubric)
   own_comment   text,                                                -- the line for this student alone on pair or group work, never copied to group mates; null when none (2026112410_criterion_own_line)
   updated_at    timestamptz not null default now(),
-  unique (enrollment_id, assessment_id, criterion_id)
+  unique (enrollment_id, assessment_id, criterion_id),
+  foreign key (enrollment_id, course_id) references enrollment(id, course_id) match full on delete cascade,
+  foreign key (assessment_id, course_id) references assessment(id, course_id) match full on delete cascade
 );
 
 -- DIBELS 8 benchmark raw scores, one row per student, DIBELS assessment and
@@ -345,25 +356,31 @@ create table rubric_score (
 -- app; a DIBELS assessment counts toward no grade (20261027_dibels_scores).
 create table dibels_score (
   id             uuid        not null primary key,
-  enrollment_id  uuid        not null references enrollment(id) on delete cascade,
-  assessment_id  uuid        not null references assessment(id) on delete cascade,
+  enrollment_id  uuid        not null,
+  assessment_id  uuid        not null,
+  course_id      uuid,                                             -- the row's class, as on score (2026112602, not applied)
   period         text        not null,                             -- boy | moy | eoy
   orf_wrc        integer,                                          -- oral reading fluency: words read correctly; null = not entered, never negative
   orf_errors     integer,                                          -- oral reading fluency: errors
   maze_correct   integer,
   maze_incorrect integer,
   updated_at     timestamptz not null default now(),
-  unique (enrollment_id, assessment_id, period)
+  unique (enrollment_id, assessment_id, period),
+  foreign key (enrollment_id, course_id) references enrollment(id, course_id) match full on delete cascade,
+  foreign key (assessment_id, course_id) references assessment(id, course_id) match full on delete cascade
 );
 
 -- A ticked Advanced Rubric checkbox on one student's rubric score. A row means
 -- ticked; unticking deletes it (20261022_advanced_rubric_checks).
 create table rubric_check_score (
-  enrollment_id uuid        not null references enrollment(id)      on delete cascade,
-  assessment_id uuid        not null references assessment(id)      on delete cascade,
-  check_id      uuid        not null references criterion_check(id) on delete cascade,
+  enrollment_id uuid        not null,
+  assessment_id uuid        not null,
+  course_id     uuid,                                                -- the row's class, as on score (2026112602, not applied)
+  check_id      uuid        not null references criterion_check(id) on delete cascade,  -- in the row's class (trigger rubric_check_score_class_parent)
   created_at    timestamptz not null default now(),
-  primary key (enrollment_id, assessment_id, check_id)
+  primary key (enrollment_id, assessment_id, check_id),
+  foreign key (enrollment_id, course_id) references enrollment(id, course_id) match full on delete cascade,
+  foreign key (assessment_id, course_id) references assessment(id, course_id) match full on delete cascade
 );
 
 -- Draft or Returned, per student per assessment: what the student has been
@@ -434,6 +451,24 @@ create table grade_return_repair_log (                              -- what a ni
 -- (fv_owns_score_cell); on writes the competency, criterion or checkbox the
 -- row names must be in that class too (fv_owns_tag_score_cell,
 -- fv_owns_rubric_score_cell, fv_owns_rubric_check_cell).
+
+-- The same rule for every writer, in the tables themselves
+-- (2026112602_score_rows_carry_their_class, not applied): each of the five carries
+-- course_id, set from its enrollment on every insert by trigger <table>_class
+-- (_score_row_class) and never taken from the caller. Its two keys to
+-- enrollment and assessment carry the class with them, against unique
+-- (id, course_id) on enrollment and on assessment (enrollment_id_course_uk,
+-- assessment_id_course_uk), so a row whose assessment is in another class is
+-- refused (23503) for the service role and the table owner as for a teacher.
+-- MATCH FULL with a nullable column: a row for an enrollment that does not
+-- exist is refused by the key, as before; no stored row has a null class.
+-- The competency, criterion or checkbox a row names is checked by trigger
+-- <table>_class_parent (_score_row_parent_class). And so that cannot go
+-- stale, the class of a section, competency, rubric, criterion and checkbox
+-- is fixed (triggers <table>_class_fixed, _class_is_fixed): section.course_id
+-- and rubric.course_id cannot change; tag.section_id, criterion.rubric_id and
+-- criterion_check.criterion_id can change only within the class. An
+-- enrollment or assessment that has score rows cannot change class.
 
 -- A completed rubric handout printed for one student: when, and a fingerprint
 -- of what the sheet showed, so the client can tell when it has changed since
