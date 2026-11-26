@@ -9,6 +9,7 @@
     "teacher/report-one-copy.js",
     "teacher/report-one-undo.js",
     "shared/rubric-scale.js",
+    "shared/rubric-comments.js",
     "teacher-mobile/crit-own.js",
     "teacher-mobile/grade-look.js",
     "teacher-mobile/student-card.js",

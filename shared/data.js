@@ -871,6 +871,8 @@ var _ECHO_SAFE_RPCS = {
   upsert_tag_score: true,
   upsert_rubric_score: true,
   set_rubric_check: true,
+  add_criterion_comment: true,
+  add_rubric_overall_comment: true,
   set_rubric_printed: true,
   upsert_dibels_score: true,
   set_score_status: true,

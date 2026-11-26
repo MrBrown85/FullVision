@@ -218,24 +218,25 @@ window.v2.upsertRubric = function (params, options) {
     if (c.level2Value != null) payload.level_2_value = Number(c.level2Value);
     if (c.level1Value != null) payload.level_1_value = Number(c.level1Value);
     if (_isUuid(c.id)) payload.id = c.id;
+    // The comment bank: only when the caller sent it (the switch is on).
+    if (Array.isArray(c.comments)) payload.comments = c.comments;
     return payload;
   });
-  return _rpcOrNoop(
-    'upsert_rubric',
-    {
-      p_id: _isUuid(params.id) ? params.id : null,
-      p_course_id: params.courseId,
-      p_name: params.name || '',
-      p_criteria: criteria,
-      p_copy_group: _isUuid(params.copyGroup) ? params.copyGroup : null,
-      p_style: rubricStyle({ style: params.style }),
-      // The competencies the whole rubric scores; [] clears them, null keeps them.
-      p_linked_tag_ids: Array.isArray(params.linkedTagIds) ? params.linkedTagIds.filter(_isUuid) : null,
-      // Its own level columns; [] clears them (the four FullVision levels).
-      p_scale: Array.isArray(params.scale) ? params.scale : [],
-    },
-    options,
-  );
+  var args = {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_course_id: params.courseId,
+    p_name: params.name || '',
+    p_criteria: criteria,
+    p_copy_group: _isUuid(params.copyGroup) ? params.copyGroup : null,
+    p_style: rubricStyle({ style: params.style }),
+    // The competencies the whole rubric scores; [] clears them, null keeps them.
+    p_linked_tag_ids: Array.isArray(params.linkedTagIds) ? params.linkedTagIds.filter(_isUuid) : null,
+    // Its own level columns; [] clears them (the four FullVision levels).
+    p_scale: Array.isArray(params.scale) ? params.scale : [],
+  };
+  // The rubric's overall comments; left off until the database has the parameter.
+  if (Array.isArray(params.overallComments)) args.p_overall_comments = params.overallComments;
+  return _rpcOrNoop('upsert_rubric', args, options);
 };
 window.v2.listRubricCopies = function (copyGroup) {
   if (!_isUuid(copyGroup)) return Promise.resolve({ data: [], error: null });

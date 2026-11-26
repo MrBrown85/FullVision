@@ -61,7 +61,7 @@ describe('service worker fingerprints', () => {
 
   it('an address with a query string is keyed exactly and hashed from the file without it', () => {
     const versioned = urls.filter(url => url.includes('?'));
-    expect(versioned).toEqual(expect.arrayContaining(['/shared/seed-data.js?v=46', '/teacher/styles.css?v=3']));
+    expect(versioned).toEqual(expect.arrayContaining(['/shared/seed-data.js?v=47', '/teacher/styles.css?v=3']));
     for (const url of versioned) {
       expect(prints[url]).toBe(fingerprint(read(url.split('?')[0].slice(1))));
       expect(prints[url.split('?')[0]]).toBeUndefined();
