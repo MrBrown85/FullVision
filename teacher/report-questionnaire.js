@@ -975,7 +975,7 @@ window.ReportQuestionnaire = (function () {
         <span class="qn-name">${esc(displayName(student))}</span>
         <span class="qn-head-sub">${student.pronouns ? esc(student.pronouns) + ' · ' : ''}${des.map(d => esc(d) + ' · ').join('')}${link}</span>
       </div>
-      <div class="qn-grade">
+      <div class="qn-grade" data-lit="grade">
         <span class="qn-grade-big">${esc(g.big)}</span>
         <span class="qn-grade-sub">${esc(g.small)}</span>
       </div>
@@ -1031,8 +1031,8 @@ window.ReportQuestionnaire = (function () {
         <span class="qn-habit-desc" id="tq-habit-desc-${h.key}" title="${esc(h.desc || h.hint)}">${esc(h.desc || h.hint)}</span>
       </div>`;
     }).join('');
-    return `<div class="qn-card qn-habits">
-      <div class="qn-card-top"><span class="qn-card-title">Work Habits</span><span class="qn-sub" id="tq-rated">${_ratedCount(stored)} of 6 rated</span></div>
+    return `<div class="qn-card qn-habits" data-lit="habits">
+      ${ReportQnBoxes.head('habits', '', `<span class="qn-ev-text" id="tq-rated">${_ratedCount(stored)} of 6 rated</span>`)}
       <div class="qn-habit-head" aria-hidden="true"><span></span><span class="qn-habit-scale">${CommentBank.SCALE.slice(
         0,
         HS_STOPS,
@@ -1390,17 +1390,26 @@ window.ReportQuestionnaire = (function () {
       .join('')}</ul>`;
   }
 
+  /* Each At a Glance row's part: the tile and colour (ReportQnBoxes.LOOK)
+     and the Sentences box it lights (data-lit; Biggest Change has none). */
+  var _GLANCE_KIND = { strongest: 'strengths', next: 'nextStep', change: 'change', missing: 'notHandedIn' };
+  var _GLANCE_PART = { strongest: 'strengths', next: 'nextStep', change: '', missing: 'notHandedIn' };
+
   /* A row that opens in place: the label, the body, the figure on the
      right and a chevron; under it the pieces. */
   // html-safe: the body, figure and list are built escaped by the callers; row and label are fixed words
-  function _glanceRowHtml(row, label, body, fig, list) {
+  function _glanceRowHtml(row, label, body, fig, list, chip) {
     var open = !!_glanceOpen[row];
-    return `<div class="qn-fact qn-glance-row">
+    var kind = _GLANCE_KIND[row];
+    return `<div class="qn-fact qn-glance-row" data-lit="${_GLANCE_PART[row] || ''}" data-tone="${_GLANCE_KIND[row]}">
         <button type="button" class="qn-glance-toggle" data-action="tqGlanceToggle" data-row="${row}" aria-expanded="${open}" aria-controls="tq-glance-${row}">
-          <span class="qn-fact-label">${label}</span>
-          <span class="qn-fact-body">${body}</span>
-          <span class="qn-glance-fig">${fig}</span>
-          <span class="qn-chev" aria-hidden="true"></span>
+          ${ReportQnBoxes.tile(kind)}
+          <span class="qn-fact-body"><span class="qn-fact-label">${label}</span>${body}</span>
+          ${
+            chip
+              ? `<span class="qn-glance-chip">${fig}<span class="qn-chev" aria-hidden="true"></span></span>`
+              : `<span class="qn-glance-fig">${fig}</span><span class="qn-chev" aria-hidden="true"></span>`
+          }
         </button>
         ${list}
       </div>`;
@@ -1413,8 +1422,10 @@ window.ReportQuestionnaire = (function () {
      mark on it. */
   // html-safe: competency names, figures, titles and marks esc()'d; row and label are fixed words
   function _glanceSkillHtml(cid, f, row, label, c, extra) {
-    var body = `<span class="qn-glance-name">${esc(c.name)}</span>`;
-    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level) + ' · ' + _pieces(c))}</span>${extra ? `<span class="qn-glance-extra">${esc(extra)}</span>` : ''}`;
+    // The name, then a detail line (the pieces and the change); the figure
+    // at the right.
+    var body = `<span class="qn-glance-name">${esc(c.name)}</span><span class="qn-glance-detail">${esc(_pieces(c) + (extra ? ' · ' + extra : ''))}</span>`;
+    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level))}</span>`;
     var items = (c.scores || []).map(function (sc) {
       return { id: sc.id, title: sc.title, mark: formatLevel(cid, sc.v) };
     });
@@ -1487,7 +1498,7 @@ window.ReportQuestionnaire = (function () {
       ? _glanceRowHtml(
           'missing',
           'Missing Work',
-          `<span>${esc(mlCount)}</span>`,
+          `<span class="qn-glance-name">${esc(mlCount)}</span>`,
           `<span class="qn-count">${ml.length}</span>`,
           _glanceListHtml(
             'missing',
@@ -1500,27 +1511,28 @@ window.ReportQuestionnaire = (function () {
               };
             }),
           ),
+          true,
         )
-      : `<div class="qn-fact">
-        <span class="qn-fact-label">Missing Work</span>
-        <div class="qn-fact-body"><span class="qn-muted">None so far this year</span></div>
+      : `<div class="qn-fact qn-glance-row" data-lit="notHandedIn">
+        <div class="qn-glance-toggle static">${ReportQnBoxes.tile('notHandedIn')}
+        <div class="qn-fact-body"><span class="qn-fact-label">Missing Work</span><span class="qn-glance-name">None so far this year</span></div></div>
       </div>`;
     var sub = f.lastReport
       ? 'So far this year · change since the ' + f.lastReport.label + ' report'
       : 'So far this year';
     var n = rows.comps.length;
     return `<div class="qn-card qn-glance qno-glance">
-      <div class="qn-card-top"><span class="qn-card-title">At a Glance</span><span class="qn-sub">${esc(sub)}</span></div>
+      ${ReportQnBoxes.head('glance', '', `<span class="qn-ev-text">${esc(sub)}</span>`)}
       <div class="qn-band">Skills</div>
       ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
       <div class="qn-band">Work</div>
-      <div class="qn-fact qn-best">
-        <span class="qn-fact-label">Best Piece</span>
+      <div class="qn-fact qn-best" data-lit="bestPiece">
+        ${ReportQnBoxes.tile('bestPiece')}
         ${
           best
-            ? `<div class="qn-fact-body"><span class="qn-glance-name">${esc(best.title)}</span><span class="qn-best-links"><button type="button" class="qn-card-link" data-action="tqOpenGrader" data-aid="${esc(best.id)}" title="Opens the grader on this piece.">Open in Grader ›</button>${_reportNoteNudge(best)}</span></div>
+            ? `<div class="qn-fact-body"><span class="qn-fact-label">Best Piece</span><span class="qn-glance-name">${esc(best.title)}</span><span class="qn-best-links"><button type="button" class="qn-card-link" data-action="tqOpenGrader" data-aid="${esc(best.id)}" title="Opens the grader on this piece.">Open in Grader ›</button>${_reportNoteNudge(best)}</span></div>
         <span class="qn-glance-fig"><span class="qn-best-mark">${esc(bestMark)}</span></span>`
-            : '<div class="qn-fact-body"><span class="qn-muted">No marked work yet</span></div>'
+            : '<div class="qn-fact-body"><span class="qn-fact-label">Best Piece</span><span class="qn-glance-name">No marked work yet</span></div>'
         }
       </div>
       ${mlRow}
@@ -1584,8 +1596,8 @@ window.ReportQuestionnaire = (function () {
     var warn = function (k, p) {
       return att[k] != null && att[p] != null && att[k] < att[p] ? ' warn' : '';
     };
-    return `<div class="qn-card qn-att">
-      <span class="qn-att-title">Attendance</span>
+    return `<div class="qn-card qn-att" data-lit="attendance">
+      <span class="qn-att-head">${ReportQnBoxes.tile('attendance')}<span class="qn-box-name qn-att-title">Attendance</span></span>
       <label class="qn-att-field">Classes Absent<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
       <label class="qn-att-field">Times Late<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
       <span class="qn-att-note" id="tq-att-note" aria-live="polite">${_attendanceNoteHtml(att)}</span>
@@ -8500,6 +8512,7 @@ window.ReportQuestionnaire = (function () {
     _wireDrag();
     _wireCard();
     _wireSliders();
+    ReportQnBoxes.wireLight();
     _wireSelAdd();
     // The teacher's own sentences in the bank (plan PR 10), and the
     // suggestions again after Later.

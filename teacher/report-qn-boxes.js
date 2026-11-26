@@ -29,6 +29,14 @@ window.ReportQnBoxes = (function () {
     nextStep: { label: 'Next Step', tint: '#0f7b83', icon: 'M3 8h10M9 4l4 4-4 4' },
     support: { label: 'Support', tint: '#0f7b83', icon: 'M8 3v10M3 8h10' },
     closing: { label: 'Closing', tint: '#5b5b60', icon: 'M4 14V2.5M4 3h8l-2 3 2 3H4' },
+    /* The left cards that are not a sentence part (slice 7). */
+    glance: { label: 'At a Glance', tint: '#5b5b60', icon: 'M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z' },
+    change: { label: 'Biggest Change', tint: '#5b5b60', icon: 'M2.5 11l3.5-3.5 2.5 2.5 5-5M10 5h3.5v3.5' },
+    observations: {
+      label: 'Observations',
+      tint: '#5856d6',
+      icon: 'M1.8 8s2.3-4.3 6.2-4.3S14.2 8 14.2 8s-2.3 4.3-6.2 4.3S1.8 8 1.8 8zM8 6.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 1 0 0-3.6',
+    },
   };
   /* Every other part (Your Sentence, Statement, Problem, Plan, Deadline,
      Meeting, Example, Earlier Comment, Language Goals) keeps its own name
@@ -200,5 +208,77 @@ window.ReportQnBoxes = (function () {
     return out;
   }
 
-  return { look: look, box: box, wrap: wrap, evidence: evidence, LOOK: LOOK };
+  /* The head line of a left card (slice 7): the same tile, name and type as
+     a box's. right is html the caller drew with esc(). */
+  // html-safe: kind is a fixed key, label esc()'d, right is html the caller drew with esc()
+  function head(kind, label, right) {
+    var l = look(kind, label);
+    return `<div class="qn-card-top qn-box-head">${_tile(l)}<span class="qn-box-name">${_esc(l.label)}</span><span class="qn-box-evidence">${right || ''}</span></div>`;
+  }
+
+  /** The small tile alone, for a row. @param {string} kind */
+  function tile(kind) {
+    return _tile(look(kind, ''));
+  }
+
+  /* A card and its sentence light each other (slice 7): pointing at or
+     focusing a left card or row (data-lit) or a box (data-part)
+     lights every element of the same part on the page. A tint and ring in
+     the part's colour (reports.css, .qn-lit); nothing moves. Wired once. */
+  var _lightWired = false;
+  /* A lit thing is a left card or row (data-lit) or a Sentences box (its
+     data-part); both name the same part. */
+  var LIT = '[data-lit], .qn-box[data-part]';
+  /** @param {Element|null} from */
+  function _partOf(from) {
+    var el = from && from.closest ? from.closest(LIT) : null;
+    if (!el) return '';
+    return el.getAttribute('data-lit') || el.getAttribute('data-part') || '';
+  }
+  /** @param {string} part @param {boolean} on */
+  function _set(part, on) {
+    document.querySelectorAll('.qn-left, .qn-right').forEach(function (side) {
+      side.querySelectorAll('[data-lit="' + part + '"], .qn-box[data-part="' + part + '"]').forEach(function (el) {
+        el.classList.toggle('qn-lit', on);
+      });
+    });
+  }
+  function wireLight() {
+    if (_lightWired || typeof document === 'undefined' || !document.addEventListener) return;
+    _lightWired = true;
+    /** @type {string} */
+    var cur = '';
+    /** @param {string} part */
+    var go = function (part) {
+      if (part === cur) {
+        if (part) _set(part, true); // the card was redrawn under the pointer
+        return;
+      }
+      if (cur) _set(cur, false);
+      cur = part;
+      if (part) _set(part, true);
+    };
+    var on = function (/** @type {Event} */ e) {
+      go(_partOf(/** @type {Element} */ (e.target)));
+    };
+    document.addEventListener('mouseover', on);
+    document.addEventListener('focusin', on);
+    document.addEventListener('mouseout', function (e) {
+      if (!e.relatedTarget) go('');
+    });
+    document.addEventListener('focusout', function (e) {
+      if (!e.relatedTarget) go('');
+    });
+  }
+
+  return {
+    look: look,
+    box: box,
+    wrap: wrap,
+    evidence: evidence,
+    head: head,
+    tile: tile,
+    wireLight: wireLight,
+    LOOK: LOOK,
+  };
 })();

@@ -52,7 +52,7 @@ function glance(st) {
 /* The card's rows as text: label, body, word. */
 function rows(html) {
   return html
-    .split(/<div class="qn-fact(?: qn-best| qn-glance-row)?">/)
+    .split(/<div class="qn-fact(?: qn-best| qn-glance-row)?"[^>]*>/)
     .slice(1)
     .map(r =>
       r
@@ -68,7 +68,9 @@ function rows(html) {
 
 describe('At a Glance', () => {
   it('names the earlier report in its sub-line', () => {
-    expect(glance(cece())).toContain('<span class="qn-sub">So far this year · change since the Term 1 report</span>');
+    expect(glance(cece())).toContain(
+      '<span class="qn-ev-text">So far this year · change since the Term 1 report</span>',
+    );
   });
 
   it('has the Skills rows, then the Work rows, in order', () => {
@@ -84,12 +86,12 @@ describe('At a Glance', () => {
     ]);
     // The competency's name only (no wording), the figure and pieces, then
     // the word and the change.
-    expect(r[0]).toBe('Strength | Data Representation | 3.3 · 5 pieces | Proficient · ↑ from 3.0');
+    expect(r[0]).toBe('Strength | Data Representation | 5 pieces · Proficient · ↑ from 3.0 | 3.3');
     expect(html).not.toContain('qn-glance-wording');
     // The comment's next step: the lowest with 2+ pieces in the year to date
     // (NEXT_STEP_PIECES), first assessed in Term 2.
-    expect(r[1]).toMatch(/^Next Step \| Sustained Inquiry \| 2\.5 · 2 pieces \| Proficient · New since the report$/);
-    expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| 3\.2 · 11 pieces \| 2\.8 → 3\.2$/);
+    expect(r[1]).toMatch(/^Next Step \| Sustained Inquiry \| 2 pieces · Proficient · New since the report \| 2\.5$/);
+    expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| 11 pieces · 2\.8 → 3\.2 \| 3\.2$/);
     expect(r[4]).toBe('Missing Work | None so far this year');
   });
 
@@ -110,7 +112,7 @@ describe('At a Glance', () => {
   });
 
   it('colours the figure by its level', () => {
-    expect(glance(cece())).toMatch(/<span class="qn-level" data-level="3">3\.3 · 5 pieces<\/span>/);
+    expect(glance(cece())).toMatch(/<span class="qn-level" data-level="3">3\.3<\/span>/);
   });
 
   it('opens a skill row to the pieces behind its figure, each linked to the grader', () => {
@@ -164,7 +166,7 @@ describe('At a Glance', () => {
     period.value = period.options[0].text = 'Report 1';
     try {
       const html = glance(cece());
-      expect(html).toContain('<span class="qn-sub">So far this year</span>');
+      expect(html).toContain('<span class="qn-ev-text">So far this year</span>');
       expect(html).not.toContain('Biggest Change');
       expect(html).not.toContain('from 3.0');
     } finally {
@@ -179,8 +181,8 @@ describe('At a Glance', () => {
     clearProfCache();
     try {
       const r = rows(glance(cece()));
-      expect(r[0]).toMatch(/^Strength \| [^|]+ \| \d+% · \d+ pieces \| [↑↓] from \d+%$/);
-      expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| \d+% · 11 pieces \| \d+% → \d+%$/);
+      expect(r[0]).toMatch(/^Strength \| [^|]+ \| \d+ pieces · [↑↓] from \d+% \| \d+%$/);
+      expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| 11 pieces · \d+% → \d+% \| \d+%$/);
     } finally {
       COURSES[CID].gradingSystem = was;
       clearProfCache();

@@ -88,7 +88,7 @@ window.ReportQnVoiceObservations = (function () {
       list.length && since != null
         ? 'So far this year · ' + since + ' since the ' + f.lastReport.label + ' report'
         : 'So far this year';
-    var top = `<div class="qn-card-top"><span class="qn-card-title">Observations</span><span class="qn-sub">${esc(sub)}</span></div>`;
+    var top = window.ReportQnBoxes.head('observations', '', `<span class="qn-ev-text">${esc(sub)}</span>`);
     if (!list.length) {
       var her = (f.pronouns && f.pronouns.obj) || 'them';
       return `<div class="qn-card qn-obs">${top}
@@ -163,17 +163,18 @@ window.ReportQnVoiceObservations = (function () {
             ? `<span class="qn-chip-quoted" data-answer="${esc(r.text)}" title="Generate can quote this in the comment."${quoted ? '' : ' hidden'}>In the comment</span>`
             : '';
         return `<div class="qn-voice-row">
-          <span class="qn-fact-label">${esc(r.label)}</span>
-          <span class="qn-voice-text${r.text ? '' : ' qn-muted'}">${esc(r.text || r.empty)}</span>
+          <div class="qn-voice-main"><span class="qn-fact-label">${esc(r.label)}</span>
+          <span class="qn-voice-text${r.text ? '' : ' qn-muted'}">${esc(r.text || r.empty)}</span></div>
           ${chip}
         </div>`;
       })
       .join('');
-    return `<div class="qn-card qn-voice">
-      <div class="qn-card-top">
-        <span class="qn-card-title">${esc(first)}’s Voice</span>
-        <a role="link" tabindex="0" data-href="/dashboard?course=${esc(cid)}&manage=questionnaires" class="qn-card-link" title="Opens this class’s Questionnaires in Class Settings, where you choose and send the questions students answer.">Questionnaires ›</a>
-      </div>
+    return `<div class="qn-card qn-voice" data-lit="voice">
+      ${window.ReportQnBoxes.head(
+        'voice',
+        first + '’s Voice',
+        `<a role="link" tabindex="0" data-href="/dashboard?course=${esc(cid)}&manage=questionnaires" class="qn-card-link" title="Opens this class’s Questionnaires in Class Settings, where you choose and send the questions students answer.">Questionnaires ›</a>`,
+      )}
       ${rows}
     </div>`;
   }
