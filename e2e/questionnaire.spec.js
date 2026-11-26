@@ -749,7 +749,7 @@ test.describe('the Sentences card', () => {
     );
     await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Options ▾');
     await expect(page.locator('#tq-sentences .qn-sub')).toHaveCount(0);
-    await expect(page.locator('#tq-sentences .qn-srow-handle[draggable="true"]')).toHaveCount(rowCount);
+    await expect(page.locator('#tq-sentences .qn-srow-handle:not(.qn-srow-spacer)')).toHaveCount(rowCount);
     await expect(page.locator('[data-do="reset"]')).toHaveCount(0);
     // The best piece's row, moved first, names Cece; the grade sentence now
     // uses her pronoun.
@@ -779,7 +779,10 @@ test.describe('the Sentences card', () => {
     expect(moved).not.toBe(draft);
     expect(moved.startsWith(await rows(page).first().locator('.qn-req-text').textContent())).toBe(true);
     expect(bestText).not.toBe(await rows(page).first().locator('.qn-req-text').textContent());
-    await expect(page.locator('#tq-sentences .qn-sub')).toHaveText('Your order is kept when you generate again.');
+    await expect(page.locator('[data-do="reset"]')).toHaveAttribute(
+      'title',
+      /Your order is kept when you generate again\./,
+    );
     expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(moved);
     // The focus stays on the moved row's handle.
     await expect(rows(page).first().locator('.qn-srow-handle')).toBeFocused();
@@ -899,7 +902,7 @@ test.describe('the Sentences card', () => {
     await expect(typed).toHaveCount(1);
     await expect(typed.locator('.qn-req-label')).toHaveText('Your Sentence');
     await expect(typed.locator('.qn-req-text')).toHaveAttribute('title', 'Typed by you · kept when you regenerate');
-    await expect(typed.locator('.qn-srow-handle[draggable="true"]')).toHaveCount(1);
+    await expect(typed.locator('.qn-srow-handle:not(.qn-srow-spacer)')).toHaveCount(1);
     await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
     // Generate again: still there, second, with the bank's parts around it.
     await page.locator('#tq-generate').click();
@@ -989,42 +992,31 @@ test.describe('the Sentences card', () => {
     await expect(plus).toHaveCSS('opacity', '0');
     const before = await boxes(page);
     const g = await gaps.nth(1).boundingBox();
-    await page.mouse.move(g.x + g.width / 2, g.y);
+    // The pill shows after the pointer rests, not at once; nothing moves.
+    await page.mouse.move(g.x + 60, g.y + g.height / 2);
     await expect(plus).toHaveCSS('opacity', '1');
     await expect(gaps.nth(1).locator('.qn-gap-line')).toHaveCSS('opacity', '1');
-    await expect(gaps.nth(1).locator('[role="tooltip"]')).toHaveText('Add a sentence here');
-    await expect(gaps.nth(1).locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
+    await expect(plus).toHaveText('+ Add a Sentence Here');
     expect(await boxes(page)).toEqual(before);
-    // The + at the line's left edge, on the hairline between the rows.
-    const p = await plus.boundingBox();
-    expect(Math.abs(p.y + p.height / 2 - g.y)).toBeLessThan(2);
-    expect(await boxes(page)).toEqual(before);
-    // The menu: Add Here; Cece's own words first, as a Next Step sentence
-    // (S18-F1: the sample Cece has answered the questionnaire); then the
-    // Best Piece part (the only bank part missing that fits); Write Your
-    // Own… and Browse Sentences…
+    // Clicking it opens the writing box at that place at once, with the
+    // choices the Add Here menu had as buttons: Cece's own words first
+    // (S18-F1), then the Best Piece part (the only bank part missing that
+    // fits); Browse Sentences… last.
     await plus.click();
-    const menu = page.locator('#tq-add-menu');
-    await expect(menu).toBeVisible();
-    await expect(menu.locator('.qn-menu-head')).toHaveText(['Add Here', 'In Their Words', 'Sentence Bank']);
-    const items = menu.locator('.qn-add-item');
-    await expect(items).toHaveCount(2);
-    await expect(items.first().locator('.qn-add-part')).toHaveText('Next Step');
-    await expect(items.first().locator('.qn-menu-text')).toHaveText(
-      /^Asked what she wants to get better at, Cece wrote: “/,
-    );
-    await expect(items.first().locator('.qn-menu-meta')).toHaveText('Her words, from her questionnaire');
-    await expect(items.first()).toBeFocused();
-    const bank = items.nth(1);
-    await expect(bank.locator('.qn-add-part')).toHaveText('Best Piece');
-    await expect(bank.locator('.qn-menu-text')).not.toHaveText('');
-    await expect(bank.locator('.qn-menu-meta')).not.toHaveText('');
-    await expect(menu.locator('.qn-menu-add')).toHaveText(['Write Your Own…', 'Browse Sentences…']);
-    expect(await boxes(page)).toEqual(before);
-    const sentence = await bank.locator('.qn-menu-text').textContent();
+    const own = page.locator('#tq-sentences #tq-own');
+    await expect(own).toBeVisible();
+    await expect(own.locator('#tq-own-input')).toBeFocused();
+    const picks = own.locator('.qn-own-pick');
+    await expect(picks).toHaveText(['+ Next Step', '+ Best Piece', 'Browse Sentences…']);
+    await expect(picks.first()).toHaveAttribute('title', /^Asked what she wants to get better at, Cece wrote: “/);
+    await expect(picks.first()).toHaveAttribute('data-source', 'words');
+    const bank = picks.nth(1);
+    const sentence = ((await bank.getAttribute('title')) || '').split(' · ')[0];
+    await expect(own.locator('.qn-line-cancel')).toHaveText('Cancel');
+    await expect(own.locator('#tq-own-save')).toHaveText('Add Here');
     const countWas = await page.locator('#tq-count').textContent();
     await bank.click();
-    await expect(menu).toHaveCount(0);
+    await expect(own).toHaveCount(0);
     // The row at that gap, tinted, "added just now"; the comment has the
     // sentence at the same place; the count moved.
     const added = rows(page).nth(2);
@@ -1047,32 +1039,24 @@ test.describe('the Sentences card', () => {
     // Now every bank part is in: only Cece's own words are offered (S18-F1,
     // the board: "With her answer on file, it offers this one first").
     await gaps.nth(1).locator('.qn-gap-add').click();
-    await expect(menu.locator('.qn-add-item')).toHaveCount(1);
-    await expect(menu.locator('.qn-add-item .qn-add-part')).toHaveText('Next Step');
-    await expect(menu.locator('.qn-add-none')).toHaveCount(0);
+    await expect(own.locator('.qn-own-pick')).toHaveText(['+ Next Step', 'Browse Sentences…']);
     await page.keyboard.press('Escape');
-    await expect(menu).toHaveCount(0);
-    await expect(gaps.nth(1).locator('.qn-gap-add')).toBeFocused();
+    await expect(own).toHaveCount(0);
     // When the fade ends the tint, the mark and "added just now" go, in place.
     await expect(added).not.toHaveClass(/\badded\b/, { timeout: 7000 });
     await expect(added.locator('.qn-req-text')).not.toHaveAttribute('title', /added just now/);
     await expect(page.locator('#tq-marks .qn-mark.added')).toHaveCount(0);
-    // With her words in too, every part is in: the menu says so.
+    // With her words in too, every part is in: only Browse is left.
     const last = gaps.nth((await gaps.count()) - 1);
     await last.locator('.qn-gap-add').click();
-    await menu.locator('.qn-add-item').first().click();
-    await expect(menu).toHaveCount(0);
+    await own.locator('.qn-own-pick').first().click();
+    await expect(own).toHaveCount(0);
     await expect(rows(page).last().locator('.qn-req-text')).toHaveAttribute(
       'title',
       /^Her words, from her questionnaire/,
     );
     await gaps.nth(1).locator('.qn-gap-add').click();
-    await expect(menu.locator('.qn-add-item')).toHaveCount(0);
-    await expect(menu.locator('.qn-add-none')).toHaveText(
-      'Every part with a sentence that fits Cece is in the comment.',
-    );
-    await page.keyboard.press('Escape');
-    await expect(menu).toHaveCount(0);
+    await expect(own.locator('.qn-own-pick')).toHaveText(['Browse Sentences…']);
   });
 
   test('Browse Sentences… from a gap: opens on a part that can go in; Use adds at the gap, never in another row’s place; ⌘A Delete then Generate at once', async ({
@@ -1088,7 +1072,7 @@ test.describe('the Sentences card', () => {
     // Every drafted part is in: Browse opens on Habits (nothing rated, so no
     // habits sentence fits), not on a part already there.
     await gaps.last().locator('.qn-gap-add').click();
-    await page.locator('#tq-add-menu [data-do="browseAt"]').click();
+    await page.locator('#tq-own [data-do="browseAt"]').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Work Habits');
     // Use adds, even a second grade sentence (Colin, 2026-11-02: "i should
@@ -1113,7 +1097,7 @@ test.describe('the Sentences card', () => {
     }, gone);
     await expect(rowByLabel(page, 'Best Piece')).toHaveCount(0);
     await gaps.last().locator('.qn-gap-add').click();
-    await page.locator('#tq-add-menu [data-do="browseAt"]').click();
+    await page.locator('#tq-own [data-do="browseAt"]').click();
     await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Best Piece');
     await expect(sheet.locator('.qn-browse-use:enabled').first()).toHaveAttribute(
       'title',
@@ -1122,13 +1106,6 @@ test.describe('the Sentences card', () => {
     await sheet.locator('.qn-browse-use:enabled').first().click();
     await expect(rows(page).last().locator('.qn-req-label')).toHaveText('Best Piece');
     await expect(rows(page)).toHaveCount(n + 1);
-    await page.keyboard.press('Escape');
-    // The keyboard focus on a menu item is filled like a hover.
-    await gaps.last().locator('.qn-gap-add').click();
-    const item = page.locator('#tq-add-menu [role="menuitem"]').first();
-    await expect(item).toBeFocused();
-    expect(await item.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
-    expect(await item.evaluate(el => getComputedStyle(el).outlineStyle)).toBe('solid');
     await page.keyboard.press('Escape');
     // A typed sentence, then ⌘A, Delete and Generate at once: nothing
     // deleted comes back.
@@ -1151,17 +1128,14 @@ test.describe('the Sentences card', () => {
     await page.locator('#tq-generate').click();
     const box = page.locator('#tq-narrative');
     const gaps = page.locator('#tq-sentences .qn-gap');
-    // Keyboard: the + is focusable in order with the rows; Enter opens the
-    // menu; ⌥↓ on a row's handle still moves it.
+    // Keyboard: the pill is focusable in order with the rows; Enter opens
+    // the writing box; ⌥↓ on a row's handle still moves a row.
     await rows(page).first().locator('.qn-srow-handle').focus();
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
     await expect(gaps.first().locator('.qn-gap-add')).toBeFocused();
     await expect(gaps.first().locator('.qn-gap-add')).toHaveCSS('opacity', '1');
     await page.keyboard.press('Enter');
-    const menu = page.locator('#tq-add-menu');
-    await expect(menu).toBeVisible();
-    await menu.locator('[data-do="ownOpen"]').click();
     const own = page.locator('#tq-sentences .qn-own-row #tq-own');
     await expect(own.locator('#tq-own-input')).toBeFocused();
     await expect(page.locator('#tq-sentences .qn-own-row .qn-req-label')).toHaveText('Your Sentence');
@@ -1190,7 +1164,7 @@ test.describe('the Sentences card', () => {
     // added there; the first stays.
     const n = await rows(page).count();
     await gaps.last().locator('.qn-gap-add').click();
-    await menu.locator('[data-do="browseAt"]').click();
+    await page.locator('#tq-own [data-do="browseAt"]').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet).toBeVisible();
     await sheet.locator('[role="tab"]', { hasText: 'Best Piece' }).click();

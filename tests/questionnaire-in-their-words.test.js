@@ -79,7 +79,7 @@ function open() {
 }
 function addMenu() {
   const html = RQ.renderTermQuestionnaire(CID);
-  const at = html.indexOf('id="tq-add-menu"');
+  const at = html.indexOf('class="qn-own-picks"');
   expect(at).toBeGreaterThan(-1);
   return html.slice(at, html.indexOf('data-do="browseAt"', at));
 }
@@ -149,7 +149,7 @@ describe('the answers it may quote', () => {
     voice({ about: { note: FULL().about.note }, checkin: null });
     expect(RQ.wordsAnswers(facts())).toEqual([]);
     open();
-    RQ.tqSentences('addMenu', { dataset: { gap: '1' } });
+    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
     expect(addMenu()).not.toContain('data-sentence="words:');
     expect(addMenu()).not.toContain('splitting up');
   });
@@ -177,10 +177,10 @@ describe('the sentence', () => {
 describe('Add Here', () => {
   it('offers her words first, under its own heading, then the bank', () => {
     open();
-    RQ.tqSentences('addMenu', { dataset: { gap: '1' } });
+    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
     const menu = addMenu();
-    const words = menu.indexOf('<span class="qn-menu-head qn-add-source">In Their Words</span>');
-    const bank = menu.indexOf('<span class="qn-menu-head qn-add-source">Sentence Bank</span>');
+    const words = menu.indexOf('data-source="words"');
+    const bank = menu.indexOf('data-source="bank"');
     expect(words).toBeGreaterThan(-1);
     expect(bank).toBeGreaterThan(words);
     expect(menu.indexOf('data-sentence="words:better:0"')).toBeLessThan(bank);
@@ -196,7 +196,7 @@ describe('Add Here', () => {
     expect(drawn).toContain('<span class="qn-req-label">Next Step</span>');
     expect(drawn).toContain('Her words, from her questionnaire');
     // Offered once: with it in, Add Here no longer offers it.
-    RQ.tqSentences('addMenu', { dataset: { gap: '2' } });
+    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '2' } });
     expect(addMenu()).not.toContain('data-sentence="words:');
   });
 });
@@ -204,7 +204,7 @@ describe('Add Here', () => {
 describe('beside the bank’s Next Step sentence', () => {
   it('is a row of its own with its own Options, not joined to the bank’s', () => {
     open();
-    RQ.tqSentences('addMenu', { dataset: { gap: '1' } });
+    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
     // The bank's Next Step sentence: the first one offered that is not her words.
     const bankNext = Array.from(
       addMenu().matchAll(/data-step="(nextStep|goWords|home)" data-sentence="([^"]*)"/g),
