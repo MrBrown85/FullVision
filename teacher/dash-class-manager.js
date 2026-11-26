@@ -2,38 +2,43 @@
 window.DashClassManager = (function () {
   'use strict';
 
+  /* What this file holds while its page is open: every variable that is
+     assigned again as the teacher works. One object, so a part of this
+     file that moves to its own file can be handed it once. */
+  var state = {};
+
   /* ── Listener tracking for cleanup ──────────────────────── */
-  var _listeners = [];
+  state._listeners = [];
   function _addDocListener(type, handler, options) {
     document.addEventListener(type, handler, options);
-    _listeners.push({ type: type, handler: handler, options: options });
+    state._listeners.push({ type: type, handler: handler, options: options });
   }
   function _removeAllListeners() {
     closeColorPop();
-    _listeners.forEach(function (l) {
+    state._listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
-    _listeners = [];
+    state._listeners = [];
   }
 
   /* ── Parent state injection ──────────────────────────────── */
-  var _activeCourse = null;
-  var _onRender = null;
-  var _onCourseChange = null;
+  state._activeCourse = null;
+  state._onRender = null;
+  state._onCourseChange = null;
   // Set when the manager changes the active course itself (finishing the create
   // wizard, or archiving the class that was active). The parent page holds its
   // own copy of the active course for rendering and only learns about a change
   // through _onCourseChange, so the switch is deferred until the manager closes
   // — announcing it mid-wizard would tear down the panel the teacher is using.
-  var _activeCourseChanged = false;
+  state._activeCourseChanged = false;
 
   function configure(opts) {
     // The parent is telling us which course it is on, so any pending switch of
     // ours is now reflected there and must not be replayed on close.
-    _activeCourse = opts.activeCourse;
-    _activeCourseChanged = false;
-    _onRender = opts.onRender;
-    _onCourseChange = opts.onCourseChange;
+    state._activeCourse = opts.activeCourse;
+    state._activeCourseChanged = false;
+    state._onRender = opts.onRender;
+    state._onCourseChange = opts.onCourseChange;
   }
   var CM_COLORS = [
     '#dc2626',
@@ -71,54 +76,54 @@ window.DashClassManager = (function () {
     { value: 'both', label: 'Both' },
   ];
 
-  var classManagerOpen = false;
-  var cmSelectedCourse = null;
-  var cmMode = 'edit';
+  state.classManagerOpen = false;
+  state.cmSelectedCourse = null;
+  state.cmMode = 'edit';
   // details | students | questionnaires | grading | terms | competencies,
   // and student-page where that tab is shown (CM_TABS).
-  var cmTab = 'details';
+  state.cmTab = 'details';
 
   // Curriculum Wizard state
-  var cwStep = 1;
-  var cwSelectedGrade = null;
-  var cwSelectedSubject = null;
-  var cwSelectedTags = [];
-  var cwCurriculumLoaded = false;
-  var cwLoadError = false;
+  state.cwStep = 1;
+  state.cwSelectedGrade = null;
+  state.cwSelectedSubject = null;
+  state.cwSelectedTags = [];
+  state.cwCurriculumLoaded = false;
+  state.cwLoadError = false;
 
   // Class Manager student editing
-  var cmEditingStudentId = null;
+  state.cmEditingStudentId = null;
 
   // Students tab roster: sort, search, and each class's guardians by enrollment
-  var cmRosterSortMode = 'lastName';
-  var cmRosterQuery = '';
+  state.cmRosterSortMode = 'lastName';
+  state.cmRosterQuery = '';
   var _cmGuardians = {};
-  var _cmGuardiansLoaded = {};
-  var _cmGuardiansReady = {};
-  var _cmGuardiansLoading = {};
+  state._cmGuardiansLoaded = {};
+  state._cmGuardiansReady = {};
+  state._cmGuardiansLoading = {};
 
   // Import preview
-  var cmPendingImport = null;
-  var cmImportFormatOpen = false; // Import Roster's strip, for a class with students
-  var cmImportError = null; // { kind: 'excel' | 'empty', fileName }
-  var cmImportDone = null; // the Done panel: { cid, added, blanks, counts, undone }
-  var cmRosterOnly = null; // Show Them: the roster shows only these students
+  state.cmPendingImport = null;
+  state.cmImportFormatOpen = false; // Import Roster's strip, for a class with students
+  state.cmImportError = null; // { kind: 'excel' | 'empty', fileName }
+  state.cmImportDone = null; // the Done panel: { cid, added, blanks, counts, undone }
+  state.cmRosterOnly = null; // Show Them: the roster shows only these students
 
   // Relink
-  var cmRelinkCid = null;
-  var cmRelinkStep = 0;
+  state.cmRelinkCid = null;
+  state.cmRelinkStep = 0;
 
   // Standard folder collapse state
-  var _cmCollapsedStdFolders = {};
-  var _cmOpenStdCards = {};
+  state._cmCollapsedStdFolders = {};
+  state._cmOpenStdCards = {};
 
   // Card state that lives outside the learning map: which cards are editing
   // their wording, and the I Can statement being dragged.
   var _cmWordingEdit = {};
   // Cards whose Levels are open for Write Your Own, by section id.
   var _cmLevelsEdit = {};
-  var _cmLevelsBankAsked = false;
-  var _cmIcanDrag = null;
+  state._cmLevelsBankAsked = false;
+  state._cmIcanDrag = null;
 
   // The same code the gradebook heads the column with.
   function _cmStdCode(tag) {
@@ -147,38 +152,38 @@ window.DashClassManager = (function () {
     return (tag.source_text ? 'BC Curriculum' : 'Category') + (sec.name ? ' · ' + sec.name : '');
   }
 
-  var _cmBankPlaces = null;
-  var _cmBankPlacesOf = null;
-  var _cmBankLoading = false;
+  state._cmBankPlaces = null;
+  state._cmBankPlacesOf = null;
+  state._cmBankLoading = false;
   function _cmBankPlace(bankId) {
     if (!CURRICULUM_INDEX) {
-      if (!_cmBankLoading && typeof loadCurriculumIndex === 'function') {
-        _cmBankLoading = true;
+      if (!state._cmBankLoading && typeof loadCurriculumIndex === 'function') {
+        state._cmBankLoading = true;
         loadCurriculumIndex().then(function (idx) {
-          _cmBankLoading = false;
-          if (idx && classManagerOpen && cmMode === 'edit') _cmRenderWithScroll();
+          state._cmBankLoading = false;
+          if (idx && state.classManagerOpen && state.cmMode === 'edit') _cmRenderWithScroll();
         });
       }
       return null;
     }
-    if (!_cmBankPlaces || _cmBankPlacesOf !== CURRICULUM_INDEX) {
-      _cmBankPlaces = {};
-      _cmBankPlacesOf = CURRICULUM_INDEX;
+    if (!state._cmBankPlaces || state._cmBankPlacesOf !== CURRICULUM_INDEX) {
+      state._cmBankPlaces = {};
+      state._cmBankPlacesOf = CURRICULUM_INDEX;
       Object.keys(CURRICULUM_INDEX).forEach(function (key) {
         var course = CURRICULUM_INDEX[key];
         (course.categories || []).forEach(function (cat) {
           var path = Array.isArray(cat.path) ? cat.path : cat.folder ? [cat.name] : [];
           (cat.competencies || []).forEach(function (comp) {
-            if (comp.id) _cmBankPlaces[comp.id] = { course: course.course_name, path: path };
+            if (comp.id) state._cmBankPlaces[comp.id] = { course: course.course_name, path: path };
           });
         });
       });
     }
-    return _cmBankPlaces[bankId] || null;
+    return state._cmBankPlaces[bankId] || null;
   }
 
   function _cmRenderStdCard(sec, lm, compGroups) {
-    if (cmCompSelect) return _cmRenderStdSelectRow(sec);
+    if (state.cmCompSelect) return _cmRenderStdSelectRow(sec);
     var tag = sec.tags[0] || {};
     var subs = lm.subjects || [];
     var sub = subs.find(function (s) {
@@ -430,7 +435,7 @@ window.DashClassManager = (function () {
   /* ── Where These Appear: teacher/cm-std-help.js ── */
   CmStdHelp.configure({
     selectedCourse: function () {
-      return cmSelectedCourse;
+      return state.cmSelectedCourse;
     },
     stdCode: _cmStdCode,
     currentId: _currentId,
@@ -439,7 +444,7 @@ window.DashClassManager = (function () {
   /* ── Points and Proficiency presets, Course Percentage bar: teacher/cm-grading-bars.js ── */
   CmGradingBars.configure({
     selectedCourse: function () {
-      return cmSelectedCourse;
+      return state.cmSelectedCourse;
     },
     catRows: function (cid) {
       return _cmCatState(cid).rows;
@@ -451,9 +456,9 @@ window.DashClassManager = (function () {
 
   function _cmStdCardOpen(secId) {
     return (
-      !!_cmOpenStdCards[secId] ||
-      Object.keys(_cmOpenStdCards).some(function (k) {
-        return _cmOpenStdCards[k] && k !== secId && _currentId('section', k) === secId;
+      !!state._cmOpenStdCards[secId] ||
+      Object.keys(state._cmOpenStdCards).some(function (k) {
+        return state._cmOpenStdCards[k] && k !== secId && _currentId('section', k) === secId;
       })
     );
   }
@@ -461,25 +466,25 @@ window.DashClassManager = (function () {
   function cmToggleStdCard(secId) {
     var open = !_cmStdCardOpen(secId);
     // Forget the key it was opened under before its id was re-keyed.
-    Object.keys(_cmOpenStdCards).forEach(function (k) {
-      if (_currentId('section', k) === secId) delete _cmOpenStdCards[k];
+    Object.keys(state._cmOpenStdCards).forEach(function (k) {
+      if (_currentId('section', k) === secId) delete state._cmOpenStdCards[k];
     });
-    _cmOpenStdCards[secId] = open;
+    state._cmOpenStdCards[secId] = open;
     var card = document.getElementById('cm-std-' + secId);
     if (card) card.classList.toggle('open', open);
   }
 
   function cmToggleStdFolder(uid) {
-    _cmCollapsedStdFolders[uid] = !_cmCollapsedStdFolders[uid];
+    state._cmCollapsedStdFolders[uid] = !state._cmCollapsedStdFolders[uid];
     var folder = document.querySelector('.mod-folder[data-module-id="' + uid + '"]');
-    if (folder) folder.classList.toggle('open', !_cmCollapsedStdFolders[uid]);
+    if (folder) folder.classList.toggle('open', !state._cmCollapsedStdFolders[uid]);
   }
 
   // Drag-and-drop for standards between group folders
-  var _cmDragStdId = null;
-  var _cmMergeTargetId = null;
-  var _cmMergeHoverTimer = null;
-  var _cmMergeAnimating = false;
+  state._cmDragStdId = null;
+  state._cmMergeTargetId = null;
+  state._cmMergeHoverTimer = null;
+  state._cmMergeAnimating = false;
   var CM_GROUP_COLORS = [
     '#6366f1',
     '#06b6d4',
@@ -512,7 +517,7 @@ window.DashClassManager = (function () {
   // Inputs rendered before a new row's server id came back still carry its
   // local id; look rows up by their current id.
   function _currentId(kind, id) {
-    return cmSelectedCourse && id ? resolveLearningMapId(cmSelectedCourse, kind, id) : id;
+    return state.cmSelectedCourse && id ? resolveLearningMapId(state.cmSelectedCourse, kind, id) : id;
   }
 
   function _isCanonicalId(id) {
@@ -551,23 +556,23 @@ window.DashClassManager = (function () {
   }
 
   function _cmClearMerge() {
-    if (_cmMergeHoverTimer) {
-      clearTimeout(_cmMergeHoverTimer);
-      _cmMergeHoverTimer = null;
+    if (state._cmMergeHoverTimer) {
+      clearTimeout(state._cmMergeHoverTimer);
+      state._cmMergeHoverTimer = null;
     }
-    if (_cmMergeTargetId) {
-      var el = document.getElementById('cm-std-' + _cmMergeTargetId);
+    if (state._cmMergeTargetId) {
+      var el = document.getElementById('cm-std-' + state._cmMergeTargetId);
       if (el) el.classList.remove('merge-target');
     }
-    _cmMergeTargetId = null;
-    _cmMergeAnimating = false;
+    state._cmMergeTargetId = null;
+    state._cmMergeAnimating = false;
   }
 
   function _cmMergeToNewGroup(draggedId, targetId) {
     draggedId = _currentId('section', draggedId);
     targetId = _currentId('section', targetId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     if (!map.competencyGroups) map.competencyGroups = [];
     var idx = map.competencyGroups.length;
@@ -652,7 +657,7 @@ window.DashClassManager = (function () {
       // An I Can statement's grip reorders it within its own card.
       var grip = e.target.closest && e.target.closest('.cm-ican-grip');
       if (grip) {
-        _cmIcanDrag = { secId: grip.dataset.secid, idx: Number(grip.dataset.idx) };
+        state._cmIcanDrag = { secId: grip.dataset.secid, idx: Number(grip.dataset.idx) };
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', 'ican');
         var row = grip.closest('.cm-ican-row');
@@ -661,31 +666,31 @@ window.DashClassManager = (function () {
       }
       var card = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (!card) return;
-      _cmDragStdId = card.dataset.stdDrag;
+      state._cmDragStdId = card.dataset.stdDrag;
       card.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', _cmDragStdId);
+      e.dataTransfer.setData('text/plain', state._cmDragStdId);
     });
     _addDocListener('dragover', function (e) {
-      if (_cmIcanDrag) {
+      if (state._cmIcanDrag) {
         var over = e.target.closest && e.target.closest('.cm-ican-row[data-idx]');
         var list = over && over.closest('.cm-ican-list');
         document.querySelectorAll('.cm-ican-row.drop-target').forEach(function (r) {
           if (r !== over) r.classList.remove('drop-target');
         });
-        if (over && list && list.dataset.secid === _cmIcanDrag.secId) {
+        if (over && list && list.dataset.secid === state._cmIcanDrag.secId) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
           over.classList.add('drop-target');
         }
         return;
       }
-      if (!_cmDragStdId) return;
+      if (!state._cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (targetCard) {
         var targetId = targetCard.dataset.stdDrag;
-        if (targetId !== _cmDragStdId) {
-          var map = cmSelectedCourse ? getLearningMap(cmSelectedCourse) : null;
+        if (targetId !== state._cmDragStdId) {
+          var map = state.cmSelectedCourse ? getLearningMap(state.cmSelectedCourse) : null;
           var targetSec =
             map &&
             (map.sections || []).find(function (s) {
@@ -694,11 +699,11 @@ window.DashClassManager = (function () {
           if (targetSec && !targetSec.groupId) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            if (_cmMergeTargetId === targetId) return;
+            if (state._cmMergeTargetId === targetId) return;
             _cmClearMerge();
-            _cmMergeTargetId = targetId;
-            _cmMergeHoverTimer = setTimeout(function () {
-              _cmMergeAnimating = true;
+            state._cmMergeTargetId = targetId;
+            state._cmMergeHoverTimer = setTimeout(function () {
+              state._cmMergeAnimating = true;
               var el = document.getElementById('cm-std-' + targetId);
               if (el) el.classList.add('merge-target');
             }, 300);
@@ -706,7 +711,7 @@ window.DashClassManager = (function () {
           }
         }
       } else {
-        if (_cmMergeTargetId) _cmClearMerge();
+        if (state._cmMergeTargetId) _cmClearMerge();
       }
       var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
       if (!folder) return;
@@ -719,33 +724,33 @@ window.DashClassManager = (function () {
       if (!folder.classList.contains('open')) folder.classList.add('open');
     });
     _addDocListener('dragleave', function (e) {
-      if (!_cmDragStdId) return;
+      if (!state._cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (targetCard && !targetCard.contains(e.relatedTarget)) {
-        if (_cmMergeTargetId === targetCard.dataset.stdDrag) _cmClearMerge();
+        if (state._cmMergeTargetId === targetCard.dataset.stdDrag) _cmClearMerge();
         return;
       }
       var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
       if (folder && !folder.contains(e.relatedTarget)) folder.classList.remove('drag-over');
     });
     _addDocListener('drop', function (e) {
-      if (_cmIcanDrag) {
+      if (state._cmIcanDrag) {
         var onto = e.target.closest && e.target.closest('.cm-ican-row[data-idx]');
-        var drag = _cmIcanDrag;
-        _cmIcanDrag = null;
+        var drag = state._cmIcanDrag;
+        state._cmIcanDrag = null;
         if (!onto) return;
         e.preventDefault();
         cmIcanMove(drag.secId, drag.idx, Number(onto.dataset.idx));
         return;
       }
-      if (!_cmDragStdId) return;
+      if (!state._cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
-      if (targetCard && _cmMergeAnimating && _cmMergeTargetId === targetCard.dataset.stdDrag) {
+      if (targetCard && state._cmMergeAnimating && state._cmMergeTargetId === targetCard.dataset.stdDrag) {
         e.preventDefault();
         e.stopPropagation();
-        _cmMergeToNewGroup(_cmDragStdId, targetCard.dataset.stdDrag);
+        _cmMergeToNewGroup(state._cmDragStdId, targetCard.dataset.stdDrag);
         _cmClearMerge();
-        _cmDragStdId = null;
+        state._cmDragStdId = null;
         document.querySelectorAll('.cm-std-card.dragging').forEach(function (c) {
           c.classList.remove('dragging');
         });
@@ -756,9 +761,9 @@ window.DashClassManager = (function () {
       e.preventDefault();
       var targetGroupId = folder.dataset.folderDrop;
       if (targetGroupId === '__none__') targetGroupId = '';
-      if (cmSelectedCourse) {
-        var map = ensureCustomLearningMap(cmSelectedCourse);
-        var dragId = _currentId('section', _cmDragStdId);
+      if (state.cmSelectedCourse) {
+        var map = ensureCustomLearningMap(state.cmSelectedCourse);
+        var dragId = _currentId('section', state._cmDragStdId);
         if (targetGroupId) targetGroupId = _currentId('group', targetGroupId);
         var sec = (map.sections || []).find(function (s) {
           return s.id === dragId;
@@ -766,11 +771,11 @@ window.DashClassManager = (function () {
         if (sec) {
           if (targetGroupId) sec.groupId = targetGroupId;
           else delete sec.groupId;
-          saveLearningMap(cmSelectedCourse, map);
+          saveLearningMap(state.cmSelectedCourse, map);
           renderClassManager();
         }
       }
-      _cmDragStdId = null;
+      state._cmDragStdId = null;
       document.querySelectorAll('.mod-folder.drag-over').forEach(function (f) {
         f.classList.remove('drag-over');
       });
@@ -779,11 +784,11 @@ window.DashClassManager = (function () {
       });
     });
     _addDocListener('dragend', function () {
-      _cmIcanDrag = null;
+      state._cmIcanDrag = null;
       document.querySelectorAll('.cm-ican-row.dragging, .cm-ican-row.drop-target').forEach(function (r) {
         r.classList.remove('dragging', 'drop-target');
       });
-      _cmDragStdId = null;
+      state._cmDragStdId = null;
       _cmClearMerge();
       document.querySelectorAll('.mod-folder.drag-over').forEach(function (f) {
         f.classList.remove('drag-over');
@@ -797,25 +802,25 @@ window.DashClassManager = (function () {
   // Choose Competencies: bank ids the teacher unticked, the preset picked
   // in Choose Courses (Humanities 8), and the review's grading switches
   // (null: the default for one course or a combined class).
-  var cwSkipped = {},
-    cwPreset = null,
-    cwFoldersOn = null,
-    cwCoursesEqual = null,
-    // The Choose Courses find box, and the Already Set for You row open.
-    cwFindText = '',
-    cwOpen = '';
+  state.cwSkipped = {};
+  state.cwPreset = null;
+  state.cwFoldersOn = null;
+  state.cwCoursesEqual = null;
+  // The Choose Courses find box, and the Already Set for You row open.
+  state.cwFindText = '';
+  state.cwOpen = '';
   // Presets that tick more than one course, in Choose Courses.
   var CW_PRESETS = [{ id: 'HUM8', name: 'Humanities 8', grade: 8, tags: ['ELA8', 'SS8'] }];
 
   // The Class Name as typed; null while it is still the one the courses give.
-  var cwStep2Name = null,
-    cwStep2Grade = '',
-    cwStep2Block = '',
-    cwStep2Span = 'full';
+  state.cwStep2Name = null;
+  state.cwStep2Grade = '';
+  state.cwStep2Block = '';
+  state.cwStep2Span = 'full';
   // '' = not chosen yet; the wizard fills in the grade-level default.
-  var cwStep2Grading = '',
-    cwStep2Calc = '',
-    cwStep2Decay = '65';
+  state.cwStep2Grading = '';
+  state.cwStep2Calc = '';
+  state.cwStep2Decay = '65';
 
   function withdrawStudentUI(sid) {
     // The roster is rendered for cmSelectedCourse, which is not always the
@@ -827,7 +832,7 @@ window.DashClassManager = (function () {
     // already keys off cmSelectedCourse; this was the lone outlier.
     // Capture the id once so the confirm and undo callbacks stay pinned to the
     // course the row belonged to even if the selection moves meanwhile.
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     var students = getStudents(cid);
     var st = students.find(function (s) {
       return s.id === sid;
@@ -853,8 +858,8 @@ window.DashClassManager = (function () {
   }
 
   function cmReenrolStudent(sid) {
-    if (!cmSelectedCourse) return;
-    if (reenrolStudent(cmSelectedCourse, sid)) renderClassManager();
+    if (!state.cmSelectedCourse) return;
+    if (reenrolStudent(state.cmSelectedCourse, sid)) renderClassManager();
   }
 
   /* S8-F1: who in class `cid` has photos of their work sent, { sid: true }
@@ -884,11 +889,11 @@ window.DashClassManager = (function () {
   /* The second step: only a withdrawn student can be deleted, and the
      delete cannot be undone, so there is no Undo. */
   function cmDeleteWithdrawn(sid) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     if (!cid) return;
     // Photos of their work go too (S8-F1, Colin's ruling 102).
     return _cmPhotosBeforeDelete(cid, function (who, maybe) {
-      if (cmSelectedCourse !== cid) return;
+      if (state.cmSelectedCourse !== cid) return;
       _cmConfirmDeleteWithdrawn(cid, sid, maybe || !!who[sid]);
     });
   }
@@ -1142,7 +1147,7 @@ window.DashClassManager = (function () {
   }
 
   function cmCancelStudent() {
-    cmEditingStudentId = null;
+    state.cmEditingStudentId = null;
     var form = document.getElementById('cm-add-student-form');
     if (form) form.style.display = 'none';
     var status = document.getElementById('cm-add-status');
@@ -1163,7 +1168,7 @@ window.DashClassManager = (function () {
   /* Save closes the form; Save and Add Another (and Enter in a field) keeps
      it open, empty, with the focus in First Name for the next student. */
   function cmSaveStudent(another) {
-    if (!cmSelectedCourse) return;
+    if (!state.cmSelectedCourse) return;
     var firstName = (document.getElementById('cm-add-first')?.value || '').trim();
     var lastName = (document.getElementById('cm-add-last')?.value || '').trim();
     if (!firstName) {
@@ -1186,13 +1191,13 @@ window.DashClassManager = (function () {
     var designations = Array.from(document.querySelectorAll('.cm-desig-check:checked')).map(function (cb) {
       return cb.value;
     });
-    var students = getStudents(cmSelectedCourse);
+    var students = getStudents(state.cmSelectedCourse);
     var sortName = ((lastName || '') + ' ' + firstName).trim();
-    var adding = !cmEditingStudentId;
+    var adding = !state.cmEditingStudentId;
 
-    if (cmEditingStudentId) {
+    if (state.cmEditingStudentId) {
       var st = students.find(function (s) {
-        return s.id === cmEditingStudentId;
+        return s.id === state.cmEditingStudentId;
       });
       if (st) {
         st.firstName = firstName;
@@ -1207,7 +1212,7 @@ window.DashClassManager = (function () {
         delete st.designation;
         if (!st.attendance) st.attendance = [];
       }
-      cmEditingStudentId = null;
+      state.cmEditingStudentId = null;
     } else {
       students.push({
         id: uid(),
@@ -1221,10 +1226,10 @@ window.DashClassManager = (function () {
         designations: designations,
         attendance: [],
         sortName: sortName,
-        enrolledDate: courseToday(cmSelectedCourse),
+        enrolledDate: courseToday(state.cmSelectedCourse),
       });
     }
-    saveStudents(cmSelectedCourse, students);
+    saveStudents(state.cmSelectedCourse, students);
     cmCancelStudent();
     renderClassManager();
     // Save and Add Another leaves the form open with the focus in First Name,
@@ -1245,7 +1250,7 @@ window.DashClassManager = (function () {
   }
 
   function cmRemoveStudent(sid) {
-    if (!cmSelectedCourse) return;
+    if (!state.cmSelectedCourse) return;
     withdrawStudentUI(sid);
   }
 
@@ -1258,7 +1263,7 @@ window.DashClassManager = (function () {
   var ROSTER_COLS = ['last', 'first', 'pref', 'pron', 'num', 'dob', 'email', 'g0', 'g1', 'desig', 'ell'];
 
   function _cmRosterStudents(cid) {
-    return sortStudents(getStudents(cid), cmRosterSortMode === 'firstName' ? 'firstName' : 'lastName');
+    return sortStudents(getStudents(cid), state.cmRosterSortMode === 'firstName' ? 'firstName' : 'lastName');
   }
 
   function _cmGuardiansFor(cid, sid) {
@@ -1269,14 +1274,14 @@ window.DashClassManager = (function () {
   /* Loads the class's guardians once per visit to the tab, then fills in
      the Parent Email boxes in place, so a box being typed in keeps focus. */
   function _cmLoadGuardians(cid) {
-    if (_cmGuardiansLoaded[cid] || !(window.v2 && window.v2.listCourseGuardians))
-      return _cmGuardiansLoading[cid] || Promise.resolve();
-    _cmGuardiansLoaded[cid] = true;
-    return (_cmGuardiansLoading[cid] = window.v2.listCourseGuardians(cid).then(function (res) {
+    if (state._cmGuardiansLoaded[cid] || !(window.v2 && window.v2.listCourseGuardians))
+      return state._cmGuardiansLoading[cid] || Promise.resolve();
+    state._cmGuardiansLoaded[cid] = true;
+    return (state._cmGuardiansLoading[cid] = window.v2.listCourseGuardians(cid).then(function (res) {
       // With no server rows (Demo Mode, a failed read) the emails still
       // waiting on the students are all there is; keep what is in memory.
       var rows = res && res.data;
-      if (rows) _cmGuardiansReady[cid] = true;
+      if (rows) state._cmGuardiansReady[cid] = true;
       var byStudent = rows ? {} : _cmGuardians[cid] || {};
       (rows || []).forEach(function (g) {
         var sid = g.enrollment_id;
@@ -1301,7 +1306,7 @@ window.DashClassManager = (function () {
       });
       _cmGuardians[cid] = byStudent;
       _cmFlushPendingGuardians(cid);
-      if (cmSelectedCourse !== cid) return;
+      if (state.cmSelectedCourse !== cid) return;
       document
         .querySelectorAll('.cm-rs-row input[data-col="g0"], .cm-rs-row input[data-col="g1"]')
         .forEach(function (inp) {
@@ -1340,7 +1345,7 @@ window.DashClassManager = (function () {
         desig++;
       if (ds.indexOf('ELL') >= 0) ell++;
       if (
-        _cmGuardiansReady[cid] &&
+        state._cmGuardiansReady[cid] &&
         !_cmGuardiansFor(cid, st.id).some(function (g) {
           return g.email;
         })
@@ -1435,7 +1440,7 @@ window.DashClassManager = (function () {
       '" data-name="' +
       esc(name) +
       '"' +
-      (out || (cmRosterQuery && name.indexOf(cmRosterQuery) < 0) ? ' hidden' : '') +
+      (out || (state.cmRosterQuery && name.indexOf(state.cmRosterQuery) < 0) ? ' hidden' : '') +
       '>' +
       '<span class="cm-rs-stick1">' +
       _cmRosterInput(st, 'last', st.lastName, 'Last name') +
@@ -1479,7 +1484,7 @@ window.DashClassManager = (function () {
   function _cmRosterHtml(cid) {
     var students = _cmRosterStudents(cid);
     var sortBtn = function (mode, label) {
-      var on = cmRosterSortMode === mode;
+      var on = state.cmRosterSortMode === mode;
       return (
         '<button type="button" class="cm-rs-sort" data-action="cmRosterSort" data-sort="' +
         mode +
@@ -1521,19 +1526,20 @@ window.DashClassManager = (function () {
   }
 
   function cmRosterSort(mode) {
-    cmRosterSortMode = mode === 'firstName' ? 'firstName' : 'lastName';
+    state.cmRosterSortMode = mode === 'firstName' ? 'firstName' : 'lastName';
     renderClassManager();
   }
 
   function cmRosterSearch(q) {
-    cmRosterQuery = String(q || '')
+    state.cmRosterQuery = String(q || '')
       .trim()
       .toLowerCase();
     var n = 0;
     document.querySelectorAll('.cm-rs-row').forEach(function (row) {
       var only = _cmRosterOnlyIds();
       var hit =
-        (!only || only[row.dataset.sid]) && (!cmRosterQuery || (row.dataset.name || '').indexOf(cmRosterQuery) >= 0);
+        (!only || only[row.dataset.sid]) &&
+        (!state.cmRosterQuery || (row.dataset.name || '').indexOf(state.cmRosterQuery) >= 0);
       row.hidden = !hit;
       if (hit) row.classList.toggle('cm-rs-alt', n++ % 2 === 1);
     });
@@ -1552,7 +1558,7 @@ window.DashClassManager = (function () {
   /* A roster box lost focus: save it if it changed. First name can't be
      blank and an email must look like one; either puts the old value back. */
   function cmRosterField(el) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     if (!cid) return;
     var col = el.dataset.col;
     var value = (el.value || '').trim();
@@ -1586,7 +1592,7 @@ window.DashClassManager = (function () {
 
   /* What a roster box holds on record now, or null when it isn't a field. */
   function _cmRosterSavedValue(el) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     var col = el.dataset.col;
     if (!cid) return null;
     if (col === 'g0' || col === 'g1') {
@@ -1664,7 +1670,7 @@ window.DashClassManager = (function () {
   }
 
   function cmRosterEll(el) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     var students = getStudents(cid);
     var st = students.find(function (s) {
       return s.id === el.dataset.sid;
@@ -1681,7 +1687,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmSetDesignations(sid, ds) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     var students = getStudents(cid);
     var st = students.find(function (s) {
       return s.id === sid;
@@ -1696,7 +1702,7 @@ window.DashClassManager = (function () {
   }
 
   function cmRosterDesigRemove(sid, code) {
-    var st = getStudents(cmSelectedCourse).find(function (s) {
+    var st = getStudents(state.cmSelectedCourse).find(function (s) {
       return s.id === sid;
     });
     if (!st) return;
@@ -1714,7 +1720,7 @@ window.DashClassManager = (function () {
     var open = wrap.querySelector('.cm-rs-picker');
     _cmCloseRosterPicker();
     if (open) return;
-    var st = getStudents(cmSelectedCourse).find(function (s) {
+    var st = getStudents(state.cmSelectedCourse).find(function (s) {
       return s.id === btn.dataset.sid;
     });
     if (!st) return;
@@ -1759,7 +1765,7 @@ window.DashClassManager = (function () {
   }
 
   function cmRosterDesigAdd(sid, code) {
-    var st = getStudents(cmSelectedCourse).find(function (s) {
+    var st = getStudents(state.cmSelectedCourse).find(function (s) {
       return s.id === sid;
     });
     if (!st) return;
@@ -1854,9 +1860,9 @@ window.DashClassManager = (function () {
   }
 
   function cmOpenStudentPage(sid) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     if (!cid || !sid) return;
-    classManagerOpen = false;
+    state.classManagerOpen = false;
     if (typeof StudentPageStudents !== 'undefined') StudentPageStudents.closeAll();
     _cmNoteOpened(cid);
     if (typeof setActiveCourse === 'function') setActiveCourse(cid);
@@ -1878,12 +1884,12 @@ window.DashClassManager = (function () {
      Done panel names who to fill in. A row with no name stays out until a
      name is typed. Nothing changes until the teacher adds or saves. */
   function cmImportRoster() {
-    if (cmPendingImport || !cmSelectedCourse || !getStudents(cmSelectedCourse).length) {
+    if (state.cmPendingImport || !state.cmSelectedCourse || !getStudents(state.cmSelectedCourse).length) {
       cmChooseRosterFile();
       return;
     }
-    cmImportFormatOpen = true;
-    cmImportError = null;
+    state.cmImportFormatOpen = true;
+    state.cmImportError = null;
     renderClassManager();
     var choose = document.querySelector('[data-action="cmChooseRosterFile"]');
     _cmFocus(choose);
@@ -1899,8 +1905,8 @@ window.DashClassManager = (function () {
   }
 
   function cmCloseImportFormat() {
-    cmImportFormatOpen = false;
-    cmImportError = null;
+    state.cmImportFormatOpen = false;
+    state.cmImportError = null;
     renderClassManager();
     var btn = document.querySelector('[data-action="cmImportRoster"]');
     _cmFocus(btn);
@@ -2059,8 +2065,8 @@ window.DashClassManager = (function () {
     var file = input.files[0];
     if (!file) return;
     var name = file.name || 'the file';
-    cmImportDone = null;
-    cmRosterOnly = null;
+    state.cmImportDone = null;
+    state.cmRosterOnly = null;
     if (/\.(xlsx|xlsm|xls|ods|numbers)$/i.test(name)) {
       input.value = '';
       _cmImportFail('excel', name);
@@ -2078,8 +2084,8 @@ window.DashClassManager = (function () {
         _cmImportFail('empty', name);
         return;
       }
-      cmImportFormatOpen = false;
-      cmImportError = null;
+      state.cmImportFormatOpen = false;
+      state.cmImportError = null;
       cmStartImport(table, name);
     };
     reader.readAsText(file);
@@ -2087,9 +2093,9 @@ window.DashClassManager = (function () {
   }
 
   function _cmImportFail(kind, fileName) {
-    cmPendingImport = null;
-    cmImportFormatOpen = false;
-    cmImportError = { kind: kind, fileName: fileName };
+    state.cmPendingImport = null;
+    state.cmImportFormatOpen = false;
+    state.cmImportError = { kind: kind, fileName: fileName };
     renderClassManager();
     var btn = document.querySelector('.cm-import-card [data-action="cmChooseRosterFile"]');
     _cmFocus(btn);
@@ -2097,8 +2103,8 @@ window.DashClassManager = (function () {
 
   /* A file read: plan it. A file with no column of names asks first. */
   function cmStartImport(table, fileName) {
-    cmImportError = null;
-    cmImportFormatOpen = false;
+    state.cmImportError = null;
+    state.cmImportFormatOpen = false;
     var plan = { fileName: fileName || '', table: table, fixes: {}, keep: {}, showColumns: false, showAll: false };
     plan.nonames = !table.map.some(_cmIsNameField);
     _cmPlanImport(plan);
@@ -2128,7 +2134,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmPlanImport(plan) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     if (!cid) return;
     var read = plan.table ? rosterRowsFromTable(plan.table, plan.fixes) : plan.parsed;
     var roster = getStudents(cid);
@@ -2173,7 +2179,7 @@ window.DashClassManager = (function () {
     sortStudents(roster, 'lastName').forEach(function (s) {
       if (!matched[s.id]) plan.missing.push({ sid: s.id, key: 'm' + s.id, on: on('m' + s.id, false) });
     });
-    cmPendingImport = plan;
+    state.cmPendingImport = plan;
     renderClassManager();
   }
 
@@ -2838,7 +2844,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmRenderImportReview(cid) {
-    var plan = cmPendingImport;
+    var plan = state.cmPendingImport;
     if (!plan) return '';
     var t = plan.table;
     if (plan.nonames && t) {
@@ -2984,7 +2990,7 @@ window.DashClassManager = (function () {
   }
 
   function cmImportToggle(kind, idx, on) {
-    var plan = cmPendingImport;
+    var plan = state.cmPendingImport;
     var list = plan && plan[kind];
     if (!list || !list[idx]) return;
     list[idx].on = !!on;
@@ -2995,7 +3001,7 @@ window.DashClassManager = (function () {
   }
 
   function cmImportToggleAll(on) {
-    var plan = cmPendingImport;
+    var plan = state.cmPendingImport;
     if (!plan) return;
     plan.added.forEach(function (a) {
       a.on = !!on;
@@ -3007,7 +3013,7 @@ window.DashClassManager = (function () {
   /* A column's choice changed: read the file again. Choosing a field
      another column has swaps the two. */
   function cmImportPick(col, field) {
-    var plan = cmPendingImport;
+    var plan = state.cmPendingImport;
     if (!plan || !plan.table) return;
     var t = plan.table;
     col = Number(col);
@@ -3036,7 +3042,7 @@ window.DashClassManager = (function () {
   }
 
   function cmImportDateOrder(col, order) {
-    var plan = cmPendingImport;
+    var plan = state.cmPendingImport;
     if (!plan || !plan.table) return;
     plan.table.dateOrder[Number(col)] = order === 'dmy' ? 'dmy' : 'mdy';
     plan.showColumns = true;
@@ -3048,7 +3054,7 @@ window.DashClassManager = (function () {
   /* A fix typed on a row: read the file again with it. Focus goes to the
      next row's box. */
   function cmImportFix(line, field, value) {
-    var plan = cmPendingImport;
+    var plan = state.cmPendingImport;
     if (!plan || !plan.table || ['dateOfBirth', 'studentNumber', 'name'].indexOf(field) < 0) return;
     line = Number(line);
     var fix = (plan.fixes[line] = plan.fixes[line] || {});
@@ -3065,27 +3071,27 @@ window.DashClassManager = (function () {
   }
 
   function cmImportShowColumns() {
-    if (!cmPendingImport) return;
-    cmPendingImport.showColumns = true;
+    if (!state.cmPendingImport) return;
+    state.cmPendingImport.showColumns = true;
     _cmRenderAndFocus('.cm-import-field-btn');
   }
 
   function cmImportShowAll() {
-    if (!cmPendingImport) return;
-    cmPendingImport.showAll = true;
+    if (!state.cmPendingImport) return;
+    state.cmPendingImport.showAll = true;
     _cmRenderAndFocus('.cm-import-list-row:nth-child(12) input');
   }
 
   function cmImportChooseNames() {
-    if (!cmPendingImport) return;
-    cmPendingImport.nonames = false;
-    cmPendingImport.showColumns = true;
+    if (!state.cmPendingImport) return;
+    state.cmPendingImport.nonames = false;
+    state.cmPendingImport.showColumns = true;
     _cmRenderAndFocus('.cm-import-field-btn');
   }
 
   function cmConfirmImport() {
-    var plan = cmPendingImport;
-    var cid = cmSelectedCourse;
+    var plan = state.cmPendingImport;
+    var cid = state.cmSelectedCourse;
     if (!plan || !cid) return;
     var counts = _cmImportCounts(plan);
     var blanks = plan.read ? _cmImportBlanks(plan) : [];
@@ -3166,17 +3172,17 @@ window.DashClassManager = (function () {
     plan.missing.forEach(function (m) {
       if (m.on) withdrawStudent(cid, m.sid);
     });
-    cmPendingImport = null;
-    cmImportDone = { cid: cid, added: addedIds, blanks: blankIds, counts: counts, undone: null };
-    cmRosterOnly = null;
+    state.cmPendingImport = null;
+    state.cmImportDone = { cid: cid, added: addedIds, blanks: blankIds, counts: counts, undone: null };
+    state.cmRosterOnly = null;
     renderClassManager();
     var head = document.getElementById('cm-import-done-title');
     _cmFocus(head);
   }
 
   function cmCancelImport() {
-    cmPendingImport = null;
-    cmImportError = null;
+    state.cmPendingImport = null;
+    state.cmImportError = null;
     renderClassManager();
     var btn = document.querySelector(
       '[data-action="cmImportRoster"], .cm-import-empty [data-action="cmChooseRosterFile"]',
@@ -3197,7 +3203,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmImportNewIds(cid) {
-    var done = cmImportDone;
+    var done = state.cmImportDone;
     var ids = {};
     if (!done || done.cid !== cid || done.undone) return ids;
     done.added.forEach(function (id) {
@@ -3208,9 +3214,9 @@ window.DashClassManager = (function () {
   }
 
   function _cmRosterOnlyIds() {
-    if (!cmRosterOnly) return null;
+    if (!state.cmRosterOnly) return null;
     var ids = {};
-    cmRosterOnly.forEach(function (id) {
+    state.cmRosterOnly.forEach(function (id) {
       ids[id] = true;
       ids[_cmStudentIdNow(id)] = true;
     });
@@ -3248,7 +3254,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmImportDoneHtml(cid) {
-    var done = cmImportDone;
+    var done = state.cmImportDone;
     if (!done || done.cid !== cid) return '';
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     var c = done.counts;
@@ -3309,7 +3315,7 @@ window.DashClassManager = (function () {
           '<p>' +
           esc((n === 1 ? '1 has a blank' : n + ' have a blank') + ' to fill in' + detail) +
           ' <button type="button" class="cm-import-link" data-action="cmImportShowBlanks">' +
-          (cmRosterOnly ? 'Show All Students' : 'Show Them') +
+          (state.cmRosterOnly ? 'Show All Students' : 'Show Them') +
           '</button></p>';
       }
       var next = [];
@@ -3340,9 +3346,9 @@ window.DashClassManager = (function () {
   }
 
   function cmImportShowBlanks() {
-    var done = cmImportDone;
+    var done = state.cmImportDone;
     if (!done) return;
-    cmRosterOnly = cmRosterOnly
+    state.cmRosterOnly = state.cmRosterOnly
       ? null
       : done.blanks.map(function (b) {
           return b.sid;
@@ -3351,8 +3357,8 @@ window.DashClassManager = (function () {
   }
 
   function cmCloseImportDone() {
-    cmImportDone = null;
-    cmRosterOnly = null;
+    state.cmImportDone = null;
+    state.cmRosterOnly = null;
     renderClassManager();
     var btn = document.querySelector('[data-action="cmImportRoster"]');
     _cmFocus(btn);
@@ -3361,8 +3367,8 @@ window.DashClassManager = (function () {
   /* Delete the students this import added, for good, unless something has
      been recorded for them. Renames and details stay. */
   function cmUndoImport() {
-    var done = cmImportDone;
-    var cid = cmSelectedCourse;
+    var done = state.cmImportDone;
+    var cid = state.cmSelectedCourse;
     if (!done || done.cid !== cid || done.undone) return;
     var removed = 0;
     var kept = [];
@@ -3382,7 +3388,7 @@ window.DashClassManager = (function () {
       }
     });
     done.undone = { removed: removed, kept: kept };
-    cmRosterOnly = null;
+    state.cmRosterOnly = null;
     renderClassManager();
     var head = document.getElementById('cm-import-done-title');
     _cmFocus(head);
@@ -3394,19 +3400,19 @@ window.DashClassManager = (function () {
      shows "Loading", so nothing is edited against an empty copy. The
      sidebar's counts fill in as each class arrives. */
   function _cmClassReady(cid) {
-    return !cid || cid === _activeCourse || typeof isClassLoaded !== 'function' || isClassLoaded(cid);
+    return !cid || cid === state._activeCourse || typeof isClassLoaded !== 'function' || isClassLoaded(cid);
   }
 
   // The sidebar alone, so a background load never redraws a field the
   // teacher is typing in.
   function _cmRefreshSidebar() {
     var el = document.querySelector('.cm-sidebar');
-    if (el && classManagerOpen) el.outerHTML = renderCmSidebar(Object.keys(COURSES));
+    if (el && state.classManagerOpen) el.outerHTML = renderCmSidebar(Object.keys(COURSES));
   }
 
   function _cmAfterLoad(cid) {
-    if (!classManagerOpen) return;
-    if (cid === cmSelectedCourse && cmMode === 'edit') renderClassManager();
+    if (!state.classManagerOpen) return;
+    if (cid === state.cmSelectedCourse && state.cmMode === 'edit') renderClassManager();
     else _cmRefreshSidebar();
   }
 
@@ -3438,7 +3444,7 @@ window.DashClassManager = (function () {
     preloadClasses();
     classesToPreload().reduce(function (chain, cid) {
       return chain.then(function () {
-        if (!classManagerOpen) return;
+        if (!state.classManagerOpen) return;
         return loadClass(cid).then(function () {
           _cmAfterLoad(cid);
         });
@@ -3450,16 +3456,16 @@ window.DashClassManager = (function () {
   // tab: a Class Settings tab, or 'new' for the New Class wizard. cid: a
   // class to show other than the open one (from the address's &class=).
   function openClassManager(tab, cid) {
-    classManagerOpen = true;
-    cmSelectedCourse = cid && COURSES[cid] ? cid : _activeCourse;
-    cmMode = 'edit';
-    if (_cmTabShown(tab, cmSelectedCourse)) cmTab = tab;
+    state.classManagerOpen = true;
+    state.cmSelectedCourse = cid && COURSES[cid] ? cid : state._activeCourse;
+    state.cmMode = 'edit';
+    if (_cmTabShown(tab, state.cmSelectedCourse)) state.cmTab = tab;
     if (tab === 'new') {
       cmStartCreate();
       return;
     }
     renderClassManager();
-    _cmNoteOpened(cmSelectedCourse);
+    _cmNoteOpened(state.cmSelectedCourse);
     _cmFollowLoads();
   }
 
@@ -3467,22 +3473,27 @@ window.DashClassManager = (function () {
      or Back returns to the same tab and class (or the New Class wizard):
      /dashboard?manage=grading&class=… . The dashboard opens it from there. */
   function _cmSyncUrl() {
-    if (!classManagerOpen || typeof Router === 'undefined' || !Router.setUrl) return;
+    if (!state.classManagerOpen || typeof Router === 'undefined' || !Router.setUrl) return;
     if (location.pathname !== '/dashboard') return;
-    var url = '/dashboard?manage=' + (cmMode === 'create' ? 'new' : cmTab);
-    if (cmMode !== 'create' && cmSelectedCourse && cmSelectedCourse !== _activeCourse && COURSES[cmSelectedCourse])
-      url += '&class=' + encodeURIComponent(cmSelectedCourse);
+    var url = '/dashboard?manage=' + (state.cmMode === 'create' ? 'new' : state.cmTab);
+    if (
+      state.cmMode !== 'create' &&
+      state.cmSelectedCourse &&
+      state.cmSelectedCourse !== state._activeCourse &&
+      COURSES[state.cmSelectedCourse]
+    )
+      url += '&class=' + encodeURIComponent(state.cmSelectedCourse);
     Router.setUrl(url);
     document.title = 'FullVision \u2014 Class Settings';
   }
 
   function closeClassManager() {
-    classManagerOpen = false;
+    state.classManagerOpen = false;
     // A student's panel on the Student Page tab closes with Class Settings.
     if (typeof StudentPageStudents !== 'undefined') StudentPageStudents.closeAll();
     // The Done panel and its New marks last until Class Settings closes.
-    cmImportDone = null;
-    cmRosterOnly = null;
+    state.cmImportDone = null;
+    state.cmRosterOnly = null;
     closeColorPop();
     if (typeof Router !== 'undefined' && Router.setUrl && location.pathname === '/dashboard') {
       Router.setUrl('/dashboard');
@@ -3492,12 +3503,12 @@ window.DashClassManager = (function () {
     // own activeCourse, loads that course's data and renders it. Without this
     // the parent falls back to whichever class was active before the manager
     // opened — and re-injects that stale id on the next configure().
-    if (_activeCourseChanged && _onCourseChange) {
-      _activeCourseChanged = false;
-      _onCourseChange(_activeCourse);
+    if (state._activeCourseChanged && state._onCourseChange) {
+      state._activeCourseChanged = false;
+      state._onCourseChange(state._activeCourse);
       return;
     }
-    if (_onRender) _onRender();
+    if (state._onRender) state._onRender();
   }
 
   /* ── Block picker and the empty state: teacher/cm-block-picker.js ── */
@@ -3528,14 +3539,14 @@ window.DashClassManager = (function () {
     }
     var html = '';
     // A remembered tab this class doesn't show opens Details instead.
-    if (!_cmTabShown(cmTab, cmSelectedCourse)) cmTab = 'details';
+    if (!_cmTabShown(state.cmTab, state.cmSelectedCourse)) state.cmTab = 'details';
     _cmSyncUrl();
 
     var detailTitle =
-      cmMode === 'create'
+      state.cmMode === 'create'
         ? 'New Class'
-        : cmSelectedCourse && COURSES[cmSelectedCourse]
-          ? COURSES[cmSelectedCourse].name
+        : state.cmSelectedCourse && COURSES[state.cmSelectedCourse]
+          ? COURSES[state.cmSelectedCourse].name
           : 'Class Settings';
     // Class Settings belongs to the dashboard: its toolbar is a breadcrumb
     // back to it in place of the dashboard's own toolbar.
@@ -3548,7 +3559,7 @@ window.DashClassManager = (function () {
         renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') +
         '<span class="dash-toolbar-spacer"></span>' +
         // The tabbed view names the class in its own header.
-        (cmMode === 'create' || cmRelinkStep > 0
+        (state.cmMode === 'create' || state.cmRelinkStep > 0
           ? '<span class="cm-toolbar-detail">' + esc(detailTitle) + '</span>'
           : '') +
         '</div>';
@@ -3559,10 +3570,10 @@ window.DashClassManager = (function () {
     var sideMount = document.getElementById('sidebar-mount');
     if (sideMount) {
       sideMount.removeAttribute('data-cid');
-      sideMount.style.display = courseIds.length === 0 && cmMode !== 'create' ? 'none' : '';
+      sideMount.style.display = courseIds.length === 0 && state.cmMode !== 'create' ? 'none' : '';
     }
 
-    if (courseIds.length === 0 && cmMode !== 'create') {
+    if (courseIds.length === 0 && state.cmMode !== 'create') {
       html += _cmEmptyStateHtml();
       _cmMark(document.getElementById('main'), 'cm-listing', false);
       document.getElementById('main').innerHTML = html;
@@ -3575,34 +3586,34 @@ window.DashClassManager = (function () {
     else html += renderCmSidebar(courseIds);
     html += '<div class="cm-detail">';
 
-    if (cmMode === 'create') {
+    if (state.cmMode === 'create') {
       html += renderCmCreateForm();
-    } else if (cmRelinkStep > 0 && cmRelinkCid && COURSES[cmRelinkCid]) {
-      html += renderCmRelinkPanel(cmRelinkCid);
-    } else if (cmCompReview && cmCompReview.kind === 'file' && COURSES[cmCompReview.cid]) {
-      html += _cmRenderCompReview(cmCompReview.cid);
-    } else if (cmSelectedCourse && COURSES[cmSelectedCourse] && !_cmClassReady(cmSelectedCourse)) {
+    } else if (state.cmRelinkStep > 0 && state.cmRelinkCid && COURSES[state.cmRelinkCid]) {
+      html += renderCmRelinkPanel(state.cmRelinkCid);
+    } else if (state.cmCompReview && state.cmCompReview.kind === 'file' && COURSES[state.cmCompReview.cid]) {
+      html += _cmRenderCompReview(state.cmCompReview.cid);
+    } else if (state.cmSelectedCourse && COURSES[state.cmSelectedCourse] && !_cmClassReady(state.cmSelectedCourse)) {
       html +=
         '<div class="cm-detail-inner cm-tabbed"><div class="cm-head"><div class="cm-head-text">' +
         '<h1 class="cm-head-title">' +
-        esc(COURSES[cmSelectedCourse].name) +
+        esc(COURSES[state.cmSelectedCourse].name) +
         '</h1><div class="cm-head-meta" role="status">Loading this class\u2026</div></div></div></div>';
-    } else if (cmSelectedCourse && COURSES[cmSelectedCourse]) {
-      html += renderCmDetail(cmSelectedCourse);
+    } else if (state.cmSelectedCourse && COURSES[state.cmSelectedCourse]) {
+      html += renderCmDetail(state.cmSelectedCourse);
     }
 
     html += '</div></div>';
     // Preserve scroll position of the detail pane across re-renders
     var detailEl = document.querySelector('.cm-detail');
     var scrollTop = detailEl ? detailEl.scrollTop : 0;
-    var kept = CmKeepMenu.mark([cmSelectedCourse, cmTab, cmMode].join('|'));
+    var kept = CmKeepMenu.mark([state.cmSelectedCourse, state.cmTab, state.cmMode].join('|'));
     document.getElementById('main').innerHTML = html;
     if (scrollTop > 0) {
       var newDetail = document.querySelector('.cm-detail');
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
     _cmRosterScrollCue();
-    CmKeepMenu.restore(kept, [cmSelectedCourse, cmTab, cmMode].join('|'), _cmFloatOverScroll);
+    CmKeepMenu.restore(kept, [state.cmSelectedCourse, state.cmTab, state.cmMode].join('|'), _cmFloatOverScroll);
     _cmRestoreKeptFocus();
   }
 
@@ -3637,7 +3648,7 @@ window.DashClassManager = (function () {
   // html-safe: badge and name are escaped; meta is built by renderCmSidebar from esc(label) and counts.
   function _cmClassItemHtml(cid, meta, extraClass) {
     var c = COURSES[cid];
-    var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
+    var sel = cid === state.cmSelectedCourse && state.cmMode === 'edit' ? ' selected' : '';
     return (
       '<div class="cm-class-item' +
       sel +
@@ -3677,7 +3688,7 @@ window.DashClassManager = (function () {
       '<button type="button" class="tb-action-btn tb-action-secondary cm-new-class-btn" data-action="cmStartCreate">+ New Class</button>' +
       '</div>' +
       '<div class="cm-class-list">';
-    if (cmMode === 'create') {
+    if (state.cmMode === 'create') {
       html +=
         '<div class="cm-class-item cm-create-active">' +
         '<span class="cm-class-avatar cm-class-avatar-new" aria-hidden="true">+</span>' +
@@ -3741,7 +3752,7 @@ window.DashClassManager = (function () {
       terms: _cmTermsPanel,
       competencies: _cmCompetenciesPanel,
     };
-    var tab = build[cmTab] ? cmTab : 'details';
+    var tab = build[state.cmTab] ? state.cmTab : 'details';
     if (qn && tab !== 'questionnaires') CmQuestionnaires.prepare(cid);
     if (sp && tab !== 'student-page') CmStudentPage.followPreview(cid);
     if (tab !== 'grading') _cmCatPrepare(cid, _cmCatState(cid));
@@ -3817,7 +3828,7 @@ window.DashClassManager = (function () {
           '<div class="atb-search cm-rs-search"><div class="atb-field">' +
           '<span class="assess-search-icon atb-ico atb-ico-search" aria-hidden="true"></span>' +
           '<input type="text" placeholder="Find a Student" aria-label="Find a Student" data-action-input="cmRosterSearch" value="' +
-          esc(cmRosterQuery) +
+          esc(state.cmRosterQuery) +
           '"></div></div>' +
           '<span class="cm-hint cm-rs-summary" id="cm-rs-more" hidden>Scroll sideways for more columns.</span>' +
           '<span class="cm-hint cm-rs-summary" id="cm-rs-summary">' +
@@ -3832,11 +3843,11 @@ window.DashClassManager = (function () {
         : '') +
       '<input type="file" id="cm-csv-input" accept=".csv,.txt,.tsv,.xlsx,.xls" hidden data-action-change="cmCSV">' +
       '<div id="cm-import-preview">' +
-      (cmImportError
-        ? _cmImportErrorHtml(cmImportError)
-        : cmPendingImport
+      (state.cmImportError
+        ? _cmImportErrorHtml(state.cmImportError)
+        : state.cmPendingImport
           ? _cmRenderImportReview(cid)
-          : cmImportFormatOpen && students.length
+          : state.cmImportFormatOpen && students.length
             ? cmImportFormatHtml()
             : !students.length
               ? cmImportEmptyHtml()
@@ -3918,7 +3929,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmTermsPanel() {
-    return '<div class="cm-section">' + _cmRenderReportingTermsField(cmSelectedCourse) + '</div>';
+    return '<div class="cm-section">' + _cmRenderReportingTermsField(state.cmSelectedCourse) + '</div>';
   }
 
   // Competencies tab: a toolbar and the list, beside the curriculum and subjects.
@@ -4023,7 +4034,7 @@ window.DashClassManager = (function () {
             }),
           ),
         );
-      var isOpen = !_cmCollapsedStdFolders[grp.id];
+      var isOpen = !state._cmCollapsedStdFolders[grp.id];
       html +=
         '<div class="mod-folder' +
         (isOpen ? ' open' : '') +
@@ -4089,7 +4100,7 @@ window.DashClassManager = (function () {
     if (compGroups.length > 0 && _cmGrouped.ungrouped.length > 0) {
       html += _cmLooseRun(null);
     } else if (compGroups.length > 0) {
-      var ungOpen = !_cmCollapsedStdFolders['__none__'];
+      var ungOpen = !state._cmCollapsedStdFolders['__none__'];
       html +=
         '<div class="mod-folder no-module' +
         (ungOpen ? ' open' : '') +
@@ -4155,7 +4166,7 @@ window.DashClassManager = (function () {
     }
     html += '</div>';
     // Select mode is the list alone.
-    return cmCompSelect
+    return state.cmCompSelect
       ? '<div class="cm-comp-layout cm-comp-selecting"><div class="cm-comp-main">' + compHtml + '</div></div>'
       : '<div class="cm-comp-layout"><div class="cm-comp-main">' +
           compHtml +
@@ -4272,7 +4283,7 @@ window.DashClassManager = (function () {
     return (
       '<div class="cm-tabs" role="tablist" aria-label="Class settings">' +
       CM_TABS.map(function (t) {
-        if (_cmTabHidden(t, cmSelectedCourse)) return '';
+        if (_cmTabHidden(t, state.cmSelectedCourse)) return '';
         var on = t.id === active;
         return (
           '<button type="button" class="cm-tab' +
@@ -4295,10 +4306,10 @@ window.DashClassManager = (function () {
   }
 
   function cmSetTab(tab) {
-    if (!_cmTabShown(tab, cmSelectedCourse)) return;
-    cmTab = tab;
+    if (!_cmTabShown(tab, state.cmSelectedCourse)) return;
+    state.cmTab = tab;
     // A school picked but not used goes back to the class's own.
-    if (cmSelectedCourse) delete _cmTermSchool[cmSelectedCourse];
+    if (state.cmSelectedCourse) delete _cmTermSchool[state.cmSelectedCourse];
     renderClassManager();
     var detail = document.querySelector('.cm-detail');
     if (detail) detail.scrollTop = 0;
@@ -4308,7 +4319,7 @@ window.DashClassManager = (function () {
 
   function cmOpenGradebook(cid) {
     if (!cid || !COURSES[cid]) return;
-    classManagerOpen = false;
+    state.classManagerOpen = false;
     _cmNoteOpened(cid);
     if (typeof setActiveCourse === 'function') setActiveCourse(cid);
     if (typeof Router !== 'undefined' && Router.navigate) Router.navigate('/gradebook');
@@ -4635,10 +4646,11 @@ window.DashClassManager = (function () {
      With it off every folder counts each competency, so As One turns the switch on with only
      this folder as one: the others go to Each first, which moves nothing while it is off. */
   function cmFolderCountChoice(grpId, value) {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var one = value === 'one';
-    _cmKeepFocusSel = window.CSS && '.cm-fc-seg[data-grpid="' + CSS.escape(grpId) + '"][data-value="' + value + '"]';
+    state._cmKeepFocusSel =
+      window.CSS && '.cm-fc-seg[data-grpid="' + CSS.escape(grpId) + '"][data-value="' + value + '"]';
     if (getFoldersCountAsOne(cid)) {
       var map = getLearningMap(cid);
       var others = (map.competencyGroups || []).filter(function (g) {
@@ -4699,12 +4711,12 @@ window.DashClassManager = (function () {
      step with no value of its own sits a third of the way between its whole
      levels and is drawn there. Picking a marker or handle opens one line to
      type its percent; Left and Right nudge it; a drag moves it. */
-  var _cmPtsError = null;
+  state._cmPtsError = null;
   // The marker or handle picked: { cid, kind: 'step', key: '3+' } or
   // { cid, kind: 'edge', level: 2–4 } (where that proficiency starts).
-  var _cmPtsPick = null;
+  state._cmPtsPick = null;
   // What was typed when it was refused, shown back in the box.
-  var _cmPtsTyped = null;
+  state._cmPtsTyped = null;
   // Markers closer than this (in % of the ruler) go on two rows: a pill's
   // width on the narrowest ruler (.cm-pts-ruler's min-width, 420px).
   var CM_PTS_CLOSE = 7.6;
@@ -4768,7 +4780,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmPtsPicked(cid) {
-    return _cmPtsPick && _cmPtsPick.cid === cid ? _cmPtsPick : null;
+    return state._cmPtsPick && state._cmPtsPick.cid === cid ? state._cmPtsPick : null;
   }
   function _cmPtsSame(a, b) {
     return !!a && !!b && a.kind === b.kind && (a.kind === 'step' ? a.key === b.key : a.level === b.level);
@@ -4913,7 +4925,8 @@ window.DashClassManager = (function () {
     var edit = '';
     if (pick) {
       var isStep = pick.kind === 'step';
-      var value = _cmPtsTyped != null ? _cmPtsTyped : isStep ? _cmPctText(steps[pick.key]) : String(at[pick.level]);
+      var value =
+        state._cmPtsTyped != null ? state._cmPtsTyped : isStep ? _cmPctText(steps[pick.key]) : String(at[pick.level]);
       edit =
         '<label class="cm-pts-edit-label" for="cm-pts-input"><span class="cm-pts-edit-name">' +
         esc(isStep ? _cmStepLabel(pick.key) : names[pick.level]) +
@@ -4925,7 +4938,7 @@ window.DashClassManager = (function () {
         ' value="' +
         esc(value) +
         '" data-action-change="cmPointsScale" data-action-input="cmPtsLive"' +
-        (_cmPtsError ? ' aria-invalid="true" aria-describedby="cm-pts-error"' : '') +
+        (state._cmPtsError ? ' aria-invalid="true" aria-describedby="cm-pts-error"' : '') +
         '><span class="cm-pts-unit">%</span>';
     }
     return (
@@ -4947,7 +4960,9 @@ window.DashClassManager = (function () {
       '<div class="cm-pts-edit">' +
       edit +
       '</div>' +
-      (_cmPtsError ? '<div class="cm-pts-error" id="cm-pts-error" role="alert">' + esc(_cmPtsError) + '</div>' : '') +
+      (state._cmPtsError
+        ? '<div class="cm-pts-error" id="cm-pts-error" role="alert">' + esc(state._cmPtsError) + '</div>'
+        : '') +
       CmGradingBars.renderPresets(scale) +
       '</div>'
     );
@@ -5011,17 +5026,17 @@ window.DashClassManager = (function () {
     var percents = _cmOwnPercents(scale);
     var text = String(raw == null ? '' : raw).trim();
     var v = parseFloat(text);
-    _cmPtsPick = Object.assign({}, pick, { cid: cid });
+    state._cmPtsPick = Object.assign({}, pick, { cid: cid });
     function refuse(msg) {
-      _cmPtsError = msg;
-      _cmPtsTyped = text;
+      state._cmPtsError = msg;
+      state._cmPtsTyped = text;
       renderClassManager();
     }
     if (pick.kind === 'edge') {
       // Blank or not a number: back to what is saved.
       if (!isFinite(v)) {
-        _cmPtsError = null;
-        _cmPtsTyped = null;
+        state._cmPtsError = null;
+        state._cmPtsTyped = null;
         renderClassManager();
         return;
       }
@@ -5032,8 +5047,8 @@ window.DashClassManager = (function () {
       var whole = pick.key.length === 1;
       if (text === '' || !isFinite(v)) {
         if (whole || text !== '') {
-          _cmPtsError = null;
-          _cmPtsTyped = null;
+          state._cmPtsError = null;
+          state._cmPtsTyped = null;
           renderClassManager();
           return;
         }
@@ -5055,8 +5070,8 @@ window.DashClassManager = (function () {
     var boundaries = DEFAULT_GRADING_SCALE.boundaries.map(function (db) {
       return { min: db.proficiency === 1 ? 0 : at[db.proficiency], proficiency: db.proficiency };
     });
-    _cmPtsError = null;
-    _cmPtsTyped = null;
+    state._cmPtsError = null;
+    state._cmPtsTyped = null;
     var before = JSON.stringify([_cmStarts(scale), _cmOwnPercents(scale)]);
     if (before === JSON.stringify([at, percents])) return renderClassManager();
     // Labels saved before the scale moved here are kept as they were.
@@ -5065,25 +5080,25 @@ window.DashClassManager = (function () {
 
   // The box under the scale changed (typed, then Enter or leaving it).
   function cmSavePointsScale(el) {
-    if (!cmSelectedCourse) return;
-    var pick = _cmPtsPicked(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var pick = _cmPtsPicked(state.cmSelectedCourse);
     if (!pick || !el) return;
-    _cmPtsSave(cmSelectedCourse, pick, el.value);
+    _cmPtsSave(state.cmSelectedCourse, pick, el.value);
   }
 
   // A marker or handle clicked: it is picked, or, picked already, let go.
-  var _cmPtsDragEnd = 0;
+  state._cmPtsDragEnd = 0;
   function cmPtsPick(el) {
-    if (!cmSelectedCourse) return;
+    if (!state.cmSelectedCourse) return;
     // The click that ends a drag: the drag has picked it already.
-    if (Date.now() - _cmPtsDragEnd < 500) return;
-    var p = _cmPtsFromEl(cmSelectedCourse, el);
+    if (Date.now() - state._cmPtsDragEnd < 500) return;
+    var p = _cmPtsFromEl(state.cmSelectedCourse, el);
     if (!p) return;
-    var was = _cmPtsPicked(cmSelectedCourse);
-    _cmPtsPick = _cmPtsSame(was, p) ? null : p;
-    _cmPtsError = null;
-    _cmPtsTyped = null;
-    _cmKeepFocusSel = '#' + _cmPtsPickId(p);
+    var was = _cmPtsPicked(state.cmSelectedCourse);
+    state._cmPtsPick = _cmPtsSame(was, p) ? null : p;
+    state._cmPtsError = null;
+    state._cmPtsTyped = null;
+    state._cmKeepFocusSel = '#' + _cmPtsPickId(p);
     renderClassManager();
   }
 
@@ -5092,22 +5107,22 @@ window.DashClassManager = (function () {
      go and puts the focus back on what was picked. */
   function _cmPtsKeydown(e) {
     var el = e.target;
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     if (!cid || !el || !el.closest || !el.closest('.cm-pts-scale')) return false;
     var pick = _cmPtsPicked(cid);
     if (e.key === 'Escape' && pick) {
       e.preventDefault();
-      _cmPtsPick = null;
-      _cmPtsError = null;
-      _cmPtsTyped = null;
-      _cmKeepFocusSel = '#' + _cmPtsPickId(pick);
+      state._cmPtsPick = null;
+      state._cmPtsError = null;
+      state._cmPtsTyped = null;
+      state._cmKeepFocusSel = '#' + _cmPtsPickId(pick);
       renderClassManager();
       return true;
     }
     if (el.id === 'cm-pts-input' && e.key === 'Enter' && !e.isComposing) {
       e.preventDefault();
       if (!pick) return true;
-      _cmKeepFocusSel = '#cm-pts-input';
+      state._cmKeepFocusSel = '#cm-pts-input';
       _cmPtsSave(cid, pick, el.value);
       return true;
     }
@@ -5118,7 +5133,7 @@ window.DashClassManager = (function () {
     e.preventDefault();
     var by = p.kind === 'edge' ? (e.shiftKey ? 5 : 1) : e.shiftKey ? 1 : 0.1;
     var next = Math.round((_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10) / 10;
-    _cmKeepFocusSel = '#' + _cmPtsPickId(p);
+    state._cmKeepFocusSel = '#' + _cmPtsPickId(p);
     _cmPtsSave(cid, p, String(next));
     return true;
   }
@@ -5149,11 +5164,11 @@ window.DashClassManager = (function () {
       });
     }
     var inp = document.getElementById('cm-pts-input');
-    if (inp && !fromInput && _cmPtsSame(_cmPtsPicked(cmSelectedCourse), p)) inp.value = String(v);
+    if (inp && !fromInput && _cmPtsSame(_cmPtsPicked(state.cmSelectedCourse), p)) inp.value = String(v);
   }
 
   function cmPtsLive(el) {
-    var p = cmSelectedCourse && _cmPtsPicked(cmSelectedCourse);
+    var p = state.cmSelectedCourse && _cmPtsPicked(state.cmSelectedCourse);
     var v = parseFloat(el.value);
     if (p && isFinite(v)) _cmPtsPreview(p, Math.max(0, Math.min(100, v)), true);
   }
@@ -5161,23 +5176,23 @@ window.DashClassManager = (function () {
   /* Dragging a marker or handle along the ruler: it snaps to 0.1 (a handle
      to 1), stays between its neighbours, and saves when let go. A press
      that doesn't move is a click. */
-  var _cmPtsDrag = null;
+  state._cmPtsDrag = null;
   function _initCmPtsDrag() {
     _addDocListener('pointerdown', function (e) {
-      if (e.button !== 0 || !cmSelectedCourse) return;
+      if (e.button !== 0 || !state.cmSelectedCourse) return;
       var btn = e.target.closest && e.target.closest('.cm-pts-ruler [data-action="cmPtsPick"]');
       var ruler = btn && btn.closest('.cm-pts-ruler');
-      var p = btn && _cmPtsFromEl(cmSelectedCourse, btn);
+      var p = btn && _cmPtsFromEl(state.cmSelectedCourse, btn);
       if (!p || !ruler) return;
-      var range = _cmPtsRange(cmSelectedCourse, p);
-      _cmPtsDrag = {
-        cid: cmSelectedCourse,
+      var range = _cmPtsRange(state.cmSelectedCourse, p);
+      state._cmPtsDrag = {
+        cid: state.cmSelectedCourse,
         pick: p,
         pointer: e.pointerId,
         rect: ruler.getBoundingClientRect(),
         x0: e.clientX,
         moved: false,
-        value: _cmPtsValue(cmSelectedCourse, p),
+        value: _cmPtsValue(state.cmSelectedCourse, p),
         lo: range[0],
         hi: range[1],
       };
@@ -5188,7 +5203,7 @@ window.DashClassManager = (function () {
       }
     });
     _addDocListener('pointermove', function (e) {
-      var d = _cmPtsDrag;
+      var d = state._cmPtsDrag;
       if (!d || e.pointerId !== d.pointer || !d.rect.width) return;
       if (!d.moved && Math.abs(e.clientX - d.x0) < 4) return;
       d.moved = true;
@@ -5199,13 +5214,13 @@ window.DashClassManager = (function () {
       _cmPtsPreview(d.pick, d.value);
     });
     function end(e) {
-      var d = _cmPtsDrag;
+      var d = state._cmPtsDrag;
       if (!d || e.pointerId !== d.pointer) return;
-      _cmPtsDrag = null;
+      state._cmPtsDrag = null;
       if (!d.moved) return;
-      _cmPtsDragEnd = Date.now();
-      if (e.type === 'pointercancel' || d.cid !== cmSelectedCourse) return renderClassManager();
-      _cmKeepFocusSel = '#' + _cmPtsPickId(d.pick);
+      state._cmPtsDragEnd = Date.now();
+      if (e.type === 'pointercancel' || d.cid !== state.cmSelectedCourse) return renderClassManager();
+      state._cmKeepFocusSel = '#' + _cmPtsPickId(d.pick);
       _cmPtsSave(d.cid, d.pick, String(d.value));
     }
     _addDocListener('pointerup', end);
@@ -5213,11 +5228,11 @@ window.DashClassManager = (function () {
   }
 
   function cmMatchPointsScale() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var scale = getGradingScale(cid);
-    _cmPtsError = null;
-    _cmPtsTyped = null;
+    state._cmPtsError = null;
+    state._cmPtsTyped = null;
     _cmApplyPointsScale(cid, {
       boundaries: scale.boundaries,
       percents: _cmMatchedPercents(scale.boundaries),
@@ -5227,11 +5242,11 @@ window.DashClassManager = (function () {
 
   // The BC Letter Bands preset: Counts As only; Points to Proficiency stays.
   function cmBcPointsScale() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var scale = getGradingScale(cid);
-    _cmPtsError = null;
-    _cmPtsTyped = null;
+    state._cmPtsError = null;
+    state._cmPtsTyped = null;
     _cmApplyPointsScale(cid, {
       boundaries: scale.boundaries,
       percents: Object.assign({}, BC_LETTER_BAND_PERCENTS),
@@ -5240,11 +5255,11 @@ window.DashClassManager = (function () {
   }
 
   function cmResetPointsScale() {
-    if (!cmSelectedCourse) return;
-    _cmPtsError = null;
-    _cmPtsTyped = null;
+    if (!state.cmSelectedCourse) return;
+    state._cmPtsError = null;
+    state._cmPtsTyped = null;
     // Saved, not deleted: other devices only take a scale the server has.
-    _cmApplyPointsScale(cmSelectedCourse, structuredClone(DEFAULT_GRADING_SCALE));
+    _cmApplyPointsScale(state.cmSelectedCourse, structuredClone(DEFAULT_GRADING_SCALE));
   }
 
   var _cmRenderWeightBar = CmGradingBars.renderWeightBar;
@@ -5382,8 +5397,8 @@ window.DashClassManager = (function () {
   }
 
   function cmCheckStudent(sid) {
-    if (!cmSelectedCourse) return;
-    _cmCheckSid[cmSelectedCourse] = sid;
+    if (!state.cmSelectedCourse) return;
+    _cmCheckSid[state.cmSelectedCourse] = sid;
     renderClassManager();
   }
 
@@ -5399,7 +5414,7 @@ window.DashClassManager = (function () {
      shows the class as it is made. A custom class (no courses) goes straight
      to step 2. */
   function renderCmCreateForm() {
-    return cwStep === 2 ? renderCwDetails() : renderCwCourses();
+    return state.cwStep === 2 ? renderCwDetails() : renderCwCourses();
   }
 
   function renderCwStepBar() {
@@ -5408,15 +5423,15 @@ window.DashClassManager = (function () {
       ['Choose Courses', 'Name Your Class']
         .map(function (label, i) {
           var n = i + 1;
-          var cls = n < cwStep ? 'done' : n === cwStep ? 'active' : '';
+          var cls = n < state.cwStep ? 'done' : n === state.cwStep ? 'active' : '';
           return (
             (i > 0 ? '<span class="cw-step-arrow">›</span>' : '') +
             '<div class="cw-step ' +
             cls +
             '"' +
-            (n === cwStep ? ' aria-current="step"' : '') +
+            (n === state.cwStep ? ' aria-current="step"' : '') +
             '><span class="cw-step-num">' +
-            (n < cwStep ? '✓' : n) +
+            (n < state.cwStep ? '✓' : n) +
             '</span><span>' +
             label +
             '</span></div>'
@@ -5443,7 +5458,7 @@ window.DashClassManager = (function () {
   }
 
   function renderCwCourses() {
-    if (!cwCurriculumLoaded && !cwLoadError)
+    if (!state.cwCurriculumLoaded && !state.cwLoadError)
       return (
         '<div class="cm-detail-inner cw-wizard">' +
         renderCwStepBar() +
@@ -5452,7 +5467,7 @@ window.DashClassManager = (function () {
         _cwCancelBtn() +
         '</div></div>'
       );
-    if (cwLoadError)
+    if (state.cwLoadError)
       return (
         '<div class="cm-detail-inner cw-wizard">' +
         renderCwStepBar() +
@@ -5462,7 +5477,7 @@ window.DashClassManager = (function () {
         '<button class="btn btn-primary" data-action="cwSkipToCustom">Custom Class</button></div></div>'
       );
 
-    var courses = cwSelectedGrade !== null ? getCoursesByGrade(cwSelectedGrade).slice() : [];
+    var courses = state.cwSelectedGrade !== null ? getCoursesByGrade(state.cwSelectedGrade).slice() : [];
     courses.sort(function (a, b) {
       return (
         String(a.subject).localeCompare(String(b.subject)) ||
@@ -5477,7 +5492,7 @@ window.DashClassManager = (function () {
       '<div class="seg cm-seg cw-grade-seg" role="radiogroup" aria-labelledby="cw-grade-label">' +
       [8, 9, 10, 11, 12]
         .map(function (g) {
-          var on = cwSelectedGrade === g;
+          var on = state.cwSelectedGrade === g;
           return (
             '<button type="button" class="seg-btn cm-seg-btn' +
             (on ? ' active' : '') +
@@ -5496,15 +5511,15 @@ window.DashClassManager = (function () {
       '</div>' +
       (long
         ? '<input type="search" class="cm-input cw-find" placeholder="Find a course" aria-label="Find a course" value="' +
-          esc(cwFindText) +
+          esc(state.cwFindText) +
           '" data-action-input="cwFind">'
         : '') +
       '</div>';
 
-    if (cwSelectedGrade === null) html += '<p class="cw-lead">Pick a grade to see its courses.</p>';
+    if (state.cwSelectedGrade === null) html += '<p class="cw-lead">Pick a grade to see its courses.</p>';
     else {
-      var q = long ? cwFindText.trim().toLowerCase() : '';
-      var presets = _cwPresetsFor(cwSelectedGrade, courses);
+      var q = long ? state.cwFindText.trim().toLowerCase() : '';
+      var presets = _cwPresetsFor(state.cwSelectedGrade, courses);
       var preset = _cwActivePreset();
       var list = '';
       presets.forEach(function (p) {
@@ -5566,7 +5581,7 @@ window.DashClassManager = (function () {
         rows += _cwCourseRow({
           action: 'cwToggleCourse',
           key: c.short_tag,
-          on: cwSelectedTags.indexOf(c.short_tag) >= 0,
+          on: state.cwSelectedTags.indexOf(c.short_tag) >= 0,
           name: c.course_name,
           counts: _cwCourseCounts([c.short_tag]),
           q: q,
@@ -5588,7 +5603,7 @@ window.DashClassManager = (function () {
       html,
       _cwCancelBtn() +
         '<button class="btn btn-primary" data-action="cwGoToStep2"' +
-        (cwSelectedTags.length ? '' : ' disabled') +
+        (state.cwSelectedTags.length ? '' : ' disabled') +
         '>Next</button>',
     );
   }
@@ -5615,7 +5630,7 @@ window.DashClassManager = (function () {
     (course ? course.categories || [] : []).forEach(function (cat) {
       (cat.competencies || []).forEach(function (comp) {
         out.all++;
-        if (!cwSkipped[curriculumCompKey(tag, comp)]) out.on++;
+        if (!state.cwSkipped[curriculumCompKey(tag, comp)]) out.on++;
       });
     });
     return out;
@@ -5643,11 +5658,11 @@ window.DashClassManager = (function () {
   /* The ticked preset, while all its courses are still ticked. */
   function _cwActivePreset() {
     var p = CW_PRESETS.find(function (x) {
-      return x.id === cwPreset;
+      return x.id === state.cwPreset;
     });
     if (!p) return null;
     return p.tags.every(function (tag) {
-      return cwSelectedTags.indexOf(tag) >= 0;
+      return state.cwSelectedTags.indexOf(tag) >= 0;
     })
       ? p
       : null;
@@ -5655,20 +5670,20 @@ window.DashClassManager = (function () {
 
   /* ── Your Class: the class as it is made, beside both steps ── */
   function _cwRailName() {
-    var name = cwStep2Name != null ? cwStep2Name : _cwDefaultName();
+    var name = state.cwStep2Name != null ? state.cwStep2Name : _cwDefaultName();
     return name.trim() || 'New Class';
   }
   function _cwRailSubText() {
     var grade = _cwGradeLevel();
     var bits = [];
     if (grade && _cwRailName() !== 'Grade ' + grade) bits.push('Grade ' + grade);
-    var block = courseBlockLabel({ block: cwStep2Block });
+    var block = courseBlockLabel({ block: state.cwStep2Block });
     if (block) bits.push(/^[A-EX]$/.test(block) ? 'Block ' + block : block);
-    if (cwStep === 2)
+    if (state.cwStep === 2)
       bits.push(
         (
           TERM_SPANS.find(function (o) {
-            return o.value === cwStep2Span;
+            return o.value === state.cwStep2Span;
           }) || TERM_SPANS[0]
         ).label,
       );
@@ -5682,7 +5697,7 @@ window.DashClassManager = (function () {
     if (sub) sub.textContent = _cwRailSubText();
   }
   function _cwRailHtml() {
-    var rows = cwSelectedTags
+    var rows = state.cwSelectedTags
       .map(function (tag) {
         var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
         if (!course) return '';
@@ -5696,7 +5711,7 @@ window.DashClassManager = (function () {
           (k.on === k.all ? k.all : k.on + ' of ' + k.all) +
           (k.all === 1 ? ' Competency' : ' Competencies') +
           '</span></span>' +
-          (cwStep === 1
+          (state.cwStep === 1
             ? '<button type="button" class="cw-rail-x" data-action="cwToggleCourse" data-tag="' +
               esc(tag) +
               '" aria-label="Take Out ' +
@@ -5708,8 +5723,8 @@ window.DashClassManager = (function () {
       })
       .join('');
     var note = '';
-    if (cwSelectedTags.length > 1) {
-      var names = cwSelectedTags.map(function (tag) {
+    if (state.cwSelectedTags.length > 1) {
+      var names = state.cwSelectedTags.map(function (tag) {
         return CURRICULUM_INDEX[tag] ? CURRICULUM_INDEX[tag].course_name : tag;
       });
       note = _cwGrading().coursesCountEqually
@@ -5717,9 +5732,9 @@ window.DashClassManager = (function () {
           ? names[0] + ' and ' + names[1] + ' each make up half of the overall.'
           : 'Each of the ' + names.length + ' courses makes up an equal share of the overall.'
         : 'A course with more competencies or folders counts for more in the overall.';
-    } else if (!cwSelectedTags.length)
+    } else if (!state.cwSelectedTags.length)
       note =
-        cwStep === 2
+        state.cwStep === 2
           ? 'No courses from the BC curriculum. Add competencies in the Competencies tab once the class is made.'
           : 'Tick a course and it shows here.';
     return (
@@ -5739,8 +5754,8 @@ window.DashClassManager = (function () {
   /* ── Step 2: Name Your Class ─────────────────────────────── */
   // The class's grade: typed for a custom class, else the grade picked.
   function _cwGradeLevel() {
-    if (cwStep2Grade) return cwStep2Grade.trim();
-    return cwSelectedGrade ? String(cwSelectedGrade) : '';
+    if (state.cwStep2Grade) return state.cwStep2Grade.trim();
+    return state.cwSelectedGrade ? String(state.cwSelectedGrade) : '';
   }
 
   /* What the teacher has typed or picked on this step, kept before the step
@@ -5750,22 +5765,22 @@ window.DashClassManager = (function () {
     var nameEl = document.getElementById('cm-new-name');
     if (!nameEl || typeof nameEl.value !== 'string') return;
     var typed = nameEl.value;
-    cwStep2Name = typed === _cwDefaultName() ? null : typed;
-    if (document.getElementById('cm-new-block')) cwStep2Block = readBlockPicker('cm-new-block');
+    state.cwStep2Name = typed === _cwDefaultName() ? null : typed;
+    if (document.getElementById('cm-new-block')) state.cwStep2Block = readBlockPicker('cm-new-block');
     var span = document.querySelector('#cm-cg-span .cm-seg-btn.active');
-    if (span && span.dataset) cwStep2Span = span.dataset.val || 'full';
+    if (span && span.dataset) state.cwStep2Span = span.dataset.val || 'full';
     var grade = document.getElementById('cm-new-grade');
-    if (grade) cwStep2Grade = grade.value || '';
+    if (grade) state.cwStep2Grade = grade.value || '';
     var decay = document.getElementById('cm-cg-decay-slider');
-    if (decay) cwStep2Decay = decay.value || '65';
+    if (decay) state.cwStep2Decay = decay.value || '65';
   }
 
   function renderCwDetails() {
-    var custom = !cwSelectedTags.length;
-    var name = cwStep2Name != null ? cwStep2Name : _cwDefaultName();
+    var custom = !state.cwSelectedTags.length;
+    var name = state.cwStep2Name != null ? state.cwStep2Name : _cwDefaultName();
     var gradeLevel = _cwGradeLevel();
-    var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: gradeLevel });
-    var calc = cwStep2Calc || _cmDefaultCalcMethod();
+    var grading = state.cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: gradeLevel });
+    var calc = state.cwStep2Calc || _cmDefaultCalcMethod();
 
     var html =
       '<div class="cm-section"><h2 class="cw-title">Name Your Class</h2>' +
@@ -5777,9 +5792,9 @@ window.DashClassManager = (function () {
       (name.trim() ? ' hidden' : '') +
       '>Enter a Class Name to continue.</div></div>' +
       '<div class="cw-detail-row"><div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
-      blockPickerHtml('cm-new-block', cwStep2Block) +
+      blockPickerHtml('cm-new-block', state.cwStep2Block) +
       '</div><div class="cm-field"><label class="cm-label" id="cm-cg-span-label">This Class Runs</label>' +
-      _cwSeg('cm-cg-span', 'cm-cg-span-label', TERM_SPANS, cwStep2Span, 'cmCreateToggle') +
+      _cwSeg('cm-cg-span', 'cm-cg-span-label', TERM_SPANS, state.cwStep2Span, 'cmCreateToggle') +
       '</div>' +
       // A custom class has no grade from a course: its grade level is typed.
       (custom
@@ -5797,29 +5812,29 @@ window.DashClassManager = (function () {
       '</p></div>';
 
     var rows = '';
-    if (custom) rows += _cwSetRow(cwOpen, 'comps', 'Competencies', 'None yet. Add them in the Competencies tab.');
+    if (custom) rows += _cwSetRow(state.cwOpen, 'comps', 'Competencies', 'None yet. Add them in the Competencies tab.');
     else {
       var on = 0;
       var all = 0;
-      cwSelectedTags.forEach(function (tag) {
+      state.cwSelectedTags.forEach(function (tag) {
         var k = _cwKept(tag);
         on += k.on;
         all += k.all;
       });
       rows += _cwSetRow(
-        cwOpen,
+        state.cwOpen,
         'comps',
         'Competencies',
         (on === all ? 'All ' + all : on + ' of ' + all) + ' from the BC curriculum',
         _cwCompsHtml,
       );
       var g = _cwGrading();
-      var folders = _cwCourseCounts(cwSelectedTags).folders > 0;
+      var folders = _cwCourseCounts(state.cwSelectedTags).folders > 0;
       rows += _cwSetRow(
-        cwOpen,
+        state.cwOpen,
         'grading',
         'Overall',
-        (cwSelectedTags.length > 1
+        (state.cwSelectedTags.length > 1
           ? (g.coursesCountEqually ? 'Each Course Counts Equally' : 'Each Course by Its Size') + ' · '
           : '') + (g.foldersCountAsOne ? 'Folders Count as One' : 'Every Competency Counts the Same'),
         function () {
@@ -5833,10 +5848,10 @@ window.DashClassManager = (function () {
       }) || CALC_METHODS[0]
     ).label;
     rows += _cwSetRow(
-      cwOpen,
+      state.cwOpen,
       'calc',
       'Calculation',
-      esc(calcLabel) + (calc === 'decayingAvg' ? ' · ' + esc(cwStep2Decay) + '% decay weight' : ''),
+      esc(calcLabel) + (calc === 'decayingAvg' ? ' · ' + esc(state.cwStep2Decay) + '% decay weight' : ''),
       function () {
         return (
           '<span class="help-sr-only" id="cm-cg-calc-label">Calculation Method</span>' +
@@ -5849,9 +5864,9 @@ window.DashClassManager = (function () {
           (calc === 'decayingAvg' ? '' : ' style="display:none"') +
           '><label class="cm-label" for="cm-cg-decay-slider">Decay Weight</label>' +
           '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
-          esc(cwStep2Decay) +
+          esc(state.cwStep2Decay) +
           '" id="cm-cg-decay-slider" data-action-input="cmCreateDecaySlider" style="flex:1"><span class="cm-slider-label" id="cm-cg-decay-val">' +
-          esc(cwStep2Decay) +
+          esc(state.cwStep2Decay) +
           '%</span></div><div class="cm-hint">Higher values weight recent scores more heavily.</div></div>'
         );
       },
@@ -5875,7 +5890,7 @@ window.DashClassManager = (function () {
   function _cwCompsHtml() {
     var html =
       '<p class="cw-cc-intro">The BC curriculum expects every competency to be taught. Untick only what you won’t assess in this class.</p>';
-    cwSelectedTags.forEach(function (tag) {
+    state.cwSelectedTags.forEach(function (tag) {
       var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
       if (!course) return;
       var color = SUBJECT_COLOURS[course.subject] || '#6366f1';
@@ -5887,7 +5902,7 @@ window.DashClassManager = (function () {
         var rows = cat.competencies
           .map(function (comp) {
             var key = curriculumCompKey(tag, comp);
-            var ticked = !cwSkipped[key];
+            var ticked = !state.cwSkipped[key];
             return (
               '<label class="cw-cc-row' +
               (ticked ? '' : ' off') +
@@ -5912,7 +5927,7 @@ window.DashClassManager = (function () {
           return;
         }
         var fOn = cat.competencies.filter(function (comp) {
-          return !cwSkipped[curriculumCompKey(tag, comp)];
+          return !state.cwSkipped[curriculumCompKey(tag, comp)];
         }).length;
         body +=
           '<div class="cw-cc-folder" role="group" aria-label="' +
@@ -5978,7 +5993,7 @@ window.DashClassManager = (function () {
         '</div>'
       );
     }
-    var names = cwSelectedTags
+    var names = state.cwSelectedTags
       .map(function (tag) {
         return CURRICULUM_INDEX[tag] && CURRICULUM_INDEX[tag].course_name;
       })
@@ -6014,10 +6029,10 @@ window.DashClassManager = (function () {
      reporting terms (the default school's, for the chosen span) and, for a
      grade that reports a letter, Counts As. */
   function _cwTermsRows(gradeLevel) {
-    var terms = _cmDefaultReportingTerms(null, cwStep2Span);
+    var terms = _cmDefaultReportingTerms(null, state.cwStep2Span);
     var school = terms && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
     var html = _cwSetRow(
-      cwOpen,
+      state.cwOpen,
       'terms',
       'Reporting Terms',
       terms && terms.length
@@ -6040,7 +6055,7 @@ window.DashClassManager = (function () {
     );
     if (_cmDefaultGradingScale(gradeLevel))
       html += _cwSetRow(
-        cwOpen,
+        state.cwOpen,
         'counts',
         'Counts As',
         'BC Letter Bands',
@@ -6054,27 +6069,27 @@ window.DashClassManager = (function () {
 
   /* ── Wizard navigation ──────────────────────────────────── */
   function cwSelectGrade(g) {
-    cwSelectedGrade = g;
-    cwStep2Grade = '';
-    cwStep2Grading = '';
-    cwStep2Calc = '';
-    cwSelectedTags = [];
-    cwSkipped = {};
-    cwPreset = null;
-    cwFoldersOn = null;
-    cwCoursesEqual = null;
-    cwFindText = '';
+    state.cwSelectedGrade = g;
+    state.cwStep2Grade = '';
+    state.cwStep2Grading = '';
+    state.cwStep2Calc = '';
+    state.cwSelectedTags = [];
+    state.cwSkipped = {};
+    state.cwPreset = null;
+    state.cwFoldersOn = null;
+    state.cwCoursesEqual = null;
+    state.cwFindText = '';
     // Another grade is another class: a name typed for the last one goes.
-    cwStep2Name = null;
+    state.cwStep2Name = null;
     renderClassManager();
   }
 
   function cwToggleCourse(tag) {
-    var idx = cwSelectedTags.indexOf(tag);
-    if (idx >= 0) cwSelectedTags.splice(idx, 1);
-    else cwSelectedTags.push(tag);
-    cwFoldersOn = null;
-    cwCoursesEqual = null;
+    var idx = state.cwSelectedTags.indexOf(tag);
+    if (idx >= 0) state.cwSelectedTags.splice(idx, 1);
+    else state.cwSelectedTags.push(tag);
+    state.cwFoldersOn = null;
+    state.cwCoursesEqual = null;
     _cwRedraw();
   }
 
@@ -6084,24 +6099,24 @@ window.DashClassManager = (function () {
       return x.id === id;
     });
     if (!p) return;
-    var on = !!_cwActivePreset() && cwPreset === id;
-    cwSelectedTags = cwSelectedTags.filter(function (tag) {
+    var on = !!_cwActivePreset() && state.cwPreset === id;
+    state.cwSelectedTags = state.cwSelectedTags.filter(function (tag) {
       return p.tags.indexOf(tag) < 0;
     });
-    if (on) cwPreset = null;
+    if (on) state.cwPreset = null;
     else {
-      cwPreset = id;
-      cwSelectedTags = p.tags.concat(cwSelectedTags);
+      state.cwPreset = id;
+      state.cwSelectedTags = p.tags.concat(state.cwSelectedTags);
     }
-    cwFoldersOn = null;
-    cwCoursesEqual = null;
+    state.cwFoldersOn = null;
+    state.cwCoursesEqual = null;
     _cwRedraw();
   }
 
   // The find box hides the courses whose names don't hold what is typed.
   function cwFindInput(value) {
-    cwFindText = value || '';
-    var q = cwFindText.trim().toLowerCase();
+    state.cwFindText = value || '';
+    var q = state.cwFindText.trim().toLowerCase();
     var list = document.querySelector('.cw-course-list');
     if (!list) return;
     list.querySelectorAll('[data-find]').forEach(function (row) {
@@ -6118,8 +6133,8 @@ window.DashClassManager = (function () {
   }
 
   function cwCompToggle(key, ticked) {
-    if (ticked) delete cwSkipped[key];
-    else cwSkipped[key] = true;
+    if (ticked) delete state.cwSkipped[key];
+    else state.cwSkipped[key] = true;
     _cwRedraw();
   }
 
@@ -6134,21 +6149,21 @@ window.DashClassManager = (function () {
     if (!cat) return;
     cat.competencies.forEach(function (comp) {
       var key = curriculumCompKey(tag, comp);
-      if (ticked) delete cwSkipped[key];
-      else cwSkipped[key] = true;
+      if (ticked) delete state.cwSkipped[key];
+      else state.cwSkipped[key] = true;
     });
     _cwRedraw();
   }
 
   // Change (or Done) on a row of Already Set for You.
   function cwOpenRow(key) {
-    cwOpen = cwOpen === key ? '' : key;
+    state.cwOpen = state.cwOpen === key ? '' : key;
     _cwRedraw();
   }
 
   // The step drawn again where it was scrolled to.
   function _cwRedraw() {
-    if (cwStep === 2) _cwReadDetails();
+    if (state.cwStep === 2) _cwReadDetails();
     var pane = document.querySelector('.cm-detail');
     var top = pane ? pane.scrollTop : 0;
     renderClassManager();
@@ -6164,9 +6179,9 @@ window.DashClassManager = (function () {
   /* A new step opens at its top, with the step bar in view, whatever the
      last step was scrolled to (the Class Name box's autofocus included). */
   function _cwShowStep(step) {
-    if (cwStep === 2) _cwReadDetails();
-    cwStep = step;
-    cwOpen = '';
+    if (state.cwStep === 2) _cwReadDetails();
+    state.cwStep = step;
+    state.cwOpen = '';
     renderClassManager();
     var top = function () {
       var detail = document.querySelector('.cm-detail');
@@ -6177,37 +6192,37 @@ window.DashClassManager = (function () {
   }
 
   function cwSkipToCustom() {
-    cwSelectedTags = [];
-    cwPreset = null;
+    state.cwSelectedTags = [];
+    state.cwPreset = null;
     _cwShowStep(2);
   }
 
   function cwGoToStep2() {
-    if (cwSelectedTags.length === 0) return;
+    if (state.cwSelectedTags.length === 0) return;
     _cwShowStep(2);
   }
 
   // The grading switches. They don't touch any class until Create Class.
   function cwSetRollup(key, on) {
-    if (key === 'courses') cwCoursesEqual = !!on;
-    else cwFoldersOn = !!on;
+    if (key === 'courses') state.cwCoursesEqual = !!on;
+    else state.cwFoldersOn = !!on;
     _cwRedraw();
   }
 
   /* The wizard's grading switches: what the teacher set, else the default
      for one course or a combined class. */
   function _cwGrading() {
-    var d = curriculumGradingDefaults(cwSelectedTags);
+    var d = curriculumGradingDefaults(state.cwSelectedTags);
     return {
-      foldersCountAsOne: cwFoldersOn != null ? cwFoldersOn : d.foldersCountAsOne,
-      coursesCountEqually: cwCoursesEqual != null ? cwCoursesEqual : d.coursesCountEqually,
+      foldersCountAsOne: state.cwFoldersOn != null ? state.cwFoldersOn : d.foldersCountAsOne,
+      coursesCountEqually: state.cwCoursesEqual != null ? state.cwCoursesEqual : d.coursesCountEqually,
     };
   }
 
   // Create Class comes on once the class has a name; Your Class follows it.
   function cwNameInput(el) {
     var typed = el.value || '';
-    cwStep2Name = typed === _cwDefaultName() ? null : typed;
+    state.cwStep2Name = typed === _cwDefaultName() ? null : typed;
     var named = !!typed.trim();
     var next = document.querySelector('[data-action="cwFinishCreate"]');
     if (next) next.disabled = !named;
@@ -6221,7 +6236,7 @@ window.DashClassManager = (function () {
   }
 
   function cwGetPreName() {
-    if (cwStep2Name != null) return cwStep2Name;
+    if (state.cwStep2Name != null) return state.cwStep2Name;
     return _cwDefaultName();
   }
 
@@ -6229,9 +6244,9 @@ window.DashClassManager = (function () {
      are ticked, else the course names. */
   function _cwDefaultName() {
     var p = _cwActivePreset();
-    if (p && cwSelectedTags.length === p.tags.length) return p.name;
+    if (p && state.cwSelectedTags.length === p.tags.length) return p.name;
     if (!CURRICULUM_INDEX) return '';
-    return cwSelectedTags
+    return state.cwSelectedTags
       .map(function (tag) {
         return CURRICULUM_INDEX[tag];
       })
@@ -6247,7 +6262,7 @@ window.DashClassManager = (function () {
     var name = cwGetPreName();
     if (!name.trim()) {
       // Back to Name Your Class, where the name is typed.
-      cwStep = 2;
+      state.cwStep = 2;
       renderClassManager();
       requestAnimationFrame(function () {
         var el = document.getElementById('cm-new-name');
@@ -6271,13 +6286,13 @@ window.DashClassManager = (function () {
 
     var course = createCourse({
       name: name.trim(),
-      block: cwStep2Block,
+      block: state.cwStep2Block,
       gradeLevel: _cwGradeLevel(),
       // Description and Late Work Policy are left to Class Settings (Colin, 2026-11-25).
       description: '',
-      gradingSystem: cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: _cwGradeLevel() }),
-      calcMethod: cwStep2Calc || _cmDefaultCalcMethod(),
-      decayWeight: parseInt(cwStep2Decay, 10) / 100,
+      gradingSystem: state.cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: _cwGradeLevel() }),
+      calcMethod: state.cwStep2Calc || _cmDefaultCalcMethod(),
+      decayWeight: parseInt(state.cwStep2Decay, 10) / 100,
       lateWorkPolicy: null,
     });
 
@@ -6293,28 +6308,30 @@ window.DashClassManager = (function () {
     if (canonicalCid && canonicalCid !== course.id) course.id = canonicalCid;
 
     var cc = getCourseConfig(course.id);
-    cc.calcMethod = cwStep2Calc || _cmDefaultCalcMethod();
-    cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
+    cc.calcMethod = state.cwStep2Calc || _cmDefaultCalcMethod();
+    cc.decayWeight = parseInt(state.cwStep2Decay, 10) / 100;
     cc.levelOrder = _cmDefaultLevelOrder(course.gradeLevel);
     var startScale = _cmDefaultGradingScale(course.gradeLevel);
     if (startScale) cc.gradingScale = startScale;
-    var defaultTerms = _cmDefaultReportingTerms(course.id, cwStep2Span);
+    var defaultTerms = _cmDefaultReportingTerms(course.id, state.cwStep2Span);
     if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
       cc.reportingTerms = defaultTerms;
     // The grading switches: by default one course counts its
     // folders as one, and a combined class counts each course equally.
-    if (cwSelectedTags.length > 0) Object.assign(cc, _cwGrading());
+    if (state.cwSelectedTags.length > 0) Object.assign(cc, _cwGrading());
     saveCourseConfig(course.id, cc);
 
     var dispatchOk = true;
-    if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
+    if (state.cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
       // Fresh local ids: the built map names rows after the course and its
       // codes, the same for every class, and a second class made from the
       // same course in this sitting would otherwise save onto the first's.
-      var map = withFreshLearningMapIds(buildLearningMapFromTags(cwSelectedTags, { skip: Object.keys(cwSkipped) }));
+      var map = withFreshLearningMapIds(
+        buildLearningMapFromTags(state.cwSelectedTags, { skip: Object.keys(state.cwSkipped) }),
+      );
       if (map) {
         var mapSaved = saveLearningMap(course.id, map);
-        updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
+        updateCourse(course.id, { curriculumTags: state.cwSelectedTags.slice() });
         // A class whose create never landed has no server id, so its
         // curriculum can't be sent yet. Otherwise wait for the map to reach
         // the server, within reason: offline, the outbox keeps it for later.
@@ -6324,12 +6341,12 @@ window.DashClassManager = (function () {
       }
     }
 
-    cmSelectedCourse = course.id;
-    cmMode = 'edit';
+    state.cmSelectedCourse = course.id;
+    state.cmMode = 'edit';
     // A new class has no students yet, so it opens where they are added.
-    cmTab = 'students';
-    _activeCourse = course.id;
-    _activeCourseChanged = true;
+    state.cmTab = 'students';
+    state._activeCourse = course.id;
+    state._activeCourseChanged = true;
     setActiveCourse(course.id);
     renderClassManager();
 
@@ -6342,72 +6359,72 @@ window.DashClassManager = (function () {
 
   /* ── CM Actions ─────────────────────────────────────────── */
   function cmSelectClass(cid) {
-    if (cid !== cmSelectedCourse) {
+    if (cid !== state.cmSelectedCourse) {
       // A review or a selection belongs to its class.
-      cmPendingImport = null;
-      cmImportFormatOpen = false;
-      cmImportError = null;
-      cmImportDone = null;
-      cmRosterOnly = null;
-      if (cmCompReview && cmCompReview.kind === 'file') cmCompReview = null;
-      cmCompSelect = false;
-      cmCompSelected = {};
+      state.cmPendingImport = null;
+      state.cmImportFormatOpen = false;
+      state.cmImportError = null;
+      state.cmImportDone = null;
+      state.cmRosterOnly = null;
+      if (state.cmCompReview && state.cmCompReview.kind === 'file') state.cmCompReview = null;
+      state.cmCompSelect = false;
+      state.cmCompSelected = {};
     }
-    cmSelectedCourse = cid;
-    cmMode = 'edit';
+    state.cmSelectedCourse = cid;
+    state.cmMode = 'edit';
     renderClassManager();
     _cmShowWhenLoaded(cid);
     _cmNoteOpened(cid);
   }
 
   function cmStartCreate() {
-    cmMode = 'create';
-    cmSelectedCourse = null;
-    cwStep = 1;
-    cwSelectedGrade = null;
-    cwSelectedSubject = null;
-    cwSelectedTags = [];
-    cwSkipped = {};
-    cwPreset = null;
-    cwFoldersOn = null;
-    cwCoursesEqual = null;
-    cwLoadError = false;
-    cwStep2Name = null;
-    cwStep2Grade = '';
-    cwStep2Block = '';
-    cwStep2Span = 'full';
-    cwStep2Grading = '';
-    cwStep2Calc = '';
-    cwStep2Decay = '65';
-    cwFindText = '';
-    cwOpen = '';
+    state.cmMode = 'create';
+    state.cmSelectedCourse = null;
+    state.cwStep = 1;
+    state.cwSelectedGrade = null;
+    state.cwSelectedSubject = null;
+    state.cwSelectedTags = [];
+    state.cwSkipped = {};
+    state.cwPreset = null;
+    state.cwFoldersOn = null;
+    state.cwCoursesEqual = null;
+    state.cwLoadError = false;
+    state.cwStep2Name = null;
+    state.cwStep2Grade = '';
+    state.cwStep2Block = '';
+    state.cwStep2Span = 'full';
+    state.cwStep2Grading = '';
+    state.cwStep2Calc = '';
+    state.cwStep2Decay = '65';
+    state.cwFindText = '';
+    state.cwOpen = '';
     loadCurriculumIndex().then(function (idx) {
-      cwCurriculumLoaded = !!idx;
-      cwLoadError = !idx;
-      if (cmMode === 'create' && cwStep === 1) renderClassManager();
+      state.cwCurriculumLoaded = !!idx;
+      state.cwLoadError = !idx;
+      if (state.cmMode === 'create' && state.cwStep === 1) renderClassManager();
     });
     renderClassManager();
   }
 
   function cmCancelCreate() {
-    cmMode = 'edit';
-    cmSelectedCourse = _activeCourse;
+    state.cmMode = 'edit';
+    state.cmSelectedCourse = state._activeCourse;
     renderClassManager();
   }
 
   function cmCreateToggle(btn, containerId) {
     segSelect(btn);
     if (containerId === 'cm-cg-span') {
-      cwStep2Span = btn.dataset.val || 'full';
+      state.cwStep2Span = btn.dataset.val || 'full';
       _cwRailSync();
     }
     if (containerId === 'cm-cg-calc') {
-      cwStep2Calc = btn.dataset.val;
+      state.cwStep2Calc = btn.dataset.val;
       var desc = document.getElementById('cm-cg-calc-desc');
       if (desc) desc.innerHTML = _cmCalcMethodDescription(btn.dataset.val);
     }
     if (containerId === 'cm-cg-grading') {
-      cwStep2Grading = btn.dataset.val;
+      state.cwStep2Grading = btn.dataset.val;
       var gdesc = document.getElementById('cm-cg-grading-desc');
       if (gdesc) gdesc.innerHTML = _cmGradingSystemDescription(btn.dataset.val);
     }
@@ -6416,21 +6433,21 @@ window.DashClassManager = (function () {
   // Typing a grade level re-applies the grade defaults to any picker the
   // teacher hasn't chosen yet.
   function cwGradeInput(value) {
-    cwStep2Grade = value || '';
+    state.cwStep2Grade = value || '';
     _cwRailSync();
-    if (!cwStep2Grading) {
+    if (!state.cwStep2Grading) {
       var gs = _cmDefaultGradingSystem({ gradeLevel: value });
       var gbtn = document.querySelector('#cm-cg-grading .cm-seg-btn[data-val="' + gs + '"]');
       if (gbtn) {
         cmCreateToggle(gbtn, 'cm-cg-grading');
-        cwStep2Grading = '';
+        state.cwStep2Grading = '';
       }
     }
-    if (!cwStep2Calc) {
+    if (!state.cwStep2Calc) {
       var cbtn = document.querySelector('#cm-cg-calc .cm-seg-btn[data-val="' + _cmDefaultCalcMethod() + '"]');
       if (cbtn) {
         cmCreateToggle(cbtn, 'cm-cg-calc');
-        cwStep2Calc = '';
+        state.cwStep2Calc = '';
         var dp = document.getElementById('cm-cg-decay');
         if (dp) dp.style.display = 'none';
       }
@@ -6439,7 +6456,7 @@ window.DashClassManager = (function () {
 
   /* ── CM Edit Actions ────────────────────────────────────── */
   function cmUpdateField(field, value, inputEl) {
-    if (!cmSelectedCourse) return;
+    if (!state.cmSelectedCourse) return;
     if (field === 'name' && !value.trim()) {
       if (inputEl) {
         inputEl.style.border = '2px solid var(--score-1)';
@@ -6453,7 +6470,7 @@ window.DashClassManager = (function () {
     }
     // A cleared optional field (Late Work Policy) arrives as null.
     var clean = field === 'block' ? normalizeCourseBlock(value) : value == null ? null : String(value).trim();
-    updateCourse(cmSelectedCourse, { [field]: clean });
+    updateCourse(state.cmSelectedCourse, { [field]: clean });
     if (field === 'name' || field === 'block') _cmRefreshSidebar();
   }
 
@@ -6529,11 +6546,11 @@ window.DashClassManager = (function () {
   // Per-course state: { rows: [{id?, name, weight, display_order}], loaded, loading }.
   // Rows without `id` are new (not yet persisted). `loaded` flips true after
   // list_categories resolves at least once for the course.
-  var _cmCategoryState = {};
+  state._cmCategoryState = {};
 
   function _cmCatState(cid) {
-    if (!_cmCategoryState[cid]) _cmCategoryState[cid] = { rows: [], loaded: false, loading: null };
-    return _cmCategoryState[cid];
+    if (!state._cmCategoryState[cid]) state._cmCategoryState[cid] = { rows: [], loaded: false, loading: null };
+    return state._cmCategoryState[cid];
   }
 
   /* The list as the server gave it or last took it: what this form was
@@ -6779,8 +6796,8 @@ window.DashClassManager = (function () {
   /* The button beside the line. Discard My Changes puts the form back to
      the class's list as the server has it; Dismiss takes the line away. */
   function cmCatNoticeDone() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var st = _cmCatState(cid);
     var discard =
       st.notice && (st.notice.kind === 'offline' || st.notice.kind === 'kept' || st.notice.kind === 'waiting');
@@ -6850,7 +6867,7 @@ window.DashClassManager = (function () {
      another class. The state is updated either way, so the class shows the
      right list and line when it is next opened. */
   function _cmCatRedraw(cid) {
-    if (classManagerOpen && cmMode === 'edit' && cmSelectedCourse === cid) renderClassManager();
+    if (state.classManagerOpen && state.cmMode === 'edit' && state.cmSelectedCourse === cid) renderClassManager();
   }
 
   /* One save of the list at a time, in the order asked: each one's check
@@ -7080,21 +7097,21 @@ window.DashClassManager = (function () {
   }
 
   function cmCatAdd() {
-    if (!cmSelectedCourse) return;
-    var st = _cmCatState(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var st = _cmCatState(state.cmSelectedCourse);
     st.rows.push({ id: null, name: '', weight: 0, display_order: st.rows.length });
-    _cmCatEdited(cmSelectedCourse);
+    _cmCatEdited(state.cmSelectedCourse);
     renderClassManager();
   }
 
   function cmCatNameLive(idx, value) {
-    if (!cmSelectedCourse) return;
-    var st = _cmCatState(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var st = _cmCatState(state.cmSelectedCourse);
     var row = st.rows[idx];
     if (!row) return;
     row.name = value || '';
-    _cmCatEdited(cmSelectedCourse);
-    _cmCatRefreshFooter(cmSelectedCourse);
+    _cmCatEdited(state.cmSelectedCourse);
+    _cmCatRefreshFooter(state.cmSelectedCourse);
   }
 
   /* A category's Calculation: Total Points or Average of Percentages
@@ -7119,25 +7136,25 @@ window.DashClassManager = (function () {
   }
 
   function cmCatMode(idx, value) {
-    if (!cmSelectedCourse) return;
-    var st = _cmCatState(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var st = _cmCatState(state.cmSelectedCourse);
     var row = st.rows[idx];
     if (!row) return;
     row.calc_mode = value === 'percent' ? 'percent' : 'points';
-    _cmCatEdited(cmSelectedCourse);
-    _cmCatRefreshFooter(cmSelectedCourse);
+    _cmCatEdited(state.cmSelectedCourse);
+    _cmCatRefreshFooter(state.cmSelectedCourse);
   }
 
   function cmCatWeightLive(idx, value) {
-    if (!cmSelectedCourse) return;
-    var st = _cmCatState(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var st = _cmCatState(state.cmSelectedCourse);
     var row = st.rows[idx];
     if (!row) return;
     var v = parseFloat(value);
     row.weight = isNaN(v) ? 0 : Math.max(0, v);
-    _cmCatEdited(cmSelectedCourse);
-    _cmCatRefreshFooter(cmSelectedCourse);
-    CmGradingBars.syncWeightBar(cmSelectedCourse);
+    _cmCatEdited(state.cmSelectedCourse);
+    _cmCatRefreshFooter(state.cmSelectedCourse);
+    CmGradingBars.syncWeightBar(state.cmSelectedCourse);
   }
 
   function _cmAssessmentCategoryId(a) {
@@ -7249,8 +7266,8 @@ window.DashClassManager = (function () {
   // Schoology requires. The last category can go: with none, the letter grade
   // counts all work by total points.
   function cmCatDelete(idx) {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var st = _cmCatState(cid);
     var row = st.rows[idx];
     if (!row) return;
@@ -7267,14 +7284,14 @@ window.DashClassManager = (function () {
   }
 
   function cmCatMoveCancel() {
-    if (!cmSelectedCourse) return;
-    _cmCatState(cmSelectedCourse).moving = null;
+    if (!state.cmSelectedCourse) return;
+    _cmCatState(state.cmSelectedCourse).moving = null;
     renderClassManager();
   }
 
   function cmCatMoveDelete(idx) {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var st = _cmCatState(cid);
     var row = st.rows[idx];
     var target = (document.getElementById('cm-cat-move-target') || {}).value;
@@ -7288,8 +7305,8 @@ window.DashClassManager = (function () {
   }
 
   function cmCatAssignUncategorized() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var sel = document.getElementById('cm-cat-uncat-target');
     var target = (sel || {}).value;
     if (!target) {
@@ -7303,8 +7320,8 @@ window.DashClassManager = (function () {
   // Send the whole list in one call. Work moved out of a deleted category
   // must reach the server first, or the delete is refused.
   function cmCatSave() {
-    if (!cmSelectedCourse) return Promise.resolve();
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return Promise.resolve();
+    var cid = state.cmSelectedCourse;
     var st = _cmCatState(cid);
     if (!_cmCatCanSave(cid)) {
       if (typeof showSyncToast === 'function' && !_cmCatSumOk(cid))
@@ -7439,8 +7456,8 @@ window.DashClassManager = (function () {
   // grading-setup-copy.js loads the first time this is pressed (router.js _onDemand).
   function cmOpenSetupCopy(opts) {
     window.Router.withScripts('gradingSetupCopy', function () {
-      if (!cmSelectedCourse || !window.GradingSetupCopy) return;
-      var cid = cmSelectedCourse;
+      if (!state.cmSelectedCourse || !window.GradingSetupCopy) return;
+      var cid = state.cmSelectedCourse;
       if (_cmCatState(cid).dirty || (_cmTermState[cid] && _cmTermState[cid].dirty)) {
         if (typeof showSyncToast === 'function')
           showSyncToast('Save or undo your changes to categories and terms first.', 'info');
@@ -7453,7 +7470,7 @@ window.DashClassManager = (function () {
             // A class whose categories were left as they were says so above
             // them when it is next shown here (noteCategoriesNotCopied).
             (cids || []).forEach(function (c) {
-              delete _cmCategoryState[c];
+              delete state._cmCategoryState[c];
               delete _cmTermState[c];
             });
             _cmCatRedraw(cid);
@@ -7540,53 +7557,53 @@ window.DashClassManager = (function () {
   }
 
   // Drag-reorder using delegated document listeners. Drop on another row → move.
-  var _cmCatDragId = null;
+  state._cmCatDragId = null;
   function _initCmCatDrag() {
     _addDocListener('dragstart', function (e) {
       var row = e.target.closest && e.target.closest('.cm-cat-row[data-cat-drag]');
       if (!row) return;
-      _cmCatDragId = row.dataset.catDrag;
+      state._cmCatDragId = row.dataset.catDrag;
       row.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
     });
     _addDocListener('dragover', function (e) {
-      if (!_cmCatDragId) return;
+      if (!state._cmCatDragId) return;
       var row = e.target.closest && e.target.closest('.cm-cat-row[data-cat-drag]');
-      if (row && row.dataset.catDrag !== _cmCatDragId) {
+      if (row && row.dataset.catDrag !== state._cmCatDragId) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
       }
     });
     _addDocListener('drop', function (e) {
-      if (!_cmCatDragId || !cmSelectedCourse) return;
+      if (!state._cmCatDragId || !state.cmSelectedCourse) return;
       var row = e.target.closest && e.target.closest('.cm-cat-row[data-cat-drag]');
       if (!row) return;
       e.preventDefault();
-      var st = _cmCatState(cmSelectedCourse);
+      var st = _cmCatState(state.cmSelectedCourse);
       var fromIdx = st.rows.findIndex(function (r) {
-        return r.id === _cmCatDragId;
+        return r.id === state._cmCatDragId;
       });
       var toIdx = st.rows.findIndex(function (r) {
         return r.id === row.dataset.catDrag;
       });
       if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) {
-        _cmCatDragId = null;
+        state._cmCatDragId = null;
         return;
       }
-      _cmCatDragId = null;
-      _cmCatReorder(cmSelectedCourse, fromIdx, toIdx);
+      state._cmCatDragId = null;
+      _cmCatReorder(state.cmSelectedCourse, fromIdx, toIdx);
     });
     _addDocListener('dragend', function () {
       document.querySelectorAll('.cm-cat-row.dragging').forEach(function (el) {
         el.classList.remove('dragging');
       });
-      _cmCatDragId = null;
+      state._cmCatDragId = null;
     });
   }
 
   function cmSetGradingSystem(val) {
-    if (!cmSelectedCourse) return;
-    updateCourse(cmSelectedCourse, { gradingSystem: val });
+    if (!state.cmSelectedCourse) return;
+    updateCourse(state.cmSelectedCourse, { gradingSystem: val });
     renderClassManager();
   }
 
@@ -7623,18 +7640,18 @@ window.DashClassManager = (function () {
     );
   }
   function cmSetLevelOrder(val) {
-    if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var cc = getCourseConfig(state.cmSelectedCourse);
     cc.levelOrder = val === 'asc' ? 'asc' : 'desc';
-    saveCourseConfig(cmSelectedCourse, cc);
+    saveCourseConfig(state.cmSelectedCourse, cc);
     renderClassManager();
   }
 
   function cmSetRoundPercent(val) {
-    if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var cc = getCourseConfig(state.cmSelectedCourse);
     cc.roundPercent = val === 'whole';
-    saveCourseConfig(cmSelectedCourse, cc);
+    saveCourseConfig(state.cmSelectedCourse, cc);
     if (typeof clearProfCache === 'function') clearProfCache();
     renderClassManager();
   }
@@ -7642,7 +7659,7 @@ window.DashClassManager = (function () {
   /* ── Reporting terms: teacher/cm-terms.js ── */
   CmTerms.configure({
     selectedCourse: function () {
-      return cmSelectedCourse;
+      return state.cmSelectedCourse;
     },
     renderClassManager: renderClassManager,
   });
@@ -7659,8 +7676,8 @@ window.DashClassManager = (function () {
   // A new method moves grades that already exist, so the change says how
   // many students it moves before it is made.
   function cmSetCalcMethod(val) {
-    if (!cmSelectedCourse || !CM_METHOD_TEXT[val]) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse || !CM_METHOD_TEXT[val]) return;
+    var cid = state.cmSelectedCourse;
     var course = COURSES[cid];
     var current = getCourseConfig(cid).calcMethod || course.calcMethod || 'average';
     if (!CM_METHOD_TEXT[current]) current = 'mostRecent';
@@ -7706,8 +7723,8 @@ window.DashClassManager = (function () {
   // Like a new method, a new limit moves existing grades, so it says how
   // many students first. The menu shows the saved choice until confirmed.
   function cmSetRecentLimit(val) {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var next = parseInt(val, 10) >= 1 ? parseInt(val, 10) : null;
     if (next === getRecentScoreLimit(cid)) return;
     var course = COURSES[cid];
@@ -7729,8 +7746,8 @@ window.DashClassManager = (function () {
   // Folders Count as One moves the overall, so like a new method it says
   // how many students first. The switch shows the saved value until confirmed.
   function cmSetFoldersCountAsOne(on) {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     on = !!on;
     if (on === getFoldersCountAsOne(cid)) return;
     var preview = previewFolderCountChange(cid, { on: on });
@@ -7750,18 +7767,18 @@ window.DashClassManager = (function () {
   var CM_FOLDER_COUNT_SENT = ' Reports already printed or sent and approved comments keep what they say.';
 
   function _cmApplyFoldersCountAsOne(on) {
-    if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var cc = getCourseConfig(state.cmSelectedCourse);
     cc.foldersCountAsOne = on;
-    saveCourseConfig(cmSelectedCourse, cc);
+    saveCourseConfig(state.cmSelectedCourse, cc);
     if (typeof clearProfCache === 'function') clearProfCache();
     renderClassManager();
   }
 
   // Each Course Counts Equally moves the overall too, so it asks the same way.
   function cmSetCoursesCountEqually(on) {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     on = !!on;
     if (on === getCoursesCountEqually(cid)) return;
     var preview = previewCoursesEqualChange(cid, on);
@@ -7779,10 +7796,10 @@ window.DashClassManager = (function () {
   }
 
   function _cmApplyCoursesCountEqually(on) {
-    if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var cc = getCourseConfig(state.cmSelectedCourse);
     cc.coursesCountEqually = on;
-    saveCourseConfig(cmSelectedCourse, cc);
+    saveCourseConfig(state.cmSelectedCourse, cc);
     if (typeof clearProfCache === 'function') clearProfCache();
     renderClassManager();
   }
@@ -7790,8 +7807,8 @@ window.DashClassManager = (function () {
   // One folder's Counts as One, from its header in Competencies.
   function cmSetFolderCountsAsOne(grpId, on) {
     grpId = _currentId('group', grpId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     on = !!on;
     var current = getCompetencyGroupById(cid, grpId);
     if (!current || (current.countsAsOne !== false) === on) return;
@@ -7810,8 +7827,8 @@ window.DashClassManager = (function () {
   }
 
   function _cmApplyFolderCountsAsOne(grpId, on) {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var g = (map.competencyGroups || []).find(function (x) {
       return x.id === grpId;
@@ -7824,52 +7841,52 @@ window.DashClassManager = (function () {
   }
 
   function _cmApplyRecentLimit(n) {
-    if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var cc = getCourseConfig(state.cmSelectedCourse);
     cc.recentScoreLimit = n;
-    saveCourseConfig(cmSelectedCourse, cc);
+    saveCourseConfig(state.cmSelectedCourse, cc);
     renderClassManager();
   }
 
   function _cmApplyCalcMethod(val) {
-    if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var cc = getCourseConfig(state.cmSelectedCourse);
     cc.calcMethod = val;
-    saveCourseConfig(cmSelectedCourse, cc);
-    updateCourse(cmSelectedCourse, { calcMethod: val });
+    saveCourseConfig(state.cmSelectedCourse, cc);
+    updateCourse(state.cmSelectedCourse, { calcMethod: val });
     renderClassManager();
   }
 
   /* While the slider moves, only its words follow it; letting it go saves
      (cmSaveDecay): a save clears the grade caches and goes to the server. */
   function cmUpdateDecay(val) {
-    if (!cmSelectedCourse) return;
+    if (!state.cmSelectedCourse) return;
     document.getElementById('cm-decay-val').textContent = val + '%';
     var rule = document.getElementById('cm-method-rule');
     if (rule) rule.textContent = _cmMethodRule('decayingAvg', parseInt(val, 10) / 100);
   }
   function cmSaveDecay(val) {
-    if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var cc = getCourseConfig(state.cmSelectedCourse);
     cc.decayWeight = parseInt(val, 10) / 100;
-    saveCourseConfig(cmSelectedCourse, cc);
-    updateCourse(cmSelectedCourse, { decayWeight: parseInt(val, 10) / 100 });
+    saveCourseConfig(state.cmSelectedCourse, cc);
+    updateCourse(state.cmSelectedCourse, { decayWeight: parseInt(val, 10) / 100 });
   }
 
   /* ── Re-link Curriculum ─────────────────────────────────── */
   function cmStartRelink(cid) {
-    cmRelinkCid = cid;
-    cmRelinkStep = 1;
-    cwSelectedGrade = null;
-    cwSelectedSubject = null;
+    state.cmRelinkCid = cid;
+    state.cmRelinkStep = 1;
+    state.cwSelectedGrade = null;
+    state.cwSelectedSubject = null;
     var course = COURSES[cid];
-    cwSelectedTags = course && course.curriculumTags ? course.curriculumTags.slice() : [];
-    cwLoadError = false;
+    state.cwSelectedTags = course && course.curriculumTags ? course.curriculumTags.slice() : [];
+    state.cwLoadError = false;
     Promise.all([loadCurriculumIndex(), _cmLoadCrosswalk()]).then(function (got) {
       var idx = got[0];
-      cwCurriculumLoaded = !!idx;
-      cwLoadError = !idx;
-      if (idx) cwSelectedTags = _cmRelinkTags(cwSelectedTags, got[1]);
+      state.cwCurriculumLoaded = !!idx;
+      state.cwLoadError = !idx;
+      if (idx) state.cwSelectedTags = _cmRelinkTags(state.cwSelectedTags, got[1]);
       renderClassManager();
     });
     renderClassManager();
@@ -7896,7 +7913,7 @@ window.DashClassManager = (function () {
 
   /* The class's courses the bank no longer has, with what replaces them. */
   function _cmDroppedCourses(cid) {
-    var cw = window._CURRICULUM_CROSSWALK || _cmCrosswalk;
+    var cw = window._CURRICULUM_CROSSWALK || state._cmCrosswalk;
     var tags = (COURSES[cid] && COURSES[cid].curriculumTags) || [];
     return tags
       .filter(function (k) {
@@ -7908,30 +7925,30 @@ window.DashClassManager = (function () {
   }
 
   function cmRelinkCancel() {
-    cmRelinkCid = null;
-    cmRelinkStep = 0;
-    cwSelectedTags = [];
+    state.cmRelinkCid = null;
+    state.cmRelinkStep = 0;
+    state.cwSelectedTags = [];
     renderClassManager();
   }
 
   function cmRelinkNext() {
-    if (!cmRelinkCid || cwSelectedTags.length === 0) return;
-    cmRelinkStep = 2;
-    _cmOpenCompReview(cmRelinkCid, _cmCurriculumCands(cwSelectedTags), {
+    if (!state.cmRelinkCid || state.cwSelectedTags.length === 0) return;
+    state.cmRelinkStep = 2;
+    _cmOpenCompReview(state.cmRelinkCid, _cmCurriculumCands(state.cwSelectedTags), {
       kind: 'curriculum',
-      tags: cwSelectedTags.slice(),
+      tags: state.cwSelectedTags.slice(),
     });
   }
 
   function renderCmRelinkPanel(cid) {
     var html = '';
 
-    if (cmRelinkStep === 1) {
+    if (state.cmRelinkStep === 1) {
       html += '<div class="cm-section"><div class="cm-section-title">Re-link to BC Curriculum</div>';
 
-      if (!cwCurriculumLoaded && !cwLoadError) {
+      if (!state.cwCurriculumLoaded && !state.cwLoadError) {
         html += '<div class="cw-empty-msg">Loading BC Curriculum data\u2026</div>';
-      } else if (cwLoadError) {
+      } else if (state.cwLoadError) {
         html += '<div class="cw-empty-msg">Could not load BC Curriculum data.</div>';
       } else {
         _cmDroppedCourses(cid).forEach(function (d) {
@@ -7957,9 +7974,9 @@ window.DashClassManager = (function () {
         [8, 9, 10, 11, 12].forEach(function (g) {
           html +=
             '<button class="cw-grade-btn' +
-            (cwSelectedGrade === g ? ' active' : '') +
+            (state.cwSelectedGrade === g ? ' active' : '') +
             '" aria-pressed="' +
-            (cwSelectedGrade === g) +
+            (state.cwSelectedGrade === g) +
             '" data-action="cwSelectGrade" data-grade="' +
             g +
             '">Grade ' +
@@ -7968,15 +7985,15 @@ window.DashClassManager = (function () {
         });
         html += '</div></div>';
 
-        if (cwSelectedGrade) {
-          var subjects = getSubjectsByGrade(cwSelectedGrade);
+        if (state.cwSelectedGrade) {
+          var subjects = getSubjectsByGrade(state.cwSelectedGrade);
           html += '<div class="cm-field"><label class="cm-label">Subject</label><div class="cw-subject-row">';
           subjects.forEach(function (s) {
             html +=
               '<button class="cw-subject-btn' +
-              (cwSelectedSubject === s ? ' active' : '') +
+              (state.cwSelectedSubject === s ? ' active' : '') +
               '" aria-pressed="' +
-              (cwSelectedSubject === s) +
+              (state.cwSelectedSubject === s) +
               '" data-action="cwSelectSubject" data-subject="' +
               esc(s) +
               '">' +
@@ -7985,16 +8002,16 @@ window.DashClassManager = (function () {
           });
           html += '</div></div>';
 
-          var courses = getCoursesByGrade(cwSelectedGrade);
-          if (cwSelectedSubject)
+          var courses = getCoursesByGrade(state.cwSelectedGrade);
+          if (state.cwSelectedSubject)
             courses = courses.filter(function (c) {
-              return c.subject === cwSelectedSubject;
+              return c.subject === state.cwSelectedSubject;
             });
 
           if (courses.length > 0) {
             html += '<div class="cm-field"><label class="cm-label">Courses</label><div class="cw-course-list">';
             courses.forEach(function (c) {
-              var sel = cwSelectedTags.includes(c.short_tag) ? ' selected' : '';
+              var sel = state.cwSelectedTags.includes(c.short_tag) ? ' selected' : '';
               // Counted and named as the New Class wizard's course rows.
               var counts = _cwCourseCounts([c.short_tag]);
               html +=
@@ -8025,9 +8042,9 @@ window.DashClassManager = (function () {
           }
         }
 
-        if (cwSelectedTags.length > 0) {
+        if (state.cwSelectedTags.length > 0) {
           var totalComps = 0;
-          cwSelectedTags.forEach(function (tag) {
+          state.cwSelectedTags.forEach(function (tag) {
             var full = CURRICULUM_INDEX[tag];
             if (full && full.categories) {
               full.categories.forEach(function (cat) {
@@ -8037,9 +8054,9 @@ window.DashClassManager = (function () {
           });
           html +=
             '<div class="cw-selection-summary"><strong>' +
-            cwSelectedTags.length +
+            state.cwSelectedTags.length +
             '</strong> course' +
-            (cwSelectedTags.length !== 1 ? 's' : '') +
+            (state.cwSelectedTags.length !== 1 ? 's' : '') +
             ' selected \u00B7 <strong>' +
             totalComps +
             '</strong> competencies</div>';
@@ -8050,10 +8067,10 @@ window.DashClassManager = (function () {
         '<div class="cm-relink-actions">' +
         '<button class="btn btn-ghost" data-action="cmRelinkCancel">Cancel</button>' +
         '<button class="btn btn-primary" data-action="cmRelinkNext"' +
-        (cwSelectedTags.length === 0 ? ' disabled style="opacity:0.5;pointer-events:none"' : '') +
+        (state.cwSelectedTags.length === 0 ? ' disabled style="opacity:0.5;pointer-events:none"' : '') +
         '>Next</button>' +
         '</div></div>';
-    } else if (cmRelinkStep === 2) {
+    } else if (state.cmRelinkStep === 2) {
       html += _cmRenderCompReview(cid);
     }
 
@@ -8064,13 +8081,13 @@ window.DashClassManager = (function () {
   function cmToggleArchive(cid) {
     var nextArchived = !isCourseArchived(cid);
     updateCourse(cid, { archived: nextArchived });
-    if (nextArchived && _activeCourse === cid) {
+    if (nextArchived && state._activeCourse === cid) {
       var nextActive = Object.keys(COURSES).find(function (courseId) {
         return courseId !== cid && !isCourseArchived(courseId);
       });
       if (nextActive) {
-        _activeCourse = nextActive;
-        _activeCourseChanged = true;
+        state._activeCourse = nextActive;
+        state._activeCourseChanged = true;
         setActiveCourse(nextActive);
       }
     }
@@ -8110,12 +8127,12 @@ window.DashClassManager = (function () {
           showSyncToast('Delete class failed. Try again.', 'error');
           return;
         }
-        if (_activeCourse === cid) {
+        if (state._activeCourse === cid) {
           var nextActive = getActiveCourse();
-          _activeCourse = nextActive;
-          if (nextActive) _activeCourseChanged = true;
+          state._activeCourse = nextActive;
+          if (nextActive) state._activeCourseChanged = true;
         }
-        if (cmSelectedCourse === cid) cmSelectedCourse = _activeCourse;
+        if (state.cmSelectedCourse === cid) state.cmSelectedCourse = state._activeCourse;
         renderClassManager();
       },
     );
@@ -8256,14 +8273,14 @@ window.DashClassManager = (function () {
         return;
       }
       close();
-      cmSelectedCourse = restored.cid;
-      cmMode = 'edit';
+      state.cmSelectedCourse = restored.cid;
+      state.cmMode = 'edit';
       renderClassManager();
       showSyncToast('Restored ' + name + '.', 'success');
       restored.sent.catch(function (err) {
         console.error('import_json_restore failed:', err);
         if (window.Sentry && typeof window.Sentry.captureException === 'function') window.Sentry.captureException(err);
-        if (cmSelectedCourse === restored.cid) cmSelectedCourse = getActiveCourse();
+        if (state.cmSelectedCourse === restored.cid) state.cmSelectedCourse = getActiveCourse();
         renderClassManager();
         showSyncToast("Couldn't restore " + name + '. The backup file is unchanged; try again.', 'info');
       });
@@ -8383,15 +8400,15 @@ window.DashClassManager = (function () {
       clone._version = 1;
       saveLearningMap(newCourse.id, clone);
     }
-    cmSelectedCourse = newCourse.id;
-    cmMode = 'edit';
+    state.cmSelectedCourse = newCourse.id;
+    state.cmMode = 'edit';
     renderClassManager();
   }
 
   /* ── CM Curriculum Editing ──────────────────────────────── */
   function cmAddSubject() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var id = 'subj' + Date.now().toString(36);
     map.subjects.push({ id: id, name: 'New Subject', color: '#6366f1' });
@@ -8401,8 +8418,8 @@ window.DashClassManager = (function () {
 
   function cmUpdateSubjectName(subId, val) {
     subId = _currentId('subject', subId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sub = map.subjects.find(function (s) {
       return s.id === subId;
@@ -8415,8 +8432,8 @@ window.DashClassManager = (function () {
 
   function cmUpdateSubjectColor(subId, color) {
     subId = _currentId('subject', subId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sub = map.subjects.find(function (s) {
       return s.id === subId;
@@ -8466,8 +8483,8 @@ window.DashClassManager = (function () {
     var target = el.dataset.target;
     var id = _currentId(el.dataset.target === 'subject' ? 'subject' : 'section', el.dataset.id);
     var color = el.dataset.color;
-    if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    if (!state.cmSelectedCourse) return;
+    var map = ensureCustomLearningMap(state.cmSelectedCourse);
     if (target === 'subject') {
       var sub = map.subjects.find(function (s) {
         return s.id === id;
@@ -8483,14 +8500,14 @@ window.DashClassManager = (function () {
         sec.color = color;
       }
     }
-    saveLearningMap(cmSelectedCourse, map);
+    saveLearningMap(state.cmSelectedCourse, map);
     renderClassManager();
   }
 
   function cmDeleteSubject(subId) {
     subId = _currentId('subject', subId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sectionCount = map.sections.filter(function (s) {
       return s.subject === subId;
@@ -8523,8 +8540,8 @@ window.DashClassManager = (function () {
 
   // ── Competency Group CRUD ──────────────────────────────────
   function cmAddCompGroup() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     if (!map.competencyGroups) map.competencyGroups = [];
     var idx = map.competencyGroups.length;
@@ -8550,8 +8567,8 @@ window.DashClassManager = (function () {
 
   function cmUpdateCompGroupName(grpId, val) {
     grpId = _currentId('group', grpId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var g = (map.competencyGroups || []).find(function (x) {
       return x.id === grpId;
@@ -8565,7 +8582,7 @@ window.DashClassManager = (function () {
   /* Competency group colour: the swatch opens the shared colour popover (ui.js). */
   function cmOpenGroupColorPop(swatch) {
     var grpId = swatch.dataset.grpid;
-    var map = cmSelectedCourse && getLearningMap(cmSelectedCourse);
+    var map = state.cmSelectedCourse && getLearningMap(state.cmSelectedCourse);
     var g = ((map && map.competencyGroups) || []).find(function (x) {
       return x.id === _currentId('group', grpId);
     });
@@ -8585,8 +8602,8 @@ window.DashClassManager = (function () {
   }
   function cmUpdateCompGroupColor(grpId, color) {
     grpId = _currentId('group', grpId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var g = (map.competencyGroups || []).find(function (x) {
       return x.id === grpId;
@@ -8600,8 +8617,8 @@ window.DashClassManager = (function () {
 
   function cmDeleteCompGroup(grpId) {
     grpId = _currentId('group', grpId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var count = (map.sections || []).filter(function (s) {
       return s.groupId === grpId;
@@ -8632,8 +8649,8 @@ window.DashClassManager = (function () {
   function cmUpdateStdGroup(secId, groupId) {
     secId = _currentId('section', secId);
     groupId = _currentId('group', groupId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sec = (map.sections || []).find(function (s) {
       return s.id === secId;
@@ -8671,8 +8688,8 @@ window.DashClassManager = (function () {
 
   // ── Flat Learning Standard CRUD ──────────────────────────────
   function cmAddStd() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     if (map.subjects.length === 0) {
       map.subjects.push({ id: 'subj1', name: 'General', color: '#6366f1' });
@@ -8704,7 +8721,7 @@ window.DashClassManager = (function () {
     map._flatVersion = 2;
     saveLearningMap(cid, map);
     // The new card opens with its Title ready to type over.
-    _cmOpenStdCards[stdId] = true;
+    state._cmOpenStdCards[stdId] = true;
     renderClassManager();
     requestAnimationFrame(function () {
       var id = _currentId('section', stdId);
@@ -8720,8 +8737,8 @@ window.DashClassManager = (function () {
 
   function cmUpdateStdName(secId, val) {
     secId = _currentId('section', secId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function (s) {
       return s.id === secId;
@@ -8740,8 +8757,8 @@ window.DashClassManager = (function () {
   function cmUpdateStdSubject(secId, subId) {
     secId = _currentId('section', secId);
     subId = _currentId('subject', subId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function (s) {
       return s.id === secId;
@@ -8754,8 +8771,8 @@ window.DashClassManager = (function () {
 
   function cmUpdateStdColor(secId, color) {
     secId = _currentId('section', secId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function (s) {
       return s.id === secId;
@@ -8771,17 +8788,17 @@ window.DashClassManager = (function () {
      Select picks several competencies to move into a folder or remove
      (scores kept). Import / Export writes the list as a CSV and reads one
      back through the same review Re-link uses, so nothing is added twice. */
-  var cmCompSelect = false;
-  var cmCompSelected = {};
-  var cmCompReview = null;
+  state.cmCompSelect = false;
+  state.cmCompSelected = {};
+  state.cmCompReview = null;
 
   var CM_COMP_CSV_HEADER = ['Code', 'Title', 'Curricular Competency', 'I Can Statements', 'Folder'];
 
   function _cmRenderCompToolbar(cid, lm, compGroups) {
     var secs = lm.sections || [];
-    if (cmCompSelect) {
+    if (state.cmCompSelect) {
       var n = secs.filter(function (s) {
-        return cmCompSelected[s.id];
+        return state.cmCompSelected[s.id];
       }).length;
       var off = n === 0 ? ' disabled' : '';
       return (
@@ -8859,7 +8876,7 @@ window.DashClassManager = (function () {
     var title = tag.label || sec.shortName || sec.name || '';
     var code = _cmStdCode(tag);
     var icans = (tag.i_can_statements || []).length;
-    var on = !!cmCompSelected[sec.id];
+    var on = !!state.cmCompSelected[sec.id];
     return (
       '<label class="cm-comp-select-row' +
       (on ? ' selected' : '') +
@@ -8893,38 +8910,38 @@ window.DashClassManager = (function () {
   }
 
   function cmCompSelectStart() {
-    cmCompSelect = true;
-    cmCompSelected = {};
+    state.cmCompSelect = true;
+    state.cmCompSelected = {};
     renderClassManager();
   }
 
   function cmCompSelectDone() {
-    cmCompSelect = false;
-    cmCompSelected = {};
+    state.cmCompSelect = false;
+    state.cmCompSelected = {};
     renderClassManager();
   }
 
   function cmCompSelectAll() {
-    (getLearningMap(cmSelectedCourse).sections || []).forEach(function (s) {
-      cmCompSelected[s.id] = true;
+    (getLearningMap(state.cmSelectedCourse).sections || []).forEach(function (s) {
+      state.cmCompSelected[s.id] = true;
     });
     _cmRenderAndFocus('[data-action="cmCompSelectAll"]');
   }
 
   function cmCompToggle(secId, on) {
-    if (on) cmCompSelected[secId] = true;
-    else delete cmCompSelected[secId];
+    if (on) state.cmCompSelected[secId] = true;
+    else delete state.cmCompSelected[secId];
     _cmRenderAndFocus('[data-action-change="cmCompToggle"][data-secid=' + _cmAttr(secId) + ']');
   }
 
   function _cmCompSelectedSections() {
-    return (getLearningMap(cmSelectedCourse).sections || []).filter(function (s) {
-      return cmCompSelected[s.id];
+    return (getLearningMap(state.cmSelectedCourse).sections || []).filter(function (s) {
+      return state.cmCompSelected[s.id];
     });
   }
 
   function cmCompMove(groupId) {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     if (!cid) return;
     groupId = groupId ? _currentId('group', groupId) : '';
     var ids = {};
@@ -8948,7 +8965,7 @@ window.DashClassManager = (function () {
     showConfirm(
       secs.length === 1 ? 'Remove 1 Competency' : 'Remove ' + secs.length + ' Competencies',
       _cmRemoveMessage(
-        cmSelectedCourse,
+        state.cmSelectedCourse,
         secs.map(function (s) {
           return s.id;
         }),
@@ -8958,13 +8975,13 @@ window.DashClassManager = (function () {
       'danger',
       function () {
         removeCompetencies(
-          cmSelectedCourse,
+          state.cmSelectedCourse,
           secs.map(function (s) {
             return _currentId('section', s.id);
           }),
         );
-        cmCompSelected = {};
-        if (!(getLearningMap(cmSelectedCourse).sections || []).length) cmCompSelect = false;
+        state.cmCompSelected = {};
+        if (!(getLearningMap(state.cmSelectedCourse).sections || []).length) state.cmCompSelect = false;
         renderClassManager();
       },
     );
@@ -9023,7 +9040,7 @@ window.DashClassManager = (function () {
   }
 
   function cmCompExport() {
-    var cid = cmSelectedCourse;
+    var cid = state.cmSelectedCourse;
     if (!cid) return;
     var lm = getLearningMap(cid);
     var groups = {};
@@ -9113,8 +9130,8 @@ window.DashClassManager = (function () {
 
   function cmCompCSV(input) {
     var file = input.files && input.files[0];
-    if (!file || !cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!file || !state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var reader = new FileReader();
     reader.onload = function (e) {
       input.value = '';
@@ -9356,17 +9373,17 @@ window.DashClassManager = (function () {
 
   /* The crosswalk from the old bank (curriculum_crosswalk.json), loaded
      with the curriculum for Re-link. */
-  var _cmCrosswalk = null;
+  state._cmCrosswalk = null;
   function _cmLoadCrosswalk() {
-    if (window._CURRICULUM_CROSSWALK) return Promise.resolve((_cmCrosswalk = window._CURRICULUM_CROSSWALK));
-    if (_cmCrosswalk) return Promise.resolve(_cmCrosswalk);
+    if (window._CURRICULUM_CROSSWALK) return Promise.resolve((state._cmCrosswalk = window._CURRICULUM_CROSSWALK));
+    if (state._cmCrosswalk) return Promise.resolve(state._cmCrosswalk);
     if (typeof fetch !== 'function') return Promise.resolve(null);
     return fetch('/curriculum_crosswalk.json')
       .then(function (res) {
         return res.ok ? res.json() : null;
       })
       .then(function (data) {
-        _cmCrosswalk = data;
+        state._cmCrosswalk = data;
         return data;
       })
       .catch(function () {
@@ -9382,7 +9399,7 @@ window.DashClassManager = (function () {
      row) isn't a replacement: the wording match takes it, and it's listed
      in exact so the review treats it as already matching. */
   function _cmCrosswalkPairs(cid, secs, live, cands, tags) {
-    var cw = window._CURRICULUM_CROSSWALK || _cmCrosswalk;
+    var cw = window._CURRICULUM_CROSSWALK || state._cmCrosswalk;
     var out = { by: {}, exact: {}, match: {} };
     if (!cw || !cw.pairs) return out;
     var olds = ((COURSES[cid] && COURSES[cid].curriculumTags) || []).concat(tags);
@@ -9460,21 +9477,21 @@ window.DashClassManager = (function () {
   /* Open the review. A signed-in teacher's removed competencies come from
      the server too, so one removed on another device is offered back. */
   function _cmOpenCompReview(cid, cands, opts) {
-    cmCompReview = _cmBuildCompReview(cid, cands, opts);
-    cmCompReview.cands = cands;
-    cmCompReview.opts = opts;
+    state.cmCompReview = _cmBuildCompReview(cid, cands, opts);
+    state.cmCompReview.cands = cands;
+    state.cmCompReview.opts = opts;
     renderClassManager();
-    var opened = cmCompReview;
+    var opened = state.cmCompReview;
     if (window.v2 && typeof window.v2.listRemovedSections === 'function') {
       Promise.resolve(window.v2.listRemovedSections(cid))
         .then(function (res) {
           if (!res || !Array.isArray(res.data) || !res.data.length) return;
           var before = getRemovedSections(cid).length;
           mergeRemovedSectionsFromServer(cid, res.data);
-          if (cmCompReview !== opened || getRemovedSections(cid).length === before) return;
-          cmCompReview = _cmBuildCompReview(cid, cands, opts);
-          cmCompReview.cands = cands;
-          cmCompReview.opts = opts;
+          if (state.cmCompReview !== opened || getRemovedSections(cid).length === before) return;
+          state.cmCompReview = _cmBuildCompReview(cid, cands, opts);
+          state.cmCompReview.cands = cands;
+          state.cmCompReview.opts = opts;
           renderClassManager();
         })
         .catch(function () {});
@@ -9528,7 +9545,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmRenderCompReview(cid) {
-    var r = cmCompReview;
+    var r = state.cmCompReview;
     if (!r) return '';
     var file = r.kind === 'file';
     var course = COURSES[cid];
@@ -9971,13 +9988,13 @@ window.DashClassManager = (function () {
   }
 
   function cmCompReviewToggle(idx, on) {
-    if (!cmCompReview || !cmCompReview.add[idx]) return;
-    cmCompReview.add[idx].on = !!on;
+    if (!state.cmCompReview || !state.cmCompReview.add[idx]) return;
+    state.cmCompReview.add[idx].on = !!on;
     _cmRenderAndFocus('[data-action-change="cmCompReviewToggle"][data-idx=' + _cmAttr(idx) + ']');
   }
 
   function cmCompReviewPick(group, idx, pick) {
-    var list = cmCompReview && cmCompReview[group];
+    var list = state.cmCompReview && state.cmCompReview[group];
     if (!list || !list[idx]) return;
     list[idx].pick = pick;
     _cmRenderAndFocus(
@@ -9992,21 +10009,21 @@ window.DashClassManager = (function () {
   }
 
   function cmCompReviewShowSame() {
-    if (!cmCompReview) return;
-    cmCompReview.showSame = !cmCompReview.showSame;
+    if (!state.cmCompReview) return;
+    state.cmCompReview.showSame = !state.cmCompReview.showSame;
     _cmRenderAndFocus('[data-action="cmCompReviewShowSame"]');
   }
 
   function _cmCloseCompReview() {
-    cmCompReview = null;
-    cmRelinkCid = null;
-    cmRelinkStep = 0;
-    cwSelectedTags = [];
+    state.cmCompReview = null;
+    state.cmRelinkCid = null;
+    state.cmRelinkStep = 0;
+    state.cwSelectedTags = [];
   }
 
   function cmCompReviewCancel() {
     _cmCloseCompReview();
-    cmTab = 'competencies';
+    state.cmTab = 'competencies';
     renderClassManager();
   }
 
@@ -10014,7 +10031,7 @@ window.DashClassManager = (function () {
      student's overall proficiency ask first, with the count, as the
      grading settings do. */
   function cmCompReviewApply(confirmed) {
-    var r = cmCompReview;
+    var r = state.cmCompReview;
     if (!r) return;
     var cid = r.cid;
     var p = _cmCompReviewParts(r);
@@ -10075,7 +10092,7 @@ window.DashClassManager = (function () {
     if (r.kind !== 'file' && _cmCompReviewLinkChanges(r)) updateCourse(cid, { curriculumTags: r.tags.slice() });
 
     _cmCloseCompReview();
-    cmTab = 'competencies';
+    state.cmTab = 'competencies';
     renderClassManager();
   }
 
@@ -10312,12 +10329,12 @@ window.DashClassManager = (function () {
     var current = _currentId('section', secId);
     showConfirm(
       'Remove Competency',
-      _cmRemoveMessage(cmSelectedCourse, [current], 'Remove this competency from the class?'),
+      _cmRemoveMessage(state.cmSelectedCourse, [current], 'Remove this competency from the class?'),
       'Remove',
       'danger',
       function () {
         // Resolved now: the id may have been re-keyed while the dialog was open.
-        removeCompetencies(cmSelectedCourse, [_currentId('section', secId)]);
+        removeCompetencies(state.cmSelectedCourse, [_currentId('section', secId)]);
         renderClassManager();
       },
     );
@@ -10325,8 +10342,8 @@ window.DashClassManager = (function () {
 
   function cmUpdateStdLabel(secId, val) {
     secId = _currentId('section', secId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function (s) {
       return s.id === secId;
@@ -10351,8 +10368,8 @@ window.DashClassManager = (function () {
 
   function cmUpdateStdText(secId, val) {
     secId = _currentId('section', secId);
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+    if (!state.cmSelectedCourse) return;
+    var cid = state.cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function (s) {
       return s.id === secId;
@@ -10365,9 +10382,9 @@ window.DashClassManager = (function () {
 
   /* The card's own competency, from a fresh copy of the map. */
   function _cmStdEntry(secId) {
-    if (!cmSelectedCourse) return null;
+    if (!state.cmSelectedCourse) return null;
     secId = _currentId('section', secId);
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var map = ensureCustomLearningMap(state.cmSelectedCourse);
     var sec = (map.sections || []).find(function (s) {
       return s.id === secId;
     });
@@ -10376,7 +10393,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmStdSave(entry, focusSel) {
-    saveLearningMap(cmSelectedCourse, entry.map);
+    saveLearningMap(state.cmSelectedCourse, entry.map);
     renderClassManager();
     if (!focusSel) return;
     requestAnimationFrame(function () {
@@ -10402,12 +10419,13 @@ window.DashClassManager = (function () {
       if (x && raw === CompetencyWording.GENERAL[l]) x.descriptor = raw;
       return x;
     });
-    if (lines[0] && !lines[0].ready && !_cmLevelsBankAsked && RubricPrint.loadBankLevels) {
-      _cmLevelsBankAsked = true;
+    if (lines[0] && !lines[0].ready && !state._cmLevelsBankAsked && RubricPrint.loadBankLevels) {
+      state._cmLevelsBankAsked = true;
       // Only the Competencies tab shows the Levels: on another tab the
       // next draw picks them up, so opening Class Settings draws it once.
       RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok && classManagerOpen && cmMode === 'edit' && cmTab === 'competencies') renderClassManager();
+        if (ok && state.classManagerOpen && state.cmMode === 'edit' && state.cmTab === 'competencies')
+          renderClassManager();
       });
     }
     // The open form: { drafts: { level: text }, base: { level: text the field was filled with } }.
@@ -10630,10 +10648,10 @@ window.DashClassManager = (function () {
 
   function cmUpdateStdCode(secId, val) {
     secId = _currentId('section', secId);
-    if (!cmSelectedCourse) return;
+    if (!state.cmSelectedCourse) return;
     var newCode = _cmCleanCode(val);
     if (!newCode) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var map = ensureCustomLearningMap(state.cmSelectedCourse);
     var sec = map.sections.find(function (s) {
       return s.id === secId;
     });
@@ -10641,7 +10659,7 @@ window.DashClassManager = (function () {
     var tag = sec.tags[0];
     if (newCode === tag.code) return;
     tag.code = newCode;
-    saveLearningMap(cmSelectedCourse, map);
+    saveLearningMap(state.cmSelectedCourse, map);
     renderClassManager();
   }
 
@@ -10660,13 +10678,13 @@ window.DashClassManager = (function () {
 
   /* ── Action dispatcher (called from parent's _handleClick) ── */
   function handleAction(action, el, e) {
-    _cmKeepFocusSel = null;
+    state._cmKeepFocusSel = null;
     // Any click other than on a card's More button closes its open menu.
     if (action !== 'cmStdMenu') _cmCloseStdMenus();
     if (action !== 'cmRosterDesigOpen') _cmCloseRosterPicker();
     if (/^sq[A-Z]/.test(action) && typeof CmQuestionnaires !== 'undefined')
       return CmQuestionnaires.handleAction(action, el);
-    if (/^sp[A-Z]/.test(action) && _cmTabShown('student-page', cmSelectedCourse))
+    if (/^sp[A-Z]/.test(action) && _cmTabShown('student-page', state.cmSelectedCourse))
       return CmStudentPage.handleAction(action, el);
     if (/^cmTerm[A-Z]/.test(action) && CmTerms.handleAction(action, el)) return true;
     var handlers = {
@@ -10939,7 +10957,7 @@ window.DashClassManager = (function () {
         blockChipSelect(el);
         if (el.dataset.picker === 'cm-block') cmUpdateField('block', el.dataset.val || '');
         if (el.dataset.picker === 'cm-new-block') {
-          cwStep2Block = el.dataset.val || '';
+          state.cwStep2Block = el.dataset.val || '';
           _cwRailSync();
         }
       },
@@ -11015,7 +11033,7 @@ window.DashClassManager = (function () {
     if (el.dataset.actionInput === 'cmBlockOtherInput') {
       blockOtherInput(el);
       if (el.dataset.picker === 'cm-new-block') {
-        cwStep2Block = readBlockPicker('cm-new-block');
+        state.cwStep2Block = readBlockPicker('cm-new-block');
         _cwRailSync();
       }
       return true;
@@ -11074,18 +11092,18 @@ window.DashClassManager = (function () {
      change, a redraw that leaves the focus nowhere gives it back to the same
      control (by id, else by its data attributes), including the redraws
      around a "Change Grades?" question and its answer. */
-  var _cmKeepFocusSel = null;
+  state._cmKeepFocusSel = null;
 
   function handleChange(el) {
-    _cmKeepFocusSel = _cmControlSelector(el);
+    state._cmKeepFocusSel = _cmControlSelector(el);
     return _handleChange(el);
   }
 
   function _cmRestoreKeptFocus() {
-    if (!_cmKeepFocusSel) return;
+    if (!state._cmKeepFocusSel) return;
     var active = document.activeElement;
     if (active && active !== document.body) return;
-    var again = document.querySelector(_cmKeepFocusSel);
+    var again = document.querySelector(state._cmKeepFocusSel);
     if (again && typeof again.focus === 'function') again.focus({ preventScroll: true });
   }
 
@@ -11106,7 +11124,7 @@ window.DashClassManager = (function () {
 
   function _handleChange(el) {
     if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleChange(el)) return true;
-    if (_cmTabShown('student-page', cmSelectedCourse) && CmStudentPage.handleChange(el)) return true;
+    if (_cmTabShown('student-page', state.cmSelectedCourse) && CmStudentPage.handleChange(el)) return true;
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
       return true;
@@ -11256,7 +11274,7 @@ window.DashClassManager = (function () {
     }
     // Arrow keys move between the class tabs, as in any tab list.
     if (el && el.classList && el.classList.contains('cm-tab') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-      var ids = _cmShownTabs(cmSelectedCourse).map(function (t) {
+      var ids = _cmShownTabs(state.cmSelectedCourse).map(function (t) {
         return t.id;
       });
       var at = ids.indexOf(el.dataset.tab);
@@ -11290,14 +11308,14 @@ window.DashClassManager = (function () {
 
   function handleBlur(el) {
     if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleBlur(el)) return true;
-    if (_cmTabShown('student-page', cmSelectedCourse) && CmStudentPage.handleBlur(el)) return true;
+    if (_cmTabShown('student-page', state.cmSelectedCourse) && CmStudentPage.handleBlur(el)) return true;
     if (el.dataset.actionBlur === 'cmRosterField') {
       cmRosterField(el);
       return true;
     }
     if (el.dataset.actionBlur === 'cmBlockOtherBlur') {
       var typed = normalizeCourseBlock(el.value);
-      var cur = normalizeCourseBlock(COURSES[cmSelectedCourse] && COURSES[cmSelectedCourse].block);
+      var cur = normalizeCourseBlock(COURSES[state.cmSelectedCourse] && COURSES[state.cmSelectedCourse].block);
       var isChip = COURSE_BLOCK_CHOICES.indexOf(cur) >= 0;
       // Leaving the box empty keeps a chosen chip; a typed label replaces it.
       if (typed) cmUpdateField('block', typed);
@@ -11371,10 +11389,10 @@ window.DashClassManager = (function () {
   return {
     configure: configure,
     get classManagerOpen() {
-      return classManagerOpen;
+      return state.classManagerOpen;
     },
     set classManagerOpen(v) {
-      classManagerOpen = v;
+      state.classManagerOpen = v;
     },
     openClassManager: openClassManager,
     closeClassManager: closeClassManager,
@@ -11400,12 +11418,12 @@ window.DashClassManager = (function () {
     guardianEmails: _cmGuardianEmails,
     saveGuardianEmail: _cmSetGuardianEmail,
     reportingTermsDraft: function (cid) {
-      var st = _cmTermRows(cid || cmSelectedCourse);
-      return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };
+      var st = _cmTermRows(cid || state.cmSelectedCourse);
+      return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || state.cmSelectedCourse) };
     },
     // The categories as Class Settings holds them, and a drag's move.
     categoriesDraft: function (cid) {
-      var st = _cmCatState(cid || cmSelectedCourse);
+      var st = _cmCatState(cid || state.cmSelectedCourse);
       return {
         rows: st.rows.slice(),
         dirty: !!st.dirty,
@@ -11415,7 +11433,7 @@ window.DashClassManager = (function () {
       };
     },
     reorderCategory: function (fromIdx, toIdx) {
-      return cmSelectedCourse ? _cmCatReorder(cmSelectedCourse, fromIdx, toIdx) : Promise.resolve();
+      return state.cmSelectedCourse ? _cmCatReorder(state.cmSelectedCourse, fromIdx, toIdx) : Promise.resolve();
     },
     handleInput: handleInput,
     handleChange: handleChange,
@@ -11429,45 +11447,45 @@ window.DashClassManager = (function () {
     },
     destroy: _removeAllListeners,
     resetState: function () {
-      classManagerOpen = false;
-      cmMode = 'edit';
-      cmTab = 'details';
-      cmSelectedCourse = _activeCourse;
-      _activeCourseChanged = false;
-      _cmPtsPick = null;
-      _cmPtsError = null;
-      _cmPtsTyped = null;
-      cmEditingStudentId = null;
-      cmRosterQuery = '';
-      _cmGuardiansLoaded = {};
-      _cmGuardiansReady = {};
-      _cmGuardiansLoading = {};
-      cmPendingImport = null;
-      cmImportFormatOpen = false;
-      cmImportError = null;
-      cmImportDone = null;
-      cmRosterOnly = null;
-      cmCompSelect = false;
-      cmCompSelected = {};
-      cmCompReview = null;
-      cmRelinkCid = null;
-      cmRelinkStep = 0;
-      cwStep = 1;
-      cwSelectedGrade = null;
-      cwSelectedSubject = null;
-      cwSelectedTags = [];
-      cwStep2Name = null;
-      cwStep2Grade = '';
-      cwStep2Block = '';
-      cwStep2Span = 'full';
-      cwStep2Grading = '';
-      cwStep2Calc = '';
-      cwStep2Decay = '65';
-      cwFindText = '';
-      cwOpen = '';
-      _cmCollapsedStdFolders = {};
-      _cmOpenStdCards = {};
-      _cmCategoryState = {};
+      state.classManagerOpen = false;
+      state.cmMode = 'edit';
+      state.cmTab = 'details';
+      state.cmSelectedCourse = state._activeCourse;
+      state._activeCourseChanged = false;
+      state._cmPtsPick = null;
+      state._cmPtsError = null;
+      state._cmPtsTyped = null;
+      state.cmEditingStudentId = null;
+      state.cmRosterQuery = '';
+      state._cmGuardiansLoaded = {};
+      state._cmGuardiansReady = {};
+      state._cmGuardiansLoading = {};
+      state.cmPendingImport = null;
+      state.cmImportFormatOpen = false;
+      state.cmImportError = null;
+      state.cmImportDone = null;
+      state.cmRosterOnly = null;
+      state.cmCompSelect = false;
+      state.cmCompSelected = {};
+      state.cmCompReview = null;
+      state.cmRelinkCid = null;
+      state.cmRelinkStep = 0;
+      state.cwStep = 1;
+      state.cwSelectedGrade = null;
+      state.cwSelectedSubject = null;
+      state.cwSelectedTags = [];
+      state.cwStep2Name = null;
+      state.cwStep2Grade = '';
+      state.cwStep2Block = '';
+      state.cwStep2Span = 'full';
+      state.cwStep2Grading = '';
+      state.cwStep2Calc = '';
+      state.cwStep2Decay = '65';
+      state.cwFindText = '';
+      state.cwOpen = '';
+      state._cmCollapsedStdFolders = {};
+      state._cmOpenStdCards = {};
+      state._cmCategoryState = {};
     },
   };
 })();
