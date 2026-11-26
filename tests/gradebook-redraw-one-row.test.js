@@ -267,6 +267,7 @@ describe('a sort by grade redraws the whole grid, as the order may change', () =
 describe('closing the grader opened from the gradebook', () => {
   function openFromGradebook(seed, sid) {
     mount(seed, { course: CID });
+    runInThisContext(readFileSync('teacher/crit-bank.js', 'utf-8'), { filename: 'teacher/crit-bank.js' });
     runInThisContext(readFileSync('teacher/crit-comment.js', 'utf-8'), { filename: 'teacher/crit-comment.js' });
     runInThisContext(readFileSync('teacher/rubric-comment-lines.js', 'utf-8'), {
       filename: 'teacher/rubric-comment-lines.js',

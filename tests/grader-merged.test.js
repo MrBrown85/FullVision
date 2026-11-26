@@ -46,6 +46,7 @@ describe('grader-arrows-step-students', () => {
   function openGrader() {
     mount(seed, { course: CID });
     realPage = window.PageAssignments;
+    runInThisContext(readFileSync('teacher/crit-bank.js', 'utf-8'), { filename: 'teacher/crit-bank.js' });
     runInThisContext(readFileSync('teacher/crit-comment.js', 'utf-8'), { filename: 'teacher/crit-comment.js' });
     runInThisContext(readFileSync('teacher/rubric-comment-lines.js', 'utf-8'), {
       filename: 'teacher/rubric-comment-lines.js',
@@ -236,6 +237,7 @@ describe('grader-tab-after-points', () => {
   function openGrader() {
     mount(seed, { course: CID });
     realPage = window.PageAssignments;
+    runInThisContext(readFileSync('teacher/crit-bank.js', 'utf-8'), { filename: 'teacher/crit-bank.js' });
     runInThisContext(readFileSync('teacher/crit-comment.js', 'utf-8'), { filename: 'teacher/crit-comment.js' });
     runInThisContext(readFileSync('teacher/rubric-comment-lines.js', 'utf-8'), {
       filename: 'teacher/rubric-comment-lines.js',
