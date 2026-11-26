@@ -197,6 +197,7 @@ interface Window {
 // the checked data files use are typed.
 declare var GradeState: {
   RETURNED: string;
+  DRAFT: string;
   holds(klass: unknown): boolean;
   stateOf(cid: string, sid: string, aid: string): string | null;
   copyOf(grade: unknown): unknown;

@@ -364,6 +364,7 @@ const PRECACHE_URLS = [
   '/teacher/assign-grader-notes.js',
   '/teacher/assign-returns.js',
   '/teacher/assign-grader-work.js',
+  '/teacher/assign-revisions.js',
   '/teacher/page-assignments.js',
   '/teacher/rubric-words.js',
   '/teacher/bulletin-share.js',

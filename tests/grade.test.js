@@ -305,7 +305,7 @@ describe('grade-format-guard', () => {
     'teacher/factor-field.js round Number(v) * 10': 'an assessment’s Factor',
     'teacher/grades-print.js round Math.max(8, r.right - menu.offsetWidth)': 'a menu’s position',
     'teacher/assign-competency-picker.js round r.left + r.width / 2 - boxRect.left - 8': 'a pointer’s position',
-    'teacher/page-assignments.js round (parseLocalDate(r.revise_by) - day) / 86400000': 'days',
+    'teacher/assign-revisions.js round (parseLocalDate(r.revise_by) - day) / 86400000': 'days',
     'teacher/student-outlook.js round p.R - lg.R': 'points between two course % as shown',
     'teacher/student-outlook.js round one.R - lg.R': 'points between two course % as shown',
     'teacher/page-student.js round levelBarPercent(cid, r.v)': 'a bar’s width',
