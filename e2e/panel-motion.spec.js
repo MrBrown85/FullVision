@@ -160,13 +160,34 @@ test.describe('with motion', () => {
       expect(after.every(([, lit, bg]) => lit === name && bg === thumb)).toBe(true);
     };
 
-    // Assignments to Dashboard: some frame has the pill part-way there.
+    // Assignments to Dashboard: half-way through the glide the pill is part-way there. The glide is held at its
+    // middle to look: on GitHub's runners the frames came too far apart to catch it moving (Nov 25, 2026).
     const from = await left('.tb-seg-active');
     const to = await left('.tb-seg-link[data-href="/dashboard"]');
+    await page.evaluate(() => {
+      window.__mid = null;
+      const seen = new MutationObserver(list =>
+        list.forEach(m =>
+          m.addedNodes.forEach(n => {
+            if (!n.classList || !n.classList.contains('seg-glide') || window.__mid !== null) return;
+            const anim = n.getAnimations()[0];
+            anim.ready.then(() => {
+              anim.pause();
+              anim.currentTime = anim.effect.getTiming().duration / 2;
+              window.__mid = n.getBoundingClientRect().left;
+              anim.play();
+            });
+          }),
+        ),
+      );
+      seen.observe(document.querySelector('#dock-mount'), { childList: true, subtree: true });
+    });
     let frames = watch();
     await page.click('.tb-seg-link[data-href="/dashboard"]');
     let seen = await frames;
-    expect(seen.some(([x]) => x !== null && x < from - 5 && x > to + 5)).toBe(true);
+    const mid = await page.evaluate(() => window.__mid);
+    expect(mid).toBeLessThan(from - 5);
+    expect(mid).toBeGreaterThan(to + 5);
     landed(seen, 'Dashboard');
 
     // Reporting loads its scripts on the first visit and draws the tabs
