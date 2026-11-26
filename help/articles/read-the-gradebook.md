@@ -3,11 +3,22 @@ title: Read the Gradebook
 section: Gradebook
 order: 1
 summary: The Gradebook shows one class's scores as a grid, with a row for each student and a column for each assessment. Each student's overall grade sits beside their name.
-checked: 2026-11-05
+checked: 2026-11-25
 pages:
   - /gradebook
 demo: /gradebook
 labels:
+  - Missing Work
+  - If Handed In
+  - Open Student Page
+  - Show Only This Student
+  - Add Observation
+  - Copy Missing Work List
+  - Mark Missing
+  - Excuse
+  - Clear
+  - Undo
+  - Undo Last Marking
   - Class Average
   - View Class Results
   - Class Results
@@ -57,7 +68,9 @@ shots:
 
 Each row is a student. The number beside the name is the student's overall grade, shown as the class's grading system sets it. In a Proficiency class it is a level from 1.0 to 4.0 with its word, such as 3.1 Proficient. A Letter class shows a letter grade and percent, and a Both class shows both. In place of a letter grade, IE means Insufficient Evidence, and No Letter Grade means the student is reported on language or IEP goals. A short code after a name is the student's BC designation; hover over it to see the designation's name.
 
-Hover over a name to see the course grade, each category's grade and each competency's level with the number of assessments behind it. Select the name to open the student's page.
+Hover over a name to see the student's card: the course grade with how far it has moved in a month, each category's grade, and under **Missing Work** each piece not handed in. In a class with a percent, **If Handed In** shows what each piece would add and the grade with all of it in; this appears once a third of the student's work is assessed.
+
+Select a name to open its menu. **Open Student Page**, **Show Only This Student**, **Add Observation** and **Copy Missing Work List** act on the one student. **Mark Missing**, **Excuse** and **Clear** act on the student's row: each opens a list that says how many cells it changes, for all of them or for one category or month. A blank cell counts only when its work is due by today, and scored work is never changed. **Undo** on the message at the bottom, or **Undo Last Marking** in the same menu, puts the cells back.
 
 Each column is an assessment, newest on the left, with its date under the title. Points work also shows its total, such as "Out of 10". **Needs a Category** under a title means the class has categories and this assessment has none yet. Select a title to open the column's menu.
 

@@ -1631,6 +1631,24 @@ const GRADER_SCENARIOS = {
     expect(storedRows()).toBe(before);
     if (on) expect(state('s1', 'essay')).toBe('draft');
   },
+  markStudentCells(on) {
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    level('s2', 'essay', 't1', 2);
+    const before = storedRows();
+    Grader.markStudentCells(CID, 's3', { 's3:essay': 'NS', 's3:lab': 'EXC' });
+    // A status is never a draft, and nobody's grade moved.
+    expect(storedRows()).toBe(before);
+    if (on) expect(['s1', 's2', 's3'].map(sid => state(sid, 'essay'))).toEqual(['returned', 'draft', null]);
+  },
+  undoMarkStudentCells(on) {
+    level('s1', 'essay', 't1', 3);
+    Grader.markStudentCells(CID, 's3', { 's3:essay': 'EXC' });
+    const before = storedRows();
+    Grader.undoMarkStudentCells(CID, 's3', {});
+    expect(storedRows()).toBe(before);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+  },
   deleteAssessmentScores(on) {
     // Deleting an assessment: its scores go, then the assessment, and its rows with them.
     level('s1', 'essay', 't1', 3);

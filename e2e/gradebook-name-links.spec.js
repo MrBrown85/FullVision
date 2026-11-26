@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoApp, TEST_COURSE } from './helpers.js';
 
-// A student's name in either gradebook view opens their page, by mouse or
-// by keyboard.
+// A student's name in either gradebook view opens the name's menu, by mouse
+// or by keyboard; Open Student Page, its first line, opens their page.
 test.beforeEach(async ({ page }) => {
   await mockAuth(page);
   await seedCourse(page);
@@ -12,12 +12,14 @@ test.beforeEach(async ({ page }) => {
   await gotoApp(page, '/gradebook');
 });
 
-test('clicking a name in Scores opens the student page', async ({ page }) => {
+test('clicking a name in Scores opens its menu, and Open Student Page the student page', async ({ page }) => {
   await page.locator('.gb-grid-rowheads a.gb-grid-rowhead-name', { hasText: 'Alice' }).click();
+  await expect(page).toHaveURL(/\/gradebook/);
+  await page.locator('.gb-ctx-menu [data-ctx="openStudent"]').click();
   await expect(page).toHaveURL(/\/student\?id=stu-001&course=/);
 });
 
-test('in Competencies, Tab and Enter on a name belong to the link, not the grid', async ({ page }) => {
+test('in Competencies, Tab and Enter on a name belong to the name, not the grid', async ({ page }) => {
   await page.locator('[data-action="setView"][data-mode="detailed"]').click();
   const storedScores = () =>
     page.evaluate(cid => {
@@ -37,8 +39,11 @@ test('in Competencies, Tab and Enter on a name belong to the link, not the grid'
   await page.keyboard.press('Tab');
   await expect(names.nth(1)).toBeFocused();
 
+  // Enter opens the menu with its first line focused; Enter again opens the page.
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.gb-ctx-menu [data-ctx="openStudent"]')).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/student\?id=stu-002&course=/);
-  // Enter followed the link; it did not step the focused cell again.
+  // Neither Enter stepped the focused cell again.
   expect(await storedScores()).toEqual(before);
 });

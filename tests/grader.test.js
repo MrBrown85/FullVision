@@ -91,6 +91,18 @@ const GRADEBOOK_CASES = [
     [['saveAssignmentStatuses', [CID, STATUSES], true]],
     [CID, null, 'lab', 'undo'],
   ],
+  [
+    'markStudentCells',
+    [CID, 's1', STATUSES],
+    [['saveAssignmentStatuses', [CID, STATUSES], true]],
+    [CID, 's1', null, 'status'],
+  ],
+  [
+    'undoMarkStudentCells',
+    [CID, 's1', STATUSES],
+    [['saveAssignmentStatuses', [CID, STATUSES], true]],
+    [CID, 's1', null, 'undo'],
+  ],
   ['deleteAssessmentScores', [CID, 'lab', AFTER], [['saveScores', [CID, AFTER], true]], [CID, null, 'lab', 'delete']],
   [
     'deleteAssessmentStatuses',

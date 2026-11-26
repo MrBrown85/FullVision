@@ -77,6 +77,8 @@
     "teacher/assign-show.js",
     "teacher/assign-toolbar.js",
     "teacher/gradebook-toolbar.js",
+    "teacher/student-outlook.js",
+    "teacher/gradebook-student-menu.js",
     "teacher/assign-list.js",
     "teacher/crit-comment.js",
     "teacher/add-from-class.js",

@@ -614,16 +614,120 @@ th.gb-group-alt {
 .gb-tip-name + .gb-tip-head {
   margin-top: 0;
 }
-/* A long competency list: two columns, and never taller than the window. */
-#gb-tooltip.gb-tip-wide {
-  max-width: min(640px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px);
+/* The card on a student's name (teacher/student-outlook.js): the grade with
+   how it has moved and a line of it over the year, a bar a category as wide
+   as its share of the grade, then the missing work and what handing each
+   piece in adds. One width, so a long title is cut, never the card wider. */
+#gb-tooltip.gb-tip-student {
+  width: 296px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  white-space: normal;
+  font-size: var(--text-base);
+}
+.gb-tip-student .gb-tip-name {
+  margin-bottom: 4px;
+}
+.gb-card-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.gb-tip-student .gb-tip-grade {
+  font-size: 22px;
+  line-height: 1.2;
+}
+.gb-card-move {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.gb-card-move.is-up {
+  color: var(--score-3-dark);
+}
+.gb-card-move.is-down {
+  color: var(--score-1-dark);
+}
+.gb-card-line {
+  flex: none;
+}
+.gb-card-cats {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 6px;
+}
+.gb-card-seg {
+  min-width: 0;
+  height: 10px;
+  border-radius: 4px;
+  background: var(--seg-track, var(--border));
   overflow: hidden;
 }
-#gb-tooltip.gb-tip-wide .gb-tip-rows {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 20px;
+.gb-card-seg > div {
+  height: 100%;
+}
+.gb-card-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 1px 0;
+}
+.gb-card-what {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gb-card-row small {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.gb-card-row b {
+  white-space: nowrap;
+}
+/* A category's line: its share follows its name, and a long name is cut, not the share. */
+.gb-card-cat .gb-card-what {
+  flex: 0 1 auto;
+}
+.gb-card-cat b {
+  margin-left: auto;
+}
+.gb-card-row .gb-card-gain {
+  width: 38px;
+  text-align: right;
+  font-size: var(--text-sm);
+  color: var(--score-3-dark);
+}
+.gb-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 12px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-2);
+}
+.gb-card-more {
+  padding: 1px 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.gb-card-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--divider-medium);
+  font-weight: 600;
 }
 .gb-tip-grade {
   font-size: var(--text-lg);
@@ -632,10 +736,6 @@ th.gb-group-alt {
 .gb-tip-note {
   font-size: var(--text-sm);
   color: var(--text-2);
-}
-.gb-tip-count {
-  font-weight: 400;
-  color: var(--text-3);
 }
 .gb-tip-foot {
   margin-top: 8px;
@@ -1323,13 +1423,16 @@ th.gb-group-alt {
   font-weight: 600;
 }
 /* Row hover sync — applied by JS across Q3 and Q4 */
-.gb-grid-rowhead.gb-row-hover {
+.gb-grid-rowhead.gb-row-hover,
+.gb-grid-rowhead.gb-col-menu {
   background: var(--active-light) !important;
 }
-.gb-table tbody tr.gb-row-hover td {
+.gb-table tbody tr.gb-row-hover td,
+.gb-table tbody tr.gb-col-menu td {
   background: var(--active-light) !important;
 }
-.gb-scores-table tbody tr.gb-row-hover td {
+.gb-scores-table tbody tr.gb-row-hover td,
+.gb-scores-table tbody tr.gb-col-menu td {
   background: var(--active-light) !important;
 }
 .gb-grid-rowhead-stats {
@@ -1669,6 +1772,31 @@ th.gb-group-alt {
   height: 1px;
   background: var(--divider-subtle);
   margin: 4px 0;
+}
+/* A line that opens a list (the menu on a student's name,
+   teacher/gradebook-student-menu.js): a chevron at its right, lit while its
+   list is open. The list is a panel of its own beside the line. */
+.gb-ctx-chevron {
+  margin-left: auto;
+}
+.gb-ctx-parent.is-open {
+  background: var(--active-fill);
+  color: #fff;
+}
+.gb-ctx-sub {
+  position: fixed;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+}
+.gb-ctx-sub[hidden] {
+  display: none;
+}
+.gb-ctx-sub .gb-ctx-hint {
+  padding-left: 20px;
 }
 
 /* New assignment popover */

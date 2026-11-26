@@ -329,110 +329,28 @@ window.GradebookChrome = (function () {
     _colLit = [];
   }
 
-  /* The tooltip on a student's name, in two groups so the two kinds of
-     number never sit side by side: the course grade as the class shows it
-     (with how many assignments are NS, which count as 0 toward a %) and
-     each category's grade, then each competency as a proficiency word
-     with how many assignments it comes from, then how many competencies
-     have evidence. Every value comes from calc.js. Kept in a map, not an
-     attribute, so the HTML never round-trips through the DOM. */
-  // html-safe: names, category and section names and grade text go through esc; levels come from calc.js.
-  function nameTip(cid, student, sections) {
-    var grade = studentGradeSummary(cid, student.id, viewedReportTerm(cid));
-    var word = levelWord(cid, getOverallProficiency(cid, student.id));
-    // The full name first: the name column cuts long ones off.
-    var tip =
-      '<div class="gb-tip-name">' +
-      esc(displayName(student)) +
-      '</div>' +
-      '<div class="gb-tip-head">Course Grade</div>' +
-      '<div class="gb-tip-grade" style="color:' +
-      (grade.text ? PROF_COLORS[grade.level] || PROF_COLORS[0] : 'var(--text-3)') +
-      '">' +
-      (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
-      '</div>';
-    // NS lowers only a percentage; a Proficiency class shows none. Only work
-    // the grade above counts: the year so far, outside 0% categories.
-    if (courseGradeMode(cid) !== 'proficiency') {
-      var ns = _scopedAssessments(cid).filter(function (a) {
-        return getAssignmentStatus(cid, student.id, a.id) === 'NS' && countsTowardGrades(cid, a);
-      }).length;
-      if (ns > 0)
-        tip +=
-          '<div class="gb-tip-note">' +
-          ns +
-          (ns === 1 ? ' assessment missing (counts as 0)' : ' assessments missing (count as 0)') +
-          '</div>';
-    }
-    // Categories make up the course grade, so they sit under it, each graded
-    // as the class shows grades.
-    var cats = getCategories(cid) || [];
-    if (cats.length) {
-      var scoped = _scopedAssessments(cid);
-      tip += '<div class="gb-tip-head">Categories</div>';
-      cats.forEach(function (cat) {
-        var g = assessmentGroupGrade(
-          cid,
-          student.id,
-          scoped.filter(function (a) {
-            return (a.categoryId || a.category_id || null) === cat.id;
-          }),
-          categoryCalcMode(cat),
-        );
-        tip +=
-          '<div class="gb-tip-row"><span class="gb-tip-label">' +
-          esc(cat.name) +
-          '</span><span class="gb-tip-val" style="color:' +
-          (g ? PROF_COLORS[g.level] || PROF_COLORS[0] : 'var(--text-3)') +
-          '">' +
-          (g ? esc(g.text) : '\u2014') +
-          '</span></div>';
-      });
-    }
-    // Each competency's level rests only on work handed in (an NS clears its
-    // scores), so the group says how much work that is, and each row how
-    // many assignments it comes from.
-    var allIds = {};
-    var rows = '';
-    var withEvidence = 0;
-    sections.forEach(function (sec) {
-      var ids = {};
-      sec.tags.forEach(function (t) {
-        getCountedTagScores(cid, student.id, t.id).forEach(function (sc) {
-          if (_isScoredEvidence(sc)) ids[sc.assessmentId] = allIds[sc.assessmentId] = true;
-        });
-      });
-      var n = Object.keys(ids).length;
-      var sp = getSectionProficiency(cid, student.id, sec.id);
-      if (getSectionProficiencyRaw(cid, student.id, sec.id) > 0) withEvidence++;
-      var r = Math.max(0, Math.min(4, roundLevel(sp)));
-      rows +=
-        '<div class="gb-tip-row"><span class="gb-tip-label">' +
-        esc(sec.shortName || sec.name) +
-        '</span><span class="gb-tip-val" style="color:' +
-        (r ? PROF_COLORS[r] : 'var(--text-3)') +
-        '">' +
-        esc(r ? levelText(cid, sp) : PROF_LABELS[0]) +
-        (r && n ? ' <span class="gb-tip-count">· ' + n + (n === 1 ? ' assessment' : ' assessments') + '</span>' : '') +
-        '</span></div>';
+  /* The card on a student's name (StudentOutlook.cardHtml), built when it
+     opens: under the student's row, or over it near the bottom of the
+     window, so the row and its scores stay in view. Not while a menu is
+     open. True when the card is showing. */
+  function showNameTip(name, cid) {
+    var gbTip = document.getElementById('gb-tooltip');
+    var student = getStudents(cid).find(function (s) {
+      return s.id === name.dataset.sid;
     });
-    var handedIn = Object.keys(allIds).length;
-    tip += '<div class="gb-tip-head">Competencies</div>';
-    if (handedIn > 0)
-      tip +=
-        '<div class="gb-tip-note">From ' +
-        handedIn +
-        (handedIn === 1 ? ' assessment' : ' assessments') +
-        ' handed in</div>';
-    tip += '<div class="gb-tip-rows">' + rows + '</div>';
-    tip +=
-      '<div class="gb-tip-note gb-tip-foot">Evidence in ' +
-      withEvidence +
-      ' of ' +
-      sections.length +
-      (sections.length === 1 ? ' competency' : ' competencies') +
-      '</div>';
-    return tip;
+    if (!gbTip || !student || document.querySelector('.gb-ctx-menu')) return false;
+    gbTip.className = 'gb-tip-student';
+    // html-safe: StudentOutlook.cardHtml escapes names, titles, categories and grade text.
+    gbTip.innerHTML = StudentOutlook.cardHtml(cid, student);
+    gbTip.style.display = 'block';
+    var rect = (name.closest('.gb-grid-rowhead') || name).getBoundingClientRect();
+    var top = rect.bottom + 4;
+    if (top + gbTip.offsetHeight > window.innerHeight - 8) top = rect.top - gbTip.offsetHeight - 4;
+    if (top < 8) top = 8;
+    if (top + gbTip.offsetHeight > window.innerHeight - 8) top = window.innerHeight - gbTip.offsetHeight - 8;
+    gbTip.style.left = rect.left + 8 + 'px';
+    gbTip.style.top = top + 'px';
+    return true;
   }
 
   /* ── Sorting ─────────────────────────────────────────────── */
@@ -594,7 +512,7 @@ window.GradebookChrome = (function () {
     initColHoverTooltip: initColHoverTooltip,
     _slantedColAt: _slantedColAt,
     _inSlantedHeads: _inSlantedHeads,
-    nameTip: nameTip,
+    showNameTip: showNameTip,
     sortRows: sortRows,
     swapHtml: swapHtml,
     patch: patch,
