@@ -38,6 +38,7 @@ public._assessment_resource_same_class() 1d661e6e1a34b6c2a82735f439fdc064 448
 public._assessment_resource_truncated() 5d4a8ca2dd10909f2d669927b2a5bba6 332
 public._assessment_work_json(p_assessment_id uuid) e281660216f4186fe3f374eeacaf2fe6 524
 public._cards_work_until(p_course_id uuid) 258317511f7b190e41f62a9570c9b7b7 983
+public._class_is_fixed() 5d06a3490d59781d773d1706a8fbba0f 1943
 public._course_restored_opened() a345459a8b66ded92f8aad90e01b4f63 618
 public._fv_date(p text) 0dcf865b5254cf0f9535df0fac1cb8a4 308
 public._fv_release_orphan_teacher_email() d1786f4b0205b700167758f4bb61e32e 762
@@ -94,6 +95,8 @@ public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned b
 public._revision_state(p_request_id uuid) 894bb53b0ad066e21f36c3a8038d5c6c 1894
 public._rubric_comment_list(p_list jsonb, p_criterion boolean) 9d4ac363cc858896b9efd137afe6fd54 2943
 public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) 2f5d1bb44e726f189f029c3e955a84ea 805
+public._score_row_class() 7d14f1bd2590e620a55bda0e29678730 290
+public._score_row_parent_class() 7a980bad7a3cb5987ad04cffc3346902 1397
 public._student_card_json(p_card_id uuid) bba8282f322ad6913ecca134c24d5cfa 1326
 public._submission_file_removed() edc99e4c04baefcf83b9ce3c94723023 587
 public._submission_gone() 606be06c71d963805c12f23208b5c304 430
