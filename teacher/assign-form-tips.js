@@ -612,8 +612,8 @@
 
     // Render toolbar
     var result = renderAssessToolbar(cid);
-    // html-safe: renderAssessToolbar escapes course names, category names, search text and student names
-    /** @type {any} */ (document.getElementById('page-toolbar-mount')).innerHTML = result.toolbarHtml;
+    // The bar's parts stay, only what changed is changed (keep-dom.js).
+    KeepDom.patch(/** @type {Element} */ (document.getElementById('page-toolbar-mount')), result.toolbarHtml);
 
     // Render assessment list
     var keptForm = _openFormToKeep(cid);
