@@ -64,7 +64,7 @@ describe('rerenderKeeping', () => {
 });
 
 describe('saving a rubric from the assessment form', () => {
-  const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
+  const src = readFileSync(resolve(root, 'teacher/assign-rubric-criteria.js'), 'utf-8');
   const save = src.slice(src.indexOf('function saveRubricEdit'), src.indexOf('function newRubricFromForm'));
 
   it('re-renders the page around the open form', () => {

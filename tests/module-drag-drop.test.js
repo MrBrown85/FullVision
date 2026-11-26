@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('dropping a module', () => {
-  const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
+  const src = readFileSync(resolve(root, 'teacher/assign-modules.js'), 'utf-8');
   const drop = src.slice(src.indexOf('function onModuleDropZoneDrop'), src.indexOf('function onAssessDragStart'));
 
   it('does not read currentTarget, which is the document', () => {

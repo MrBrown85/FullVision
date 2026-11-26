@@ -386,7 +386,10 @@ declare var AddWorkTwoClasses: any; // teacher/add-work-two-classes.js (B6)
 declare var PhotoExpiry: any; // shared/photo-expiry.js, for shared/data-courses-terms.js
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
-declare var GraderWork: { workShown(cid: string, a: unknown): boolean };
+declare var GraderWork: {
+  workShown(cid: string, a: unknown): boolean;
+  draftsIn(cid: string, aid: string, shownIds: unknown): any[];
+};
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };
 declare function showConfirm(
@@ -507,6 +510,8 @@ interface Window {
 }
 declare var Router: any;
 declare var SidebarKeep: { draw(html: string): void; release(): void; settle(): void };
+// teacher/keep-dom.js, as teacher/assign-form-tips.js calls it (window.KeepDom above is the same object).
+declare var KeepDom: Window['KeepDom'];
 declare var CmRosterFile: any;
 declare var closeColorPop: any;
 declare var CmBlockPicker: any;
@@ -522,3 +527,46 @@ declare var CmTerms: any;
 declare var CompetencyWording: any;
 declare var RubricDraft: any;
 declare var RubricPrint: any;
+// The Assignments page's pieces (teacher/assign-*.js, cut from page-assignments.js)
+// and the modules they call, which are not typed.
+declare var FactorField: any;
+declare var AssignShow: any;
+declare var AssignList: any;
+declare var CritComment: any;
+declare var AssessmentCopy: any;
+declare var AssessmentTypeField: any;
+declare var AssignDraft: any;
+declare var HandoutFiles: any;
+interface Window {
+  BANK_CORE_COMPETENCIES?: any;
+  AssessmentCopy?: any;
+  HandoutFiles?: any;
+}
+declare var RubricBank: any;
+interface Window {
+  RubricBank?: any;
+}
+declare var RubricChecks: any;
+declare var RubricCommentLines: any;
+declare var RubricGuard: any;
+declare var RubricScale: any;
+interface Window {
+  RubricChecks?: any;
+}
+declare var RubricLibrary: any;
+interface Window {
+  RubricLibrary?: any;
+}
+declare var AssignCompPicker: any;
+declare var GradeChange: any;
+declare var Grader: any;
+declare var QuizData: any;
+declare var refreshSidebarGrades: any;
+interface Window {
+  QuizData?: any;
+}
+declare var rerenderKeeping: any;
+declare var ExpandMotion: any;
+interface Window {
+  ExpandMotion?: any;
+}

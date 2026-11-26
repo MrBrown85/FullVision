@@ -23,11 +23,11 @@ describe('edit-copy-duplicate-checks', () => {
 
   const U = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0');
 
-  /* _scoreMoveMaps as written in page-assignments.js. */
+  /* _scoreMoveMaps as written in assign-crud.js (moved from page-assignments.js). */
   function scoreMoveMaps() {
-    const src = readFileSync('teacher/page-assignments.js', 'utf-8');
+    const src = readFileSync('teacher/assign-crud.js', 'utf-8');
     const fn = src.match(/ {2}function _scoreMoveMaps\([^)]*\) \{[\s\S]*?\n {2}\}\n/);
-    expect(fn, '_scoreMoveMaps in page-assignments.js').toBeTruthy();
+    expect(fn, '_scoreMoveMaps in assign-crud.js').toBeTruthy();
     // eslint-disable-next-line no-new-func
     return new Function('getRubricById', '_writesEnabled', '_isUuid', fn[0] + '\nreturn _scoreMoveMaps;')(
       () => null,
