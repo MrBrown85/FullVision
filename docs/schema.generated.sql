@@ -57,6 +57,7 @@ table public.assessment (rls on)
   constraint assessment_core_competency_ids_check CHECK ((core_competency_ids <@ ARRAY['COM'::text, 'COL'::text, 'CT'::text, 'CRT'::text, 'PPI'::text, 'PAR'::text, 'SAR'::text]))
   constraint assessment_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
   constraint assessment_group_work_check CHECK ((group_work = ANY (ARRAY['each'::text, 'group'::text])))
+  constraint assessment_id_course_uk UNIQUE (id, course_id)
   constraint assessment_max_points_check CHECK (((max_points IS NULL) OR (max_points > (0)::numeric)))
   constraint assessment_module_id_fkey FOREIGN KEY (module_id) REFERENCES public.module(id) ON DELETE SET NULL
   constraint assessment_pkey PRIMARY KEY (id)
@@ -68,6 +69,7 @@ table public.assessment (rls on)
   CREATE INDEX assessment_copy_group_idx ON public.assessment USING btree (copy_group) WHERE (copy_group IS NOT NULL)
   CREATE INDEX assessment_course_idx ON public.assessment USING btree (course_id)
   CREATE INDEX assessment_date_assigned_idx ON public.assessment USING btree (course_id, date_assigned)
+  CREATE UNIQUE INDEX assessment_id_course_uk ON public.assessment USING btree (id, course_id)
   CREATE INDEX assessment_module_idx ON public.assessment USING btree (module_id)
   CREATE UNIQUE INDEX assessment_pkey ON public.assessment USING btree (id)
   CREATE INDEX assessment_rubric_idx ON public.assessment USING btree (rubric_id)
@@ -412,6 +414,7 @@ table public.criterion (rls on)
   CREATE UNIQUE INDEX criterion_pkey ON public.criterion USING btree (id)
   CREATE INDEX criterion_rubric_idx ON public.criterion USING btree (rubric_id)
   CREATE TRIGGER course_sync_cursor_criterion_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.criterion FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'rubric')
+  CREATE TRIGGER criterion_class_fixed BEFORE UPDATE OF rubric_id ON public.criterion FOR EACH ROW WHEN ((old.rubric_id IS DISTINCT FROM new.rubric_id)) EXECUTE FUNCTION public._class_is_fixed('criterion')
   policy criterion_via_rubric for all to public using ((EXISTS ( SELECT 1
    FROM public.rubric r
   WHERE ((r.id = criterion.rubric_id) AND public.fv_owns_course(r.course_id))))) with check ((EXISTS ( SELECT 1
@@ -431,6 +434,7 @@ table public.criterion_check (rls on)
   CREATE INDEX criterion_check_criterion_idx ON public.criterion_check USING btree (criterion_id)
   CREATE UNIQUE INDEX criterion_check_pkey ON public.criterion_check USING btree (id)
   CREATE TRIGGER course_sync_cursor_criterion_check_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.criterion_check FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'criterion')
+  CREATE TRIGGER criterion_check_class_fixed BEFORE UPDATE OF criterion_id ON public.criterion_check FOR EACH ROW WHEN ((old.criterion_id IS DISTINCT FROM new.criterion_id)) EXECUTE FUNCTION public._class_is_fixed('checkbox')
   policy criterion_check_via_parents for all to public using ((EXISTS ( SELECT 1
    FROM (public.criterion cr
      JOIN public.rubric r ON ((r.id = cr.rubric_id)))
@@ -476,8 +480,9 @@ table public.dibels_score (rls on)
   maze_correct integer
   maze_incorrect integer
   updated_at timestamp with time zone not null default now()
-  constraint dibels_score_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
-  constraint dibels_score_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  course_id uuid
+  constraint dibels_score_assessment_id_fkey FOREIGN KEY (assessment_id, course_id) REFERENCES public.assessment(id, course_id) MATCH FULL ON DELETE CASCADE
+  constraint dibels_score_enrollment_id_fkey FOREIGN KEY (enrollment_id, course_id) REFERENCES public.enrollment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint dibels_score_maze_correct_check CHECK ((maze_correct >= 0))
   constraint dibels_score_maze_incorrect_check CHECK ((maze_incorrect >= 0))
   constraint dibels_score_orf_errors_check CHECK ((orf_errors >= 0))
@@ -488,6 +493,7 @@ table public.dibels_score (rls on)
   CREATE INDEX dibels_score_assessment_idx ON public.dibels_score USING btree (assessment_id)
   CREATE UNIQUE INDEX dibels_score_pkey ON public.dibels_score USING btree (id)
   CREATE UNIQUE INDEX dibels_score_unique ON public.dibels_score USING btree (enrollment_id, assessment_id, period)
+  CREATE TRIGGER dibels_score_class BEFORE INSERT OR UPDATE OF enrollment_id, course_id ON public.dibels_score FOR EACH ROW EXECUTE FUNCTION public._score_row_class()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF enrollment_id, assessment_id ON public.dibels_score FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('enrollment_id:enrollment', 'assessment_id:assessment')
   policy dibels_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_score_cell(enrollment_id, assessment_id))
 table public.enrollment (rls on)
@@ -503,10 +509,12 @@ table public.enrollment (rls on)
   show_overall_grade boolean
   page_paused_at timestamp with time zone
   constraint enrollment_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
+  constraint enrollment_id_course_uk UNIQUE (id, course_id)
   constraint enrollment_pkey PRIMARY KEY (id)
   constraint enrollment_student_id_course_id_key UNIQUE (student_id, course_id)
   constraint enrollment_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.student(id) ON DELETE CASCADE
   CREATE INDEX enrollment_course_idx ON public.enrollment USING btree (course_id)
+  CREATE UNIQUE INDEX enrollment_id_course_uk ON public.enrollment USING btree (id, course_id)
   CREATE UNIQUE INDEX enrollment_pkey ON public.enrollment USING btree (id)
   CREATE UNIQUE INDEX enrollment_student_id_course_id_key ON public.enrollment USING btree (student_id, course_id)
   CREATE INDEX enrollment_student_idx ON public.enrollment USING btree (student_id)
@@ -1186,6 +1194,7 @@ table public.rubric (rls on)
   CREATE INDEX rubric_course_idx ON public.rubric USING btree (course_id)
   CREATE UNIQUE INDEX rubric_pkey ON public.rubric USING btree (id)
   CREATE TRIGGER course_sync_cursor_rubric_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.rubric FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
+  CREATE TRIGGER rubric_class_fixed BEFORE UPDATE OF course_id ON public.rubric FOR EACH ROW WHEN ((old.course_id IS DISTINCT FROM new.course_id)) EXECUTE FUNCTION public._class_is_fixed('rubric')
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF course_id, copy_group ON public.rubric FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('course_id:course', 'copy_group:rubric_copy_group')
   policy rubric_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.rubric_check_score (rls on)
@@ -1193,9 +1202,10 @@ table public.rubric_check_score (rls on)
   assessment_id uuid not null
   check_id uuid not null
   created_at timestamp with time zone not null default now()
-  constraint rubric_check_score_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
+  course_id uuid
+  constraint rubric_check_score_assessment_id_fkey FOREIGN KEY (assessment_id, course_id) REFERENCES public.assessment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint rubric_check_score_check_id_fkey FOREIGN KEY (check_id) REFERENCES public.criterion_check(id) ON DELETE CASCADE
-  constraint rubric_check_score_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint rubric_check_score_enrollment_id_fkey FOREIGN KEY (enrollment_id, course_id) REFERENCES public.enrollment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint rubric_check_score_pkey PRIMARY KEY (enrollment_id, assessment_id, check_id)
   CREATE INDEX rubric_check_score_assessment_idx ON public.rubric_check_score USING btree (assessment_id)
   CREATE INDEX rubric_check_score_check_idx ON public.rubric_check_score USING btree (check_id)
@@ -1205,6 +1215,8 @@ table public.rubric_check_score (rls on)
   CREATE TRIGGER grade_return_insert AFTER INSERT ON public.rubric_check_score REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
   CREATE TRIGGER grade_return_repoint AFTER UPDATE ON public.rubric_check_score FOR EACH ROW WHEN ((old.check_id IS DISTINCT FROM new.check_id)) EXECUTE FUNCTION public._grade_return_repoint('checks', 'check_id')
   CREATE TRIGGER grade_return_update AFTER UPDATE ON public.rubric_check_score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER rubric_check_score_class BEFORE INSERT OR UPDATE OF enrollment_id, course_id ON public.rubric_check_score FOR EACH ROW EXECUTE FUNCTION public._score_row_class()
+  CREATE TRIGGER rubric_check_score_class_parent AFTER INSERT OR UPDATE OF check_id, enrollment_id, course_id ON public.rubric_check_score FOR EACH ROW EXECUTE FUNCTION public._score_row_parent_class()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF enrollment_id, assessment_id, check_id ON public.rubric_check_score FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('enrollment_id:enrollment', 'assessment_id:assessment', 'check_id:criterion_check')
   policy rubric_check_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_rubric_check_cell(enrollment_id, assessment_id, check_id))
 table public.rubric_print (rls on)
@@ -1232,10 +1244,11 @@ table public.rubric_score (rls on)
   comment text
   beyond text
   own_comment text
-  constraint rubric_score_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
+  course_id uuid
+  constraint rubric_score_assessment_id_fkey FOREIGN KEY (assessment_id, course_id) REFERENCES public.assessment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint rubric_score_criterion_id_fkey FOREIGN KEY (criterion_id) REFERENCES public.criterion(id) ON DELETE CASCADE
   constraint rubric_score_enrollment_id_assessment_id_criterion_id_key UNIQUE (enrollment_id, assessment_id, criterion_id)
-  constraint rubric_score_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint rubric_score_enrollment_id_fkey FOREIGN KEY (enrollment_id, course_id) REFERENCES public.enrollment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint rubric_score_modifier_check CHECK ((((modifier >= '-1'::integer) AND (modifier <= 1)) AND (NOT ((value = 1) AND (modifier = '-1'::integer))) AND (NOT ((value = 4) AND (modifier = 1)))))
   constraint rubric_score_pkey PRIMARY KEY (id)
   constraint rubric_score_value_check CHECK (((value >= 1) AND (value <= 4)))
@@ -1248,6 +1261,8 @@ table public.rubric_score (rls on)
   CREATE TRIGGER grade_return_insert AFTER INSERT ON public.rubric_score REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
   CREATE TRIGGER grade_return_repoint AFTER UPDATE ON public.rubric_score FOR EACH ROW WHEN ((old.criterion_id IS DISTINCT FROM new.criterion_id)) EXECUTE FUNCTION public._grade_return_repoint('criteria', 'criterion_id')
   CREATE TRIGGER grade_return_update AFTER UPDATE ON public.rubric_score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER rubric_score_class BEFORE INSERT OR UPDATE OF enrollment_id, course_id ON public.rubric_score FOR EACH ROW EXECUTE FUNCTION public._score_row_class()
+  CREATE TRIGGER rubric_score_class_parent AFTER INSERT OR UPDATE OF criterion_id, enrollment_id, course_id ON public.rubric_score FOR EACH ROW EXECUTE FUNCTION public._score_row_parent_class()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF criterion_id, enrollment_id, assessment_id ON public.rubric_score FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('criterion_id:criterion', 'enrollment_id:enrollment', 'assessment_id:assessment')
   policy rubric_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_rubric_score_cell(enrollment_id, assessment_id, criterion_id))
 table public.rubric_tag (rls on)
@@ -1292,9 +1307,10 @@ table public.score (rls on)
   updated_at timestamp with time zone not null default now()
   modifier smallint not null default 0
   report_note text
-  constraint score_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
+  course_id uuid
+  constraint score_assessment_id_fkey FOREIGN KEY (assessment_id, course_id) REFERENCES public.assessment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint score_enrollment_id_assessment_id_key UNIQUE (enrollment_id, assessment_id)
-  constraint score_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint score_enrollment_id_fkey FOREIGN KEY (enrollment_id, course_id) REFERENCES public.enrollment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint score_modifier_check CHECK (((modifier >= '-1'::integer) AND (modifier <= 1)))
   constraint score_pkey PRIMARY KEY (id)
   constraint score_report_note_length CHECK (((report_note IS NULL) OR ((char_length(report_note) >= 1) AND (char_length(report_note) <= 300))))
@@ -1308,6 +1324,7 @@ table public.score (rls on)
   CREATE TRIGGER grade_return_insert AFTER INSERT ON public.score REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
   CREATE TRIGGER grade_return_update AFTER UPDATE ON public.score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF enrollment_id, assessment_id ON public.score FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('enrollment_id:enrollment', 'assessment_id:assessment')
+  CREATE TRIGGER score_class BEFORE INSERT OR UPDATE OF enrollment_id, course_id ON public.score FOR EACH ROW EXECUTE FUNCTION public._score_row_class()
   policy score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_score_cell(enrollment_id, assessment_id))
 table public.score_audit (rls on)
   id uuid not null default gen_random_uuid()
@@ -1351,6 +1368,7 @@ table public.section (rls on)
   CREATE INDEX section_subject_idx ON public.section USING btree (subject_id)
   CREATE TRIGGER course_sync_cursor_section_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.section FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF course_id, competency_group_id, subject_id ON public.section FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('course_id:course', 'competency_group_id:competency_group', 'subject_id:subject')
+  CREATE TRIGGER section_class_fixed BEFORE UPDATE OF course_id ON public.section FOR EACH ROW WHEN ((old.course_id IS DISTINCT FROM new.course_id)) EXECUTE FUNCTION public._class_is_fixed('section')
   policy section_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.section_override (rls on)
   id uuid not null default gen_random_uuid()
@@ -1562,6 +1580,7 @@ table public.tag (rls on)
   CREATE UNIQUE INDEX tag_pkey ON public.tag USING btree (id)
   CREATE INDEX tag_section_idx ON public.tag USING btree (section_id)
   CREATE TRIGGER course_sync_cursor_tag_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.tag FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'section')
+  CREATE TRIGGER tag_class_fixed BEFORE UPDATE OF section_id ON public.tag FOR EACH ROW WHEN ((old.section_id IS DISTINCT FROM new.section_id)) EXECUTE FUNCTION public._class_is_fixed('competency')
   policy tag_via_section for all to public using ((EXISTS ( SELECT 1
    FROM public.section s
   WHERE ((s.id = tag.section_id) AND public.fv_owns_course(s.course_id))))) with check ((EXISTS ( SELECT 1
@@ -1576,9 +1595,10 @@ table public.tag_score (rls on)
   updated_at timestamp with time zone not null default now()
   modifier smallint not null default 0
   comment text
-  constraint tag_score_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE
+  course_id uuid
+  constraint tag_score_assessment_id_fkey FOREIGN KEY (assessment_id, course_id) REFERENCES public.assessment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint tag_score_enrollment_id_assessment_id_tag_id_key UNIQUE (enrollment_id, assessment_id, tag_id)
-  constraint tag_score_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint tag_score_enrollment_id_fkey FOREIGN KEY (enrollment_id, course_id) REFERENCES public.enrollment(id, course_id) MATCH FULL ON DELETE CASCADE
   constraint tag_score_modifier_check CHECK ((((modifier >= '-1'::integer) AND (modifier <= 1)) AND (NOT ((value = 1) AND (modifier = '-1'::integer))) AND (NOT ((value = 4) AND (modifier = 1)))))
   constraint tag_score_pkey PRIMARY KEY (id)
   constraint tag_score_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tag(id) ON DELETE CASCADE
@@ -1593,6 +1613,8 @@ table public.tag_score (rls on)
   CREATE TRIGGER grade_return_repoint AFTER UPDATE ON public.tag_score FOR EACH ROW WHEN ((old.tag_id IS DISTINCT FROM new.tag_id)) EXECUTE FUNCTION public._grade_return_repoint('tags', 'tag_id')
   CREATE TRIGGER grade_return_update AFTER UPDATE ON public.tag_score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
   CREATE TRIGGER same_teacher BEFORE INSERT OR UPDATE OF enrollment_id, assessment_id, tag_id ON public.tag_score FOR EACH ROW EXECUTE FUNCTION fv_private.same_teacher('enrollment_id:enrollment', 'assessment_id:assessment', 'tag_id:tag')
+  CREATE TRIGGER tag_score_class BEFORE INSERT OR UPDATE OF enrollment_id, course_id ON public.tag_score FOR EACH ROW EXECUTE FUNCTION public._score_row_class()
+  CREATE TRIGGER tag_score_class_parent AFTER INSERT OR UPDATE OF tag_id, enrollment_id, course_id ON public.tag_score FOR EACH ROW EXECUTE FUNCTION public._score_row_parent_class()
   policy tag_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_tag_score_cell(enrollment_id, assessment_id, tag_id))
 table public.teacher (rls on)
   id uuid not null default gen_random_uuid()
@@ -1802,6 +1824,7 @@ function public._assessment_resource_same_class() returns trigger security defin
 function public._assessment_resource_truncated() returns trigger security definer
 function public._assessment_work_json(p_assessment_id uuid) returns jsonb security definer
 function public._cards_work_until(p_course_id uuid) returns date security definer
+function public._class_is_fixed() returns trigger security definer
 function public._course_restored_opened() returns trigger security definer
 function public._fv_date(p text) returns date
 function public._fv_release_orphan_teacher_email() returns void security definer
@@ -1858,6 +1881,8 @@ function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_r
 function public._revision_state(p_request_id uuid) returns jsonb security definer
 function public._rubric_comment_list(p_list jsonb, p_criterion boolean) returns jsonb
 function public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) returns void security definer
+function public._score_row_class() returns trigger security definer
+function public._score_row_parent_class() returns trigger security definer
 function public._student_card_json(p_card_id uuid) returns jsonb security definer
 function public._submission_file_removed() returns trigger security definer
 function public._submission_gone() returns trigger security definer
