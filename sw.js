@@ -333,6 +333,7 @@ const PRECACHE_URLS = [
   '/teacher/assessment-type-field.js',
   '/teacher/rubric-comment-lines.js',
   '/teacher/assign-form-tips.js',
+  '/teacher/assign-form.js',
   '/teacher/page-assignments.js',
   '/teacher/rubric-words.js',
   '/teacher/bulletin-share.js',
