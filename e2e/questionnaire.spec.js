@@ -465,7 +465,9 @@ test('At a Glance: the year so far, the best piece and View All Skills', async (
   await expect(page.locator('.qno-glance .qn-fact').nth(0)).toContainText(expected.strongest);
   await expect(page.locator('.qno-glance .qn-fact').nth(1)).toContainText(expected.next);
   await expect(page.locator('.qn-best .qn-fact-body')).toContainText(expected.best);
-  await expect(page.locator('.qno-glance .qn-sub')).toHaveText('So far this year · change since the Term 1 report');
+  await expect(page.locator('.qno-glance .qn-card-top .qn-ev-text')).toHaveText(
+    'So far this year · change since the Term 1 report',
+  );
   await expect(page.locator('.qno-glance [data-action="tqOpenSkills"]')).toHaveText(
     'View All ' + expected.comps + ' Skills ›',
   );
@@ -486,7 +488,7 @@ test('At a Glance: the year so far, the best piece and View All Skills', async (
 
 test('Cece’s Voice: the answers, the private one marked, a quoted answer says In the comment', async ({ page }) => {
   await open(page);
-  await expect(page.locator('.qn-voice .qn-card-title')).toHaveText('Cece’s Voice');
+  await expect(page.locator('.qn-voice .qn-box-name')).toHaveText('Cece’s Voice');
   const priv = page.locator('.qn-voice-row', { has: page.locator('.qn-chip-private') });
   await expect(priv.locator('.qn-fact-label')).toHaveText('To you only');
   await expect(priv).toContainText('grandma');
