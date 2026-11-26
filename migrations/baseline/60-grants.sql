@@ -221,6 +221,7 @@ revoke all on routine public._assessment_resource_truncated() from public;
 revoke all on routine public._assessment_work_json(p_assessment_id uuid) from public;
 revoke all on routine public._cards_work_until(p_course_id uuid) from public;
 grant execute on routine public._cards_work_until(p_course_id uuid) to service_role;
+revoke all on routine public._class_is_fixed() from public;
 revoke all on routine public._course_restored_opened() from public;
 revoke all on routine public._fv_date(p text) from public;
 grant execute on routine public._fv_date(p text) to service_role;
@@ -305,6 +306,8 @@ grant execute on routine public._rubric_comment_list(p_list jsonb, p_criterion b
 revoke all on routine public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) from public;
 grant execute on routine public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) to authenticated;
 grant execute on routine public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) to service_role;
+revoke all on routine public._score_row_class() from public;
+revoke all on routine public._score_row_parent_class() from public;
 revoke all on routine public._student_card_json(p_card_id uuid) from public;
 grant execute on routine public._student_card_json(p_card_id uuid) to service_role;
 revoke all on routine public._submission_file_removed() from public;
