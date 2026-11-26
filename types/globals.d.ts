@@ -569,3 +569,4 @@ declare var ClassResults: any;
 interface Window {
   ClassResults?: any;
 }
+declare var RubricWords: any;
