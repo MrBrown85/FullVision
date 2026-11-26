@@ -195,7 +195,12 @@ describe('grade-format-guard', () => {
     'teacher/dash-observations.js': 1,
     'teacher/assign-blank-rubric.js': 4, // the compact rubric editor's column heads (moved from page-assignments.js, which keeps 23 of its 27)
     'teacher/assign-copy-class-view.js': 1, // Edit My Wording's level labels (moved from page-assignments.js, which keeps 22 of its 23)
-    'teacher/page-assignments.js': 22, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
+    'teacher/assign-card-list.js': 3, // the card's level names (moved from page-assignments.js, which keeps 19 of its 22)
+    'teacher/assign-cards.js': 1, // the single-point card's level word (moved from page-assignments.js, which keeps 18 of its 19)
+    'teacher/assign-dibels.js': 2, // the benchmark card's level names (moved from page-assignments.js, which keeps 16 of its 18)
+    'teacher/assign-levels.js': 2, // the six-point rubric's level names (moved from page-assignments.js, which keeps 14 of its 16)
+    'teacher/assign-rubric-grading.js': 3, // the rubric rows' level names (moved from page-assignments.js, which keeps 11 of its 14)
+    'teacher/page-assignments.js': 11, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
     'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,

@@ -389,6 +389,8 @@ declare var PhotoReaders: { openPdf: unknown };
 declare var GraderWork: {
   workShown(cid: string, a: unknown): boolean;
   draftsIn(cid: string, aid: string, shownIds: unknown): any[];
+  workOnInClass(cid: string): boolean;
+  workCounts(cid: string, aid: string, shownIds: unknown): any;
 };
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };
@@ -569,4 +571,17 @@ declare var rerenderKeeping: any;
 declare var ExpandMotion: any;
 interface Window {
   ExpandMotion?: any;
+}
+declare var AssignToolbar: any;
+declare var printFileName: any;
+declare var setPrintTitle: any;
+declare var ClassResults: any;
+interface Window {
+  ClassResults?: any;
+}
+declare var RubricWords: any;
+declare var ObsCapture: any;
+declare var ObsFollowUps: any;
+interface Window {
+  ObsFollowUps?: any;
 }

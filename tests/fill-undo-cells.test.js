@@ -5,7 +5,7 @@
  * was up was undone too. restoreScoreCells (shared/data.js) puts back only
  * the cells the fill changed that still hold what it wrote.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -176,7 +176,15 @@ describe('restoreScoreCells', () => {
 
 describe('the fills undo through restoreScoreCells', () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
+  // The Assignments page is teacher/page-assignments.js and the teacher/assign-*.js cut from it.
+  const src = ['teacher/page-assignments.js']
+    .concat(
+      readdirSync(resolve(root, 'teacher'))
+        .filter(n => /^assign-.*\.js$/.test(n))
+        .map(n => 'teacher/' + n),
+    )
+    .map(f => readFileSync(resolve(root, f), 'utf-8'))
+    .join('\n');
 
   // Through Grader.undo since S1-T3; tests/grader.test.js holds that undo
   // calls restoreScoreCells with the same arguments.
