@@ -86,6 +86,7 @@
     "teacher/assign-toolbar.js",
     "teacher/gradebook-toolbar.js",
     "teacher/assign-list.js",
+    "teacher/crit-bank.js",
     "teacher/crit-comment.js",
     "teacher/add-from-class.js",
     "teacher/assign-draft.js",

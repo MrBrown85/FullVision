@@ -309,6 +309,7 @@ const PRECACHE_URLS = [
   '/teacher/assign-toolbar.js',
   '/teacher/grade-change.js',
   '/teacher/assign-list.js',
+  '/teacher/crit-bank.js',
   '/teacher/crit-comment.js',
   '/teacher/assign-draft.js',
   '/teacher/assessment-type-field.js',

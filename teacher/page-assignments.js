@@ -17699,15 +17699,15 @@ window.PageAssignments = (function () {
     delete window.toggleFocusStudent;
   }
 
-  // The criterion comment (teacher/crit-comment.js) borrows the class on
-  // screen and three of this page's helpers.
+  // The criterion comment (teacher/crit-comment.js) borrows the class on screen,
+  // four of this page's helpers and the level picked.
   CritComment.configure({
-    course: function () {
-      return activeCourse;
-    },
+    course: () => activeCourse,
     groupRow: _groupRowFor,
     criterion: getRubricCriterion,
     scrollIntoView: _scrollIntoViewIfNeeded,
+    level: (cid, sid, aid, crit) =>
+      _sixRubricOf(cid, aid) ? _sixScoreNow(cid, sid, aid, crit) : _criterionState(cid, sid, aid, crit).level,
   });
 
   /* ── Public API ─────────────────────────────────────────── */
