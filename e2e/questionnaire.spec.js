@@ -1904,9 +1904,6 @@ test('an IE with no comment shows + Problem Sentence and + Plan Sentence, and no
   await expect(card.getByRole('button', { name: '+ Plan Sentence' })).toBeVisible();
   await expect(card).not.toContainText('Your gradebook');
   await expect(card.locator('.qn-req-source')).toHaveCount(0);
-  await page.screenshot({
-    path: '/private/tmp/claude-504/-Users-brown-colin-FullVision/87877a57-acb9-4f57-aeb7-42e409a2b08e/scratchpad/approve-ie-empty.png',
-  });
   // The button opens a line for that part; what is written is the part's sentence.
   await card.getByRole('button', { name: '+ Problem Sentence' }).click();
   await page.locator('#tq-own-input').fill('Cece has handed in too little marked work for a grade.');
