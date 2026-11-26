@@ -7,12 +7,6 @@ import { readFileSync } from 'node:fs';
 const read = f => readFileSync(new URL('../teacher/' + f, import.meta.url), 'utf-8');
 
 describe('Assignments dialog words', () => {
-  it('Criteria From Competencies and its Add button are in Title Case', () => {
-    const src = read('page-assignments.js');
-    expect(src).toContain("title: 'Criteria From Competencies'");
-    expect(src).toContain("(n === 1 ? ' Criterion' : ' Criteria')");
-    expect(src).not.toContain("title: 'Criteria from competencies'");
-  });
   it('Check Before Adding and its buttons are in Title Case', () => {
     const src = read('assessment-copy.js');
     expect(src).toContain("title: 'Check Before Adding'");

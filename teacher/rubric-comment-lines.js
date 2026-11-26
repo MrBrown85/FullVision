@@ -337,7 +337,8 @@ window.RubricCommentLines = (function () {
 
   /** @param {Event} e */
   function _onClick(e) {
-    var el = e.target instanceof Element ? e.target.closest('[data-cm="open"]') : null;
+    var tg = /** @type {any} */ (e.target);
+    var el = tg && tg.closest ? tg.closest('[data-cm="open"]') : null;
     var b = _api && _api.get();
     if (!el || !b || !el.closest('.af-ge-card')) return;
     var ds = /** @type {HTMLElement} */ (el).dataset;
@@ -354,8 +355,9 @@ window.RubricCommentLines = (function () {
           '"]'
         : null;
     /** @type {any} */ (_api).render(sel);
+    /** @type {any} */
     var to = sel ? document.querySelector('.af-ge-card ' + sel) : _firstEmpty(i);
-    if (to instanceof HTMLTextAreaElement) {
+    if (to && to.setSelectionRange) {
       to.focus({ preventScroll: true });
       to.setSelectionRange(to.value.length, to.value.length);
     }
@@ -370,13 +372,14 @@ window.RubricCommentLines = (function () {
   /* Enter ends the line, as it does in a comment box: it goes to the next line, never makes a second. */
   /** @param {KeyboardEvent} e */
   function _onKey(e) {
+    /** @type {any} */
     var t = e.target;
-    if (e.key !== 'Enter' || !(t instanceof HTMLTextAreaElement) || t.dataset.ge !== 'comment') return;
+    if (e.key !== 'Enter' || !t || !t.dataset || t.dataset.ge !== 'comment') return;
     e.preventDefault();
-    var next = t.closest('.af-cm-wrap');
-    next = next && next.nextElementSibling;
+    var wrap = t.closest('.af-cm-wrap');
+    var next = wrap && wrap.nextElementSibling;
     var field = next && next.querySelector('.af-cm-field');
-    if (field instanceof HTMLElement) field.focus();
+    if (field) field.focus();
   }
 
   /** @param {{ render: (sel?: string | null) => void, get: () => any, courseId: () => string }} api */
@@ -386,8 +389,9 @@ window.RubricCommentLines = (function () {
 
   /** @param {Event} e */
   function _onInputEvent(e) {
+    /** @type {any} */
     var t = e.target;
-    if (t instanceof HTMLTextAreaElement && t.dataset.ge === 'comment' && t.closest('.af-ge-card')) _onInput(t);
+    if (t && t.dataset && t.dataset.ge === 'comment' && t.closest('.af-ge-card')) _onInput(t);
   }
   document.addEventListener('input', _onInputEvent);
   document.addEventListener('click', _onClick);

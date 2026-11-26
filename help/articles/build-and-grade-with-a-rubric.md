@@ -30,7 +30,6 @@ labels:
   - Standard Rubric
   - Advanced Rubric
   - Single-Point Rubric
-  - Competencies assessed
   - Use in New Assessment
   - Choose a Rubric
   - Set Everyone To
@@ -78,7 +77,7 @@ shots:
 
 1. On the Assignments page, open **More**, the three dots at the right of the toolbar, and choose **Rubrics**. The **Rubric Bank** lists the class's rubrics.
 2. Choose **+ New Rubric**, then **Standard Rubric**, **Advanced Rubric** or **Single-Point Rubric**.
-3. Enter the name. For each criterion, select its **Competencies assessed** and type the level descriptors. Add rows with **+ Add Criterion** or **+ From Competency**.
+3. Enter the name. For each criterion, add its competencies with **+ Competency** and type the level descriptors. Add rows with **+ Add Criterion** or **+ From Competency**.
 4. Choose **Save Rubric**.
 
 To use a saved rubric, select it in the Rubric Bank and choose **Use in New Assessment**, or choose **Choose a Rubric** in the New Assessment form.
