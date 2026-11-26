@@ -1044,6 +1044,7 @@ export type Database = {
       dibels_score: {
         Row: {
           assessment_id: string
+          course_id: string | null
           enrollment_id: string
           id: string
           maze_correct: number | null
@@ -1056,6 +1057,7 @@ export type Database = {
         ComputedFields: never
         Insert: {
           assessment_id: string
+          course_id?: string | null
           enrollment_id: string
           id?: string
           maze_correct?: number | null
@@ -1067,6 +1069,7 @@ export type Database = {
         }
         Update: {
           assessment_id?: string
+          course_id?: string | null
           enrollment_id?: string
           id?: string
           maze_correct?: number | null
@@ -1079,15 +1082,15 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "dibels_score_assessment_id_fkey"
-            columns: ["assessment_id"]
+            columns: ["assessment_id", "course_id"]
             referencedRelation: "assessment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
           {
             foreignKeyName: "dibels_score_enrollment_id_fkey"
-            columns: ["enrollment_id"]
+            columns: ["enrollment_id", "course_id"]
             referencedRelation: "enrollment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
         ]
       }
@@ -2641,6 +2644,7 @@ export type Database = {
         Row: {
           assessment_id: string
           check_id: string
+          course_id: string | null
           created_at: string
           enrollment_id: string
         }
@@ -2648,21 +2652,23 @@ export type Database = {
         Insert: {
           assessment_id: string
           check_id: string
+          course_id?: string | null
           created_at?: string
           enrollment_id: string
         }
         Update: {
           assessment_id?: string
           check_id?: string
+          course_id?: string | null
           created_at?: string
           enrollment_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "rubric_check_score_assessment_id_fkey"
-            columns: ["assessment_id"]
+            columns: ["assessment_id", "course_id"]
             referencedRelation: "assessment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
           {
             foreignKeyName: "rubric_check_score_check_id_fkey"
@@ -2672,9 +2678,9 @@ export type Database = {
           },
           {
             foreignKeyName: "rubric_check_score_enrollment_id_fkey"
-            columns: ["enrollment_id"]
+            columns: ["enrollment_id", "course_id"]
             referencedRelation: "enrollment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
         ]
       }
@@ -2718,6 +2724,7 @@ export type Database = {
           assessment_id: string
           beyond: string | null
           comment: string | null
+          course_id: string | null
           criterion_id: string
           enrollment_id: string
           id: string
@@ -2731,6 +2738,7 @@ export type Database = {
           assessment_id: string
           beyond?: string | null
           comment?: string | null
+          course_id?: string | null
           criterion_id: string
           enrollment_id: string
           id?: string
@@ -2743,6 +2751,7 @@ export type Database = {
           assessment_id?: string
           beyond?: string | null
           comment?: string | null
+          course_id?: string | null
           criterion_id?: string
           enrollment_id?: string
           id?: string
@@ -2754,9 +2763,9 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rubric_score_assessment_id_fkey"
-            columns: ["assessment_id"]
+            columns: ["assessment_id", "course_id"]
             referencedRelation: "assessment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
           {
             foreignKeyName: "rubric_score_criterion_id_fkey"
@@ -2766,9 +2775,9 @@ export type Database = {
           },
           {
             foreignKeyName: "rubric_score_enrollment_id_fkey"
-            columns: ["enrollment_id"]
+            columns: ["enrollment_id", "course_id"]
             referencedRelation: "enrollment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
         ]
       }
@@ -2837,6 +2846,7 @@ export type Database = {
         Row: {
           assessment_id: string
           comment: string | null
+          course_id: string | null
           enrollment_id: string
           id: string
           modifier: number
@@ -2850,6 +2860,7 @@ export type Database = {
         Insert: {
           assessment_id: string
           comment?: string | null
+          course_id?: string | null
           enrollment_id: string
           id?: string
           modifier?: number
@@ -2862,6 +2873,7 @@ export type Database = {
         Update: {
           assessment_id?: string
           comment?: string | null
+          course_id?: string | null
           enrollment_id?: string
           id?: string
           modifier?: number
@@ -2874,15 +2886,15 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "score_assessment_id_fkey"
-            columns: ["assessment_id"]
+            columns: ["assessment_id", "course_id"]
             referencedRelation: "assessment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
           {
             foreignKeyName: "score_enrollment_id_fkey"
-            columns: ["enrollment_id"]
+            columns: ["enrollment_id", "course_id"]
             referencedRelation: "enrollment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
         ]
       }
@@ -3441,6 +3453,7 @@ export type Database = {
         Row: {
           assessment_id: string
           comment: string | null
+          course_id: string | null
           enrollment_id: string
           id: string
           modifier: number
@@ -3452,6 +3465,7 @@ export type Database = {
         Insert: {
           assessment_id: string
           comment?: string | null
+          course_id?: string | null
           enrollment_id: string
           id?: string
           modifier?: number
@@ -3462,6 +3476,7 @@ export type Database = {
         Update: {
           assessment_id?: string
           comment?: string | null
+          course_id?: string | null
           enrollment_id?: string
           id?: string
           modifier?: number
@@ -3472,15 +3487,15 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tag_score_assessment_id_fkey"
-            columns: ["assessment_id"]
+            columns: ["assessment_id", "course_id"]
             referencedRelation: "assessment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
           {
             foreignKeyName: "tag_score_enrollment_id_fkey"
-            columns: ["enrollment_id"]
+            columns: ["enrollment_id", "course_id"]
             referencedRelation: "enrollment"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "course_id"]
           },
           {
             foreignKeyName: "tag_score_tag_id_fkey"

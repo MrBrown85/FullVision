@@ -32,38 +32,39 @@ const lastBoxTop = page =>
     .last()
     .evaluate(el => el.getBoundingClientRect().top);
 
-test('the add bar shows after a pause, draws over the gap and moves nothing; it is not there while a sentence is dragged', async ({
-  page,
-}) => {
-  await open(page);
-  const top = await lastBoxTop(page);
-  const gaps = page.locator('#tq-sentences .qn-gap');
-  const n = await gaps.count();
-  // Sweep the pointer down the card, resting on each gap: the last box never moves.
-  for (let i = 0; i < n; i++) {
-    const g = await gaps.nth(i).boundingBox();
-    await page.mouse.move(g.x + 80, g.y + g.height / 2);
+for (const font of FONTS) {
+  test(`the add bar shows after a pause, draws over the gap and moves nothing (${font} font)`, async ({ page }) => {
+    await open(page);
+    await useFont(page, font);
+    const top = await lastBoxTop(page);
+    const gaps = page.locator('#tq-sentences .qn-gap');
+    const n = await gaps.count();
+    // Sweep the pointer down the card, resting on each gap: the last box never moves.
+    for (let i = 0; i < n; i++) {
+      const g = await gaps.nth(i).boundingBox();
+      await page.mouse.move(g.x + 80, g.y + g.height / 2);
+      expect(await lastBoxTop(page)).toBe(top);
+    }
+    // Not at once, then it is there.
+    const g = await gaps.nth(1).boundingBox();
+    await page.mouse.move(g.x + 90, g.y + g.height / 2);
+    const pill = gaps.nth(1).locator('.qn-gap-add');
+    expect(await pill.evaluate(el => getComputedStyle(el).opacity)).toBe('0');
+    await expect(pill).toHaveCSS('opacity', '1');
+    const look = await pill.evaluate(el => {
+      const c = getComputedStyle(el);
+      return { h: el.getBoundingClientRect().height, r: c.borderRadius, bg: c.backgroundColor, fs: c.fontSize };
+    });
+    expect(look).toEqual({ h: 18, r: '9px', bg: 'rgb(0, 102, 204)', fs: '11.5px' });
     expect(await lastBoxTop(page)).toBe(top);
-  }
-  // Not at once, then it is there.
-  const g = await gaps.nth(1).boundingBox();
-  await page.mouse.move(g.x + 90, g.y + g.height / 2);
-  const pill = gaps.nth(1).locator('.qn-gap-add');
-  expect(await pill.evaluate(el => getComputedStyle(el).opacity)).toBe('0');
-  await expect(pill).toHaveCSS('opacity', '1');
-  const look = await pill.evaluate(el => {
-    const c = getComputedStyle(el);
-    return { h: el.getBoundingClientRect().height, r: c.borderRadius, bg: c.backgroundColor, fs: c.fontSize };
+    // A click on the top edge of a sentence reaches the sentence, not the bar.
+    const t = await rows(page).nth(2).locator('.qn-req-text').boundingBox();
+    await page.mouse.click(t.x + 70, t.y + 1);
+    await expect(page.locator('.qn-edit-field')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.qn-edit-field')).toHaveCount(0);
   });
-  expect(look).toEqual({ h: 18, r: '9px', bg: 'rgb(0, 102, 204)', fs: '11.5px' });
-  expect(await lastBoxTop(page)).toBe(top);
-  // A click on the top edge of a sentence reaches the sentence, not the bar.
-  const t = await rows(page).nth(2).locator('.qn-req-text').boundingBox();
-  await page.mouse.click(t.x + 70, t.y + 1);
-  await expect(page.locator('.qn-edit-field')).toHaveCount(1);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.qn-edit-field')).toHaveCount(0);
-});
+}
 
 test('+ Add a Sentence writes at the end, before the closing; the bar writes at its gap; Return adds, Esc cancels', async ({
   page,
@@ -75,7 +76,7 @@ test('+ Add a Sentence writes at the end, before the closing; the bar writes at 
     const c = getComputedStyle(el);
     return { h: el.getBoundingClientRect().height, r: c.borderRadius, bg: c.backgroundColor, fs: c.fontSize };
   });
-  expect(look).toEqual({ h: 28, r: '7px', bg: 'rgb(0, 102, 204)', fs: '13px' });
+  expect(look).toEqual({ h: 28, r: '7px', bg: 'rgba(0, 102, 204, 0.1)', fs: '13px' });
   await add.click();
   const own = page.locator('#tq-sentences #tq-own');
   await expect(own.locator('#tq-own-input')).toBeFocused();
