@@ -1562,7 +1562,7 @@ window.MGrade = (function () {
         '</p>' +
         '<label class="m-revision-label" for="m-revision-fix">What to Fix</label>' +
         '<textarea id="m-revision-fix" class="m-revision-fix" rows="3" maxlength="2000"></textarea>' +
-        // Revise By and Revise side by side.
+        // Revise By, then Revise under it (grade.css).
         '<div class="m-revision-row"><div class="m-revision-field">' +
         '<label class="m-revision-label" for="m-revision-by">Revise By</label>' +
         '<input type="date" id="m-revision-by" class="m-revision-by"></div>' +
