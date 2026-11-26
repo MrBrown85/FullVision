@@ -64,13 +64,13 @@ test('the amber note: Rate It lowers the rating a step; Keep It hides it and rem
   const note = page.locator('.qn-habit-note');
   await expect(note).toHaveCount(1);
   await expect(note.locator('.qn-habit-note-text')).toHaveText(
-    /^This says he consistently hands in his work on time\. One assignment is not handed in: “KMT & States of Matter Lab\.”$/,
+    /^This says he always hands in his work on time\. One assignment is not handed in: “KMT & States of Matter Lab\.”$/,
   );
   await expect(note.locator('.qn-habit-note-fix')).toHaveText('Rate It Usually');
   const statuses = await page.evaluate(() => JSON.stringify(getAssignmentStatuses('sci8')));
   await note.locator('.qn-habit-note-fix').click();
   await expect(page.locator('.qn-hs[data-habit="completes"]')).toHaveAttribute('data-value', '3');
-  await expect(note.locator('.qn-habit-note-text')).toContainText('usually hands in');
+  await expect(note.locator('.qn-habit-note-text')).toContainText('hands in his work on time');
   await note.locator('.qn-habit-note-keep').click();
   await expect(note).toHaveCount(0);
   expect(await page.evaluate(() => JSON.stringify(getAssignmentStatuses('sci8')))).toBe(statuses);

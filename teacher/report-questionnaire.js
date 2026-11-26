@@ -5730,27 +5730,36 @@ window.ReportQuestionnaire = (function () {
      labelled Missing (the same count the Missing Work box shows). Rate It
      lowers that one rating a step through the ordinary rating; Keep It hides
      the note for this student and report. It changes no status. */
+  /* What the note says: the frequency word is the one the habit sentence
+     itself uses before "hand(s) in" (always, usually, consistently ...); a
+     sentence that uses none gets none. */
+  var _FREQ =
+    /\b(always|usually|consistently|regularly|generally|typically|often|mostly|normally|reliably)\s+hands?\s+in\b/i;
+  function habitNoteText(sentence, pron, nh) {
+    var m = _FREQ.exec(String(sentence || ''));
+    return (
+      'This says ' +
+      pron.subj +
+      ' ' +
+      (m ? m[1].toLowerCase() + ' ' : '') +
+      (pron.subj === 'they' ? 'hand' : 'hands') +
+      ' in ' +
+      pron.poss +
+      ' work on time. ' +
+      CommentBank.notHandedInSentence(nh)
+    );
+  }
   // html-safe: the sentence's words are esc()'d; the rating is a number
   function _habitNoteHtml(cid, st, f, rows) {
     var v = _habitsOf(cid, st, f).completes;
     var nh = f.notHandedIn;
     if (!(v >= 3 && v <= HS_STOPS) || !nh || !(nh.count > 0) || _habitKept(st)) return '';
-    var says = rows.some(function (r) {
+    var said = rows.find(function (r) {
       return _HABIT_STEPS.test(r.step || '') && ((r.prov && r.prov.factKeys) || []).indexOf('habit:completes') >= 0;
     });
-    if (!says) return '';
+    if (!said) return '';
     var p = ReportBlocks.getPronouns(st);
-    var text =
-      'This says ' +
-      p.subj +
-      ' ' +
-      (v === 4 ? 'consistently' : 'usually') +
-      ' ' +
-      (p.subj === 'they' ? 'hand' : 'hands') +
-      ' in ' +
-      p.poss +
-      ' work on time. ' +
-      CommentBank.notHandedInSentence(nh);
+    var text = habitNoteText(said.text, p, nh);
     return `<div class="qn-habit-note" role="status"><span class="qn-habit-note-text">${esc(text)}</span><button type="button" class="qn-habit-note-fix" data-action="tqSentences" data-do="habitNoteRate" data-to="${v - 1}" title="Lowers the Completes Work rating one step. The habit sentence follows.">Rate It ${esc(CommentBank.SCALE[v - 2])}</button><button type="button" class="qn-habit-note-keep" data-action="tqSentences" data-do="habitNoteKeep" title="Leaves the sentence and the rating as they are, and hides this note for ${esc(_first(st))} in this report.">Keep It</button></div>`;
   }
   /* "+ Close to a C+" on the Grade box, only where the comment already says
@@ -8781,6 +8790,7 @@ window.ReportQuestionnaire = (function () {
     PARTS: PARTS,
     partOf: partOf,
     rowLabel: rowLabel,
+    habitNoteText: habitNoteText,
     sentencesOf: sentencesOf,
     rowsFromDraft: rowsFromDraft,
     rowFromSentence: rowFromSentence,
