@@ -2,6 +2,13 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## The Term Questionnaire is named Write Comments (2026-11-26)
+
+Colin, Nov 26: "Write Comments". The Reporting page's first tab reads **Write Comments**, beside **Print Reports**: two verbs, two steps. Nothing on the page is a questionnaire any more, the students' reflections were also called questionnaires, and "Term" went against the year-to-date rule ("The comment says the year, not the term").
+
+- **What changed:** every place a teacher reads the name: the tab, the student page's button back to it, the Progress Reports note that a changed comment saves there too, two tooltips, and the help articles.
+- **What did not:** the page's address (`/reports?tab=questionnaire`), the help article's address (`fill-in-the-term-questionnaire`), file and function names, and older plans and decisions, which still say Term Questionnaire. They mean this page.
+
 ## Moves that touch marks may travel grouped by area (2026-11-26)
 
 Context: the Nov 12 ruling below ("Marks may be moved; Colin and Karen must see no change") says every piece that touches marks is its own move-only pull request. `teacher/page-assignments.js` splits into about 20 pieces, about 14 of which read or save marks. Since Nov 12 the moves are made and proved by scripts kept in the repo (`scripts/split/`): `state.mjs` puts a page file's changing variables on one object, and `cut.mjs` moves lines as text; each has a `--prove` that fails on any other difference. Colin was asked whether to keep one pull request per piece or to group them, and chose: "Group by area (Recommended)".

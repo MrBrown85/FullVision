@@ -180,7 +180,7 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   await expect(page.locator('.qn-grade-sub')).toHaveText(/^\d+ of \d+ handed in$/);
   await page.locator('.qn-head-link').click();
   await page.waitForURL(/\/student\?id=st1/);
-  await page.getByRole('link', { name: 'Term Questionnaire' }).click();
+  await page.getByRole('link', { name: 'Write Comments' }).click();
   await page.locator('#tq-narrative').waitFor();
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
 

@@ -2716,7 +2716,7 @@ window.PageStudent = (function () {
 
     // ── Header ──
     html += renderStudentHeader(cid, studentId, {
-      buttonLabel: 'Term Questionnaire',
+      buttonLabel: 'Write Comments',
       buttonHref: '/reports?course=' + cid + '&tab=questionnaire&student=' + studentId,
     });
 
