@@ -1,6 +1,6 @@
 /**
  * The Comment Bank in the grader (docs/plans/comment-bank-plan.md, "The screens > Grader"), in
- * Demo Mode with the commentBank switch on before the page loads. Science 8, Scientific
+ * Demo Mode. Science 8, Scientific
  * Inquiry on the KMT & States of Matter Lab (sci8a4); the Lab Investigation rubric carries
  * sample comments (shared/seed-data.js). Noor has an earlier comment on the Cell Microscope
  * Lab, which shares the criterion's competencies, so Last Time shows.
@@ -25,7 +25,6 @@ async function startScenario(page, opts) {
   page.on('pageerror', e => {
     throw e;
   });
-  await page.addInitScript(() => localStorage.setItem('fv-build-commentBank', '1'));
   if (!opts || opts.reduced !== false) await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });

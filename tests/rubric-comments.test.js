@@ -1,6 +1,6 @@
 /**
  * The Comment Bank per rubric, data layer (shared/rubric-comments.js and the loader,
- * payload, signature, wrapper and backup changes behind the commentBank switch).
+ * payload, signature, wrapper and backup changes).
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -19,10 +19,6 @@ const A1 = 'c1000000-0000-4000-8000-000000000031';
 const A2 = 'c1000000-0000-4000-8000-000000000032';
 const A3 = 'c1000000-0000-4000-8000-000000000033';
 
-function switchOn(on) {
-  if (on) localStorage.setItem('fv-build-commentBank', '1');
-  else localStorage.removeItem('fv-build-commentBank');
-}
 function recordingClient() {
   const calls = [];
   return {
@@ -75,7 +71,6 @@ describe('RubricComments helpers', () => {
 describe('RubricComments reads the class', () => {
   beforeEach(() => {
     localStorage.clear();
-    switchOn(false);
     ['rubrics', 'assessments', 'students', 'scores'].forEach(f => delete _cache[f][CID]);
     saveStudents(CID, [
       { id: E1, firstName: 'Ava', lastName: 'A' },
@@ -162,12 +157,10 @@ describe('the comment bank on the wire', () => {
     originalGetSupabase = getSupabase;
     originalUseSupabase = _useSupabase;
     localStorage.clear();
-    switchOn(false);
   });
   afterEach(() => {
     globalThis.getSupabase = originalGetSupabase;
     _useSupabase = originalUseSupabase;
-    switchOn(false);
   });
 
   const rubric = () => ({
@@ -207,18 +200,7 @@ describe('the comment bank on the wire', () => {
     expect(_canonicalRubricRowsToCache([{ id: R2, name: 'x' }], [], [], [], [])[0].overallComments).toEqual([]);
   });
 
-  it('with the switch off the payload and signature are today’s', () => {
-    const payload = _rubricCriteriaPayload(rubric());
-    expect('comments' in payload[0]).toBe(false);
-    const plain = rubric();
-    delete plain.overallComments;
-    plain.criteria[0].comments = [];
-    expect(_rubricSignature(rubric())).toBe(_rubricSignature(plain));
-    expect(_rubricsContentSignature([rubric()])).toBe(_rubricsContentSignature([plain]));
-  });
-
-  it('with the switch on the payload and signatures carry comments', () => {
-    switchOn(true);
+  it('the payload and signatures carry comments', () => {
     expect(_rubricCriteriaPayload(rubric())[0].comments).toEqual([{ level: 3, text: 'Clear question.' }]);
     const edited = rubric();
     edited.overallComments = ['Good lab.', 'More.'];
@@ -229,7 +211,7 @@ describe('the comment bank on the wire', () => {
     expect(_rubricSignature(other)).not.toBe(_rubricSignature(rubric()));
   });
 
-  it('upsertRubric sends comments and p_overall_comments only with the switch on', async () => {
+  it('upsertRubric sends comments and p_overall_comments when it is given them, and leaves them out when it is not', async () => {
     _useSupabase = true;
     const client = recordingClient();
     globalThis.getSupabase = () => client;
@@ -240,33 +222,25 @@ describe('the comment bank on the wire', () => {
       criteria: _rubricCriteriaPayload(rubric()),
       overallComments: _overallCommentsOf(rubric()),
     });
-    await window.v2.upsertRubric({ ...params(), overallComments: undefined });
-    let call = client.calls[client.calls.length - 1];
-    expect('p_overall_comments' in call.payload).toBe(false);
-    expect('comments' in call.payload.p_criteria[0]).toBe(false);
-    expect(
-      Object.keys(call.payload)
-        .filter(k => k !== 'p_idempotency_key')
-        .sort(),
-    ).toEqual([
-      'p_copy_group',
-      'p_course_id',
-      'p_criteria',
-      'p_id',
-      'p_linked_tag_ids',
-      'p_name',
-      'p_scale',
-      'p_style',
-    ]);
-
-    switchOn(true);
     await window.v2.upsertRubric(params());
-    call = client.calls[client.calls.length - 1];
+    let call = client.calls[client.calls.length - 1];
     expect(call.payload.p_overall_comments).toEqual(['Good lab.']);
     expect(call.payload.p_criteria[0].comments).toEqual([{ level: 3, text: 'Clear question.' }]);
+
+    // A call that does not name them leaves them out, so the database keeps what it holds.
+    const bare = params();
+    bare.overallComments = undefined;
+    bare.criteria = bare.criteria.map(c => {
+      const { comments, ...rest } = c;
+      return rest;
+    });
+    await window.v2.upsertRubric(bare);
+    call = client.calls[client.calls.length - 1];
+    expect('p_overall_comments' in call.payload).toBe(false);
+    expect('comments' in call.payload.p_criteria[0]).toBe(false);
   });
 
-  it('the fallback loader selects the new columns only with the switch on', async () => {
+  it('the fallback loader selects the comment columns', async () => {
     const selects = [];
     const query = table => {
       const q = {
@@ -283,7 +257,7 @@ describe('the comment bank on the wire', () => {
     globalThis.getSupabase = () => ({ from: query, rpc: () => Promise.resolve({ data: null, error: null }) });
     const cols = table => selects.filter(s => s.table === table).map(s => s.cols);
     await _loadCanonicalRubrics(CID);
-    expect(cols('rubric')).toEqual(['id,name,created_at,copy_group,style,scale']);
+    expect(cols('rubric')).toEqual(['id,name,created_at,copy_group,style,scale,overall_comments']);
     // With a rubric present the criterion query runs too.
     selects.length = 0;
     const withRubric = table => {
@@ -293,10 +267,6 @@ describe('the comment bank on the wire', () => {
       return q;
     };
     globalThis.getSupabase = () => ({ from: withRubric });
-    await _loadCanonicalRubrics(CID);
-    expect(cols('criterion')[0]).not.toContain('comments');
-    selects.length = 0;
-    switchOn(true);
     await _loadCanonicalRubrics(CID);
     expect(cols('rubric')[0]).toContain(',overall_comments');
     expect(cols('criterion')[0]).toMatch(/,comments$/);
@@ -326,7 +296,6 @@ describe('Add to Bank writes', () => {
     originalGetSupabase = getSupabase;
     originalUseSupabase = _useSupabase;
     localStorage.clear();
-    switchOn(false);
     _rubricSaveQueue = {};
     client = recordingClient();
     globalThis.getSupabase = () => client;
@@ -355,7 +324,6 @@ describe('Add to Bank writes', () => {
     expect(sent[0].payload).toMatchObject({ p_criterion_id: K1, p_level: 2, p_text: 'Add units.' });
     expect(sent[0].payload.p_idempotency_key).toMatch(/^[0-9a-f-]{36}$/);
     // The next save finds nothing to send.
-    switchOn(true);
     await saveRubrics(CID, getRubrics(CID));
     await settle();
     expect(calls('upsert_rubric')).toHaveLength(0);
@@ -371,7 +339,6 @@ describe('Add to Bank writes', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].payload).toMatchObject({ p_rubric_id: R1, p_text: 'Next steps.' });
     expect(sent[0].payload.p_idempotency_key).toBeTruthy();
-    switchOn(true);
     await saveRubrics(CID, getRubrics(CID));
     await settle();
     expect(calls('upsert_rubric')).toHaveLength(0);

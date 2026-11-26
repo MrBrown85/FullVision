@@ -3,7 +3,7 @@ title: Build and Grade With a Rubric
 section: Assignments
 order: 2
 summary: A rubric describes each level of the work, one row per criterion. A criterion linked to a competency scores that competency.
-checked: 2026-11-24
+checked: 2026-11-25
 pages:
   - /assignments
 demo: /assignments
@@ -38,6 +38,10 @@ labels:
   - Line for One Student
   - Work On
   - Went Beyond
+  - + Comments
+  - + Overall Comments
+  - Add to Bank
+  - Last Time
 next:
   - grade-an-assessment
   - read-the-gradebook
@@ -88,3 +92,12 @@ To use a saved rubric, select it in the Rubric Bank and choose **Use in New Asse
 2. Select a level on each line. On an Advanced rubric, tick the boxes the work shows; the highest level whose boxes are all ticked is suggested, and any level can be chosen instead. On a Single-Point rubric, type notes under **Work On** and **Went Beyond**.
 3. To add a note to one criterion, choose **Comment** under its name and type the note in the box that opens under the levels. It saves as you type. Press Tab or Enter to go on to the next criterion, then to the overall comment; Shift+Enter starts a new line, and Escape closes the box. The note prints under that criterion on the rubric handout. On pair and group work the note is the group's; under **Line for One Student**, choose a member's name to add a line for them alone, which prints only on their sheet and shows only on their page. A note already written on that criterion for another student or group shows under **Same As**; choose it to use it again.
 4. To score the whole class, choose a level in the **Set Everyone To** row and confirm. Only criteria not yet scored are set.
+
+## Keep Comments With a Rubric
+
+A rubric can hold comments to reuse: feedback written once, given to many students. They belong to that rubric and are never printed or shown to students. A student sees only a comment the teacher gives them.
+
+1. In the rubric editor, choose **+ Comments** under a criterion. Each level gets a box; type a comment under the level it fits and add as many as you like. To keep comments about the whole piece of work, choose **+ Overall Comments** at the foot of the editor.
+2. Type `[Name]` where the student's name belongs. It is filled with the student's first name when the comment is given.
+3. While assessing, open a criterion's **Comment**. A Bank row under the box offers the comments kept for that criterion at the level the student has. Choose one to put it in the box, and edit it there if needed. Above the box, **Last Time** shows the student's earlier comment on the same competency.
+4. To keep a comment you have just written, choose **Add to Bank**. Only a comment kept this way joins the bank; nothing is added on its own. A small count beside a comment shows how many students have had it.

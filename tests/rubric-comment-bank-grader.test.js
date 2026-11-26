@@ -1,5 +1,5 @@
 /**
- * The Comment Bank in the grader (teacher/crit-bank.js, behind the commentBank switch;
+ * The Comment Bank in the grader (teacher/crit-bank.js,
  * docs/plans/comment-bank-plan.md, "The screens > Grader"): Last Time above the box, the
  * Bank row, Add to Bank, the whole bank, the preview and the Overall Comment's row. Same As
  * is held by tests/pin.test.js and is not touched here.
@@ -106,16 +106,14 @@ function seed(scores) {
     });
 }
 
-function open(on, scores) {
+function open(scores) {
   openAssignments(seed(scores), CID, { open: LAB });
   const proto = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div')));
   if (!proto.getClientRects) proto.getClientRects = () => [{}];
-  if (on) localStorage.setItem('fv-build-commentBank', '1');
 }
 afterEach(() => {
   closePages();
   clearClass(CID);
-  localStorage.removeItem('fv-build-commentBank');
 });
 
 const critRow = (sid, crit) =>
@@ -136,18 +134,8 @@ const savedNote = (sid, crit = METHOD) => (entries(CID, sid, LAB).find(e => e.ta
 const methodComments = () => getRubricById(CID, LAB_RUBRIC).criteria[0].comments;
 
 describe('the Comment Bank in the grader', () => {
-  it('with the switch off the editor is today’s: no Last Time, no Bank row', () => {
-    open(false);
-    openField(AVA);
-    const edit = document.querySelector('.rsg-crit-edit');
-    expect(edit.className).toBe('rsg-crit-edit');
-    expect(edit.innerHTML.startsWith('<div class="rsg-crit-edit-box">')).toBe(true);
-    expect(edit.innerHTML).not.toContain('bank');
-    expect(document.querySelector('.rsg-crit-last')).toBe(null);
-  });
-
   it('Last Time sits above the box for a student with an earlier comment, and is plain text', () => {
-    open(true);
+    open();
     openField(AVA);
     const last = document.querySelector('.rsg-crit-last');
     expect(last.textContent).toBe('Last Time, Warm-Up:Check the scale.');
@@ -157,13 +145,13 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('Last Time is left out when there is nothing earlier', () => {
-    open(true);
+    open();
     openField(BEN);
     expect(document.querySelector('.rsg-crit-last')).toBe(null);
   });
 
   it('the Bank row offers the level picked, most used first, with the name filled and the count', () => {
-    open(true);
+    open();
     openField(AVA);
     expect(document.querySelector('.rsg-crit-bank-label').textContent).toBe('Bank');
     expect(chips()).toEqual(['Ava, your units are right.1×', AXES]);
@@ -173,13 +161,13 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('with no level picked it offers the most used at any level', () => {
-    open(true);
+    open();
     openField(CARA);
     expect(chips()).toEqual(['Cara, your units are right.1×', AXES, VARIABLE]);
   });
 
   it('while typing, the chips narrow to banked comments that contain the part typed; Same As hides', () => {
-    open(true);
+    open();
     openField(AVA);
     expect(document.querySelector('.rsg-crit-reuse').hidden).toBe(false);
     type('two var');
@@ -191,7 +179,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('a pick fills the empty box and saves at once; the focus stays in the box', () => {
-    open(true);
+    open();
     openField(AVA);
     click(document.querySelectorAll('.rsg-crit-bank-chip')[1]);
     expect(field().value).toBe(AXES);
@@ -200,7 +188,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('a pick is added after what is written, one space between', () => {
-    open(true);
+    open();
     openField(AVA);
     click(document.querySelector('.rsg-crit-bank-chip'));
     expect(field().value).toBe('Ava, your units are right.');
@@ -216,7 +204,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('a pick takes the place of the part that narrowed the row', () => {
-    open(true);
+    open();
     openField(AVA);
     type('Ava, your units are right. two var');
     expect(chips()).toEqual([TWO]);
@@ -225,7 +213,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('Add to Bank shows for a new part, keeps only that part with the name put back, then reads In the Bank', () => {
-    open(true);
+    open();
     openField(AVA);
     expect(addBtn()).toBe(null);
     type('Ava, show your work');
@@ -238,7 +226,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('Add to Bank keeps only the new part, under level 3 when none is picked', () => {
-    open(true);
+    open();
     openField(CARA);
     type('Cara, your units are right. Show your work');
     click(addBtn());
@@ -247,7 +235,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('Add to Bank is not offered under 3 characters, or while a chip matches', () => {
-    open(true);
+    open();
     openField(AVA);
     type('ab');
     expect(addBtn()).toBe(null);
@@ -257,7 +245,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('a new comment is offered for the next student', () => {
-    open(true);
+    open();
     openField(AVA);
     type('Ava, show your work');
     click(addBtn());
@@ -268,7 +256,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('the whole bank opens as a panel: the level picked first, each comment once, Edit Comments; a second click shuts it', () => {
-    open(true);
+    open();
     openField(AVA);
     const label = document.querySelector('.rsg-crit-bank-label');
     click(label);
@@ -293,7 +281,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('pointing at a chip shows the whole comment as the placeholder; leaving restores it', () => {
-    open(true);
+    open();
     openField(AVA);
     const was = field().getAttribute('placeholder');
     const chip = document.querySelectorAll('.rsg-crit-bank-chip')[1];
@@ -308,7 +296,7 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('Down and Up step through the chips from the empty box; Enter picks the one highlighted', () => {
-    open(true);
+    open();
     openField(AVA);
     const was = field().getAttribute('placeholder');
     // Same As first, then the Bank.
@@ -333,14 +321,14 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('Enter with nothing highlighted moves on to the next criterion, as it does today', () => {
-    open(true);
+    open();
     openField(AVA);
     key(field(), 'Enter');
     expect(critRow(AVA, SAFETY).contains(field())).toBe(true);
   });
 
   it('Tab and Escape keep their meaning with a chip highlighted', () => {
-    open(true);
+    open();
     openField(AVA);
     key(field(), 'ArrowDown');
     key(field(), 'Escape');
@@ -348,14 +336,14 @@ describe('the Comment Bank in the grader', () => {
   });
 
   it('a group row has no Last Time; its text is kept as typed in Add to Bank', () => {
-    open(true);
+    open();
     // The group's own row is the page's; here a student's row stands in only for Last Time's rule.
     openField(AVA);
     expect(document.querySelector('.rsg-crit-last')).not.toBe(null);
   });
 
   it('the Overall Comment shows the rubric’s overall comments while it has focus, and takes them away after', () => {
-    open(true);
+    open();
     const overall = document.querySelector('.rsg-overall-comment[data-sid="' + AVA + '"]');
     overall.focus();
     expect(document.querySelector('.rsg-overall .rsg-crit-bank-box')).not.toBe(null);
