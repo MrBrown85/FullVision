@@ -451,12 +451,12 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
       expect(box.value).toMatch(excellent);
       expect(drawn.length).toBeGreaterThan(0);
       const card = drawn[drawn.length - 1];
-      expect(label(card, 'Habits')).toBe(true);
+      expect(label(card, 'Work Habits')).toBe(true);
       expect(card).toMatch(excellent);
       RQ.tqRate('devices', 1);
       expect(box.value).toMatch(/keeping his phone and devices on his work/);
       expect(drawn[drawn.length - 1]).toMatch(/keeping his phone and devices on his work/);
-      expect(label(drawn[drawn.length - 1], 'Habits')).toBe(true);
+      expect(label(drawn[drawn.length - 1], 'Work Habits')).toBe(true);
       expect(saved()).toBe(box.value);
     });
 

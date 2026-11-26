@@ -15,9 +15,9 @@ const RQ = ReportQuestionnaire;
 describe('partOf and rowLabel', () => {
   it('labels each draft step with its part, the IE parts by name, the goals statement', () => {
     expect(RQ.partOf('example').label).toBe('Best Piece');
-    expect(RQ.partOf('overall').label).toBe('Strengths');
-    expect(RQ.partOf('attendance').label).toBe('Habits');
-    expect(RQ.partOf('lateWork').label).toBe('Not Handed In');
+    expect(RQ.partOf('overall').label).toBe('Strength');
+    expect(RQ.partOf('attendance').label).toBe('Work Habits');
+    expect(RQ.partOf('lateWork').label).toBe('Missing Work');
     expect(RQ.partOf('home').label).toBe('Next Step');
     expect(RQ.partOf('closer').label).toBe('Closing');
     expect(RQ.partOf('ieProblem')).toBeNull();
@@ -33,9 +33,9 @@ describe('partOf and rowLabel', () => {
     expect(RQ.PARTS.map(p => p.label)).toEqual([
       'Grade',
       'Best Piece',
-      'Strengths',
-      'Habits',
-      'Not Handed In',
+      'Strength',
+      'Work Habits',
+      'Missing Work',
       'Next Step',
       'Support',
       'Closing',
@@ -794,6 +794,10 @@ describe('the card drawn for a Demo Mode student', () => {
     expect(RQ.rowLabel({ step: 'example', id: 'n31', s: { group: 'Examples From Work' } }, null)).toBe('Example');
     expect(RQ.rowLabel({ step: 'example', id: 'n50', s: { group: "In the Student's Words" } }, null)).toBe('Voice');
     expect(RQ.rowLabel({ step: 'grade', id: 'gr01' }, null)).toBe('Grade');
+    // With the student, the Voice label is the student's.
+    expect(
+      RQ.rowLabel({ step: 'example', id: 'n50', s: { group: "In the Student's Words" } }, null, { firstName: 'Liam' }),
+    ).toBe('Liam’s Voice');
   });
 
   it('a saved draft: one row per sentence with its part, source, handle and Other Wording; Browse Sentences…', () => {
@@ -812,7 +816,7 @@ describe('the card drawn for a Demo Mode student', () => {
     const html = RQ.renderTermQuestionnaire(cid);
     saveScoreReportNote(cid, st.id, best.id, '');
     const card = html.slice(html.indexOf('id="tq-sentences"'));
-    expect(card).toContain('Reword, edit or drag to reorder. The comment above follows.');
+    expect(card).not.toContain('Reword, edit or drag to reorder.');
     expect(card).toContain('Browse Sentences…');
     expect(card).not.toContain('Reset Order');
     // One row per unit: the next-step sentences share a row.

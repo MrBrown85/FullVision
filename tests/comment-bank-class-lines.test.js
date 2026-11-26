@@ -439,10 +439,10 @@ describe('the class settings (report_config) and the review screen', () => {
   it('shows the empty states when the class has nothing set', () => {
     seed();
     const html = open();
-    expect(html).toContain('No support lines chosen for this class. The comment leaves this sentence out.');
-    expect(html).toContain('>Choose…</button>');
-    expect(html).toContain('No closing sentence for this class.');
-    expect(html).toContain('>Add One…</button>');
+    expect(html).toContain('>+ Support Line ▾</button>');
+    expect(html).not.toContain('No support lines chosen');
+    expect(html).toContain('>+ Closing Sentence for the Class</button>');
+    expect(html).not.toContain('No closing sentence for this class');
     expect(html).toContain('<span id="tq-limit-text"> · no limit</span> ▾');
     expect(html).not.toContain('qn-required');
   });
@@ -451,7 +451,7 @@ describe('the class settings (report_config) and the review screen', () => {
     seed(['a9', 'a8']);
     COURSES[CID].lateWorkPolicy = 'Late work is accepted until December 4.';
     const html = open();
-    expect(html).toContain('<span class="qn-req-label">Not Handed In</span>');
+    expect(html).toContain('<span class="qn-req-label">Missing Work</span>');
     expect(html).toMatch(/<span class="qn-req-text">[^<]*“Task 9”[^<]*“Task 10\.?”/);
     expect(html).toContain('>Late work is accepted until December 4.</button>');
     expect(html).toContain('2 of 10 · check that both are really missing before you approve');
@@ -580,7 +580,7 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(settings().supportFor[TERM][GAB.id]).toBe(own.id);
     html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain(
-      'In class, I will meet with the group each Friday.</span><span class="qn-req-source">One of your support lines for History 12',
+      'title="One of your support lines for History 12">In class, I will meet with the group each Friday.</span>',
     );
     RQ.tqLine('pickSupport', { dataset: { line: 'none' } });
     html = RQ.renderTermQuestionnaire(CID);
