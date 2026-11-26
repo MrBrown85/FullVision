@@ -102,6 +102,7 @@
     "teacher/report-one-head.js",
     "teacher/work-rubric-card.js",
     "teacher/assign-show.js",
+    "teacher/keep-dom.js",
     "teacher/assign-toolbar.js",
     "teacher/gradebook-toolbar.js",
     "teacher/student-outlook.js",

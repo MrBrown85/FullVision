@@ -3,6 +3,8 @@ declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
   // Build flags (shared/build-flags.js): unfinished work stays behind one.
   BuildFlags: { on(name: string): boolean };
+  // Draws markup into a place, keeping the parts that did not change (teacher/keep-dom.js).
+  KeepDom: { patch(root: Element, html: string): void };
   SegGlide: {
     run(track: HTMLElement, from: { left: number; width: number }, to: DOMRect, ms?: number): void;
     lit(track: Element): HTMLElement | null;

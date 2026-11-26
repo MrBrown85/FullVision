@@ -408,6 +408,7 @@ load('teacher/grades-print.js');
 load('teacher/rubric-library.js');
 load('teacher/rubric-bank.js');
 load('teacher/grading-setup-copy.js');
+load('teacher/keep-dom.js');
 load('teacher/assign-show.js');
 load('teacher/assign-toolbar.js');
 load('teacher/grade-change.js');
