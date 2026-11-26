@@ -1171,10 +1171,6 @@ window.StudentPageView = (function () {
     '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>';
   var TO_ARROW =
     '<svg class="sp-fb-to-mark" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-  var TICKED =
-    '<svg class="sp-fb-box" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.5 12.3l3 3 6-6.3" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  var NOT_YET =
-    '<svg class="sp-fb-box sp-fb-box-open" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"/></svg>';
   var OPEN_CHEVRON =
     '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
   var CLOSE_CHEVRON =
@@ -1499,51 +1495,10 @@ window.StudentPageView = (function () {
     );
   }
 
-  // An Advanced Rubric's boxes at one level on The Whole Rubric, the ones ticked marked.
-  function wholeChecksHtml(checks) {
-    return checks
-      .map(function (k) {
-        return (
-          '<span class="sp-fb-check">' + (k.ticked ? TICKED : NOT_YET) + '<span>' + esc(k.label) + '</span></span>'
-        );
-      })
-      .join('');
-  }
-
   /* The Whole Rubric: every criterion with each of its levels, the level
      given marked "You". A Single-Point Rubric has only its goal. */
   function wholeHtml(view, p) {
-    var style = p.rubric.style;
-    var cards = p.rubric.rows
-      .map(function (row) {
-        var levels = row.whole.filter(function (l) {
-          if (style === 'single_point') return l.level === 3;
-          return l.you || l.descriptor || l.checks.length;
-        });
-        return (
-          '<section class="sp-fb-card sp-fb-whole"><h2 class="sp-fb-crit-name">' +
-          esc(row.name) +
-          '</h2><ul class="sp-fb-whole-levels">' +
-          levels
-            .map(function (l) {
-              var you = l.you && row.text;
-              return (
-                '<li class="sp-fb-whole-level' +
-                (you ? ' sp-fb-you sp-lv-' + lvClass(l.level) : '') +
-                '"><span class="sp-fb-whole-name">' +
-                esc(you ? row.text : style === 'single_point' ? 'The Goal' : l.name) +
-                (you ? '<span class="sp-fb-you-tag">You</span>' : '') +
-                '</span><span class="sp-fb-whole-words">' +
-                (l.descriptor ? wordsHtml(l.descriptor) : '') +
-                (style === 'advanced' ? wholeChecksHtml(l.checks) : '') +
-                '</span></li>'
-              );
-            })
-            .join('') +
-          '</ul></section>'
-        );
-      })
-      .join('');
+    var cards = StudentRubric.cards(p);
     var back = hasFeedback(p) ? 'Your Feedback' : 'Assignments';
     return (
       '<section class="sp-feedback sp-whole" aria-labelledby="sp-fb-title">' +
@@ -2991,6 +2946,7 @@ window.StudentPageView = (function () {
     pagesLine: pagesLine,
     canSeeWork: canSeeWork,
     planHtml: planHtml,
+    resourcesHtml: resourcesHtml,
     quizTopHtml: quizTopHtml,
     // "Returned Nov 24": the date as Your Feedback and the rows read it (a time is read in the student's own day).
     returnedOn: function (p) {

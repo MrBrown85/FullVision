@@ -506,7 +506,7 @@ window.DashInbox = (function () {
 
   /* A click on the tile, or on the top bar's To Grade cell. ctx: { cid,
      redraw }. True when it was the Inbox's. */
-  /** @param {MouseEvent} e @param {{ cid: string, redraw: () => void }} ctx */
+  /** @param {MouseEvent} e @param {{ cid: string, redraw: () => void, redrawTile?: () => void }} ctx */
   function click(e, ctx) {
     var t = /** @type {any} */ (e.target);
     if (!t || !t.closest) return false;
@@ -537,7 +537,7 @@ window.DashInbox = (function () {
     var kind = el.getAttribute('data-dash-inbox') || '';
     if (kind === 'mode') {
       setView(cid, el.getAttribute('data-mode') || '');
-      redraw();
+      (ctx.redrawTile || redraw)();
       return true;
     }
     if (kind === 'targets-open' || kind === 'targets-close' || kind === 'target' || kind === 'target-other') {
@@ -551,7 +551,7 @@ window.DashInbox = (function () {
     }
     if (kind === 'start' || kind === 'returnall' || kind.indexOf('stack-') === 0) {
       var S = /** @type {any} */ (window).DashInboxStacks;
-      return !!S && S.click(el, { cid: cid, redraw: redraw });
+      return !!S && S.click(el, { cid: cid, redraw: redraw, redrawTile: ctx.redrawTile || redraw });
     }
     if (el.getAttribute('data-dash-inbox') === 'wall') {
       if (window.WorkWall) WorkWall.open(cid, aid, { onClose: redraw });
