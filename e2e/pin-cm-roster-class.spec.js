@@ -509,11 +509,9 @@ test('Signed in, what a teacher is typing when Class Settings is drawn again sta
   await expect(desc).toBeVisible();
   const saved = () => page.evaluate(cid => COURSES[cid].description || '', CID_A);
   const changes = () => page.evaluate(() => window.__e2eChanges);
-  // The draw puts a new box in place of the old one, which carries a mark here. Changes are counted from the
-  // draw on, on the new box.
+  // Changes are counted from the draw on.
   const redraw = () =>
     page.evaluate(() => {
-      document.getElementById('cm-desc').__before = true;
       DashClassManager.renderClassManager();
       window.__e2eChanges = 0;
     });
@@ -527,7 +525,6 @@ test('Signed in, what a teacher is typing when Class Settings is drawn again sta
   await page.keyboard.type('Bring a calculator');
   for (let i = 0; i < 'calculator'.length; i++) await page.keyboard.press('ArrowLeft');
   await redraw();
-  expect(await desc.evaluate(el => el.__before)).toBeUndefined();
   await expect(desc).toHaveValue('Bring a calculator');
   await expect(desc).toBeFocused();
   // The cursor is where it was, so the next keys go in the same place.

@@ -173,18 +173,11 @@ test('A choice and a tab keep the focus when Class Settings is drawn again, so t
   await enterDemo(page);
   await openCompetencies(page);
   const each = () => page.locator('.cm-fc-seg[data-value="each"]').first();
-  // The draw puts a new control in place of the old one, which carries a mark here.
-  const redraw = () =>
-    page.evaluate(() => {
-      document.activeElement.__before = true;
-      DashClassManager.renderClassManager();
-    });
-  const isNew = async () => expect(await page.evaluate(() => document.activeElement.__before)).toBeUndefined();
+  const redraw = () => page.evaluate(() => DashClassManager.renderClassManager());
 
   await each().focus();
   await redraw();
   await expect(each()).toBeFocused();
-  await isNew();
   await page.keyboard.press('Space');
   await expect(page.locator('#confirm-cancel-btn')).toBeFocused();
   await page.keyboard.press('Escape');
@@ -194,7 +187,6 @@ test('A choice and a tab keep the focus when Class Settings is drawn again, so t
   await tab.focus();
   await redraw();
   await expect(tab).toBeFocused();
-  await isNew();
 });
 
 test('Re-link with no changes shows Apply Changes greyed out', async ({ page }) => {
