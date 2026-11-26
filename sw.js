@@ -203,6 +203,7 @@ const PRECACHE_URLS = [
   '/teacher/comment-personal.js',
   '/teacher/report-qn-browse-cases.js',
   '/teacher/report-qn-voice-observations.js',
+  '/teacher/report-qn-boxes.js',
   '/teacher/report-questionnaire.js',
   '/teacher/grade-report.js',
   '/teacher/report-preview.js',

@@ -20,9 +20,9 @@ labels:
   - Use
   - + Write Your Own
   - Support
-  - Choose…
+  - + Support Line
   - Closing
-  - Add One…
+  - + Closing Sentence for the Class
   - Save for Class
   - Approve and Next
 next:
@@ -59,4 +59,4 @@ If the student has no marked work in the report period, nothing is drafted. If a
 
 ## Class Lines
 
-**Support** and **Closing** are set once for the whole class. Under **Support**, choose **Choose…** and pick the lines that say what the teacher will do in class. Under **Closing**, choose **Add One…**, type a sentence and choose **Save for Class**. It ends every new comment in the class.
+**Support** and **Closing** are set once for the whole class. Under **Support**, choose **+ Support Line** and pick the lines that say what the teacher will do in class. Under **Closing**, choose **+ Closing Sentence for the Class**, type a sentence and choose **Save for Class**. It ends every new comment in the class.

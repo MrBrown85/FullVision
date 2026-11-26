@@ -162,7 +162,7 @@ describe('2. The Language Goals row once the comment has sentences', () => {
     });
     let html = open();
     expect(html).toContain('id="tq-row-languageGoals"');
-    expect(html).toContain('No language goal lines chosen for this class. The comment leaves this sentence out.');
+    expect(html).toContain('>+ Language Goal ▾</button>');
     const lang = html.indexOf('id="tq-row-languageGoals"');
     expect(lang).toBeLessThan(html.indexOf('id="tq-row-closing"'));
     expect(lang).toBeLessThan(html.indexOf('id="tq-row-support"'));
@@ -214,9 +214,7 @@ describe('3. An IE comment written without Generate', () => {
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18', narrative: TYPED });
     const html = open();
     ['Grade', 'Problem', 'Plan', 'Deadline', 'Meeting'].forEach(label =>
-      expect(html, label).toContain(
-        `<span class="qn-req-label">${label}</span><span class="qn-req-chip">Required</span>`,
-      ),
+      expect(html, label).toContain(`<span class="qn-req-label">${label}</span></div>`),
     );
     expect(html).toContain('data-tq-check="ie"');
     // The teacher's own sentences are still there.
@@ -267,7 +265,7 @@ describe('3b. A meeting sentence the teacher typed', () => {
     let html = open();
     expect(meetingRows(html)).toBe(1);
     expect(html).toMatch(
-      /<span class="qn-req-label">Meeting<\/span><span class="qn-req-chip">Required<\/span><\/div>\s*<div class="qn-req-body"><span class="qn-req-text">Please call me so we can set up a time to talk\.<\/span><span class="qn-req-source">Written by you<\/span>/,
+      /<span class="qn-req-label">Meeting<\/span><\/div>\s*<div class="qn-req-body"><span class="qn-req-text" title="Written by you">Please call me so we can set up a time to talk\.<\/span>/,
     );
     // Generate fills in the other parts around it, never a second Meeting.
     const box = {
