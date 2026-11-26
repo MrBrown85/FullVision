@@ -2407,7 +2407,7 @@ describe('categories: the server’s list is read before the whole list is saved
       'shared/data-categories.js': 1, // its definition
       'shared/data.js': 1, // a class just made on this device going up
       'shared/seed-data.js': 1, // Demo Mode's sample class
-      'teacher/dash-class-manager.js': 1, // Duplicate Class: a new class
+      'teacher/cm-class-actions.js': 1, // Duplicate Class: a new class
       'teacher/grading-setup-copy.js': 1, // Copy Grading Setup: an existing class
     });
     // The three that save over an existing class ask first.

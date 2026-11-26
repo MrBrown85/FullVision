@@ -376,7 +376,7 @@ describe('every caller of saveCourseConfig and update_course', () => {
       'teacher/cm-grading.js': 1,
       'teacher/cm-wizard.js': 1,
       'teacher/cm-edit-actions.js': 7,
-      'teacher/dash-class-manager.js': 1,
+      'teacher/cm-class-actions.js': 1,
       'teacher/grading-setup-copy.js': 1,
     });
   });

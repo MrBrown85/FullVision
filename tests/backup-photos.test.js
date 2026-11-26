@@ -173,7 +173,7 @@ describe('Restore Class from Backup and photos of student work', () => {
 
   it('has the exact line, put after "…scores and reports." in the dialog', () => {
     expect(FVBackupRestore.PHOTOS_NOT_IN_BACKUP).toBe(LINE);
-    const src = readFileSync('teacher/dash-class-manager.js', 'utf-8');
+    const src = readFileSync('teacher/cm-class-actions.js', 'utf-8');
     const at = src.indexOf('scores and reports. ');
     expect(at).toBeGreaterThan(0);
     expect(src.slice(at, at + 900)).toMatch(
@@ -184,7 +184,7 @@ describe('Restore Class from Backup and photos of student work', () => {
   it('says Bulletins and Quizzes are not in a backup, every time, before the photos line', () => {
     expect(FVBackupRestore.BULLETINS_NOT_IN_BACKUP).toBe('Bulletins are not in a backup.');
     expect(FVBackupRestore.QUIZZES_NOT_IN_BACKUP).toBe('Quizzes are not in a backup.');
-    const src = readFileSync('teacher/dash-class-manager.js', 'utf-8');
+    const src = readFileSync('teacher/cm-class-actions.js', 'utf-8');
     const at = src.indexOf('scores and reports. ');
     expect(src.slice(at, at + 600)).toMatch(
       /scores and reports\. ' \+\s*\(typeof FVBackupRestore !== 'undefined' \? esc\(FVBackupRestore\.BULLETINS_NOT_IN_BACKUP\) \+ ' ' : ''\) \+\s*\(typeof FVBackupRestore !== 'undefined' \? esc\(FVBackupRestore\.QUIZZES_NOT_IN_BACKUP\) \+ ' ' : ''\) \+\s*\/\/[^\n]*\n\s*\(typeof FVBackupRestore !== 'undefined' && FVBackupRestore\.anyClassTakesWork\(\)/,
