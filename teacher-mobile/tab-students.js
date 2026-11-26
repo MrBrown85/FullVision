@@ -67,7 +67,10 @@ window.MStudents = (function () {
   var _moreObserver = null;
   var _moreScrollOn = false;
   function _markMoreBelow(box) {
-    box.classList.toggle('m-more-below', box.scrollHeight - box.scrollTop - box.clientHeight > 4);
+    var more = box.scrollHeight - box.scrollTop - box.clientHeight > 4;
+    box.classList.toggle('m-more-below', more);
+    // The cue is drawn by the box around the list, which doesn't scroll (students.css).
+    if (box.parentElement) box.parentElement.classList.toggle('m-more-below', more);
   }
   function _watchMoreBelow(container) {
     var check = function () {
