@@ -18,7 +18,8 @@
    others.
 
    commentBank (the Comment Bank per rubric, docs/plans/comment-bank-plan.md)
-   is off until the last slice of that build turns it on. */
+   is on since Nov 25 2026 and nothing asks for it any more. The name stays
+   for the same reason as the others. */
 (function () {
   /** @type {Record<string, boolean>} */
   var DEFAULTS = {
@@ -27,7 +28,7 @@
     quizzes: true,
     inboxStacks: true,
     phoneLook: true,
-    commentBank: false,
+    commentBank: true,
   };
 
   /** @param {string} name */
