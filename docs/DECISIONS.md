@@ -1139,6 +1139,16 @@ Replaces "Playwright runs on main after each merge, not on PRs." That rule came 
 3. **The e2e job runs on every pull request** as well as on main. It is not a required check: a red run shows on the PR before merging, but a flaky test doesn't block a merge. `test-and-format` stays the only required check.
 4. **The repo stays public** (Colin, 2026-11-05): Actions minutes are free, so the extra runners cost nothing. Outside pull requests need Colin's approval before CI runs on them.
 
+## Browser tests required before a merge (2026-11-25)
+
+Replaces the Nov 11 rule that browser tests run on main only. With several chats merging all day, red tests landed on main several times a day, each found after the merge and fixed by another PR, and a release waited hours for a green run on main's newest commit (Nov 25: three releases in one evening, each held up by a different red test). Colin asked what working developers do, then: "change all of my settings and relevant memories to reflect this workflow."
+
+1. **The browser tests run on every pull request and must pass before it merges.** `browser-tests` (every shard passed) is a required check beside `test-and-format`. They still run on main after each merge, to catch two pull requests that pass alone and fail together.
+2. **A test that fails at random is set aside, not chased.** `@flaky` in its title keeps it out of the run that gates a merge (`playwright.config.js`); the `e2e-flaky` job runs those alone and never blocks. Each has an open issue labelled `flaky-test`, and fixing it is its own pull request.
+3. **A test that depends on timing also runs on a slowed CPU** before its pull request opens. Two of the Nov 25 failures were real lag on slow computers (the top tabs' glide cut short, a keystroke redrawing the Comment Bank), found that way.
+4. **A release ships a commit whose browser run passed**: main when it is green, otherwise the newest green commit on a `release/<sha>` branch. It never waits for a green run on a moving main.
+5. **Not done: GitHub's merge queue.** It tests pull requests in line with everything ahead of them, but only for repositories owned by an organization; this one is under Colin's own account. Moving it is his call.
+
 ## Dashboard cards (2026-11-05)
 
 Colin's CSL reviewer (Nov 5) couldn't tell what the student cards' bars meant or that the Curricular Competencies card's percentages were class averages. Plan at [`plans/dashboard-cards-plan.md`](plans/dashboard-cards-plan.md); mockups on the private canvas it names.
