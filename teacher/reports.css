@@ -6543,3 +6543,148 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12.5px;
   cursor: pointer;
 }
+
+/* ── Work Habits in the box, the amber note and + Close to (slice 8) ── */
+.qn-box-head {
+  position: relative;
+}
+.qn-ev-habits {
+  position: static;
+  display: inline-flex;
+}
+.qn-ev-bars-btn {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(107, 79, 187, 0.08);
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.qn-ev-bars-btn:hover,
+.qn-ev-bars-btn.on {
+  background: rgba(107, 79, 187, 0.16);
+}
+.qn-ev-bars-btn:focus-visible,
+.qn-hm-step:focus-visible,
+.qn-habit-note button:focus-visible,
+.qn-add-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-habits-menu {
+  top: calc(100% + 2px);
+  right: 0;
+  width: 440px;
+}
+.qn-hm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+}
+.qn-hm-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.qn-hm-steps {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.qn-hm-step {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 0 3px;
+  cursor: pointer;
+}
+.qn-hm-step > span {
+  width: 5px;
+  border-radius: 2px;
+  background: var(--qn-ev-track);
+}
+.qn-hm-step.lit > span {
+  background: var(--qn-habit);
+}
+.qn-hm-step:hover {
+  background: rgba(107, 79, 187, 0.12);
+}
+.qn-hm-word {
+  flex: none;
+  width: 84px;
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.qn-habit-note {
+  margin: 6px 0 0 32px;
+  background: var(--qn-missing-bg);
+  border-radius: 9px;
+  padding: 6px 6px 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.qn-habit-note-text {
+  flex: 1 1 280px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.qn-habit-note button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-habit-note-fix {
+  background: #a35f00;
+  color: #fff;
+}
+.qn-habit-note-keep {
+  background: rgba(138, 90, 0, 0.14);
+  color: #6b4200;
+}
+@media (prefers-color-scheme: dark) {
+  .qn-habit-note-keep {
+    background: rgba(255, 214, 10, 0.16);
+    color: #ffd60a;
+  }
+}
+.qn-extra-row {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0 32px;
+}
+.qn-add-btn {
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--qn-tint-bg);
+  color: var(--link);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-sentences.dragging .qn-habit-note,
+.qn-sentences.dragging .qn-extra-row {
+  visibility: hidden;
+}
