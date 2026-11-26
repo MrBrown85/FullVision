@@ -41,17 +41,12 @@ export async function pickGrade(page, grade) {
     const btn = document.querySelector(`[data-action="cwSelectGrade"][data-grade="${g}"]`);
     window.DashClassManager.handleAction('cwSelectGrade', btn, null);
   }, grade);
-  await page.waitForSelector('[data-action="cwSelectSubject"]', { timeout: 5000 });
+  await page.waitForSelector('[data-action="cwToggleCourse"]', { timeout: 5000 });
 }
 
-export async function pickSubject(page, subjectName) {
-  await page.evaluate(name => {
-    const btn = Array.from(document.querySelectorAll('[data-action="cwSelectSubject"]')).find(
-      b => b.textContent.trim() === name,
-    );
-    if (!btn) throw new Error(`Subject not found: ${name}`);
-    window.DashClassManager.handleAction('cwSelectSubject', btn, null);
-  }, subjectName);
+// Choose Courses lists every course of the grade (Nov 25 2026): there is no
+// subject to pick, so this only waits for the list.
+export async function pickSubject(page) {
   await page.waitForSelector('[data-action="cwToggleCourse"]', { timeout: 5000 });
 }
 
@@ -63,17 +58,15 @@ export async function toggleCurriculumTag(page, tag) {
   }, tag);
 }
 
-// Step 2 here is Class Details (it passes Choose Competencies with every
-// competency ticked); step 3 is Review.
+// Step 2 is Name Your Class, which also holds Create Class (every
+// competency stays ticked). Step 3, the old Review, is the same step now.
 export async function wizardGoToStep(page, step) {
   if (step !== 2 && step !== 3) throw new Error('wizardGoToStep accepts 2 or 3');
-  const actions = step === 2 ? ['cwGoToStep2', 'cwCompsNext'] : ['cwGoToStep3'];
-  for (const a of actions) {
-    await page.evaluate(a => {
-      const btn = document.querySelector(`[data-action="${a}"]`);
-      window.DashClassManager.handleAction(a, btn, null);
-    }, a);
-  }
+  if (step === 2)
+    await page.evaluate(() => {
+      const btn = document.querySelector('[data-action="cwGoToStep2"]');
+      window.DashClassManager.handleAction('cwGoToStep2', btn, null);
+    });
   await page.waitForSelector(step === 2 ? '#cm-new-name' : '[data-action="cwFinishCreate"]', { timeout: 5000 });
 }
 

@@ -203,9 +203,8 @@ describe('reporting-term-presets', () => {
       DashClassManager.handleAction('cwSkipToCustom', { dataset: {} });
       const originalGetElementById = document.getElementById;
       document.getElementById = id => (id === 'cm-new-name' ? { value: 'Custom 8' } : originalGetElementById(id));
-      DashClassManager.handleAction('cwGoToStep3', { dataset: {} });
-      document.getElementById = originalGetElementById;
       DashClassManager.handleAction('cwFinishCreate', { dataset: {} });
+      document.getElementById = originalGetElementById;
       await tick(50);
 
       const cid = Object.keys(COURSES).find(id => COURSES[id].name === 'Custom 8');

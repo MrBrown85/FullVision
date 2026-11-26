@@ -2,6 +2,15 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## New Class in two steps (2026-11-25)
+
+Colin chose the shape on the Course Tabs Board ("Yes, two steps"), then "Build it now".
+
+1. **Choose Courses, then Name Your Class.** Step 1 asks "What Do You Teach in This Class?": a grade, then every course of that grade in one list (no Subject step; a find box and a heading for each subject when a grade has more than 12 courses). Humanities 8 is still the one-tick preset. Step 2 holds Class Name, Block, This Class Runs and Grades Show As. A Your Class panel beside both shows the class as it is made.
+2. **What Create Class sets on its own is under Already Set for You, each behind Change.** Competencies (all ticked; this replaces the Choose Competencies step in "The BC curriculum bank" item 4), Overall (Each Course Counts Equally and Folders Count as One, which the Review step used to show), Calculation (Mean, "New class defaults"), Reporting Terms and, for Grades 10 to 12, Counts As. The Review step is gone.
+3. **Description and Late Work Policy are left out of the wizard** (Colin: "Yes, leave out"). They stay on the class's Details tab in Class Settings. Read-only count that day: of 12 live classes with students, 1 had a description and 1 a late work policy.
+4. **A custom class goes straight to step 2**, where its Grade Level is typed.
+
 ## Slips and phone report links are removed (2026-11-24)
 
 Colin: "get rid of it. no students actually got them." Reflect reaches questionnaires from the card sign-in with no slips (Nov 16), and phone reports left the student page on Nov 14.

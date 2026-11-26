@@ -15,7 +15,7 @@ async function enterDemo(page) {
 async function openWizard(page) {
   await page.locator('[data-action="openClassManager"]').first().click();
   await page.locator('[data-action="cmStartCreate"]').first().click();
-  await expect(page.locator('.cw-grade-btn').first()).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Grade 9' })).toBeVisible();
 }
 
 test('A signed-in teacher with no classes can create one or open Demo Mode', async ({ page }) => {
@@ -49,7 +49,7 @@ test('A signed-in teacher with no classes can create one or open Demo Mode', asy
   await page.locator('#confirm-cancel-btn').click();
   await expect(page).toHaveURL(/\/dashboard/);
   await empty.getByRole('button', { name: 'Create a Class' }).click();
-  await expect(page.locator('.cw-grade-btn').first()).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Grade 9' })).toBeVisible();
 });
 
 test('Open Demo Mode, confirmed, takes a signed-in teacher into Demo Mode', async ({ page }) => {
@@ -73,47 +73,23 @@ test('Open Demo Mode, confirmed, takes a signed-in teacher into Demo Mode', asyn
   );
 });
 
-test('Choose Courses: ticking a course never moves Next', async ({ page }) => {
+test('Name Your Class: Create Class waits for a Class Name, and opens the Students tab', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await enterDemo(page);
   await openWizard(page);
-  const next = page.locator('[data-action="cwGoToStep2"]');
-  const rect = () => next.evaluate(el => el.getBoundingClientRect().toJSON());
-  const start = await rect();
-  await page.locator('.cw-grade-btn', { hasText: 'Grade 9' }).click();
-  expect(await rect()).toEqual(start);
-  await page.locator('.cw-subject-btn', { hasText: 'Science' }).first().click();
-  const shown = await rect();
-  await page.locator('.cw-course-item').first().click();
-  await expect(page.locator('.cw-selection-summary')).toBeVisible();
-  await expect(next).toBeEnabled();
-  expect(await rect()).toEqual(shown);
-  expect(shown).toEqual(start);
-  // The custom-class bar stays above the footer, clear of Next.
-  const custom = await page.locator('.cw-custom-btn').evaluate(el => el.getBoundingClientRect().toJSON());
-  expect(custom.bottom).toBeLessThanOrEqual(shown.top);
-});
-
-test('Class Details: Next waits for a Class Name, and Create Class opens the Students tab', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await enterDemo(page);
-  await openWizard(page);
-  await page.locator('.cw-grade-btn', { hasText: 'Grade 9' }).click();
-  await page.locator('.cw-subject-btn', { hasText: 'Science' }).first().click();
-  await page.locator('.cw-course-item').first().click();
+  await page.getByRole('radio', { name: 'Grade 9' }).click();
+  await page.getByRole('checkbox', { name: /^Science 9\b/ }).click();
   await page.locator('[data-action="cwGoToStep2"]').click();
-  await page.locator('[data-action="cwCompsNext"]').click();
   const name = page.locator('#cm-new-name');
-  const next = page.locator('[data-action="cwGoToStep3"]');
-  await expect(next).toBeEnabled();
+  const create = page.locator('[data-action="cwFinishCreate"]');
+  await expect(create).toBeEnabled();
   await name.fill('');
-  await expect(next).toBeDisabled();
+  await expect(create).toBeDisabled();
   await expect(page.locator('#cm-new-name-hint')).toHaveText('Enter a Class Name to continue.');
   await name.fill('Science 9 Block C');
-  await expect(next).toBeEnabled();
+  await expect(create).toBeEnabled();
   await expect(page.locator('#cm-new-name-hint')).toBeHidden();
-  await next.click();
-  await page.locator('[data-action="cwFinishCreate"]').click();
+  await create.click();
   await expect(page.getByRole('tab', { name: /^Students/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.cm-roster-add')).toBeVisible();
   await expect(page).toHaveURL(/manage=students/);

@@ -2348,6 +2348,7 @@ a.dash-ins-name:hover {
   font-size: var(--text-sm);
 }
 
+/* Re-link (Class Settings) still picks a grade, a subject and its courses with these. */
 .cw-grade-row {
   display: flex;
   gap: 8px;
@@ -2419,14 +2420,34 @@ a.dash-ins-name:hover {
   border-radius: 50%;
 }
 
+.cw-course-tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  background: var(--overlay-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+}
+.cw-selection-summary {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(0, 122, 255, 0.06);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.cw-selection-summary strong {
+  font-weight: 600;
+}
+
 .cw-course-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-height: 320px;
-  overflow-y: auto;
+  gap: 2px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 10px;
   padding: 4px;
   background: var(--surface);
 }
@@ -2472,103 +2493,279 @@ a.dash-ins-name:hover {
   color: var(--text);
   flex: 1;
 }
-.cw-course-tag {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  background: var(--overlay-hover);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
-}
 .cw-course-count {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-3);
   white-space: nowrap;
 }
-
-.cw-custom-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  margin-top: 12px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-2);
+.cw-course-item {
+  min-height: 40px;
+  box-sizing: border-box;
+}
+.cw-course-item:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.cw-course-name {
+  flex: 0 1 auto;
+}
+.cw-course-sub {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-base);
+  color: var(--text-3);
+}
+.cw-course-name + .cw-course-count {
+  margin-left: auto;
+}
+.cw-course-head {
+  padding: 10px 12px 4px;
   font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-3);
+}
+.cw-course-sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--divider-subtle);
+}
+.cw-course-list [hidden] {
+  display: none;
+}
+.cw-find-none {
+  margin: 0;
+  padding: 12px;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+
+/* ── New Class: the two steps beside Your Class (Course Tabs Board, Nov 25) ── */
+.cw-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+.cw-main {
+  flex: 999 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cw-title {
+  margin: 0 0 14px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+}
+.cw-subtitle {
+  margin: 0 0 10px;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+.cw-grade-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.cw-label {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.cw-grade-seg .seg-btn {
+  min-width: 40px;
+}
+.cw-find {
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: none;
+}
+.cw-lead,
+.cw-desc {
+  margin: 16px 0 8px;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+.cw-desc {
+  margin: 10px 0 0;
+}
+.cw-custom-link {
+  display: block;
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
-  width: 100%;
-  transition:
-    background-color 0.12s,
-    border-color 0.12s,
-    color 0.12s;
 }
-.cw-custom-btn:hover {
-  border-color: var(--text-3);
-  color: var(--text);
-  background: var(--overlay-hover);
+.cw-custom-link:hover {
+  text-decoration: underline;
 }
-
-.cw-selection-summary {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: rgba(0, 122, 255, 0.06);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  color: var(--text);
+.cw-detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 32px;
 }
-.cw-selection-summary strong {
+.cw-detail-row > .cm-field {
+  margin-bottom: 0;
+}
+.cw-wizard .cw-main .cm-label {
+  font-size: var(--text-base);
   font-weight: 600;
+  color: var(--text);
 }
-
-.cw-review-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  margin-bottom: 12px;
+.cw-name {
+  max-width: 420px;
 }
-.cw-review-title {
+.cw-grade-input {
+  max-width: 160px;
+}
+/* Already Set for You: a row a setting, its Change opening it in place. */
+.cw-set-row {
+  border-top: 1px solid var(--divider-subtle);
+}
+.cw-set-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+}
+.cw-set-label {
+  flex: 0 0 150px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.cw-set-value {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--text-md);
-  font-weight: 600;
   color: var(--text);
-  margin-bottom: 4px;
 }
-.cw-review-meta {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
+.cw-set-btn {
+  flex: 0 0 auto;
+  min-height: 32px;
+}
+.cw-set-panel {
+  padding: 0 0 14px;
+}
+.cw-set-panel .cw-cc-course {
+  margin-top: 12px;
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.cw-set-panel .cw-cc-course-head {
+  padding: 14px 16px 8px;
+}
+.cw-set-panel .cw-cc-folder {
+  padding: 6px 16px 12px;
+}
+.cw-set-panel .cw-cc-loose {
+  padding: 2px 16px 14px;
+}
+/* Your Class: the class as a page, its courses listed as they are ticked. */
+.cw-rail {
+  flex: 1 1 300px;
+  max-width: 360px;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  padding: 18px 16px;
+  background: var(--surface);
+  border: 0.5px solid var(--divider-subtle);
+  border-radius: var(--radius);
+}
+.cw-rail-title {
+  margin: 0 0 10px 4px;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+.cw-rail-page {
+  min-height: 150px;
+  box-sizing: border-box;
+  padding: 12px 12px 10px 14px;
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 12px #ececf0,
+    0 1px 3px 12px rgba(0, 0, 0, 0.04);
+  margin: 12px;
+}
+.cw-rail-name {
+  font-size: var(--text-md);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.cw-rail-sub {
+  min-height: 4px;
+  margin-bottom: 8px;
+  font-size: var(--text-sm);
   color: var(--text-3);
 }
-.cw-review-sections {
-  margin-top: 12px;
-}
-.cw-review-sec {
+.cw-rail-course {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  min-height: 44px;
+  border-top: 1px solid #ececf0;
+}
+.cw-rail-dot {
+  flex: 0 0 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.cw-rail-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 0;
+}
+.cw-rail-cname {
   font-size: var(--text-sm);
-  color: var(--text-2);
-  border-bottom: 1px solid var(--overlay-hover);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.cw-review-sec:last-child {
-  border-bottom: none;
-}
-.cw-review-sec-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.cw-review-sec-count {
-  font-family: var(--font-mono);
+.cw-rail-count {
   font-size: var(--text-xs);
+  line-height: 1.35;
   color: var(--text-3);
-  margin-left: auto;
+}
+.cw-rail-x {
+  flex: 0 0 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-3);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cw-rail-x:hover {
+  background: var(--overlay-pressed);
+}
+.cw-rail-note {
+  margin: 14px 4px 0;
+  font-size: var(--text-md);
+  color: var(--text);
 }
 
 .cw-footer {
@@ -7395,10 +7592,7 @@ button.rb-v-prompt {
   font-size: var(--text-md);
   margin: 0 0 14px;
 }
-.cm-section.cw-cc-course {
-  padding: 0;
-  overflow: hidden;
-}
+
 .cw-cc-course-head {
   display: flex;
   align-items: baseline;
@@ -7505,7 +7699,7 @@ button.rb-v-prompt {
   font-size: var(--text-sm);
   line-height: 1.45;
 }
-.cm-section.cw-grading-rows > .cm-folder-count-row:first-child {
+.cw-grading-rows > .cm-folder-count-row:first-child {
   border-top: 0;
   margin-top: 0;
   padding-top: 0;

@@ -800,20 +800,22 @@ window.DashClassManager = (function () {
   var cwSkipped = {},
     cwPreset = null,
     cwFoldersOn = null,
-    cwCoursesEqual = null;
+    cwCoursesEqual = null,
+    // The Choose Courses find box, and the Already Set for You row open.
+    cwFindText = '',
+    cwOpen = '';
   // Presets that tick more than one course, in Choose Courses.
   var CW_PRESETS = [{ id: 'HUM8', name: 'Humanities 8', grade: 8, tags: ['ELA8', 'SS8'] }];
 
-  var cwStep2Name = '',
+  // The Class Name as typed; null while it is still the one the courses give.
+  var cwStep2Name = null,
     cwStep2Grade = '',
-    cwStep2Desc = '',
     cwStep2Block = '',
     cwStep2Span = 'full';
   // '' = not chosen yet; the wizard fills in the grade-level default.
   var cwStep2Grading = '',
     cwStep2Calc = '',
-    cwStep2Decay = '65',
-    cwStep2LatePolicy = '';
+    cwStep2Decay = '65';
 
   function withdrawStudentUI(sid) {
     // The roster is rendered for cmSelectedCourse, which is not always the
@@ -3504,6 +3506,9 @@ window.DashClassManager = (function () {
   var blockChipSelect = CmBlockPicker.blockChipSelect;
   var blockOtherInput = CmBlockPicker.blockOtherInput;
   var _cmEmptyStateHtml = CmBlockPicker._cmEmptyStateHtml;
+  var _cwCourseRow = CmBlockPicker.wizardCourseRow;
+  var _cwSeg = CmBlockPicker.wizardSeg;
+  var _cwSetRow = CmBlockPicker.wizardSetRow;
   var cmOpenDemoMode = CmBlockPicker.cmOpenDemoMode;
 
   // A class for dashboard.css on el (the body, or #main).
@@ -5387,45 +5392,34 @@ window.DashClassManager = (function () {
   }
 
   /* ── Curriculum Wizard ──────────────────────────────────── */
-  /* The wizard's steps, by number: 1 Choose Courses, 2 Choose
-     Competencies, 3 Class Details, 4 Review. A custom class (no courses)
-     skips Choose Competencies, and its bar leaves it out. */
+  /* Two steps (Colin, 2026-11-25, the Course Tabs Board): 1 Choose Courses,
+     "What Do You Teach in This Class?", with every course of the grade in one
+     list; 2 Name Your Class, with what Create Class sets on its own under
+     Already Set for You, each behind Change. A Your Class panel beside both
+     shows the class as it is made. A custom class (no courses) goes straight
+     to step 2. */
   function renderCmCreateForm() {
-    if (cwStep === 1) return renderCwStep1();
-    if (cwStep === 2) return renderCwCompetencies();
-    if (cwStep === 3) return renderCwStep2();
-    if (cwStep === 4) return renderCwStep3();
-    return '';
+    return cwStep === 2 ? renderCwDetails() : renderCwCourses();
   }
 
   function renderCwStepBar() {
-    var steps = [
-      [1, 'Choose Courses'],
-      [2, 'Choose Competencies'],
-      [3, 'Class Details'],
-      [4, 'Review'],
-    ].filter(function (s) {
-      return s[0] !== 2 || cwStep === 1 || cwSelectedTags.length > 0;
-    });
     return (
       '<div class="cw-steps">' +
-      steps
-        .map(function (s, i) {
-          var l = s[1];
+      ['Choose Courses', 'Name Your Class']
+        .map(function (label, i) {
           var n = i + 1;
-          var cls = s[0] < cwStep ? 'done' : s[0] === cwStep ? 'active' : '';
+          var cls = n < cwStep ? 'done' : n === cwStep ? 'active' : '';
           return (
-            (i > 0 ? '<span class="cw-step-arrow">\u203A</span>' : '') +
+            (i > 0 ? '<span class="cw-step-arrow">›</span>' : '') +
             '<div class="cw-step ' +
             cls +
-            '">' +
-            '<span class="cw-step-num">' +
-            (s[0] < cwStep ? '\u2713' : n) +
-            '</span>' +
-            '<span>' +
-            l +
-            '</span>' +
-            '</div>'
+            '"' +
+            (n === cwStep ? ' aria-current="step"' : '') +
+            '><span class="cw-step-num">' +
+            (n < cwStep ? '✓' : n) +
+            '</span><span>' +
+            label +
+            '</span></div>'
           );
         })
         .join('') +
@@ -5433,164 +5427,454 @@ window.DashClassManager = (function () {
     );
   }
 
-  function renderCwStep1() {
-    var html = '<div class="cm-detail-inner cw-wizard">';
-    html += renderCwStepBar();
-
-    if (!cwCurriculumLoaded && !cwLoadError) {
-      html += '<div class="cm-section"><div class="cw-empty-msg">Loading BC Curriculum data\u2026</div></div>';
-      html += '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button></div>';
-      html += '</div>';
-      return html;
-    }
-
-    if (cwLoadError) {
-      html +=
-        '<div class="cm-section"><div class="cw-empty-msg">Could not load BC Curriculum data.<br>You can still create a class with a custom learning map.</div></div>';
-      html +=
-        '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button><button class="btn btn-primary" data-action="cwSkipToCustom">Custom Class</button></div>';
-      html += '</div>';
-      return html;
-    }
-
-    // Grade selection
-    html += '<div class="cm-section"><div class="cm-section-title">Grade</div><div class="cw-grade-row">';
-    [8, 9, 10, 11, 12].forEach(function (g) {
-      var active = cwSelectedGrade === g ? ' active' : '';
-      html +=
-        '<button class="cw-grade-btn' +
-        active +
-        '" aria-pressed="' +
-        (cwSelectedGrade === g) +
-        '" data-action="cwSelectGrade" data-grade="' +
-        g +
-        '">Grade ' +
-        g +
-        '</button>';
-    });
-    html += '</div></div>';
-
-    // Subject selection
-    if (cwSelectedGrade !== null) {
-      var allCourses = getCoursesByGrade(cwSelectedGrade);
-      var bySubject = {};
-      allCourses.forEach(function (c) {
-        if (!bySubject[c.subject]) bySubject[c.subject] = [];
-        bySubject[c.subject].push(c);
-      });
-      var subjectNames = Object.keys(bySubject).sort();
-
-      html += '<div class="cm-section"><div class="cm-section-title">Subject</div><div class="cw-subject-row">';
-      subjectNames.forEach(function (subj) {
-        var active = cwSelectedSubject === subj ? ' active' : '';
-        var color = SUBJECT_COLOURS[subj] || '#6366f1';
-        html +=
-          '<button class="cw-subject-btn' +
-          active +
-          '" aria-pressed="' +
-          (cwSelectedSubject === subj) +
-          '" data-action="cwSelectSubject" data-subject="' +
-          esc(subj) +
-          '">' +
-          '<span class="cw-subject-dot" style="background:' +
-          color +
-          '"></span>' +
-          esc(subj) +
-          '</button>';
-      });
-      html += '</div></div>';
-
-      // Course checklist. A preset (Humanities 8) sits first and, while
-      // ticked, stands in for the courses it ticks.
-      if (cwSelectedSubject && bySubject[cwSelectedSubject]) {
-        var courses = bySubject[cwSelectedSubject];
-        var presets = _cwPresetsFor(cwSelectedGrade, courses);
-        var preset = _cwActivePreset();
-        html +=
-          '<div class="cm-section"><div class="cm-section-title">Courses</div>' +
-          '<div class="cm-hint" style="margin-bottom:8px">Select one or more courses. Multiple selections create a combined class.</div>' +
-          '<div class="cw-course-list">';
-        presets.forEach(function (p) {
-          var on = !!preset && preset.id === p.id;
-          html += _cwCourseRow({
-            action: 'cwTogglePreset',
-            key: p.id,
-            on: on,
-            name: p.name,
-            tag: p.tags.join(' + '),
-            counts: _cwCourseCounts(p.tags),
-          });
-        });
-        courses.forEach(function (c) {
-          if (preset && preset.tags.indexOf(c.short_tag) >= 0) return;
-          // The old bank's own HUM8 course gives way to the preset.
-          if (
-            presets.some(function (p) {
-              return p.id === c.short_tag;
-            })
-          )
-            return;
-          html += _cwCourseRow({
-            action: 'cwToggleCourse',
-            key: c.short_tag,
-            on: cwSelectedTags.includes(c.short_tag),
-            name: c.course_name,
-            tag: c.short_tag,
-            counts: _cwCourseCounts([c.short_tag]),
-          });
-        });
-        html += '</div>';
-
-        if (cwSelectedTags.length > 0) {
-          var totalComps = _cwCourseCounts(cwSelectedTags).competencies;
-          var lead =
-            preset && cwSelectedTags.length === preset.tags.length
-              ? '<strong>' +
-                esc(preset.name) +
-                '</strong>: ' +
-                esc(
-                  preset.tags
-                    .map(function (tag) {
-                      return CURRICULUM_INDEX[tag].course_name;
-                    })
-                    .join(' and '),
-                )
-              : '<strong>' +
-                cwSelectedTags.length +
-                '</strong> course' +
-                (cwSelectedTags.length !== 1 ? 's' : '') +
-                ' selected';
-          html +=
-            '<div class="cw-selection-summary">' +
-            lead +
-            ' \u00B7 <strong>' +
-            totalComps +
-            '</strong> competencies</div>';
-        }
-        html += '</div>';
-      }
-    }
-
-    html +=
-      '<button class="cw-custom-btn" data-action="cwSkipToCustom">\u270E Create a custom class without BC Curriculum</button>';
-    html +=
-      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button>' +
-      '<button class="btn btn-primary" data-action="cwGoToStep2" ' +
-      (cwSelectedTags.length === 0 ? 'disabled style="opacity:0.4;pointer-events:none"' : '') +
-      '>Next</button></div>';
-    html += '</div>';
-    return html;
+  // A step's page: the step bar, the step beside Your Class, then the footer.
+  function _cwPage(main, footer) {
+    return (
+      '<div class="cm-detail-inner cw-wizard">' +
+      renderCwStepBar() +
+      '<div class="cw-body"><div class="cw-main">' +
+      main +
+      '</div>' +
+      _cwRailHtml() +
+      '</div><div class="cw-footer">' +
+      footer +
+      '</div></div>'
+    );
   }
 
-  /* Choose Competencies: each ticked course as a card, its competencies in
-     Ministry order with their full wording, all ticked to start. A Ministry
-     folder is a heading with its figure and Select All / Clear. */
-  function renderCwCompetencies() {
-    var html = '<div class="cm-detail-inner cw-wizard">' + renderCwStepBar();
+  function renderCwCourses() {
+    if (!cwCurriculumLoaded && !cwLoadError)
+      return (
+        '<div class="cm-detail-inner cw-wizard">' +
+        renderCwStepBar() +
+        '<div class="cm-section"><div class="cw-empty-msg">Loading BC Curriculum data…</div></div>' +
+        '<div class="cw-footer">' +
+        _cwCancelBtn() +
+        '</div></div>'
+      );
+    if (cwLoadError)
+      return (
+        '<div class="cm-detail-inner cw-wizard">' +
+        renderCwStepBar() +
+        '<div class="cm-section"><div class="cw-empty-msg">Could not load BC Curriculum data.<br>You can still create a class with a custom learning map.</div></div>' +
+        '<div class="cw-footer">' +
+        _cwCancelBtn() +
+        '<button class="btn btn-primary" data-action="cwSkipToCustom">Custom Class</button></div></div>'
+      );
+
+    var courses = cwSelectedGrade !== null ? getCoursesByGrade(cwSelectedGrade).slice() : [];
+    courses.sort(function (a, b) {
+      return (
+        String(a.subject).localeCompare(String(b.subject)) ||
+        String(a.course_name).localeCompare(String(b.course_name), undefined, { numeric: true })
+      );
+    });
+    // A long grade (10 to 12 hold 45 to 96 courses) gets a find box and a heading a subject.
+    var long = courses.length > 12;
+    var html =
+      '<div class="cm-section cw-courses"><h2 class="cw-title">What Do You Teach in This Class?</h2>' +
+      '<div class="cw-grade-line"><span class="cw-label" id="cw-grade-label">Grade</span>' +
+      '<div class="seg cm-seg cw-grade-seg" role="radiogroup" aria-labelledby="cw-grade-label">' +
+      [8, 9, 10, 11, 12]
+        .map(function (g) {
+          var on = cwSelectedGrade === g;
+          return (
+            '<button type="button" class="seg-btn cm-seg-btn' +
+            (on ? ' active' : '') +
+            '"' +
+            segAttr(on, 'radio') +
+            ' aria-label="Grade ' +
+            g +
+            '" data-action="cwSelectGrade" data-grade="' +
+            g +
+            '">' +
+            g +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      (long
+        ? '<input type="search" class="cm-input cw-find" placeholder="Find a course" aria-label="Find a course" value="' +
+          esc(cwFindText) +
+          '" data-action-input="cwFind">'
+        : '') +
+      '</div>';
+
+    if (cwSelectedGrade === null) html += '<p class="cw-lead">Pick a grade to see its courses.</p>';
+    else {
+      var q = long ? cwFindText.trim().toLowerCase() : '';
+      var presets = _cwPresetsFor(cwSelectedGrade, courses);
+      var preset = _cwActivePreset();
+      var list = '';
+      presets.forEach(function (p) {
+        list += _cwCourseRow({
+          action: 'cwTogglePreset',
+          key: p.id,
+          on: !!preset && preset.id === p.id,
+          name: p.name,
+          sub:
+            p.tags
+              .map(function (tag) {
+                return CURRICULUM_INDEX[tag].course_name;
+              })
+              .join(' and ') + ', taught together',
+          counts: _cwCourseCounts(p.tags),
+          q: q,
+        });
+      });
+      if (presets.length) list += '<div class="cw-course-sep" role="presentation"' + (q ? ' hidden' : '') + '></div>';
+      // What the find box leaves showing: in each subject, and in all.
+      var shows = function (name) {
+        return !q || String(name).toLowerCase().indexOf(q) >= 0;
+      };
+      var anyShown = presets.some(function (p) {
+        return shows(p.name);
+      });
+      var group = null;
+      var rows = '';
+      var groupShown = false;
+      var shut = function () {
+        if (group === null) return;
+        list += long
+          ? '<div class="cw-course-group" role="group" aria-label="' +
+            esc(group) +
+            '"' +
+            (groupShown ? '' : ' hidden') +
+            '><div class="cw-course-head">' +
+            esc(group) +
+            '</div>' +
+            rows +
+            '</div>'
+          : rows;
+        rows = '';
+        groupShown = false;
+      };
+      courses.forEach(function (c) {
+        // The old bank's own HUM8 course gives way to the preset.
+        if (
+          presets.some(function (p) {
+            return p.id === c.short_tag;
+          })
+        )
+          return;
+        if (c.subject !== group) {
+          shut();
+          group = c.subject;
+        }
+        if (shows(c.course_name)) groupShown = anyShown = true;
+        rows += _cwCourseRow({
+          action: 'cwToggleCourse',
+          key: c.short_tag,
+          on: cwSelectedTags.indexOf(c.short_tag) >= 0,
+          name: c.course_name,
+          counts: _cwCourseCounts([c.short_tag]),
+          q: q,
+        });
+      });
+      shut();
+      html +=
+        '<p class="cw-lead">Tick every course you teach in this class.</p>' +
+        '<div class="cw-course-list">' +
+        list +
+        '<p class="cw-find-none" id="cw-find-none"' +
+        (anyShown ? ' hidden' : '') +
+        '>No course by that name in this grade.</p></div>';
+    }
     html +=
-      '<div class="cw-cc-intro">The BC curriculum expects every competency to be taught. Untick only what you won\u2019t assess in this class.</div>';
-    var total = 0;
-    var on = 0;
+      '<button type="button" class="cw-custom-link" data-action="cwSkipToCustom">Not in the BC Curriculum? Make Your Own Class</button></div>';
+
+    return _cwPage(
+      html,
+      _cwCancelBtn() +
+        '<button class="btn btn-primary" data-action="cwGoToStep2"' +
+        (cwSelectedTags.length ? '' : ' disabled') +
+        '>Next</button>',
+    );
+  }
+
+  /* Competencies and Ministry folders in these courses (the old bank has
+     no folders). */
+  function _cwCourseCounts(tags) {
+    var out = { competencies: 0, folders: 0 };
+    tags.forEach(function (tag) {
+      var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+      (course ? course.categories || [] : []).forEach(function (cat) {
+        var n = (cat.competencies || []).length;
+        out.competencies += n;
+        if (cat.folder === true && n) out.folders++;
+      });
+    });
+    return out;
+  }
+
+  // A course's competencies still ticked, and all of them.
+  function _cwKept(tag) {
+    var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+    var out = { on: 0, all: 0 };
+    (course ? course.categories || [] : []).forEach(function (cat) {
+      (cat.competencies || []).forEach(function (comp) {
+        out.all++;
+        if (!cwSkipped[curriculumCompKey(tag, comp)]) out.on++;
+      });
+    });
+    return out;
+  }
+
+  /* The presets for this grade whose courses are all in the bank and one of
+     which is in the grade's list. */
+  function _cwPresetsFor(grade, courses) {
+    var here = courses.map(function (c) {
+      return c.short_tag;
+    });
+    return CW_PRESETS.filter(function (p) {
+      return (
+        p.grade === grade &&
+        p.tags.every(function (tag) {
+          return CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+        }) &&
+        p.tags.some(function (tag) {
+          return here.indexOf(tag) >= 0;
+        })
+      );
+    });
+  }
+
+  /* The ticked preset, while all its courses are still ticked. */
+  function _cwActivePreset() {
+    var p = CW_PRESETS.find(function (x) {
+      return x.id === cwPreset;
+    });
+    if (!p) return null;
+    return p.tags.every(function (tag) {
+      return cwSelectedTags.indexOf(tag) >= 0;
+    })
+      ? p
+      : null;
+  }
+
+  /* ── Your Class: the class as it is made, beside both steps ── */
+  function _cwRailName() {
+    var name = cwStep2Name != null ? cwStep2Name : _cwDefaultName();
+    return name.trim() || 'New Class';
+  }
+  function _cwRailSubText() {
+    var grade = _cwGradeLevel();
+    var bits = [];
+    if (grade && _cwRailName() !== 'Grade ' + grade) bits.push('Grade ' + grade);
+    var block = courseBlockLabel({ block: cwStep2Block });
+    if (block) bits.push(/^[A-EX]$/.test(block) ? 'Block ' + block : block);
+    if (cwStep === 2)
+      bits.push(
+        (
+          TERM_SPANS.find(function (o) {
+            return o.value === cwStep2Span;
+          }) || TERM_SPANS[0]
+        ).label,
+      );
+    return bits.join(' · ');
+  }
+  // The rail's name and line under it, as the teacher types or picks.
+  function _cwRailSync() {
+    var name = document.getElementById('cw-rail-name');
+    if (name) name.textContent = _cwRailName();
+    var sub = document.getElementById('cw-rail-sub');
+    if (sub) sub.textContent = _cwRailSubText();
+  }
+  function _cwRailHtml() {
+    var rows = cwSelectedTags
+      .map(function (tag) {
+        var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+        if (!course) return '';
+        var k = _cwKept(tag);
+        return (
+          '<div class="cw-rail-course"><span class="cw-rail-dot" style="background:' +
+          (SUBJECT_COLOURS[course.subject] || '#6366f1') +
+          '" aria-hidden="true"></span><span class="cw-rail-text"><span class="cw-rail-cname">' +
+          esc(course.course_name) +
+          '</span><span class="cw-rail-count">' +
+          (k.on === k.all ? k.all : k.on + ' of ' + k.all) +
+          (k.all === 1 ? ' Competency' : ' Competencies') +
+          '</span></span>' +
+          (cwStep === 1
+            ? '<button type="button" class="cw-rail-x" data-action="cwToggleCourse" data-tag="' +
+              esc(tag) +
+              '" aria-label="Take Out ' +
+              esc(course.course_name) +
+              '">×</button>'
+            : '') +
+          '</div>'
+        );
+      })
+      .join('');
+    var note = '';
+    if (cwSelectedTags.length > 1) {
+      var names = cwSelectedTags.map(function (tag) {
+        return CURRICULUM_INDEX[tag] ? CURRICULUM_INDEX[tag].course_name : tag;
+      });
+      note = _cwGrading().coursesCountEqually
+        ? names.length === 2
+          ? names[0] + ' and ' + names[1] + ' each make up half of the overall.'
+          : 'Each of the ' + names.length + ' courses makes up an equal share of the overall.'
+        : 'A course with more competencies or folders counts for more in the overall.';
+    } else if (!cwSelectedTags.length)
+      note =
+        cwStep === 2
+          ? 'No courses from the BC curriculum. Add competencies in the Competencies tab once the class is made.'
+          : 'Tick a course and it shows here.';
+    return (
+      '<aside class="cw-rail" aria-labelledby="cw-rail-title"><h2 class="cw-rail-title" id="cw-rail-title">Your Class</h2>' +
+      '<div class="cw-rail-page"><div class="cw-rail-name" id="cw-rail-name">' +
+      esc(_cwRailName()) +
+      '</div><div class="cw-rail-sub" id="cw-rail-sub">' +
+      esc(_cwRailSubText()) +
+      '</div>' +
+      rows +
+      '</div>' +
+      (note ? '<p class="cw-rail-note">' + esc(note) + '</p>' : '') +
+      '</aside>'
+    );
+  }
+
+  /* ── Step 2: Name Your Class ─────────────────────────────── */
+  // The class's grade: typed for a custom class, else the grade picked.
+  function _cwGradeLevel() {
+    if (cwStep2Grade) return cwStep2Grade.trim();
+    return cwSelectedGrade ? String(cwSelectedGrade) : '';
+  }
+
+  /* What the teacher has typed or picked on this step, kept before the step
+     draws again (Change, a competency ticked, Back, Create Class), so nothing is lost. A
+     name left as the one the courses give follows the courses. */
+  function _cwReadDetails() {
+    var nameEl = document.getElementById('cm-new-name');
+    if (!nameEl || typeof nameEl.value !== 'string') return;
+    var typed = nameEl.value;
+    cwStep2Name = typed === _cwDefaultName() ? null : typed;
+    if (document.getElementById('cm-new-block')) cwStep2Block = readBlockPicker('cm-new-block');
+    var span = document.querySelector('#cm-cg-span .cm-seg-btn.active');
+    if (span && span.dataset) cwStep2Span = span.dataset.val || 'full';
+    var grade = document.getElementById('cm-new-grade');
+    if (grade) cwStep2Grade = grade.value || '';
+    var decay = document.getElementById('cm-cg-decay-slider');
+    if (decay) cwStep2Decay = decay.value || '65';
+  }
+
+  function renderCwDetails() {
+    var custom = !cwSelectedTags.length;
+    var name = cwStep2Name != null ? cwStep2Name : _cwDefaultName();
+    var gradeLevel = _cwGradeLevel();
+    var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: gradeLevel });
+    var calc = cwStep2Calc || _cmDefaultCalcMethod();
+
+    var html =
+      '<div class="cm-section"><h2 class="cw-title">Name Your Class</h2>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-new-name">Class Name</label><input class="cm-input cw-name" id="cm-new-name" value="' +
+      esc(name) +
+      '" placeholder="e.g. English 10" required aria-describedby="cm-new-name-hint" data-action-input="cwNameInput" autofocus>' +
+      // Create Class waits for a name, so a slip can't make a class called Untitled.
+      '<div class="cm-hint" id="cm-new-name-hint"' +
+      (name.trim() ? ' hidden' : '') +
+      '>Enter a Class Name to continue.</div></div>' +
+      '<div class="cw-detail-row"><div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
+      blockPickerHtml('cm-new-block', cwStep2Block) +
+      '</div><div class="cm-field"><label class="cm-label" id="cm-cg-span-label">This Class Runs</label>' +
+      _cwSeg('cm-cg-span', 'cm-cg-span-label', TERM_SPANS, cwStep2Span, 'cmCreateToggle') +
+      '</div>' +
+      // A custom class has no grade from a course: its grade level is typed.
+      (custom
+        ? '<div class="cm-field"><label class="cm-label" for="cm-new-grade">Grade Level</label><input class="cm-input cw-grade-input" id="cm-new-grade" value="' +
+          esc(gradeLevel) +
+          '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div>'
+        : '') +
+      '</div></div>';
+
+    html +=
+      '<div class="cm-section"><h2 class="cw-subtitle" id="cm-cg-grading-label">Grades Show As</h2>' +
+      _cwSeg('cm-cg-grading', 'cm-cg-grading-label', GRADING_SYSTEMS, grading, 'cmCreateToggle') +
+      '<p class="cw-desc" id="cm-cg-grading-desc">' +
+      _cmGradingSystemDescription(grading) +
+      '</p></div>';
+
+    var rows = '';
+    if (custom) rows += _cwSetRow(cwOpen, 'comps', 'Competencies', 'None yet. Add them in the Competencies tab.');
+    else {
+      var on = 0;
+      var all = 0;
+      cwSelectedTags.forEach(function (tag) {
+        var k = _cwKept(tag);
+        on += k.on;
+        all += k.all;
+      });
+      rows += _cwSetRow(
+        cwOpen,
+        'comps',
+        'Competencies',
+        (on === all ? 'All ' + all : on + ' of ' + all) + ' from the BC curriculum',
+        _cwCompsHtml,
+      );
+      var g = _cwGrading();
+      var folders = _cwCourseCounts(cwSelectedTags).folders > 0;
+      rows += _cwSetRow(
+        cwOpen,
+        'grading',
+        'Overall',
+        (cwSelectedTags.length > 1
+          ? (g.coursesCountEqually ? 'Each Course Counts Equally' : 'Each Course by Its Size') + ' · '
+          : '') + (g.foldersCountAsOne ? 'Folders Count as One' : 'Every Competency Counts the Same'),
+        function () {
+          return _cwRenderGradingRows(folders);
+        },
+      );
+    }
+    var calcLabel = (
+      CALC_METHODS.find(function (m) {
+        return m.value === calc;
+      }) || CALC_METHODS[0]
+    ).label;
+    rows += _cwSetRow(
+      cwOpen,
+      'calc',
+      'Calculation',
+      esc(calcLabel) + (calc === 'decayingAvg' ? ' · ' + esc(cwStep2Decay) + '% decay weight' : ''),
+      function () {
+        return (
+          '<span class="help-sr-only" id="cm-cg-calc-label">Calculation Method</span>' +
+          _cwSeg('cm-cg-calc', 'cm-cg-calc-label', CALC_METHODS, calc, function (m) {
+            return m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
+          }) +
+          '<p class="cw-desc" id="cm-cg-calc-desc">' +
+          _cmCalcMethodDescription(calc) +
+          '</p><div id="cm-cg-decay" class="cm-field"' +
+          (calc === 'decayingAvg' ? '' : ' style="display:none"') +
+          '><label class="cm-label" for="cm-cg-decay-slider">Decay Weight</label>' +
+          '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
+          esc(cwStep2Decay) +
+          '" id="cm-cg-decay-slider" data-action-input="cmCreateDecaySlider" style="flex:1"><span class="cm-slider-label" id="cm-cg-decay-val">' +
+          esc(cwStep2Decay) +
+          '%</span></div><div class="cm-hint">Higher values weight recent scores more heavily.</div></div>'
+        );
+      },
+    );
+    rows += _cwTermsRows(gradeLevel);
+
+    html += '<div class="cm-section"><h2 class="cw-subtitle">Already Set for You</h2>' + rows + '</div>';
+
+    return _cwPage(
+      html,
+      _cwCancelBtn() +
+        '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate"' +
+        (name.trim() ? '' : ' disabled') +
+        '>Create Class</button>',
+    );
+  }
+
+  /* The competencies of each ticked course, all ticked to start, in Ministry
+     order with their full wording. A Ministry folder is a heading with its
+     figure and Select All / Clear. */
+  function _cwCompsHtml() {
+    var html =
+      '<p class="cw-cc-intro">The BC curriculum expects every competency to be taught. Untick only what you won’t assess in this class.</p>';
     cwSelectedTags.forEach(function (tag) {
       var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
       if (!course) return;
@@ -5598,16 +5882,12 @@ window.DashClassManager = (function () {
       var cats = (course.categories || []).filter(function (cat) {
         return (cat.competencies || []).length;
       });
-      var n = 0;
-      var nOn = 0;
       var body = '';
       cats.forEach(function (cat, ci) {
         var rows = cat.competencies
           .map(function (comp) {
             var key = curriculumCompKey(tag, comp);
             var ticked = !cwSkipped[key];
-            n++;
-            if (ticked) nOn++;
             return (
               '<label class="cw-cc-row' +
               (ticked ? '' : ' off') +
@@ -5656,40 +5936,24 @@ window.DashClassManager = (function () {
           rows +
           '</div></div>';
       });
-      total += n;
-      on += nOn;
+      var k = _cwKept(tag);
       html +=
-        '<div class="cm-section cw-cc-course"><div class="cw-cc-course-head"><span class="cw-cc-course-name">' +
+        '<div class="cw-cc-course"><div class="cw-cc-course-head"><span class="cw-cc-course-name">' +
         esc(course.course_name) +
-        '</span><span class="cw-course-tag">' +
-        esc(tag) +
         '</span><span class="cw-cc-course-fig">' +
-        nOn +
+        k.on +
         ' of ' +
-        n +
+        k.all +
         ' Competencies</span></div>' +
         body +
         '</div>';
     });
-    html +=
-      '<div class="cw-selection-summary"><strong>' +
-      on +
-      '</strong> of <strong>' +
-      total +
-      '</strong> competencies selected</div>';
-    html +=
-      '<div class="cw-footer">' +
-      _cwCancelBtn() +
-      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button>' +
-      '<button class="btn btn-primary" data-action="cwCompsNext"' +
-      (on === 0 ? ' disabled style="opacity:0.4;pointer-events:none"' : '') +
-      '>Next</button></div></div>';
     return html;
   }
 
-  /* The review's grading switches, worded as the Grading tab words them:
-     Each Course Counts Equally for a combined class, and Folders Count as
-     One. Both can change later in Grading. */
+  /* The grading switches, worded as the Grading tab words them: Each Course
+     Counts Equally for a combined class, and Folders Count as One. Both can
+     change later in Grading. */
   function _cwRenderGradingRows(anyFolder) {
     var g = _cwGrading();
     var later = ' You can change this later in Grading.';
@@ -5719,7 +5983,7 @@ window.DashClassManager = (function () {
         return CURRICULUM_INDEX[tag] && CURRICULUM_INDEX[tag].course_name;
       })
       .filter(Boolean);
-    var html = '<div class="cm-section cw-grading-rows">';
+    var html = '<div class="cw-grading-rows">';
     if (names.length > 1)
       html += row(
         'courses',
@@ -5746,369 +6010,45 @@ window.DashClassManager = (function () {
     return html + '</div>';
   }
 
-  /* One row in Choose Courses: a course, or a preset that ticks several. */
-  function _cwCourseRow(r) {
-    return (
-      '<div class="cw-course-item' +
-      (r.on ? ' selected' : '') +
-      '" role="checkbox" tabindex="0" aria-checked="' +
-      (r.on ? 'true' : 'false') +
-      '" data-action="' +
-      r.action +
-      '" data-tag="' +
-      esc(r.key) +
-      '">' +
-      '<span class="cw-course-check">' +
-      (r.on ? '\u2713' : '') +
-      '</span>' +
-      '<span class="cw-course-name">' +
-      esc(r.name) +
-      '</span>' +
-      '<span class="cw-course-tag">' +
-      esc(r.tag) +
-      '</span>' +
-      '<span class="cw-course-count">' +
-      r.counts.competencies +
-      (r.counts.competencies === 1 ? ' Competency' : ' Competencies') +
-      (r.counts.folders ? ' \u00B7 ' + r.counts.folders + (r.counts.folders === 1 ? ' Folder' : ' Folders') : '') +
-      '</span>' +
-      '</div>'
-    );
-  }
-
-  /* Competencies and Ministry folders in these courses (the old bank has
-     no folders). */
-  function _cwCourseCounts(tags) {
-    var out = { competencies: 0, folders: 0 };
-    tags.forEach(function (tag) {
-      var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
-      (course ? course.categories || [] : []).forEach(function (cat) {
-        var n = (cat.competencies || []).length;
-        out.competencies += n;
-        if (cat.folder === true && n) out.folders++;
-      });
-    });
-    return out;
-  }
-
-  /* The presets for this grade whose courses are all in the bank and one of
-     which is in the subject showing. */
-  function _cwPresetsFor(grade, courses) {
-    var here = courses.map(function (c) {
-      return c.short_tag;
-    });
-    return CW_PRESETS.filter(function (p) {
-      return (
-        p.grade === grade &&
-        p.tags.every(function (tag) {
-          return CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
-        }) &&
-        p.tags.some(function (tag) {
-          return here.indexOf(tag) >= 0;
-        })
-      );
-    });
-  }
-
-  /* The ticked preset, while all its courses are still ticked. */
-  function _cwActivePreset() {
-    var p = CW_PRESETS.find(function (x) {
-      return x.id === cwPreset;
-    });
-    if (!p) return null;
-    return p.tags.every(function (tag) {
-      return cwSelectedTags.indexOf(tag) >= 0;
-    })
-      ? p
-      : null;
-  }
-
-  function renderCwStep2() {
-    var preName = '';
-    var preGrade = '';
-    if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      var names = cwSelectedTags
-        .map(function (tag) {
-          return CURRICULUM_INDEX[tag];
-        })
-        .filter(Boolean)
-        .map(function (c) {
-          return c.course_name;
-        });
-      preName = names.length ? _cwDefaultName() : '';
-      preGrade = cwSelectedGrade ? String(cwSelectedGrade) : '';
-    }
-    // A name the teacher typed stays when they come back from Review.
-    if (cwStep2Name) preName = cwStep2Name;
-    if (cwStep2Grade) preGrade = cwStep2Grade;
-    var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: preGrade });
-    var calc = cwStep2Calc || _cmDefaultCalcMethod();
-
-    var html = '<div class="cm-detail-inner cw-wizard">';
-    html += renderCwStepBar();
-
-    html +=
-      '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
-      '<div class="cm-field"><label class="cm-label" for="cm-new-name">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
-      esc(preName) +
-      '" placeholder="e.g. English 10" required aria-describedby="cm-new-name-hint" data-action-input="cwNameInput" autofocus>' +
-      // Next waits for a name, so a slip can't make a class called Untitled.
-      '<div class="cm-hint" id="cm-new-name-hint"' +
-      (preName.trim() ? ' hidden' : '') +
-      '>Enter a Class Name to continue.</div></div>' +
-      '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
-      blockPickerHtml('cm-new-block', cwStep2Block) +
-      '</div>' +
-      '<div class="cm-field"><label class="cm-label" id="cm-cg-span-label">This Class Runs</label>' +
-      '<div class="seg seg-sm cm-seg" id="cm-cg-span" role="radiogroup" aria-labelledby="cm-cg-span-label">' +
-      TERM_SPANS.map(function (o) {
-        var on = cwStep2Span === o.value;
-        return (
-          '<button type="button" class="seg-btn cm-seg-btn' +
-          (on ? ' active' : '') +
-          '"' +
-          segAttr(on, 'radio') +
-          ' data-val="' +
-          o.value +
-          '" data-action="cmCreateToggle" data-group="cm-cg-span">' +
-          o.label +
-          '</button>'
-        );
-      }).join('') +
-      '</div></div>' +
-      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label" for="cm-new-grade">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
-      esc(preGrade) +
-      '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div></div>' +
-      '<div class="cm-field"><label class="cm-label" for="cm-new-desc">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
-      esc(cwStep2Desc) +
-      '</textarea></div></div>';
-
-    html +=
-      '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
-      '<div class="cm-field"><label class="cm-label" id="cm-cg-grading-label">Grading System</label>' +
-      // T-UI-02 · wizard grading_system picker. Grades 10–12 default to
-      // Letter; with no categories, letter grades use total points.
-      '<div class="seg cm-seg" id="cm-cg-grading" role="radiogroup" aria-labelledby="cm-cg-grading-label" aria-describedby="cm-cg-grading-desc">' +
-      GRADING_SYSTEMS.map(function (g) {
-        return (
-          '<button class="seg-btn cm-seg-btn' +
-          (grading === g.value ? ' active' : '') +
-          '"' +
-          segAttr(grading === g.value, 'radio') +
-          ' data-val="' +
-          g.value +
-          '" data-action="cmCreateToggle" data-group="cm-cg-grading">' +
-          g.label +
-          '</button>'
-        );
-      }).join('') +
-      '</div>' +
-      '<div class="cm-hint" id="cm-cg-grading-desc" style="margin-top:6px">' +
-      _cmGradingSystemDescription(grading) +
-      '</div>' +
-      '</div>' +
-      '<div class="cm-field"><label class="cm-label" id="cm-cg-calc-label">Calculation Method</label>' +
-      '<div class="seg cm-seg" id="cm-cg-calc" role="radiogroup" aria-labelledby="cm-cg-calc-label" aria-describedby="cm-cg-calc-desc">' +
-      CALC_METHODS.map(function (m) {
-        var action = m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
-        var isActive = m.value === calc;
-        return (
-          '<button class="seg-btn cm-seg-btn' +
-          (isActive ? ' active' : '') +
-          '"' +
-          segAttr(isActive, 'radio') +
-          ' data-val="' +
-          m.value +
-          '" data-action="' +
-          action +
-          '" data-group="cm-cg-calc">' +
-          m.label +
-          '</button>'
-        );
-      }).join('') +
-      '</div>' +
-      '<div class="cm-hint" id="cm-cg-calc-desc" style="margin-top:6px">' +
-      _cmCalcMethodDescription(calc) +
-      '</div></div>' +
-      '<div id="cm-cg-decay" class="cm-field" style="' +
-      (calc === 'decayingAvg' ? '' : 'display:none') +
-      '"><label class="cm-label" for="cm-cg-decay-slider">Decay Weight</label>' +
-      '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
-      esc(cwStep2Decay) +
-      '" id="cm-cg-decay-slider" data-action-input="cmCreateDecaySlider" style="flex:1"><span class="cm-slider-label" id="cm-cg-decay-val">' +
-      esc(cwStep2Decay) +
-      '%</span></div>' +
-      '<div class="cm-hint">Higher values weight recent scores more heavily.</div></div>' +
-      '<div class="cm-field">' +
-      '<label class="cm-label" for="cm-new-late-policy">Late Work Policy</label>' +
-      '<textarea class="cm-textarea" id="cm-new-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." aria-label="Late work policy">' +
-      esc(cwStep2LatePolicy) +
-      '</textarea>' +
-      '<div class="cm-hint">Optional. If set, this text appears on the Score Distribution section of printed progress reports.</div>' +
-      '</div>' +
-      '</div>';
-
-    html +=
-      '<div class="cw-footer">' +
-      _cwCancelBtn() +
-      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3"' +
-      (preName.trim() ? '' : ' disabled') +
-      '>Next</button></div>';
-    html += '</div>';
-    return html;
-  }
-
-  function renderCwStep3() {
-    var html = '<div class="cm-detail-inner cw-wizard">';
-    html += renderCwStepBar();
-
-    var className = document.getElementById('cm-new-name')?.value || cwGetPreName();
-    var gradeLevel = document.getElementById('cm-new-grade')?.value || (cwSelectedGrade ? String(cwSelectedGrade) : '');
-    var gradingLabel = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' }[cwStep2Grading] || 'Proficiency';
-    var calcLabel = (
-      CALC_METHODS.find(function (m) {
-        return m.value === cwStep2Calc;
-      }) || CALC_METHODS[0]
-    ).label;
-
-    html +=
-      '<div class="cm-section"><div class="cm-section-title">Review</div>' +
-      '<div class="cm-field"><label class="cm-label">Class Name</label><div style="font-size:var(--text-lg);font-weight:600;color:var(--text)">' +
-      esc(className || 'Untitled') +
-      '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Block</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
-      esc(courseBlockLabel({ block: cwStep2Block }) || '\u2014') +
-      '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Runs</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
-      esc(
-        (
-          TERM_SPANS.find(function (o) {
-            return o.value === cwStep2Span;
-          }) || TERM_SPANS[0]
-        ).label,
-      ) +
-      '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Grade</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
-      esc(gradeLevel || '\u2014') +
-      '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Grading System</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
-      esc(gradingLabel) +
-      '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Calculation Method</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
-      esc(calcLabel) +
-      (cwStep2Calc === 'decayingAvg' ? ' \u00B7 ' + esc(cwStep2Decay) + '% decay weight' : '') +
-      '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Late Work Policy</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
-      esc(cwStep2LatePolicy.trim() || '\u2014') +
-      '</div></div>' +
-      _cwReviewSetupRows(cwStep2Grade || gradeLevel) +
-      '</div>';
-
-    if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      var anyFolder = false;
-      cwSelectedTags.forEach(function (tag) {
-        var courseData = CURRICULUM_INDEX[tag];
-        if (!courseData) return;
-        var color = SUBJECT_COLOURS[courseData.subject] || '#6366f1';
-        var cats = courseData.categories || [];
-        var isNew = cats.some(function (c) {
-          return 'folder' in c;
-        });
-        // Ministry order: a folder row, or one "Not in a Folder" row for each
-        // run of competencies outside folders. The old bank lists its headings.
-        var rows = [];
-        var total = 0;
-        var folders = 0;
-        cats.forEach(function (cat) {
-          var n = (cat.competencies || []).filter(function (comp) {
-            return !cwSkipped[curriculumCompKey(tag, comp)];
-          }).length;
-          if (!n) return;
-          total += n;
-          if (cat.folder === true) {
-            folders++;
-            rows.push({ name: cat.name, n: n, dot: color });
-          } else if (!isNew) rows.push({ name: cat.name, n: n, dot: color });
-          else if (rows.length && rows[rows.length - 1].loose) rows[rows.length - 1].n += n;
-          else rows.push({ name: 'Not in a Folder', n: n, dot: '#aeaeb2', loose: true });
-        });
-        if (folders) anyFolder = true;
-        html +=
-          '<div class="cw-review-card">' +
-          '<div class="cw-review-title" style="color:' +
-          color +
-          '">' +
-          esc(courseData.course_name) +
-          '</div>' +
-          '<div class="cw-review-meta">' +
-          esc(tag) +
-          ' \u00B7 ' +
-          total +
-          (total === 1 ? ' Competency' : ' Competencies') +
-          (folders ? ' \u00B7 ' + folders + (folders === 1 ? ' Folder' : ' Folders') : '') +
-          '</div>' +
-          '<div class="cw-review-sections">' +
-          rows
-            .map(function (r) {
-              return (
-                '<div class="cw-review-sec"><span class="cw-review-sec-dot" style="background:' +
-                r.dot +
-                '"></span>' +
-                esc(r.name) +
-                '<span class="cw-review-sec-count">' +
-                r.n +
-                (r.n === 1 ? ' Competency' : ' Competencies') +
-                '</span></div>'
-              );
-            })
-            .join('') +
-          '</div></div>';
-      });
-      html += _cwRenderGradingRows(anyFolder);
-    } else {
-      html +=
-        '<div class="cm-section"><div class="cw-empty-msg">This class has no BC curriculum. Folders and competencies can be added in the Competencies tab after the class is created.</div></div>';
-    }
-
-    html +=
-      '<div class="cw-footer">' +
-      _cwCancelBtn() +
-      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate"' +
-      (className.trim() ? '' : ' disabled') +
-      '>Create Class</button></div>';
-    html += '</div>';
-    return html;
-  }
-
-  /* What Create Class sets without asking, shown on the review so a teacher
-     at another school knows to change it: the reporting terms (the default
-     school's, for the chosen span) and, for a Letter class, Counts As. */
-  function _cwReviewSetupRows(gradeLevel) {
-    var val = function (text) {
-      return '<div style="font-size:var(--text-md);color:var(--text-2)">' + text + '</div>';
-    };
+  /* What Create Class sets without asking that is changed elsewhere: the
+     reporting terms (the default school's, for the chosen span) and, for a
+     grade that reports a letter, Counts As. */
+  function _cwTermsRows(gradeLevel) {
     var terms = _cmDefaultReportingTerms(null, cwStep2Span);
     var school = terms && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
-    var html =
-      '<div class="cm-field"><label class="cm-label">Reporting Terms</label>' +
-      (terms && terms.length
-        ? val(
-            esc(school ? school.school.name : '') +
-              (school ? ': ' : '') +
+    var html = _cwSetRow(
+      cwOpen,
+      'terms',
+      'Reporting Terms',
+      terms && terms.length
+        ? esc(school ? school.school.name + ', ' : '') + terms.length + (terms.length === 1 ? ' term' : ' terms')
+        : 'None. You can add them later in Reporting Terms.',
+      terms && terms.length
+        ? function () {
+            return (
+              '<p class="cw-desc">' +
               terms
                 .map(function (t) {
-                  return esc(t.label + ' ' + _cmTermDay(t.starts_on) + ' \u2013 ' + _cmTermDay(t.ends_on));
+                  return esc(t.label + ' ' + _cmTermDay(t.starts_on) + ' – ' + _cmTermDay(t.ends_on));
                 })
-                .join(' \u00B7 '),
-          ) + '<div class="cm-hint">Another school? Change the school or the dates later in Reporting Terms.</div>'
-        : val('None. You can add them later in Reporting Terms.')) +
-      '</div>';
+                .join(' · ') +
+              '. Another school, or other dates? Change them in Reporting Terms once the class is made.</p>'
+            );
+          }
+        : null,
+      true,
+    );
     if (_cmDefaultGradingScale(gradeLevel))
-      html +=
-        '<div class="cm-field"><label class="cm-label">Counts As</label>' +
-        val('BC Letter Bands') +
-        '<div class="cm-hint">Each proficiency counts as a percent in the course % from the BC letter bands. You can change this later in Grading.</div>' +
-        '</div>';
+      html += _cwSetRow(
+        cwOpen,
+        'counts',
+        'Counts As',
+        'BC Letter Bands',
+        function () {
+          return '<p class="cw-desc">Each proficiency counts as a percent in the course % from the BC letter bands. You can change this later in Grading.</p>';
+        },
+        true,
+      );
     return html;
   }
 
@@ -6118,17 +6058,14 @@ window.DashClassManager = (function () {
     cwStep2Grade = '';
     cwStep2Grading = '';
     cwStep2Calc = '';
-    cwSelectedSubject = null;
     cwSelectedTags = [];
     cwSkipped = {};
     cwPreset = null;
     cwFoldersOn = null;
     cwCoursesEqual = null;
-    renderClassManager();
-  }
-
-  function cwSelectSubject(subj) {
-    cwSelectedSubject = subj;
+    cwFindText = '';
+    // Another grade is another class: a name typed for the last one goes.
+    cwStep2Name = null;
     renderClassManager();
   }
 
@@ -6138,7 +6075,7 @@ window.DashClassManager = (function () {
     else cwSelectedTags.push(tag);
     cwFoldersOn = null;
     cwCoursesEqual = null;
-    renderClassManager();
+    _cwRedraw();
   }
 
   // A preset ticks its courses together and unticks them together.
@@ -6156,13 +6093,34 @@ window.DashClassManager = (function () {
       cwPreset = id;
       cwSelectedTags = p.tags.concat(cwSelectedTags);
     }
-    renderClassManager();
+    cwFoldersOn = null;
+    cwCoursesEqual = null;
+    _cwRedraw();
+  }
+
+  // The find box hides the courses whose names don't hold what is typed.
+  function cwFindInput(value) {
+    cwFindText = value || '';
+    var q = cwFindText.trim().toLowerCase();
+    var list = document.querySelector('.cw-course-list');
+    if (!list) return;
+    list.querySelectorAll('[data-find]').forEach(function (row) {
+      row.hidden = !!q && row.dataset.find.indexOf(q) < 0;
+    });
+    list.querySelectorAll('.cw-course-group').forEach(function (g) {
+      g.hidden = !g.querySelector('[data-find]:not([hidden])');
+    });
+    list.querySelectorAll('.cw-course-sep').forEach(function (s) {
+      s.hidden = !!q;
+    });
+    var none = document.getElementById('cw-find-none');
+    if (none) none.hidden = !q || !!list.querySelector('[data-find]:not([hidden])');
   }
 
   function cwCompToggle(key, ticked) {
     if (ticked) delete cwSkipped[key];
     else cwSkipped[key] = true;
-    _cmRenderWithScroll();
+    _cwRedraw();
   }
 
   // Select All / Clear for one Ministry folder.
@@ -6179,10 +6137,26 @@ window.DashClassManager = (function () {
       if (ticked) delete cwSkipped[key];
       else cwSkipped[key] = true;
     });
-    _cmRenderWithScroll();
+    _cwRedraw();
   }
 
-  // Cancel on every step, as on the first.
+  // Change (or Done) on a row of Already Set for You.
+  function cwOpenRow(key) {
+    cwOpen = cwOpen === key ? '' : key;
+    _cwRedraw();
+  }
+
+  // The step drawn again where it was scrolled to.
+  function _cwRedraw() {
+    if (cwStep === 2) _cwReadDetails();
+    var pane = document.querySelector('.cm-detail');
+    var top = pane ? pane.scrollTop : 0;
+    renderClassManager();
+    pane = document.querySelector('.cm-detail');
+    if (pane) pane.scrollTop = top;
+  }
+
+  // Cancel on both steps.
   function _cwCancelBtn() {
     return '<button class="btn btn-ghost cw-cancel" data-action="cmCancelCreate">Cancel</button>';
   }
@@ -6190,7 +6164,9 @@ window.DashClassManager = (function () {
   /* A new step opens at its top, with the step bar in view, whatever the
      last step was scrolled to (the Class Name box's autofocus included). */
   function _cwShowStep(step) {
+    if (cwStep === 2) _cwReadDetails();
     cwStep = step;
+    cwOpen = '';
     renderClassManager();
     var top = function () {
       var detail = document.querySelector('.cm-detail');
@@ -6203,7 +6179,7 @@ window.DashClassManager = (function () {
   function cwSkipToCustom() {
     cwSelectedTags = [];
     cwPreset = null;
-    _cwShowStep(3);
+    _cwShowStep(2);
   }
 
   function cwGoToStep2() {
@@ -6211,19 +6187,15 @@ window.DashClassManager = (function () {
     _cwShowStep(2);
   }
 
-  function cwCompsNext() {
-    _cwShowStep(3);
-  }
-
-  // The review's grading switches. They don't touch any class until Finish.
+  // The grading switches. They don't touch any class until Create Class.
   function cwSetRollup(key, on) {
     if (key === 'courses') cwCoursesEqual = !!on;
     else cwFoldersOn = !!on;
-    renderClassManager();
+    _cwRedraw();
   }
 
-  /* The wizard's grading switches: what the teacher set on the review, else
-     the default for one course or a combined class. */
+  /* The wizard's grading switches: what the teacher set, else the default
+     for one course or a combined class. */
   function _cwGrading() {
     var d = curriculumGradingDefaults(cwSelectedTags);
     return {
@@ -6232,45 +6204,25 @@ window.DashClassManager = (function () {
     };
   }
 
-  // Class Details: Next comes on once the class has a name.
+  // Create Class comes on once the class has a name; Your Class follows it.
   function cwNameInput(el) {
-    var named = !!(el.value || '').trim();
-    var next = document.querySelector('[data-action="cwGoToStep3"]');
+    var typed = el.value || '';
+    cwStep2Name = typed === _cwDefaultName() ? null : typed;
+    var named = !!typed.trim();
+    var next = document.querySelector('[data-action="cwFinishCreate"]');
     if (next) next.disabled = !named;
     var hint = document.getElementById('cm-new-name-hint');
     if (hint) hint.hidden = named;
-  }
-
-  function cwGoToStep3() {
-    if (!(document.getElementById('cm-new-name')?.value || '').trim()) return;
-    cwStep2Name = document.getElementById('cm-new-name')?.value || '';
-    cwStep2Block = readBlockPicker('cm-new-block');
-    cwStep2Span = (document.querySelector('#cm-cg-span .cm-seg-btn.active') || {}).dataset?.val || 'full';
-    cwStep2Grade = document.getElementById('cm-new-grade')?.value || '';
-    cwStep2Desc = document.getElementById('cm-new-desc')?.value || '';
-    cwStep2Grading =
-      (document.querySelector('#cm-cg-grading .cm-seg-btn.active') || {}).dataset?.val ||
-      _cmDefaultGradingSystem({ gradeLevel: cwStep2Grade });
-    cwStep2Calc =
-      (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val || _cmDefaultCalcMethod();
-    cwStep2Decay = document.getElementById('cm-cg-decay-slider')?.value || '65';
-    cwStep2LatePolicy = document.getElementById('cm-new-late-policy')?.value || '';
-    _cwShowStep(4);
+    _cwRailSync();
   }
 
   function cwGoBack() {
-    if (cwStep === 4) _cwShowStep(3);
-    else if (cwStep === 3) _cwShowStep(cwSelectedTags.length ? 2 : 1);
-    else if (cwStep === 2) _cwShowStep(1);
-    else renderClassManager();
+    _cwShowStep(1);
   }
 
   function cwGetPreName() {
-    if (cwStep2Name) return cwStep2Name;
-    if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      return _cwDefaultName();
-    }
-    return '';
+    if (cwStep2Name != null) return cwStep2Name;
+    return _cwDefaultName();
   }
 
   /* A new class's name: the preset's (Humanities 8) while only its courses
@@ -6278,6 +6230,7 @@ window.DashClassManager = (function () {
   function _cwDefaultName() {
     var p = _cwActivePreset();
     if (p && cwSelectedTags.length === p.tags.length) return p.name;
+    if (!CURRICULUM_INDEX) return '';
     return cwSelectedTags
       .map(function (tag) {
         return CURRICULUM_INDEX[tag];
@@ -6290,10 +6243,11 @@ window.DashClassManager = (function () {
   }
 
   async function cwFinishCreate() {
-    var name = cwStep2Name || cwGetPreName();
+    _cwReadDetails();
+    var name = cwGetPreName();
     if (!name.trim()) {
-      // Back to Class Details, where the name is typed.
-      cwStep = 3;
+      // Back to Name Your Class, where the name is typed.
+      cwStep = 2;
       renderClassManager();
       requestAnimationFrame(function () {
         var el = document.getElementById('cm-new-name');
@@ -6318,12 +6272,13 @@ window.DashClassManager = (function () {
     var course = createCourse({
       name: name.trim(),
       block: cwStep2Block,
-      gradeLevel: (cwStep2Grade || (cwSelectedGrade ? String(cwSelectedGrade) : '')).trim(),
-      description: (cwStep2Desc || '').trim(),
-      gradingSystem: cwStep2Grading,
-      calcMethod: cwStep2Calc,
+      gradeLevel: _cwGradeLevel(),
+      // Description and Late Work Policy are left to Class Settings (Colin, 2026-11-25).
+      description: '',
+      gradingSystem: cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: _cwGradeLevel() }),
+      calcMethod: cwStep2Calc || _cmDefaultCalcMethod(),
       decayWeight: parseInt(cwStep2Decay, 10) / 100,
-      lateWorkPolicy: cwStep2LatePolicy.trim() || null,
+      lateWorkPolicy: null,
     });
 
     // createCourse fires create_course asynchronously and returns a course
@@ -6338,7 +6293,7 @@ window.DashClassManager = (function () {
     if (canonicalCid && canonicalCid !== course.id) course.id = canonicalCid;
 
     var cc = getCourseConfig(course.id);
-    cc.calcMethod = cwStep2Calc;
+    cc.calcMethod = cwStep2Calc || _cmDefaultCalcMethod();
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
     cc.levelOrder = _cmDefaultLevelOrder(course.gradeLevel);
     var startScale = _cmDefaultGradingScale(course.gradeLevel);
@@ -6346,7 +6301,7 @@ window.DashClassManager = (function () {
     var defaultTerms = _cmDefaultReportingTerms(course.id, cwStep2Span);
     if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
       cc.reportingTerms = defaultTerms;
-    // The review's grading switches: by default one course counts its
+    // The grading switches: by default one course counts its
     // folders as one, and a combined class counts each course equally.
     if (cwSelectedTags.length > 0) Object.assign(cc, _cwGrading());
     saveCourseConfig(course.id, cc);
@@ -6417,15 +6372,15 @@ window.DashClassManager = (function () {
     cwFoldersOn = null;
     cwCoursesEqual = null;
     cwLoadError = false;
-    cwStep2Name = '';
+    cwStep2Name = null;
     cwStep2Grade = '';
-    cwStep2Desc = '';
     cwStep2Block = '';
     cwStep2Span = 'full';
     cwStep2Grading = '';
     cwStep2Calc = '';
     cwStep2Decay = '65';
-    cwStep2LatePolicy = '';
+    cwFindText = '';
+    cwOpen = '';
     loadCurriculumIndex().then(function (idx) {
       cwCurriculumLoaded = !!idx;
       cwLoadError = !idx;
@@ -6442,6 +6397,10 @@ window.DashClassManager = (function () {
 
   function cmCreateToggle(btn, containerId) {
     segSelect(btn);
+    if (containerId === 'cm-cg-span') {
+      cwStep2Span = btn.dataset.val || 'full';
+      _cwRailSync();
+    }
     if (containerId === 'cm-cg-calc') {
       cwStep2Calc = btn.dataset.val;
       var desc = document.getElementById('cm-cg-calc-desc');
@@ -6457,6 +6416,8 @@ window.DashClassManager = (function () {
   // Typing a grade level re-applies the grade defaults to any picker the
   // teacher hasn't chosen yet.
   function cwGradeInput(value) {
+    cwStep2Grade = value || '';
+    _cwRailSync();
     if (!cwStep2Grading) {
       var gs = _cmDefaultGradingSystem({ gradeLevel: value });
       var gbtn = document.querySelector('#cm-cg-grading .cm-seg-btn[data-val="' + gs + '"]');
@@ -10899,9 +10860,6 @@ window.DashClassManager = (function () {
       cwSelectGrade: function () {
         cwSelectGrade(parseInt(el.dataset.grade, 10));
       },
-      cwSelectSubject: function () {
-        cwSelectSubject(el.dataset.subject);
-      },
       cwToggleCourse: function () {
         cwToggleCourse(el.dataset.tag);
       },
@@ -10914,17 +10872,14 @@ window.DashClassManager = (function () {
       cwTogglePreset: function () {
         cwTogglePreset(el.dataset.tag);
       },
-      cwCompsNext: function () {
-        cwCompsNext();
-      },
       cwFolderAll: function () {
         cwFolderSet(el.dataset.tag, parseInt(el.dataset.idx, 10), true);
       },
       cwFolderNone: function () {
         cwFolderSet(el.dataset.tag, parseInt(el.dataset.idx, 10), false);
       },
-      cwGoToStep3: function () {
-        cwGoToStep3();
+      cwOpenRow: function () {
+        cwOpenRow(el.dataset.row);
       },
       cwGoBack: function () {
         cwGoBack();
@@ -10983,6 +10938,10 @@ window.DashClassManager = (function () {
       cmBlockChip: function () {
         blockChipSelect(el);
         if (el.dataset.picker === 'cm-block') cmUpdateField('block', el.dataset.val || '');
+        if (el.dataset.picker === 'cm-new-block') {
+          cwStep2Block = el.dataset.val || '';
+          _cwRailSync();
+        }
       },
       cmCreateToggle: function () {
         cmCreateToggle(el, el.dataset.group);
@@ -11055,6 +11014,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionInput === 'cmBlockOtherInput') {
       blockOtherInput(el);
+      if (el.dataset.picker === 'cm-new-block') {
+        cwStep2Block = readBlockPicker('cm-new-block');
+        _cwRailSync();
+      }
       return true;
     }
     if (el.dataset.actionInput === 'cmPtsLive') {
@@ -11063,6 +11026,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionInput === 'cmDecaySlider') {
       cmUpdateDecay(el.value);
+      return true;
+    }
+    if (el.dataset.actionInput === 'cwFind') {
+      cwFindInput(el.value);
       return true;
     }
     if (el.dataset.actionInput === 'cwGradeInput') {
@@ -11489,15 +11456,15 @@ window.DashClassManager = (function () {
       cwSelectedGrade = null;
       cwSelectedSubject = null;
       cwSelectedTags = [];
-      cwStep2Name = '';
+      cwStep2Name = null;
       cwStep2Grade = '';
-      cwStep2Desc = '';
       cwStep2Block = '';
       cwStep2Span = 'full';
       cwStep2Grading = '';
       cwStep2Calc = '';
       cwStep2Decay = '65';
-      cwStep2LatePolicy = '';
+      cwFindText = '';
+      cwOpen = '';
       _cmCollapsedStdFolders = {};
       _cmOpenStdCards = {};
       _cmCategoryState = {};
