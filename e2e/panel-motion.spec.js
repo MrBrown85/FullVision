@@ -304,6 +304,23 @@ test.describe('every slider', () => {
     await expect(page.locator('.seg-gliding')).toHaveCount(0);
   });
 
+  test("the Sentences sheet's parts glide (Browse Sentences: Strength)", async ({ page }) => {
+    await page.goto('/login.html?demo=1');
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+    await page.waitForFunction(() => getAssessments('sci8').length > 0);
+    await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
+    await page.locator('#tq-narrative').waitFor();
+    await page.locator('#tq-browse-btn').click();
+    const track = '.qn-browse-parts';
+    await page.locator(track).waitFor();
+    const thumb = await page.evaluate(
+      t => getComputedStyle(SegGlide.lit(document.querySelector(t))).backgroundColor,
+      track,
+    );
+    const seen = await glideFrames(page, track, track + ' .qn-browse-tab[data-part="strengths"]');
+    glidedAndLanded(seen, 'Strength', thumb);
+  });
+
   test("the phone's sliders glide too (Grade: To Return)", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/login.html');
