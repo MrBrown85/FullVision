@@ -525,7 +525,7 @@ window.DashInboxStacks = (function () {
 
   /** A click on one of the view's controls. el carries data-dash-inbox;
    * ctx is { cid, redraw }. True when it was this view's.
-   * @param {Element} el @param {{ cid: string, redraw: () => void }} ctx
+   * @param {Element} el @param {{ cid: string, redraw: () => void, redrawTile?: () => void }} ctx
    * @returns {boolean} */
   function click(el, ctx) {
     var kind = el.getAttribute('data-dash-inbox') || '';
@@ -534,11 +534,11 @@ window.DashInboxStacks = (function () {
     var RC = /** @type {any} */ (window).DashInboxRollCall;
     var PA = /** @type {any} */ (window).PageAssignments;
     if (kind === 'stack-open') {
-      _set(cid, _st.open === aid ? null : aid, ctx.redraw);
+      _set(cid, _st.open === aid ? null : aid, ctx.redrawTile || ctx.redraw);
       return true;
     }
     if (kind === 'stack-close') {
-      _set(cid, null, ctx.redraw);
+      _set(cid, null, ctx.redrawTile || ctx.redraw);
       return true;
     }
     if (kind === 'stack-page') {

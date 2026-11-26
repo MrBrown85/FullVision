@@ -272,6 +272,7 @@ const PRECACHE_URLS = [
   '/teacher/dash-inbox-rollcall.js',
   '/teacher/dash-observations.js',
   '/teacher/dash-student-cards.js',
+  '/teacher/dash-tile-redraw.js',
   '/teacher/dash-insights.js',
   '/teacher/assign-collab.js',
   '/teacher/assessment-copy.js',

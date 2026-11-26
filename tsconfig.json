@@ -96,6 +96,7 @@
     "teacher/dash-inbox-stacks.js",
     "teacher/dash-inbox-rollcall.js",
     "teacher/dash-inbox-targets.js",
+    "teacher/dash-tile-redraw.js",
     "teacher/report-one-zoom.js",
     "teacher/student-overview.js",
     "teacher/student-page-students.js",

@@ -73,6 +73,9 @@ describe('the Dashboard draws the students alone', () => {
     _cache.observations[CID] = {};
     setActiveCourse(CID);
     saveDashboardPrefs({ studentView: 'cards' });
+    runInThisContext(readFileSync(resolve(root, 'teacher/dash-tile-redraw.js'), 'utf-8'), {
+      filename: 'teacher/dash-tile-redraw.js',
+    });
     runInThisContext(readFileSync(resolve(root, 'teacher/page-dashboard.js'), 'utf-8'), {
       filename: 'teacher/page-dashboard.js',
     });
