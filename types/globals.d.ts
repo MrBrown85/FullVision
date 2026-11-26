@@ -543,3 +543,7 @@ declare var RubricScale: any;
 interface Window {
   RubricChecks?: any;
 }
+declare var RubricLibrary: any;
+interface Window {
+  RubricLibrary?: any;
+}
