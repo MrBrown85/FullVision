@@ -465,7 +465,9 @@ test('At a Glance: the year so far, the best piece and View All Skills', async (
   await expect(page.locator('.qno-glance .qn-fact').nth(0)).toContainText(expected.strongest);
   await expect(page.locator('.qno-glance .qn-fact').nth(1)).toContainText(expected.next);
   await expect(page.locator('.qn-best .qn-fact-body')).toContainText(expected.best);
-  await expect(page.locator('.qno-glance .qn-card-top .qn-ev-text')).toHaveText('So far this year · change since the Term 1 report');
+  await expect(page.locator('.qno-glance .qn-card-top .qn-ev-text')).toHaveText(
+    'So far this year · change since the Term 1 report',
+  );
   await expect(page.locator('.qno-glance [data-action="tqOpenSkills"]')).toHaveText(
     'View All ' + expected.comps + ' Skills ›',
   );
