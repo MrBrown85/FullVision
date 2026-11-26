@@ -207,11 +207,12 @@
 }
 
 /* ── The progress line: a segment for each card ──────────────── */
-/* Dark once graded, blue for the card on screen. Nothing in it is a control. */
+/* A quiet grey track; blue for the cards graded, full blue for the card on
+   screen. Nothing in it is a control. */
 .m-grade-progress {
   display: flex;
   flex: none;
-  gap: 4px;
+  gap: 1px;
   padding: 0 16px 8px;
 }
 .m-grade-progress[hidden] {
@@ -221,14 +222,21 @@
   flex: 1 1 0;
   min-width: 0;
   height: 3px;
-  border-radius: 2px;
-  background: var(--border);
+  background: var(--divider-medium);
+}
+.m-prog-seg:first-child {
+  border-radius: 2px 0 0 2px;
+}
+.m-prog-seg:last-child {
+  border-radius: 0 2px 2px 0;
 }
 .m-prog-seg.is-graded {
-  background: var(--text);
+  background: var(--active);
+  opacity: 0.5;
 }
 .m-prog-seg.is-current {
   background: var(--active);
+  opacity: 1;
 }
 
 /* One student's work: a tab for each piece. */
@@ -1046,7 +1054,14 @@ button.m-grade-chip:focus-visible {
   overflow: hidden;
 }
 .m-crit-each {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-top: 10px;
+}
+.m-crit-each .m-crit-own-btn {
+  margin-top: 0;
 }
 .m-crit-own-btn {
   display: inline-flex;
@@ -1975,4 +1990,135 @@ button.m-grade-chip:focus-visible {
 }
 .m-revision-send:disabled {
   opacity: 0.6;
+}
+
+/* ── Work Wall on the phone (shared/work-wall.js; the computer keeps
+   teacher/work-wall.css). A full-screen view over the tab bar, like Full
+   Screen grading: Back at the left, the title centred, the sort as a
+   segmented control, one full-width Grade in This Order, the level chips on
+   one scrolling row and the Criterion list as a form row. ── */
+body.mobile-mode .ww-overlay {
+  padding: 0;
+}
+body.mobile-mode .ww-page {
+  border-radius: 0;
+  box-shadow: none;
+}
+body.mobile-mode .ww-bar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  box-shadow: none;
+}
+body.mobile-mode .ww-back {
+  width: 44px;
+  height: 44px;
+  background: none;
+  color: var(--link);
+}
+body.mobile-mode .ww-titles {
+  align-items: center;
+  text-align: center;
+}
+body.mobile-mode .ww-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.mobile-mode .ww-bar > .ww-gap,
+body.mobile-mode .ww-bar > .ww-label {
+  display: none;
+}
+body.mobile-mode .ww-bar > .ww-seg,
+body.mobile-mode .ww-bar > .ww-grade,
+body.mobile-mode .ww-bar > .ww-add-work {
+  grid-column: 1 / -1;
+}
+body.mobile-mode .ww-seg {
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--overlay-pressed);
+}
+body.mobile-mode .ww-seg-btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 7px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+body.mobile-mode .ww-seg-btn.is-on {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+body.mobile-mode .ww-grade {
+  justify-content: center;
+  height: auto;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 17px;
+}
+body.mobile-mode .ww-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 4px 12px 10px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-medium);
+}
+body.mobile-mode .ww-filters > .ww-gap {
+  display: none;
+}
+body.mobile-mode .ww-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -12px;
+  padding: 0 12px;
+}
+body.mobile-mode .ww-pills::-webkit-scrollbar {
+  display: none;
+}
+/* One quiet filled shape for every chip; the one picked is the active blue. */
+body.mobile-mode .ww-pill,
+body.mobile-mode .ww-pill-work,
+body.mobile-mode .ww-pill-all {
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+}
+body.mobile-mode .ww-pill.is-on,
+body.mobile-mode .ww-pill-lv.is-on {
+  background: var(--active-fill);
+  color: #fff;
+}
+body.mobile-mode .ww-by-row .ww-label {
+  font-size: 15px;
+  font-weight: 400;
+}
+body.mobile-mode .ww-by-row select {
+  font-size: 15px;
+}
+body.mobile-mode .ww-scroll {
+  padding: 12px;
+}
+body.mobile-mode .ww-seg-btn {
+  white-space: nowrap;
+  padding: 0 6px;
+  font-size: 14px;
+}
+body.mobile-mode .ww-back svg {
+  width: 22px;
+  height: 22px;
 }

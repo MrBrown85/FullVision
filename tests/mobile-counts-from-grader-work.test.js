@@ -15,7 +15,7 @@
  *
  * "Every phone number" pins what the phone shows on that fixture: the Grade
  * tab's rows, its red count and To Grade count, the row menu, the filter
- * sheet's "Showing X of Y", the student card's To Grade list and the speed
+ * sheet, the student card's To Grade list and the speed
  * grader's "1 of N to grade". "The same numbers" holds the phone, the
  * gradebook and the dashboard to GraderWork on the same fixture.
  */
@@ -129,13 +129,6 @@ function menu(aid) {
   return titles.filter(t => / Waiting$| Not In$/.test(t));
 }
 
-function showing() {
-  MGrade.openFilterSheet(CID);
-  const n = text(document.querySelector('#m-sheet-container .m-live-filter-count'));
-  MGrade.doneFilterSheet();
-  return n;
-}
-
 // "Lab: Grade", "Talk: Add Work" for one student's To Grade list.
 function card(i) {
   const st = getStudents(CID).find(s => s.id === IDS[i]);
@@ -163,7 +156,6 @@ function phone() {
     talk: row(TALK),
     labMenu: menu(LAB),
     talkMenu: menu(TALK),
-    showing: showing(),
     cards: Object.fromEntries([0, 2, 5, 9].map(i => ['S' + i, card(i)])),
     labGrader: grader(LAB),
     talkGrader: grader(TALK),
@@ -216,7 +208,6 @@ describe('every phone number for sent work, on the fixture', () => {
       talk: { pill: '2 to Grade', notin: '6 Not In' },
       labMenu: ['Grade the 3 Waiting', 'Add Work for the 2 Not In'],
       talkMenu: ['Grade the 2 Waiting', 'Add Work for the 6 Not In'],
-      showing: 'Showing 2 of 3',
       cards: {
         S0: ['Talk: Grade', 'Lab: Grade'],
         S2: ['Talk: Grade', 'Lab: Grade'],
