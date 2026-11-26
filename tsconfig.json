@@ -106,6 +106,7 @@
     "teacher/student-outlook.js",
     "teacher/gradebook-student-menu.js",
     "teacher/assign-list.js",
+    "teacher/assign-cards.js",
     "teacher/assign-card-list.js",
     "teacher/assign-focus.js",
     "teacher/assign-modules.js",
