@@ -51,7 +51,7 @@ RELIED = ['public.fv_owns_course(uuid)', 'public.fv_idem_check(uuid,text)', 'pub
           'student_submit.page(text,uuid,text)']
 PATCHED = ['public.get_class_bundle(uuid,bigint)', 'public.duplicate_course(uuid,uuid)', 'public.import_json_restore(jsonb,uuid)']
 OLD = ['public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb)']
-NEW = ['public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', 'public._rubric_comment_list(jsonb,integer)',
+NEW = ['public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', 'public._rubric_comment_list(jsonb,boolean)',
        'public.add_criterion_comment(uuid,smallint,text,uuid)', 'public.add_rubric_overall_comment(uuid,text,uuid)']
 UPSERT10 = NEW[0]
 STOPPED_UPSERT = 'stopped'   # the ten-argument upsert_rubric as PART 0 of the undo leaves it
@@ -269,15 +269,16 @@ def scen_upsert():
         snap = (d.all('select id, name, comments from criterion order by id'), d.all('select id, name, overall_comments from rubric order by id'), version(d, w.c))
         long500 = 'x' * 500; long501 = 'x' * 501
         bad = {
-            'level 0': [C(0, 'a')], 'level 5 on a four-level rubric': [C(5, 'a')], 'no level': [{'text': 'a'}],
-            'level 2.5': [C(2.5, 'a')], 'level as words': [C('three', 'a')], 'empty text': [C(3, '')], 'spaces only': [C(3, ' \t\n ')],
+            'level 0': [C(0, 'a')], 'level 7': [C(7, 'a')], 'no level': [{'text': 'a'}], 'level null': [C(None, 'a')],
+            'level 2.5': [C(2.5, 'a')], 'level 3.0': [C(3.0, 'a')], 'level true': [C(True, 'a')], 'level 10**20': [C(10 ** 20, 'a')],
+            'level " 3"': [C(' 3', 'a')], 'level as words': [C('three', 'a')], 'empty text': [C(3, '')], 'spaces only': [C(3, ' \t\n ')],
             '501 characters': [C(3, long501)], 'text not text': [C(3, 7)], 'no text': [{'level': 3}], 'a bare string': ['a'],
             'not a list (object)': {'level': 3, 'text': 'a'}, 'not a list (string)': 'a', '41 different': [C(3, 'c%d' % i) for i in range(41)],
         }
         for name, val in bad.items():
             rows = crit_rows(d, w.rub); rows[0]['name'] = 'CHANGED'; rows[0]['comments'] = val
             r = refused(d, lambda: ur(d, w.rub, w.c, 'CHANGED', rows))
-            ok('upsert: refused, nothing changed: ' + name, r is not None and r[1] in ('22023', '22P02') and
+            ok('upsert: refused with 22023, nothing changed: ' + name, r is not None and r[1] == '22023' and
                (d.all('select id, name, comments from criterion order by id'), d.all('select id, name, overall_comments from rubric order by id'), version(d, w.c)) == snap, r)
         for name, val in {'overall: a number': [3], 'overall: an object': [{'text': 'a'}], 'overall: empty': [''], 'overall: 501': [long501],
                           'overall: 41 different': ['o%d' % i for i in range(41)], 'overall: not a list': 'a', 'overall: json null': 'JSONNULL'}.items():
@@ -300,19 +301,22 @@ def scen_upsert():
         rows[0]['comments'] = [C(7, 'seven')]
         r = refused(d, lambda: ur(d, w.rub6, w.c, 'Six Point', rows))
         ok('upsert: level 7 is refused there', r is not None and r[1] == '22023' and comments(d, w.crit6) == [C(5, 'five'), C(6, 'six')], r)
-        rows = crit_rows(d, w.rub6); rows[0]['comments'] = [C(5, 'five on the old scale')]
-        r = refused(d, lambda: ur(d, w.rub6, w.c, 'Six Point', rows, scale=[]))
-        ok('upsert: a save that clears the scale reads levels against the four levels it leaves', r is not None and r[1] == '22023', r)
+        rows = crit_rows(d, w.rub)
+        rows[0]['comments'] = [C(5, 'five on four'), C(6, 'six on four'), C('2', 'two as text')]
+        ur(d, w.rub, w.c, 'Essay Rubric', rows)
+        ok('upsert: levels 1 to 6 on a four-level rubric too (as a checkbox level); a digit as text is stored as a number',
+           comments(d, w.crits[0]) == [C(5, 'five on four'), C(6, 'six on four'), C(2, 'two as text')], comments(d, w.crits[0]))
         # another teacher
         rows = crit_rows(d, w.rub); rows[0]['comments'] = [C(3, 'EVIL')]
         r = refused(d, lambda: ur(d, w.rub, w.c, 'EVIL', rows, uid=B, overall=['EVIL']))
         ok("upsert: another teacher's save of this rubric is refused and changes nothing", r is not None and 'EVIL' not in json.dumps(d.all('select comments from criterion')) + json.dumps(d.all('select overall_comments from rubric')), r)
         # who may run it
-        ok('upsert: a visitor may not run it', refused(d, lambda: d.role('anon', "select upsert_rubric(null, null, 'x', '[]'::jsonb)")) is not None)
+        r = refused(d, lambda: d.role('anon', "select upsert_rubric(null, null, 'x', '[]'::jsonb)"))
+        ok('upsert: a visitor may not run it', r is not None and 'permission denied' in r[0], r)
         ok('upsert: the rule for a list: a teacher and the service role may run it, a visitor may not',
-           d.one("select has_function_privilege('authenticated', 'public._rubric_comment_list(jsonb,integer)', 'execute') and has_function_privilege('service_role', 'public._rubric_comment_list(jsonb,integer)', 'execute') and not has_function_privilege('anon', 'public._rubric_comment_list(jsonb,integer)', 'execute')"))
-        ok('upsert: the rule for a list is immutable and reads no table', d.one("select provolatile from pg_proc where oid = to_regprocedure('public._rubric_comment_list(jsonb,integer)')") == 'i'
-           and set(re.findall(r'(?i)\bfrom\s+(\w+)', defn(d, NEW[1]))) == {'jsonb_array_elements'}, re.findall(r'(?i)\bfrom\s+(\w+)', defn(d, NEW[1])))
+           d.one("select has_function_privilege('authenticated', 'public._rubric_comment_list(jsonb,boolean)', 'execute') and has_function_privilege('service_role', 'public._rubric_comment_list(jsonb,boolean)', 'execute') and not has_function_privilege('anon', 'public._rubric_comment_list(jsonb,boolean)', 'execute')"))
+        ok('upsert: the rule for a list is immutable and reads no table', d.one("select provolatile from pg_proc where oid = to_regprocedure('public._rubric_comment_list(jsonb,boolean)')") == 'i'
+           and set(re.findall(r'(?i)\bfrom\s+(\w+)', re.sub(r'--[^\n]*', '', defn(d, NEW[1])))) == {'jsonb_array_elements'})
     finally:
         d.close()
 
@@ -338,11 +342,13 @@ def scen_add():
            r == [C(3, 'Clear claim, [Name].'), C(4, 'Clear claim, [Name].'), C(1, 'Start here.')], r)
         ok('add: the other criteria are untouched', comments(d, c2) == [])
         before = comments(d, c1)
-        for name, (lv, tx, st) in {'level 0': (0, 'a', '22023'), 'level 5 on a four-level rubric': (5, 'a', '22023'), 'no level': (None, 'a', '22023'),
+        for name, (lv, tx, st) in {'level 0': (0, 'a', '22023'), 'level 7': (7, 'a', '22023'), 'level -1': (-1, 'a', '22023'), 'no level': (None, 'a', '22023'),
                                     'no text': (3, None, '22023'), 'blank text': (3, '   ', '22023'), '501 characters': (3, 'y' * 501, '22023')}.items():
             r = refused(d, lambda: add(d, c1, lv, tx))
             ok('add: refused, nothing changed: ' + name, r is not None and r[1] == st and comments(d, c1) == before, r)
         ok('add: level 6 on a rubric with its own levels', add(d, w.crit6, 6, 'six') == [C(6, 'six')])
+        ok('add: and level 5 on a four-level rubric', add(d, c2, 5, 'five on four') == [C(5, 'five on four')])
+        d.run("update criterion set comments = '[]' where id = :c", c=c2)
         # another teacher, a visitor, nobody
         r = refused(d, lambda: add(d, c1, 3, 'EVIL', uid=B))
         ok("add: another teacher is refused (as not found) and nothing changes", r is not None and r[1] == 'P0002' and comments(d, c1) == before, r)
@@ -389,7 +395,8 @@ def scen_add():
             ok('overall: refused, nothing changed: ' + name, r is not None and r[1] == '22023' and overall(d, w.rub) == ['Well argued, [Name].'], r)
         r = refused(d, lambda: add_o(d, w.rub, 'EVIL', uid=B))
         ok('overall: another teacher is refused', r is not None and r[1] == 'P0002' and overall(d, w.rub) == ['Well argued, [Name].'], r)
-        ok('overall: a visitor may not run it', refused(d, lambda: d.role('anon', "select add_rubric_overall_comment(:r::uuid, 'EVIL')", r=w.rub)) is not None)
+        r = refused(d, lambda: d.role('anon', "select add_rubric_overall_comment(:r::uuid, 'EVIL')", r=w.rub))
+        ok('overall: a visitor may not run it', r is not None and 'permission denied' in r[0], r)
         k = d.one('select gen_random_uuid()::text')
         r1 = add_o(d, w.rub, 'Keyed.', key=k); add_o(d, w.rub, 'After.'); r2 = add_o(d, w.rub, 'Keyed.', key=k)
         ok('overall: the key replays', r1 == r2 == ['Well argued, [Name].', 'Keyed.'] and overall(d, w.rub) == ['Well argued, [Name].', 'Keyed.', 'After.'])
@@ -491,7 +498,7 @@ def scen_readers():
         ok('readers: student_submit.page is the definition it was before the file', md5(d, 'student_submit.page(text,uuid,text)') == listed(text_of(FILE), 'relied')['student_submit.page(text,uuid,text)'])
         det = json.dumps(obj(T(d, 'get_assessment_detail(:a)', a=w.asm)))
         ok('readers: get_assessment_detail (a teacher reader that sends whole rows) now shows the bank too; teacher only',
-           'BANKED-SECRET-ONE' in det and 'OVERALL-SECRET' in det and refused(d, lambda: d.role('anon', 'select get_assessment_detail(:a)', a=w.asm)) is not None
+           'BANKED-SECRET-ONE' in det and 'OVERALL-SECRET' in det and 'permission denied' in (refused(d, lambda: d.role('anon', 'select get_assessment_detail(:a)', a=w.asm)) or ('',))[0]
            and 'BANKED' not in json.dumps(refused(d, lambda: T(d, 'get_assessment_detail(:a)', B, a=w.asm)) or obj(T(d, 'get_assessment_detail(:a)', B, a=w.asm))))
     finally:
         d.close()
@@ -646,6 +653,96 @@ def scen_race():
     finally:
         d.close()
 
+# == scales ==
+def scale_of(n): return [{'k': i, 'name': 'L%d' % i, 'level': min(4, max(1, i - (n - 4))), 'mod': 0} for i in range(1, n + 1)]
+
+def scen_scales():
+    w = world('scales', apply=True); d = w.d
+    try:
+        # the story: a six-level rubric banks a level-6 comment, then goes back to four levels
+        add(d, w.crit6, 6, 'Top of six.'); add(d, w.crit6, 5, 'Five of six.')
+        ur(d, w.rub6, w.c, 'Six Point', crit_rows(d, w.rub6), scale=[])
+        ok('scales: back to four levels (p_scale []): the save works and keeps the level 5 and 6 comments',
+           d.one('select scale from rubric where id = :r', r=w.rub6) is None and comments(d, w.crit6) == [C(6, 'Top of six.'), C(5, 'Five of six.')], comments(d, w.crit6))
+        rows = crit_rows(d, w.rub6); rows[0]['comments'] = comments(d, w.crit6) + [C(4, 'Four.')]
+        r = refused(d, lambda: ur(d, w.rub6, w.c, 'Six Point', rows))
+        ok('scales: the editor sends the list back, levels 5 and 6 in it: the save works', r is None and len(comments(d, w.crit6)) == 3, r)
+        r = refused(d, lambda: add(d, w.crit6, 6, 'Another six.'))
+        ok('scales: Add to Bank at level 6 on it works', r is None and C(6, 'Another six.') in comments(d, w.crit6), r)
+        nc = str(T(d, 'duplicate_course(:c, gen_random_uuid())', c=w.c))
+        copied = obj(d.one("select c.comments from criterion c join rubric r on r.id = c.rubric_id where r.course_id = :c and r.name = 'Six Point'", c=nc))
+        ok('scales: Duplicate Class copies it', copied == comments(d, w.crit6), copied)
+        payload = {'rubrics': [{'id': w.rub6, 'course_id': w.c, 'name': 'Six Point', 'style': 'standard', 'scale': None, 'overall_comments': []}],
+                   'criteria': [dict(crit('Ideas'), id=w.crit6, rubric_id=w.rub6, comments=comments(d, w.crit6))]}
+        r = refused(d, lambda: T(d, 'import_json_restore(:p::jsonb, gen_random_uuid())', p=json.dumps(payload)))
+        ok('scales: a backup of the class restores, levels 5 and 6 and all', r is None and len(comments(d, w.crit6)) == 4, r)
+        # rubrics of two to five levels: every level 1 to 6 is taken, by a save and by Add to Bank
+        for n in (2, 3, 4, 5):
+            rid = str(ur(d, None, w.c, 'Scale %d' % n, [crit('Only', comments=[C(lv, 'saved %d' % lv) for lv in range(1, 7)])],
+                         scale=scale_of(n) if n != 4 else None))
+            cid = crit_ids(d, rid)[0]
+            got = [add(d, cid, lv, 'added %d' % lv) for lv in range(1, 7)][-1]
+            r7 = refused(d, lambda: add(d, cid, 7, 'seven'))
+            ok('scales: a rubric of %d levels takes levels 1 to 6 (save and add), refuses 7' % n,
+               len(got) == 12 and {x['level'] for x in got} == set(range(1, 7)) and r7 is not None and r7[1] == '22023', (got, r7))
+    finally:
+        d.close()
+
+# == table ==
+def direct(d, sql, **kw):
+    """A teacher's own write straight to the table, as authenticated may (row security lets them update their rows)."""
+    return refused(d, lambda: d.role('authenticated', sql, uid=A, **kw))
+
+def worst(n, overall=False):
+    """n distinct texts of 500 control characters (each a 6-byte escape in jsonb's text), at level 6."""
+    ctrl = [c for c in range(1, 32) if c not in (8, 9, 10, 12, 13)]   # the five with a two-byte escape left out
+    texts = [chr(ctrl[i % len(ctrl)]) + chr(ctrl[i // len(ctrl)]) + chr(1) * 498 for i in range(n)]
+    return texts if overall else [C(6, x) for x in texts]
+
+def scen_table():
+    w = world('table', apply=True); d = w.d
+    try:
+        c1 = w.crits[0]
+        add(d, c1, 3, 'kept'); add_o(d, w.rub, 'kept overall')
+        before = (comments(d, c1), overall(d, w.rub))
+        cases = {
+            'level 99, 100 KB': [{'level': 99, 'text': 'x' * 100000}],
+            'level 99': [C(99, 'x')],
+            '41 items': [C(3, 'c%d' % i) for i in range(41)],
+            'a text of 501 characters': [C(3, 'y' * 501)],
+            'an untrimmed text': [C(3, ' padded ')],
+            'a repeat': [C(3, 'same'), C(3, 'same')],
+            'a level as text': [C('3', 'stored as text')],
+            'an extra key': [{'level': 3, 'text': 'x', 'extra': 1}],
+            'not a list': {'level': 3, 'text': 'x'},
+            '200 KB in one item': [C(3, 'z' * 200000)],
+        }
+        for name, val in cases.items():
+            r = direct(d, 'update criterion set comments = :v::jsonb where id = :c', v=json.dumps(val), c=c1)
+            ok('table: a direct write is refused: ' + name, r is not None and r[1] in ('23514', '22023') and comments(d, c1) == before[0], r)
+        for name, val in {'41': ['o%d' % i for i in range(41)], 'a number': [3], 'untrimmed': [' x '], '200 KB': ['z' * 200000]}.items():
+            r = direct(d, 'update rubric set overall_comments = :v::jsonb where id = :r', v=json.dumps(val), r=w.rub)
+            ok('table: a direct overall write is refused: ' + name, r is not None and r[1] in ('23514', '22023') and overall(d, w.rub) == before[1], r)
+        r = direct(d, 'update criterion set comments = :v::jsonb where id = :c', v=json.dumps([C(2, 'direct and fine')]), c=c1)
+        ok('table: a direct write that keeps the rule is taken', r is None and comments(d, c1) == [C(2, 'direct and fine')], r)
+        # the byte caps are the most the rule allows, exactly
+        big, bigo = worst(40), worst(40, overall=True)
+        ok('table: (setup) the rule takes forty 500-character control-character comments at level 6',
+           obj(d.one('select _rubric_comment_list(:v::jsonb, true)', v=json.dumps(big))) == big)
+        r = direct(d, 'update criterion set comments = :v::jsonb where id = :c', v=json.dumps(big), c=c1)
+        n = d.one('select octet_length(comments::text) from criterion where id = :c', c=c1)
+        ok('table: the largest list the rule allows fits the criterion cap, which it fills exactly (121,040 bytes)', r is None and n == 121040, (r, n))
+        r = direct(d, 'update rubric set overall_comments = :v::jsonb where id = :r', v=json.dumps(bigo), r=w.rub)
+        n = d.one('select octet_length(overall_comments::text) from rubric where id = :r', r=w.rub)
+        ok('table: and the overall cap (120,160 bytes)', r is None and n == 120160, (r, n))
+        r = direct(d, 'update criterion set comments = :v::jsonb where id = :c', v=json.dumps([C(3, chr(0x1F600) * 500)] * 1), c=c1)
+        ok('table: four-byte letters are well inside it', r is None)
+        con = {x[0]: x[1] for x in d.all("select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid in ('public.criterion'::regclass, 'public.rubric'::regclass) and conname like '%comments%' order by 1")}
+        ok('table: the six checks', sorted(con) == ['criterion_comments_is_list', 'criterion_comments_rule', 'criterion_comments_size',
+                                                    'rubric_overall_comments_is_list', 'rubric_overall_comments_rule', 'rubric_overall_comments_size'], con)
+    finally:
+        d.close()
+
 # == apply ==
 def scen_apply():
     w = world('apply'); d = w.d
@@ -723,6 +820,26 @@ def scen_apply():
         t0 = time.time(); r = d.file(FILE); c2.run('rollback'); c2.close()
         ok('apply: a reader holding criterion: gives up in about five seconds, nothing applied',
            r.startswith('STOPPED') and 'lock timeout' in r and 4 <= time.time() - t0 < 12 and not applied(d), (r, time.time() - t0))
+        # a teacher's save in flight: it holds the rubric row (and so the table) while it writes
+        wr = Conn(d); wr.run('begin'); wr.run('update rubric set name = name where id = :r', r=w.rub)
+        t0 = time.time(); r = d.file(FILE); wr.run('rollback'); wr.close()
+        ok('apply: a save holding a rubric row past five seconds: the file gives up, nothing applied',
+           r.startswith('STOPPED') and 'lock timeout' in r and not applied(d), r[:200])
+        wr = Conn(d); wr.run('begin')
+        ur(d, w.rub, w.c, 'Saved while applying', crit_rows(d, w.rub), conn=wr)
+        t, box = bg(lambda: d.file(FILE))
+        time.sleep(1); still = t.is_alive(); wr.run('commit'); wr.close(); t.join(30)
+        ok('apply: a save in flight that ends within five seconds: the file waits for it, then applies; the save is kept',
+           still and box.get('r') == 'ok' and applied(d) and d.one('select name from rubric where id = :r', r=w.rub) == 'Saved while applying', box)
+        r = d.file(UNDO); ok('apply: (setup) undone again', r == 'ok' and not applied(d), r)
+        a = Conn(d); a.run('begin'); a.run('update rubric set updated_at = now() where id = :r', r=w.rub)
+        t, box = bg(lambda: d.file(FILE))
+        time.sleep(0.5); still = t.is_alive()
+        t2, box2 = bg(lambda: a.run('update criterion set updated_at = now() where rubric_id = :r', r=w.rub))
+        t2.join(10); a.run('commit'); a.close(); t.join(30)
+        ok('apply: a save that has the rubric and then writes its criteria while the file waits: no deadlock, both finish',
+           still and 'e' not in box2 and box.get('r') == 'ok' and applied(d), (box, box2))
+        r = d.file(UNDO); ok('apply: (setup) undone once more', r == 'ok' and not applied(d), r)
         ok('apply: a constant default (no rewrite): the criterion table keeps its file', (lambda f0: (d.file(FILE), d.one("select pg_relation_filenode('public.criterion')") == f0)[1])(d.one("select pg_relation_filenode('public.criterion')")))
     finally:
         d.close()
@@ -786,7 +903,8 @@ def scen_undo():
     finally:
         d.close()
 
-SCENARIOS = {'upsert': scen_upsert, 'add': scen_add, 'readers': scen_readers, 'race': scen_race, 'apply': scen_apply, 'undo': scen_undo}
+SCENARIOS = {'upsert': scen_upsert, 'add': scen_add, 'scales': scen_scales, 'table': scen_table, 'readers': scen_readers, 'race': scen_race,
+             'apply': scen_apply, 'undo': scen_undo}
 
 if __name__ == '__main__':
     args = sys.argv[1:]

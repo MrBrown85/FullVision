@@ -13,11 +13,11 @@ with want(sig, after_md5) as (values
     ('student_submit.page(text,uuid,text)', '0caa34be2c4c9f26f36a6776664d1bfa'),
     ('public.get_class_bundle(uuid,bigint)', '481cba076e47cf26dbd523cfe7943d2e'),
     ('public.duplicate_course(uuid,uuid)', '07496e59952ea9fddc55373e21322b09'),
-    ('public.import_json_restore(jsonb,uuid)', 'c2943dda03581e9397b1d5e3e44ec5d6'),
-    ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '9ee43afa5a004f1eb49c19ea066b4f09'),
-    ('public._rubric_comment_list(jsonb,integer)', '3c09d92742de880fac5cafa2657a6f99'),
-    ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'bb89f9e27e67e91b03606cd753b2a19a'),
-    ('public.add_rubric_overall_comment(uuid,text,uuid)', 'f39938dae40b2c981c43f76a1b934640')
+    ('public.import_json_restore(jsonb,uuid)', '1c23aac8893f1c47a5b8f840f0e4648b'),
+    ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '27da30778e5e7e8b2094d32bd404ed87'),
+    ('public._rubric_comment_list(jsonb,boolean)', '9d4ac363cc858896b9efd137afe6fd54'),
+    ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'f0ca9e3743c24e7aa5d8912a8559e785'),
+    ('public.add_rubric_overall_comment(uuid,text,uuid)', 'e0f77c8bbdba9f2120764bc4113673bd')
     -- FINGERPRINTS-END
 )
 select 'fingerprint ' || sig as check,
@@ -28,18 +28,22 @@ union all select 'the nine-argument upsert_rubric is gone; one upsert_rubric is 
        case when to_regprocedure('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb)') is null
              and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                    where n.nspname = 'public' and p.proname = 'upsert_rubric') = 1 then 'ok' else 'NOT AS EXPECTED' end
-union all select 'criterion.comments and rubric.overall_comments: jsonb, not null, default [], checked to be lists',
+union all select 'criterion.comments and rubric.overall_comments: jsonb, not null, default [], each with its three checks',
        case when (select count(*) from pg_attribute a join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
                    where ((a.attrelid = 'public.criterion'::regclass and a.attname = 'comments')
                        or (a.attrelid = 'public.rubric'::regclass and a.attname = 'overall_comments'))
                      and not a.attisdropped and a.attnotnull and a.atttypid = 'jsonb'::regtype
                      and pg_get_expr(d.adbin, d.adrelid) = '''[]''::jsonb') = 2
-             and (select count(*) from pg_constraint where conname in ('criterion_comments_is_list', 'rubric_overall_comments_is_list')
-                   and contype = 'c' and convalidated) = 2 then 'ok' else 'NOT AS EXPECTED' end
+             and (select count(*) from pg_constraint
+                   where ((conrelid = 'public.criterion'::regclass
+                           and conname in ('criterion_comments_is_list', 'criterion_comments_size', 'criterion_comments_rule'))
+                       or (conrelid = 'public.rubric'::regclass
+                           and conname in ('rubric_overall_comments_is_list', 'rubric_overall_comments_size', 'rubric_overall_comments_rule')))
+                     and contype = 'c' and convalidated) = 6 then 'ok' else 'NOT AS EXPECTED' end
 union all select 'a teacher and the service role may run the four functions; a visitor may not',
        case when (select bool_and(has_function_privilege('authenticated', f, 'execute') and has_function_privilege('service_role', f, 'execute')
                                   and not has_function_privilege('anon', f, 'execute'))
                     from unnest(array['public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)',
                                       'public.add_criterion_comment(uuid,smallint,text,uuid)',
                                       'public.add_rubric_overall_comment(uuid,text,uuid)',
-                                      'public._rubric_comment_list(jsonb,integer)']) f) then 'ok' else 'NOT AS EXPECTED' end;
+                                      'public._rubric_comment_list(jsonb,boolean)']) f) then 'ok' else 'NOT AS EXPECTED' end;

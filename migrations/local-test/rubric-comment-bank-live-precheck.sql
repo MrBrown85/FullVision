@@ -46,7 +46,8 @@ checks(check_name, value) as (
      where s is distinct from 'id uuid not null, course_id uuid not null, name text not null, created_at timestamp with time zone not null, updated_at timestamp with time zone not null, copy_group uuid, style text not null, scale jsonb'
     union all
     select 'already there: constraint ' || conname, conrelid::regclass::text
-      from pg_constraint where conname in ('criterion_comments_is_list', 'rubric_overall_comments_is_list')
+      from pg_constraint where conname in ('criterion_comments_is_list', 'criterion_comments_size', 'criterion_comments_rule',
+                       'rubric_overall_comments_is_list', 'rubric_overall_comments_size', 'rubric_overall_comments_rule')
     union all
     select 'PostgreSQL major version', current_setting('server_version_num')
      where current_setting('server_version_num')::int / 10000 <> 17

@@ -88,6 +88,11 @@ begin;
 set local lock_timeout = '5s';
 set local search_path = public, pg_temp;
 
+-- Both tables, held to commit, in the order upsert_rubric writes them (rubric, then criterion), so this file
+-- waits behind a save in flight instead of deadlocking with it; it gives up after five seconds with nothing
+-- applied.
+lock table public.rubric, public.criterion in access exclusive mode;
+
 do $guard$
 declare
     _f    record;
@@ -129,7 +134,7 @@ begin
             -- FINGERPRINTS-BEGIN replaces
             ('public.get_class_bundle(uuid,bigint)', '1bf06bc81bcdae7f51bfdcd594f02311', '481cba076e47cf26dbd523cfe7943d2e'),
             ('public.duplicate_course(uuid,uuid)', '27a2bdb32de32b2c2eea29e45bd7186d', '07496e59952ea9fddc55373e21322b09'),
-            ('public.import_json_restore(jsonb,uuid)', '313b640628406434ac900443f0e91976', 'c2943dda03581e9397b1d5e3e44ec5d6')
+            ('public.import_json_restore(jsonb,uuid)', '313b640628406434ac900443f0e91976', '1c23aac8893f1c47a5b8f840f0e4648b')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
     loop
@@ -155,10 +160,10 @@ begin
     for _f in
         select * from (values
             -- FINGERPRINTS-BEGIN new
-            ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '9ee43afa5a004f1eb49c19ea066b4f09'),
-            ('public._rubric_comment_list(jsonb,integer)', '3c09d92742de880fac5cafa2657a6f99'),
-            ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'bb89f9e27e67e91b03606cd753b2a19a'),
-            ('public.add_rubric_overall_comment(uuid,text,uuid)', 'f39938dae40b2c981c43f76a1b934640')
+            ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '27da30778e5e7e8b2094d32bd404ed87'),
+            ('public._rubric_comment_list(jsonb,boolean)', '9d4ac363cc858896b9efd137afe6fd54'),
+            ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'f0ca9e3743c24e7aa5d8912a8559e785'),
+            ('public.add_rubric_overall_comment(uuid,text,uuid)', 'e0f77c8bbdba9f2120764bc4113673bd')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop
@@ -179,7 +184,7 @@ begin
                       'public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)',
                       'public.add_criterion_comment(uuid,smallint,text,uuid)',
                       'public.add_rubric_overall_comment(uuid,text,uuid)',
-                      'public._rubric_comment_list(jsonb,integer)']) s)) then
+                      'public._rubric_comment_list(jsonb,boolean)']) s)) then
         raise exception 'a function named upsert_rubric, add_criterion_comment, add_rubric_overall_comment or _rubric_comment_list with other arguments is there. Nothing was changed.';
     end if;
     select string_agg(attname || ' ' || format_type(atttypid, atttypmod) || case when attnotnull then ' not null' else '' end, ', ' order by attnum) into _c
@@ -197,40 +202,24 @@ begin
 end
 $guard$;
 
--- == 1. The two columns ==
--- A constant default: PostgreSQL 17 stores it once and rewrites no row.
-alter table public.criterion add column if not exists comments jsonb not null default '[]'::jsonb;
-alter table public.rubric add column if not exists overall_comments jsonb not null default '[]'::jsonb;
-do $checks$
-begin
-    if not exists (select 1 from pg_constraint where conrelid = 'public.criterion'::regclass and conname = 'criterion_comments_is_list') then
-        alter table public.criterion add constraint criterion_comments_is_list check (jsonb_typeof(comments) = 'array');
-    end if;
-    if not exists (select 1 from pg_constraint where conrelid = 'public.rubric'::regclass and conname = 'rubric_overall_comments_is_list') then
-        alter table public.rubric add constraint rubric_overall_comments_is_list check (jsonb_typeof(overall_comments) = 'array');
-    end if;
-end
-$checks$;
-comment on column public.criterion.comments is
-    'The teacher''s comment bank for this criterion (2026112601): [{level, text}], in the order shown. Teacher-only; never sent to the student page.';
-comment on column public.rubric.overall_comments is
-    'The teacher''s overall comments for this rubric (2026112601): [text], in the order shown. Teacher-only; never sent to the student page.';
-
--- == 2. The one rule for a list of comments ==
-create or replace function public._rubric_comment_list(p_list jsonb, p_levels integer)
+-- == 1. The one rule for a list of comments ==
+-- Made first: the tables' checks below call it.
+create or replace function public._rubric_comment_list(p_list jsonb, p_criterion boolean)
  returns jsonb
  language plpgsql
  immutable
  set search_path to 'pg_catalog', 'pg_temp'
 as $function$
--- p_levels null: a rubric's overall comments, a list of texts. Otherwise a criterion's comments, a list of
--- {level, text} with level 1..p_levels (4, or 6 on a rubric with its own levels), read as upsert_rubric
--- reads a check's level. Each text is trimmed of spaces, tabs and line breaks and must then be 1 to 500
--- characters. A repeat of the same level and text is kept once, where it first came. At most 40. Returns
--- the list as it is to be stored, or stops with 22023.
+-- p_criterion false: a rubric's overall comments, a list of texts. True: a criterion's comments, a list of
+-- {level, text}, the level 1 to 6 whatever the rubric's levels are now (a rubric can go from six levels back
+-- to four and keep what was banked, as the restore keeps a checkbox's level). The level may be a number or
+-- the same digit as text. Each text is trimmed of spaces, tabs and line breaks and must then be 1 to 500
+-- characters. A repeat of the same level and text is kept once, where it first came. At most 40. Returns the
+-- list as it is to be stored ({level: number, text}), or stops with 22023 and a plain message.
 declare
     _e     jsonb;
     _t     text;
+    _l     text;
     _lv    int;
     _item  jsonb;
     _out   jsonb := '[]'::jsonb;
@@ -240,26 +229,29 @@ begin
         raise exception 'comments must be a list' using errcode = '22023';
     end if;
     for _e in select x.v from jsonb_array_elements(p_list) with ordinality as x(v, n) order by x.n loop
-        if p_levels is null then
+        if not coalesce(p_criterion, false) then
             if jsonb_typeof(_e) <> 'string' then
                 raise exception 'an overall comment must be text' using errcode = '22023';
             end if;
             _t := _e #>> '{}';
         else
-            if jsonb_typeof(_e) <> 'object' or jsonb_typeof(_e->'text') is distinct from 'string' then
+            if jsonb_typeof(_e) <> 'object' or jsonb_typeof(_e->'text') is distinct from 'string'
+               or coalesce(jsonb_typeof(_e->'level'), 'none') not in ('number', 'string') then
                 raise exception 'a comment must have a level and a text' using errcode = '22023';
             end if;
-            _lv := (_e->>'level')::int;
-            if _lv is null or _lv < 1 or _lv > p_levels then
-                raise exception 'a comment''s level must be 1..4, or 1..6 on a rubric with its own levels' using errcode = '22023';
+            -- One digit 1 to 6, compared under "C": 3.0, 7, "three" or a huge number are refused here.
+            _l := _e->>'level';
+            if not (_l collate "C" ~ '^[1-6]$') then
+                raise exception 'a comment''s level must be 1 to 6' using errcode = '22023';
             end if;
+            _lv := _l::int;
             _t := _e->>'text';
         end if;
         _t := btrim(_t, _trim);
         if length(_t) < 1 or length(_t) > 500 then
             raise exception 'a comment must be 1 to 500 characters' using errcode = '22023';
         end if;
-        _item := case when p_levels is null then to_jsonb(_t) else jsonb_build_object('level', _lv, 'text', _t) end;
+        _item := case when coalesce(p_criterion, false) then jsonb_build_object('level', _lv, 'text', _t) else to_jsonb(_t) end;
         -- jsonb containment compares texts byte for byte: no collation is involved.
         if not _out @> jsonb_build_array(_item) then
             if jsonb_array_length(_out) >= 40 then
@@ -271,6 +263,45 @@ begin
     return _out;
 end;
 $function$;
+
+-- == 2. The two columns, and what the tables hold to ==
+-- A constant default: PostgreSQL 17 stores it once and rewrites no row.
+alter table public.criterion add column if not exists comments jsonb not null default '[]'::jsonb;
+alter table public.rubric add column if not exists overall_comments jsonb not null default '[]'::jsonb;
+-- Three checks on each column, so a teacher's direct write to the table (authenticated may update both
+-- tables) can store nothing the functions would refuse:
+--   ..._is_list  a JSON list.
+--   ..._size     at most 40 items, and at most N bytes as text. N is the most 40 comments of 500 characters
+--                can take: a character is at most 6 bytes in jsonb's text (4 in UTF-8; a control character
+--                other than tab, line feed, carriage return, backspace and form feed is written as a 6-byte
+--                escape), so a text is at most 3,000 bytes. A criterion's item is
+--                {"text": "<text>", "level": 6}: 3,000 + 24. Forty items, 39 ", " between them and the two
+--                brackets: 40 * 3,024 + 78 + 2 = 121,040. An overall item is "<text>": 3,002;
+--                40 * 3,002 + 80 = 120,160.
+--   ..._rule     the list is exactly what the rule above makes of it: every level, text, repeat and the
+--                stored shape. A write that breaks it stops with the rule's own message (22023).
+do $checks$
+declare
+    _c record;
+begin
+    for _c in select * from (values
+        ('public.criterion', 'criterion_comments_is_list', 'jsonb_typeof(comments) = ''array'''),
+        ('public.criterion', 'criterion_comments_size', 'jsonb_array_length(comments) <= 40 and octet_length(comments::text) <= 121040'),
+        ('public.criterion', 'criterion_comments_rule', 'public._rubric_comment_list(comments, true) = comments'),
+        ('public.rubric', 'rubric_overall_comments_is_list', 'jsonb_typeof(overall_comments) = ''array'''),
+        ('public.rubric', 'rubric_overall_comments_size', 'jsonb_array_length(overall_comments) <= 40 and octet_length(overall_comments::text) <= 120160'),
+        ('public.rubric', 'rubric_overall_comments_rule', 'public._rubric_comment_list(overall_comments, false) = overall_comments')
+    ) as v(rel, name, expr) loop
+        if not exists (select 1 from pg_constraint where conrelid = _c.rel::regclass and conname = _c.name) then
+            execute format('alter table %s add constraint %I check (%s)', _c.rel, _c.name, _c.expr);
+        end if;
+    end loop;
+end
+$checks$;
+comment on column public.criterion.comments is
+    'The teacher''s comment bank for this criterion (2026112601): [{level, text}], in the order shown. Teacher-only; never sent to the student page.';
+comment on column public.rubric.overall_comments is
+    'The teacher''s overall comments for this rubric (2026112601): [text], in the order shown. Teacher-only; never sent to the student page.';
 
 -- == 3. upsert_rubric: comments on each criterion, and p_overall_comments ==
 -- Edits to the live nine-argument definition, each found exactly once, then the ten-argument function is
@@ -291,7 +322,7 @@ begin'],
     array['    if p_linked_tag_ids is not null and jsonb_typeof(p_linked_tag_ids) <> ''array'' then',
           '    -- 2026112601: the rubric''s overall comments. Null keeps them; a list replaces them.
     if p_overall_comments is not null then
-        _overall := public._rubric_comment_list(p_overall_comments, null);
+        _overall := public._rubric_comment_list(p_overall_comments, false);
     end if;
 
     if p_linked_tag_ids is not null and jsonb_typeof(p_linked_tag_ids) <> ''array'' then'],
@@ -315,8 +346,7 @@ begin'],
         -- a list replaces it.
         _comments := case when jsonb_typeof(_elem->''comments'') is distinct from ''null''
                                and jsonb_typeof(_elem->''comments'') is not null
-                          then public._rubric_comment_list(_elem->''comments'',
-                                   case when (select scale from rubric where id = _rubric_id) is not null then 6 else 4 end)
+                          then public._rubric_comment_list(_elem->''comments'', true)
                      end;
 '],
     array['display_order      = coalesce((_elem->>''display_order'')::int, 0),
@@ -387,7 +417,7 @@ declare
           'case when jsonb_typeof(_row->''scale'') = ''array'' then _row->''scale'' end)',
           'case when jsonb_typeof(_row->''scale'') = ''array'' then _row->''scale'' end,
                 case when jsonb_typeof(_row->''overall_comments'') = ''array''
-                     then public._rubric_comment_list(_row->''overall_comments'', null) else ''[]''::jsonb end)'],
+                     then public._rubric_comment_list(_row->''overall_comments'', false) else ''[]''::jsonb end)'],
     array['public.import_json_restore(jsonb,uuid)',
           'scale=excluded.scale, updated_at=now();',
           'scale=excluded.scale, overall_comments=excluded.overall_comments, updated_at=now();'],
@@ -398,8 +428,7 @@ declare
           '_row->>''level_5_descriptor'', _row->>''level_6_descriptor'')',
           '_row->>''level_5_descriptor'', _row->>''level_6_descriptor'',
                 case when jsonb_typeof(_row->''comments'') = ''array''
-                     then public._rubric_comment_list(_row->''comments'',
-                              case when (select scale from rubric where id = (_row->>''rubric_id'')::uuid) is not null then 6 else 4 end)
+                     then public._rubric_comment_list(_row->''comments'', true)
                      else ''[]''::jsonb end)'],
     array['public.import_json_restore(jsonb,uuid)',
           'level_5_descriptor=excluded.level_5_descriptor, level_6_descriptor=excluded.level_6_descriptor,',
@@ -421,7 +450,7 @@ begin
           -- FINGERPRINTS-BEGIN becomes
           ('public.get_class_bundle(uuid,bigint)', '481cba076e47cf26dbd523cfe7943d2e'),
           ('public.duplicate_course(uuid,uuid)', '07496e59952ea9fddc55373e21322b09'),
-          ('public.import_json_restore(jsonb,uuid)', 'c2943dda03581e9397b1d5e3e44ec5d6')
+          ('public.import_json_restore(jsonb,uuid)', '1c23aac8893f1c47a5b8f840f0e4648b')
           -- FINGERPRINTS-END
         ) as v(fn, becomes) where v.fn = _fn);
     end if;
@@ -452,7 +481,6 @@ as $function$
 declare
     _cached jsonb;
     _rubric uuid;
-    _scale  jsonb;
     _list   jsonb;
     _one    jsonb;
 begin
@@ -463,7 +491,7 @@ begin
     if _cached is not null then
         return _cached;
     end if;
-    select r.id, r.scale into _rubric, _scale
+    select r.id into _rubric
       from rubric r join criterion c on c.rubric_id = r.id
      where c.id = p_criterion_id and fv_owns_course(r.course_id)
        for no key update of r;
@@ -475,8 +503,7 @@ begin
     if not found then
         raise exception 'criterion not found' using errcode = 'P0002';
     end if;
-    _one := _rubric_comment_list(jsonb_build_array(jsonb_build_object('level', p_level, 'text', p_text)),
-                                 case when _scale is not null then 6 else 4 end);
+    _one := _rubric_comment_list(jsonb_build_array(jsonb_build_object('level', p_level, 'text', p_text)), true);
     if not _list @> _one then
         if jsonb_array_length(_list) >= 40 then
             raise exception 'this criterion already has 40 comments' using errcode = '22023';
@@ -514,7 +541,7 @@ begin
     if not found then
         raise exception 'rubric not found' using errcode = 'P0002';
     end if;
-    _one := _rubric_comment_list(jsonb_build_array(to_jsonb(p_text)), null);
+    _one := _rubric_comment_list(jsonb_build_array(to_jsonb(p_text)), false);
     if not _list @> _one then
         if jsonb_array_length(_list) >= 40 then
             raise exception 'this rubric already has 40 overall comments' using errcode = '22023';
@@ -536,8 +563,8 @@ revoke all on function public.add_criterion_comment(uuid, smallint, text, uuid) 
 grant execute on function public.add_criterion_comment(uuid, smallint, text, uuid) to authenticated, service_role;
 revoke all on function public.add_rubric_overall_comment(uuid, text, uuid) from public, anon, authenticated, service_role;
 grant execute on function public.add_rubric_overall_comment(uuid, text, uuid) to authenticated, service_role;
-revoke all on function public._rubric_comment_list(jsonb, integer) from public, anon, authenticated, service_role;
-grant execute on function public._rubric_comment_list(jsonb, integer) to authenticated, service_role;
+revoke all on function public._rubric_comment_list(jsonb, boolean) from public, anon, authenticated, service_role;
+grant execute on function public._rubric_comment_list(jsonb, boolean) to authenticated, service_role;
 
 -- == Everything is as the header says ==
 do $final$
@@ -552,11 +579,11 @@ begin
             -- FINGERPRINTS-BEGIN after
             ('public.get_class_bundle(uuid,bigint)', '481cba076e47cf26dbd523cfe7943d2e'),
             ('public.duplicate_course(uuid,uuid)', '07496e59952ea9fddc55373e21322b09'),
-            ('public.import_json_restore(jsonb,uuid)', 'c2943dda03581e9397b1d5e3e44ec5d6'),
-            ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '9ee43afa5a004f1eb49c19ea066b4f09'),
-            ('public._rubric_comment_list(jsonb,integer)', '3c09d92742de880fac5cafa2657a6f99'),
-            ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'bb89f9e27e67e91b03606cd753b2a19a'),
-            ('public.add_rubric_overall_comment(uuid,text,uuid)', 'f39938dae40b2c981c43f76a1b934640')
+            ('public.import_json_restore(jsonb,uuid)', '1c23aac8893f1c47a5b8f840f0e4648b'),
+            ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '27da30778e5e7e8b2094d32bd404ed87'),
+            ('public._rubric_comment_list(jsonb,boolean)', '9d4ac363cc858896b9efd137afe6fd54'),
+            ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'f0ca9e3743c24e7aa5d8912a8559e785'),
+            ('public.add_rubric_overall_comment(uuid,text,uuid)', 'e0f77c8bbdba9f2120764bc4113673bd')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop
@@ -575,8 +602,8 @@ begin
     end if;
     for _f in
         select * from (values
-            ('public.criterion'::regclass, 'comments', 'criterion_comments_is_list'),
-            ('public.rubric'::regclass, 'overall_comments', 'rubric_overall_comments_is_list')
+            ('public.criterion'::regclass, 'comments', array['criterion_comments_is_list', 'criterion_comments_size', 'criterion_comments_rule']),
+            ('public.rubric'::regclass, 'overall_comments', array['rubric_overall_comments_is_list', 'rubric_overall_comments_size', 'rubric_overall_comments_rule'])
         ) as v(rel, col, con)
     loop
         if not exists (select 1 from pg_attribute a join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
@@ -584,8 +611,8 @@ begin
                           and a.atttypid = 'jsonb'::regtype and pg_get_expr(d.adbin, d.adrelid) = '''[]''::jsonb') then
             _bad := _bad || format('%s.%s is not jsonb not null default []', _f.rel, _f.col);
         end if;
-        if not exists (select 1 from pg_constraint where conrelid = _f.rel and conname = _f.con and contype = 'c' and convalidated) then
-            _bad := _bad || format('%s has no check %s', _f.rel, _f.con);
+        if (select count(*) from pg_constraint where conrelid = _f.rel and conname = any (_f.con) and contype = 'c' and convalidated) <> 3 then
+            _bad := _bad || format('%s does not have its three checks', _f.rel);
         end if;
     end loop;
     -- Grants are read from proacl itself, so default privileges show here.
@@ -594,7 +621,7 @@ begin
             ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)'),
             ('public.add_criterion_comment(uuid,smallint,text,uuid)'),
             ('public.add_rubric_overall_comment(uuid,text,uuid)'),
-            ('public._rubric_comment_list(jsonb,integer)')
+            ('public._rubric_comment_list(jsonb,boolean)')
         ) as v(fn)
     loop
         select coalesce(string_agg(w, ', ' order by w collate "C"), '') into _got
@@ -610,5 +637,8 @@ begin
     end if;
 end
 $final$;
+
+-- PostgREST reads the new functions at once, not at its next schema reload.
+notify pgrst, 'reload schema';
 
 commit;

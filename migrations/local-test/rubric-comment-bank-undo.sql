@@ -12,7 +12,11 @@
 -- import_json_restore do with them stay. Run PART 0 alone (from "PART 0 begins" to "PART 0 ends"). On a
 -- database without the file it changes nothing; a second run changes nothing.
 --
--- == PART 1, the full removal: the rest of this file ==
+-- == PART 1, the full removal: the rest of this file. ONLY when no app in use sends p_overall_comments ==
+-- PART 1 drops the ten-argument upsert_rubric. Once an app that sends p_overall_comments is released (the
+-- Comment Bank switch on), every rubric save from a browser running it is refused after PART 1 ("function
+-- not found") and waits on the sync dot. Use PART 1 only before that app is released, or after an app
+-- without the argument has replaced it everywhere. PART 0 is the undo to reach for.
 -- Brings back the nine-argument upsert_rubric as live had it (same grants), drops the ten-argument one, the
 -- two Add to Bank functions and the rule for a list, puts get_class_bundle, duplicate_course and
 -- import_json_restore back word for word (the edits reversed, then checked against the md5 live had), and
@@ -26,8 +30,8 @@
 --     update public.criterion set comments = '[]'::jsonb where comments <> '[]'::jsonb;
 --     update public.rubric set overall_comments = '[]'::jsonb where overall_comments <> '[]'::jsonb;
 -- Each touched row moves its class's sync cursor, so open devices reload the class. No grade is touched.
--- It locks criterion and rubric (share row exclusive) before it counts, so nothing is written between the
--- count and the drop; a save waits for it, or it gives up after five seconds with nothing changed. It also
+-- It locks rubric and criterion (access exclusive, held to commit) before it counts, so nothing is written
+-- between the count and the drop; a save waits for it, or it gives up after five seconds with nothing changed. It also
 -- stops if a function is neither as before the file nor as the file (or PART 0) left it.
 -- On a database where the file was never applied it changes nothing; a second run changes nothing.
 
@@ -43,7 +47,7 @@ declare
 begin
     for _f in select * from (values
         -- FINGERPRINTS-BEGIN undo-stop
-        ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '9ee43afa5a004f1eb49c19ea066b4f09', '7ca85e457eb33b2e08f685608f5fafb8')
+        ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '27da30778e5e7e8b2094d32bd404ed87', '7ca85e457eb33b2e08f685608f5fafb8')
         -- FINGERPRINTS-END
     ) as v(fn, now, stopped) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
@@ -260,8 +264,9 @@ begin;
 set local lock_timeout = '5s';
 set local search_path = public, pg_temp;
 
--- Held to the end: no comment is written between the count below and the drop.
-lock table public.criterion, public.rubric in share row exclusive mode;
+-- Held to the end, in the order upsert_rubric writes them: no comment is written between the count below
+-- and the drop, and a save in flight is waited for, not deadlocked with.
+lock table public.rubric, public.criterion in access exclusive mode;
 
 do $guard$
 declare
@@ -272,10 +277,10 @@ declare
 begin
     for _f in select * from (values
         -- FINGERPRINTS-BEGIN undo-new
-        ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '9ee43afa5a004f1eb49c19ea066b4f09', '7ca85e457eb33b2e08f685608f5fafb8'),
-        ('public._rubric_comment_list(jsonb,integer)', '3c09d92742de880fac5cafa2657a6f99', '3c09d92742de880fac5cafa2657a6f99'),
-        ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'bb89f9e27e67e91b03606cd753b2a19a', 'bb89f9e27e67e91b03606cd753b2a19a'),
-        ('public.add_rubric_overall_comment(uuid,text,uuid)', 'f39938dae40b2c981c43f76a1b934640', 'f39938dae40b2c981c43f76a1b934640')
+        ('public.upsert_rubric(uuid,uuid,text,jsonb,uuid,uuid,text,jsonb,jsonb,jsonb)', '27da30778e5e7e8b2094d32bd404ed87', '7ca85e457eb33b2e08f685608f5fafb8'),
+        ('public._rubric_comment_list(jsonb,boolean)', '9d4ac363cc858896b9efd137afe6fd54', '9d4ac363cc858896b9efd137afe6fd54'),
+        ('public.add_criterion_comment(uuid,smallint,text,uuid)', 'f0ca9e3743c24e7aa5d8912a8559e785', 'f0ca9e3743c24e7aa5d8912a8559e785'),
+        ('public.add_rubric_overall_comment(uuid,text,uuid)', 'e0f77c8bbdba9f2120764bc4113673bd', 'e0f77c8bbdba9f2120764bc4113673bd')
         -- FINGERPRINTS-END
     ) as v(fn, now, alt) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
@@ -297,7 +302,7 @@ begin
         -- FINGERPRINTS-BEGIN undo-replaced
         ('public.get_class_bundle(uuid,bigint)', '1bf06bc81bcdae7f51bfdcd594f02311', '481cba076e47cf26dbd523cfe7943d2e'),
         ('public.duplicate_course(uuid,uuid)', '27a2bdb32de32b2c2eea29e45bd7186d', '07496e59952ea9fddc55373e21322b09'),
-        ('public.import_json_restore(jsonb,uuid)', '313b640628406434ac900443f0e91976', 'c2943dda03581e9397b1d5e3e44ec5d6')
+        ('public.import_json_restore(jsonb,uuid)', '313b640628406434ac900443f0e91976', '1c23aac8893f1c47a5b8f840f0e4648b')
         -- FINGERPRINTS-END
     ) as v(fn, before, now) loop
         _md5 := md5(pg_get_functiondef(to_regprocedure(_f.fn)));
@@ -532,8 +537,7 @@ declare
     array['public.import_json_restore(jsonb,uuid)',
           '_row->>''level_5_descriptor'', _row->>''level_6_descriptor'',
                 case when jsonb_typeof(_row->''comments'') = ''array''
-                     then public._rubric_comment_list(_row->''comments'',
-                              case when (select scale from rubric where id = (_row->>''rubric_id'')::uuid) is not null then 6 else 4 end)
+                     then public._rubric_comment_list(_row->''comments'', true)
                      else ''[]''::jsonb end)',
           '_row->>''level_5_descriptor'', _row->>''level_6_descriptor'')'],
     array['public.import_json_restore(jsonb,uuid)',
@@ -545,7 +549,7 @@ declare
     array['public.import_json_restore(jsonb,uuid)',
           'case when jsonb_typeof(_row->''scale'') = ''array'' then _row->''scale'' end,
                 case when jsonb_typeof(_row->''overall_comments'') = ''array''
-                     then public._rubric_comment_list(_row->''overall_comments'', null) else ''[]''::jsonb end)',
+                     then public._rubric_comment_list(_row->''overall_comments'', false) else ''[]''::jsonb end)',
           'case when jsonb_typeof(_row->''scale'') = ''array'' then _row->''scale'' end)'],
     array['public.import_json_restore(jsonb,uuid)',
           'insert into rubric (id, course_id, name, style, scale, overall_comments)',
@@ -567,7 +571,8 @@ declare
     array['public.get_class_bundle(uuid,bigint)',
           '''copy_group'', r.copy_group, ''style'', r.style, ''scale'', r.scale,
                                                 ''overall_comments'', r.overall_comments)',
-          '''copy_group'', r.copy_group, ''style'', r.style, ''scale'', r.scale)']  ];
+          '''copy_group'', r.copy_group, ''style'', r.style, ''scale'', r.scale)']
+  ];
   _def  text;
   _hits int;
   _fn   text := '';
@@ -599,11 +604,16 @@ begin
 end
 $migration$;
 
-drop function if exists public._rubric_comment_list(jsonb, integer);
+-- The checks call the rule, so they and the columns go first.
+alter table public.criterion drop constraint if exists criterion_comments_rule;
+alter table public.criterion drop constraint if exists criterion_comments_size;
 alter table public.criterion drop constraint if exists criterion_comments_is_list;
 alter table public.criterion drop column if exists comments;
+alter table public.rubric drop constraint if exists rubric_overall_comments_rule;
+alter table public.rubric drop constraint if exists rubric_overall_comments_size;
 alter table public.rubric drop constraint if exists rubric_overall_comments_is_list;
 alter table public.rubric drop column if exists overall_comments;
+drop function if exists public._rubric_comment_list(jsonb, boolean);
 
 do $final$
 declare
@@ -637,6 +647,9 @@ begin
     end if;
 end
 $final$;
+
+-- PostgREST reads the change at once, not at its next schema reload.
+notify pgrst, 'reload schema';
 
 commit;
 -- PART 1 ends
