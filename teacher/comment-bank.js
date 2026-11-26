@@ -6006,7 +6006,9 @@ window.CommentBank = (function () {
     return n;
   }
 
-  var SO_FAR = /\bso far\b/i;
+  // "So far this year" is its own phrase, not the comment's one "so far", or the
+  // grade sentence's would keep attendance out of nearly every draft (Nov 26).
+  var SO_FAR = /\bso far\b(?! this year)/i;
   /* The course-set sentences Generate may draft for this student. */
   function _draftExtra(ctx) {
     return ((ctx && ctx._extra) || []).filter(function (s) {
@@ -7728,6 +7730,14 @@ window.CommentBank = (function () {
     return _has(pv, 'habitsExcellent') && (eff || {}).completes === CONSISTENTLY;
   }
 
+  /* Retired sentences that make a claim (Nov 26: the missing-work and attendance
+     frames): found by id and checked like the rest, never offered. */
+  function _retiredClaiming(bank) {
+    return ((bank && bank.retired) || []).filter(function (s) {
+      return Array.isArray(s.claims);
+    });
+  }
+
   /* fn() as if the course-set file had not loaded: the cluster wording. */
   function _withoutSets(fn) {
     var saved = window.BANK_SETS;
@@ -7743,9 +7753,11 @@ window.CommentBank = (function () {
     var bank = opts.bank || COMMENT_BANK;
     var ctx = context(f, picks);
     var byId = {};
-    bank.sentences.concat(ctx._extra || []).forEach(function (s) {
-      byId[s.id] = s;
-    });
+    _retiredClaiming(bank)
+      .concat(bank.sentences, ctx._extra || [])
+      .forEach(function (s) {
+        byId[s.id] = s;
+      });
     var used = {};
     var prov = (d && d.provenance) || [];
     prov.forEach(function (pv) {
@@ -7987,7 +7999,7 @@ window.CommentBank = (function () {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
     var inBank = {};
-    bank.sentences.forEach(function (s) {
+    bank.sentences.concat(_retiredClaiming(bank)).forEach(function (s) {
       inBank[s.id] = true;
     });
     var sentences = [];
@@ -8179,7 +8191,7 @@ window.CommentBank = (function () {
     var hash = factsHash(f);
     var moved = !!meta.facts_hash && meta.facts_hash !== hash;
     var byId = {};
-    bank.sentences.forEach(function (s) {
+    bank.sentences.concat(_retiredClaiming(bank)).forEach(function (s) {
       byId[s.id] = s;
     });
     var at = {};
