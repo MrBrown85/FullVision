@@ -9,11 +9,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-export function assignPieces() {
-  const dir = resolve(root, 'teacher');
+/* The files, as paths from the repo's root: a guard that says "no Assignments file does X" lists these. */
+export function assignFiles() {
   return ['page-assignments.js']
-    .concat(readdirSync(dir).filter(n => /^assign-.*\.js$/.test(n)))
-    .map(n => readFileSync(resolve(dir, n), 'utf-8'));
+    .concat(readdirSync(resolve(root, 'teacher')).filter(n => /^assign-.*\.js$/.test(n)))
+    .map(n => 'teacher/' + n);
+}
+
+export function assignPieces() {
+  return assignFiles().map(f => readFileSync(resolve(root, f), 'utf-8'));
 }
 
 export function assignAll() {

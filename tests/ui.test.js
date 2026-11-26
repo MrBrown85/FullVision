@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { assignAll } from './helpers/assign-sources.js';
 
 describe('ui-account-menu', () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,7 +40,7 @@ describe('ui-account-menu', () => {
 
   describe('Assignments toolbar', () => {
     it('has a Rubrics button and no Advanced menu', () => {
-      var src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf8');
+      var src = assignAll();
       var bar = readFileSync(resolve(root, 'teacher/assign-toolbar.js'), 'utf8');
       // Rubrics is the last item of the toolbar's ⋯ menu.
       expect(bar).toContain("_item('openRubricBank', LINE_ICONS.rubric, 'Rubrics')");
