@@ -84,6 +84,7 @@ window.SidebarKeep = (function () {
     var pos = 0;
     Array.prototype.slice.call(fresh.childNodes).forEach(function (f) {
       var k = _key(f);
+      /** @type {Node | null} */
       var m = null;
       if (k) {
         m = byKey[k] || null;
@@ -96,14 +97,15 @@ window.SidebarKeep = (function () {
           }
         }
       }
+      /** @type {Node} */
+      var put = f;
       if (m && m.nodeName === f.nodeName) {
         _patch(m, f);
-      } else {
-        m = f;
+        put = m;
       }
-      used.push(m);
+      used.push(put);
       var at = parent.childNodes[pos];
-      if (at !== m) parent.insertBefore(m, at || null);
+      if (at !== put) parent.insertBefore(put, at || null);
       pos++;
     });
     olds.forEach(function (n) {
@@ -125,13 +127,15 @@ window.SidebarKeep = (function () {
     var mount = _mount();
     if (!mount) return;
     mount._fvStale = false;
-    var had = mount.querySelector('#gb-sidebar');
+    if (!mount.querySelector('#gb-sidebar')) {
+      mount.innerHTML = html; // html-safe: renderSidebar's markup (ui.js), escaped where it is built
+      return;
+    }
     var t = document.createElement('template');
-    // html-safe: renderSidebar's markup (ui.js), escaped where it is built
-    t.innerHTML = html;
+    t.innerHTML = html; // html-safe: as above
     var want = _course(t.content);
-    if (!had || !want || _course(mount) !== want) {
-      mount.innerHTML = html; // html-safe: renderSidebar's markup, as above
+    if (!want || _course(mount) !== want) {
+      mount.replaceChildren(t.content);
       return;
     }
     _children(mount, t.content);

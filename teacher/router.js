@@ -361,8 +361,7 @@ window.Router = (function () {
     // Clear DOM mounts
     document.getElementById('main').innerHTML = '';
     document.getElementById('page-toolbar-mount').innerHTML = '';
-    // The student list stays for the page to patch (teacher/sidebar-keep.js).
-    SidebarKeep.release();
+    SidebarKeep.release(); // the student list stays for the page to patch
 
     // Re-render dock on every route change
     _renderDock(dockPage);

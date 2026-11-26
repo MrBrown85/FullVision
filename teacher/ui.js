@@ -2063,8 +2063,7 @@ function fillSidebarBadges(cid) {
       return;
     }
     document.querySelectorAll('[data-prof-sid]').forEach(function (el) {
-      // Left as it is when the grade is the same, so the chips do not flash.
-      var h = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid'));
+      var h = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid')); // same grade: left, no flash
       if (el.innerHTML !== h) el.innerHTML = h;
     });
   });
@@ -2246,8 +2245,6 @@ function refreshRosterRows() {
 
 // Refresh sidebar in place (call after score changes)
 function refreshSidebar() {
-  const mount = document.getElementById('sidebar-mount');
-  if (!mount) return;
   const cid = typeof activeCourse !== 'undefined' ? activeCourse : getActiveCourse();
   const clickFn = _sidebarClickFnName || null;
   // Use focusStudentId if available (assignments page), otherwise parse from selected row href
