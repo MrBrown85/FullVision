@@ -342,6 +342,7 @@ load('shared/backup-restore.js');
 load('teacher/cm-roster-file.js');
 load('teacher/cm-block-picker.js');
 load('teacher/cm-std-help.js');
+load('teacher/cm-keep-draw.js');
 load('teacher/cm-keep-menu.js');
 load('teacher/cm-terms.js');
 load('teacher/cm-grading-bars.js');

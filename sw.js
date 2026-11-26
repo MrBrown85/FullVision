@@ -240,6 +240,7 @@ const PRECACHE_URLS = [
   '/teacher/cm-roster-file.js',
   '/teacher/cm-block-picker.js',
   '/teacher/cm-std-help.js',
+  '/teacher/cm-keep-draw.js',
   '/teacher/cm-keep-menu.js',
   '/teacher/cm-terms.js',
   '/teacher/cm-grading-bars.js',

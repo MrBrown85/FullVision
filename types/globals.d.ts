@@ -127,6 +127,7 @@ interface Window {
   ReportQnBoxes: any;
   ReportQnMotion: any;
   CmStdHelp: unknown;
+  CmKeepDraw: unknown;
   CmKeepMenu: unknown;
   FocusBack: { from(el: Element | null): () => void };
   CmTerms: unknown;
@@ -538,6 +539,7 @@ declare var CmRosterFile: any;
 declare var closeColorPop: any;
 declare var CmBlockPicker: any;
 declare var renderBreadcrumb: any;
+declare var CmKeepDraw: any;
 declare var CmKeepMenu: any;
 declare var _avatarColor: any;
 declare var CmQuestionnaires: any;
