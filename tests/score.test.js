@@ -232,7 +232,8 @@ describe('score-save-parity', () => {
     it('the grader dialog and Set Unmarked to max save points once, through setPointsScore', () => {
       const src = assignAll();
       const grader = assignBetween('function _graderCommitPoints(', 'function _focusGraderCard(');
-      expect(grader).toContain('Grader.setPoints(cid, pageState.focusStudentId, aid, raw)');
+      // For the box's own student, not the page's when the blur runs (tests/grader-box-student.test.js).
+      expect(grader).toContain('Grader.setPoints(cid, sid, aid, raw)');
       expect(grader).not.toMatch(/\bsetScore\(/);
       const fill = assignBetween('function confirmFillPoints(', 'function livePointsUpdate(');
       expect(fill).toContain('Grader.setPoints(cid, st.id, aid, max)');
