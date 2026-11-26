@@ -1175,6 +1175,7 @@ window.ReportQuestionnaire = (function () {
     var chip = document.getElementById('tq-empty-rated');
     if (chip) chip.textContent = _ratedCount(habits) + ' of 6 habits rated';
     _redrawHabits(st);
+    _syncRequired();
   }
 
   /* After a rating: the comment's habits sentence written again for the new
@@ -4701,6 +4702,7 @@ window.ReportQuestionnaire = (function () {
      assessment the report mentions is the best piece, the first strength
      tag the skill named as the strength. */
   var _piecesAll = false;
+  var _habMenu = false; // the six ratings open under the Work Habits bars
   // html-safe: titles, names, marks and ids esc()'d; indexes are numbers
   function _pickHtml(cid, student, row, i) {
     var f = _facts(student);
@@ -5041,7 +5043,7 @@ window.ReportQuestionnaire = (function () {
       );
     var open = !!_wording && _wording.index === i;
     var low = row.step === 'grade' && _checksFor(f, rows).indexOf('low') >= 0;
-    var typed = isTyped(row);
+    var typed = isTyped(row) || !!row.derived;
     var edited =
       !typed &&
       unit.some(function (r) {
@@ -5676,9 +5678,10 @@ window.ReportQuestionnaire = (function () {
       return {
         habits: CommentBank.HABITS.map(function (h) {
           var v = Number(habits[h.key]);
-          return { name: h.name, v: v >= 1 && v <= HS_STOPS ? v : 0 };
+          return { key: h.key, name: h.name, v: v >= 1 && v <= HS_STOPS ? v : 0 };
         }),
         scale: CommentBank.SCALE,
+        open: _habMenu,
       };
     }
     if (kind === 'attendance') return { absent: f.absent || 0, late: f.late || 0 };
@@ -5701,6 +5704,108 @@ window.ReportQuestionnaire = (function () {
         return _boxFacts(kind, cid, student, f, row);
       },
     });
+  }
+
+  /* ── The amber note and + Close to (slice 8) ─────────────────── */
+
+  var _HABIT_STEPS = /^(habits|habitsMore|habitsBuild|strongHabits)$/;
+  var _habKept = {};
+  var _HAB_KEEP_STORE = 'fv-tq-habit-keep';
+  function _habKeepKey(st) {
+    return _activeCourse + '|' + st.id + '|' + getTermId();
+  }
+  function _habitKept(st) {
+    var k = _habKeepKey(st);
+    if (_habKept[k] != null) return !!_habKept[k];
+    var on = false;
+    try {
+      on = !!(JSON.parse(localStorage.getItem(_HAB_KEEP_STORE) || '{}') || {})[k];
+    } catch (e) {
+      /* no storage: the choice lasts for this page only */
+    }
+    _habKept[k] = on;
+    return on;
+  }
+  function _keepHabitNote(st) {
+    var k = _habKeepKey(st);
+    _habKept[k] = true;
+    try {
+      var all = JSON.parse(localStorage.getItem(_HAB_KEEP_STORE) || '{}') || {};
+      all[k] = true;
+      localStorage.setItem(_HAB_KEEP_STORE, JSON.stringify(all));
+    } catch (e) {
+      /* no storage */
+    }
+  }
+  /* The amber note under the habit sentences when one of them says the student
+     usually or consistently hands in work on time and the gradebook has work
+     labelled Missing (the same count the Missing Work box shows). Rate It
+     lowers that one rating a step through the ordinary rating; Keep It hides
+     the note for this student and report. It changes no status. */
+  /* What the note says: the frequency word is the one the habit sentence
+     itself uses before "hand(s) in" (always, usually, consistently ...); a
+     sentence that uses none gets none. */
+  var _FREQ =
+    /\b(always|usually|consistently|regularly|generally|typically|often|mostly|normally|reliably)\s+hands?\s+in\b/i;
+  function habitNoteText(sentence, pron, nh) {
+    var m = _FREQ.exec(String(sentence || ''));
+    return (
+      'This says ' +
+      pron.subj +
+      ' ' +
+      (m ? m[1].toLowerCase() + ' ' : '') +
+      (pron.subj === 'they' ? 'hand' : 'hands') +
+      ' in ' +
+      pron.poss +
+      ' work on time. ' +
+      CommentBank.notHandedInSentence(nh)
+    );
+  }
+  // html-safe: the sentence's words are esc()'d; the rating is a number
+  function _habitNoteHtml(cid, st, f, rows) {
+    var v = _habitsOf(cid, st, f).completes;
+    var nh = f.notHandedIn;
+    if (!(v >= 3 && v <= HS_STOPS) || !nh || !(nh.count > 0) || _habitKept(st)) return '';
+    var said = rows.find(function (r) {
+      return _HABIT_STEPS.test(r.step || '') && ((r.prov && r.prov.factKeys) || []).indexOf('habit:completes') >= 0;
+    });
+    if (!said) return '';
+    var p = ReportBlocks.getPronouns(st);
+    var text = habitNoteText(said.text, p, nh);
+    return `<div class="qn-habit-note" role="status"><span class="qn-habit-note-text">${esc(text)}</span><button type="button" class="qn-habit-note-fix" data-action="tqSentences" data-do="habitNoteRate" data-to="${v - 1}" title="Lowers the Completes Work rating one step. The habit sentence follows.">Rate It ${esc(CommentBank.SCALE[v - 2])}</button><button type="button" class="qn-habit-note-keep" data-action="tqSentences" data-do="habitNoteKeep" title="Leaves the sentence and the rating as they are, and hides this note for ${esc(_first(st))} in this report.">Keep It</button></div>`;
+  }
+  /* "+ Close to a C+" on the Grade box, only where the comment already says
+     a student is close to the next band (CommentBank.closeTo, from
+     calc.js's band): a letter grade within reach, no sentence about it yet.
+     It adds no grade math and prints no figure. */
+  function _closeNext(f, rows) {
+    var c = f.grade && f.grade.mode !== 'proficiency' ? CommentBank.closeTo(f.grade) : null;
+    if (!c || CommentBank.reportPath(f)) return null;
+    var said = rows.some(function (r) {
+      return /\bclose to\b/i.test(r.text || '');
+    });
+    return said ? null : c;
+  }
+  // html-safe: the letter comes from the band table and is esc()'d
+  function _closeBtnHtml(c) {
+    return `<div class="qn-extra-row"><button type="button" class="qn-add-btn" data-action="tqSentences" data-do="closeAdd" title="Adds one sentence under the grade saying the student is close to the next band.">+ Close to ${esc(CommentBank.aOrAn(c.letter))}</button></div>`;
+  }
+  function _addClose(st) {
+    tqSaveCurrentIfNeeded();
+    var key = _rowKey(st);
+    var f = _facts(st);
+    var rows = _rows[key] || [];
+    var c = _closeNext(f, rows);
+    var at = rows.findIndex(function (r) {
+      return r.step === 'grade';
+    });
+    if (!c || at < 0) return;
+    var ctx = _bankContext(_activeCourse, st, f);
+    var text = CommentBank.fill({ text: '{He} [is|are] close to ' + CommentBank.aOrAn(c.letter) + '.' }, ctx);
+    var row = Object.assign(typedRow(text), { step: 'grade', id: 'close:' + c.letter, derived: true, edited: false });
+    _rows[key] = insertRow(rows, row, at + 1);
+    _markAdded(st, row);
+    _writeRows(st);
   }
 
   /* The IE comment's parts in its order (the IEPath mockup): where a
@@ -5790,16 +5895,29 @@ window.ReportQuestionnaire = (function () {
     });
     // After each row of the comment, the gap where a sentence can be put in
     // (the InsertRows mockup): its index is how many rows come before it.
+    var habNote = _habitNoteHtml(cid, student, f, rows);
+    var close = _closeNext(f, rows);
+    var kindAt = function (it) {
+      return it.i >= 0 && it.i === meetAt ? 'ieMeeting' : _boxKind(it.unit[0], path);
+    };
+    var lastHab = -1;
+    var gradeAt = -1;
+    items.forEach(function (it, k) {
+      if (kindAt(it) === 'habits') lastHab = k;
+      if (gradeAt < 0 && kindAt(it) === 'grade') gradeAt = k;
+    });
     return _wrapBoxes(
       cid,
       student,
       f,
-      items.reduce(function (out, it) {
+      items.reduce(function (out, it, k) {
         var row = it.unit[0];
         var html = _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
         var kind = it.i >= 0 && it.i === meetAt ? 'ieMeeting' : _boxKind(row, path);
         var ownGap = '';
         if (it.i >= 0) {
+          if (k === lastHab && habNote) html += habNote;
+          if (k === gradeAt && close) html += _closeBtnHtml(close);
           claims.forEach(function (c) {
             if (it.unit.indexOf(rows[c.row]) >= 0) html += _claimHtml(c);
           });
@@ -6460,6 +6578,7 @@ window.ReportQuestionnaire = (function () {
         var open = !!_wording && _wording.index === i;
         _wording = open ? null : { index: i };
         _piecesAll = false;
+        _habMenu = false;
         _miss = null;
         _supportMenu = false;
         _langMenu = false;
@@ -6522,6 +6641,32 @@ window.ReportQuestionnaire = (function () {
         _openBrowse(_gapPart(rowsNow, _bankContext(_activeCourse, st, _facts(st)), _insertOpts(_activeCourse, st)), at);
         return;
       }
+      case 'habitsMenu':
+        _habMenu = !_habMenu;
+        _wording = null;
+        _miss = null;
+        _syncRequired();
+        if (_habMenu) _focusSel('#tq-habits-menu [aria-checked="true"], #tq-habits-menu .qn-hm-step');
+        else _focusSel('#tq-sentences [data-do="habitsMenu"]');
+        return;
+      case 'rateHabit':
+        tqRate(ds.habit, Number(ds.value));
+        _syncRequired();
+        _focusSel('#tq-habits-menu [data-habit="' + ds.habit + '"][data-value="' + ds.value + '"]');
+        return;
+      case 'habitNoteRate': {
+        var low = Number(ds.to);
+        if (low >= 1) tqRate('completes', low);
+        _syncRequired();
+        return;
+      }
+      case 'habitNoteKeep':
+        _keepHabitNote(st);
+        _syncRequired();
+        return;
+      case 'closeAdd':
+        _addClose(st);
+        return;
       case 'pickPiece':
         _repick(st, i, { mentionAssessments: [ds.aid] });
         return;
@@ -7853,6 +7998,7 @@ window.ReportQuestionnaire = (function () {
       !!_wording ||
       !!_own ||
       !!_miss ||
+      _habMenu ||
       !!(_browse && _browse.menu)
     );
   }
@@ -7883,6 +8029,10 @@ window.ReportQuestionnaire = (function () {
       _wording = null;
       _syncRequired();
     }
+    if (_habMenu && !target.closest('#tq-habits-menu, [data-do="habitsMenu"]')) {
+      _habMenu = false;
+      _syncRequired();
+    }
     if (_miss && !target.closest('#tq-miss-menu, [data-do="missOpen"], #undo-toast')) {
       _miss = null;
       _syncRequired();
@@ -7903,6 +8053,12 @@ window.ReportQuestionnaire = (function () {
     if (_browse && _browse.menu) {
       _browse.menu = false;
       _syncBrowse('tq-browse-fits');
+      return true;
+    }
+    if (_habMenu) {
+      _habMenu = false;
+      _syncRequired();
+      _focusSel('#tq-sentences [data-do="habitsMenu"]');
       return true;
     }
     if (_miss) {
@@ -8647,6 +8803,7 @@ window.ReportQuestionnaire = (function () {
     PARTS: PARTS,
     partOf: partOf,
     rowLabel: rowLabel,
+    habitNoteText: habitNoteText,
     sentencesOf: sentencesOf,
     rowsFromDraft: rowsFromDraft,
     rowFromSentence: rowFromSentence,

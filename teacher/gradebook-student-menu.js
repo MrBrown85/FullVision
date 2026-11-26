@@ -12,10 +12,12 @@
 
    Each line says how many cells it changes; a line with none is greyed, and
    a category or month with none is left out. A cell is blank when it has no
-   score, mark, status or feedback and its work is due by today, so work not
-   due yet is never touched. Only the columns on screen count, as the
-   column's Mark Blank Cells counts only the rows on screen. Scored work is
-   never changed (canSetAssignmentStatus).
+   grade: no score, mark or status, and nothing written on it (the cell's own
+   Mark Missing refuses those too). Its date does not matter (Colin, Nov 25:
+   "blank means no grade"): a rule of "due by today" passed over nearly every
+   cell, as teachers leave the due date at the end of the term. Only the
+   columns on screen count, as the column's Mark Blank Cells counts only the
+   rows on screen.
 
    One use is undone by its toast, by Cmd+Z, or by Undo Last Marking in the
    same menu, which is kept on this device: each cell goes back to what it
@@ -69,8 +71,9 @@
     } catch (e) {}
   }
 
-  function _due(a) {
-    return String(a.dueDate || a.date || '').slice(0, 10);
+  // A piece's date as its column shows it, under its title (the month lines and the copied list).
+  function _day(a) {
+    return String(a.date || a.dueDate || '').slice(0, 10);
   }
 
   /* The student's cells in the columns on screen, by what they hold:
@@ -82,7 +85,6 @@
     document.querySelectorAll('#gb-data tr[data-sid="' + sid + '"] td[data-aid]').forEach(function (td) {
       shown[/** @type {HTMLElement} */ (td).dataset.aid || ''] = true;
     });
-    var today = courseToday(cid);
     /** @type {Record<string, any[]>} */
     var out = { blank: [], missing: [], both: [], excused: [], late: [] };
     getAssessments(cid).forEach(function (a) {
@@ -93,11 +95,7 @@
         out.both.push(a);
       } else if (status === 'EXC') out.excused.push(a);
       else if (status === 'LATE') out.late.push(a);
-      else if (
-        assessmentCellValue(cid, sid, a).kind === 'none' &&
-        _due(a) <= today &&
-        canSetAssignmentStatus(cid, sid, a.id, 'NS')
-      ) {
+      else if (assessmentCellValue(cid, sid, a).kind === 'none' && canSetAssignmentStatus(cid, sid, a.id, 'NS')) {
         out.blank.push(a);
         out.both.push(a);
       }
@@ -194,7 +192,7 @@
   function _copyMissing(cid, student, missing) {
     var lines = [displayName(student) + ': missing work in ' + ((COURSES[cid] || {}).name || 'this class')].concat(
       missing.map(function (a) {
-        var day = formatShortDate(_due(a));
+        var day = formatShortDate(_day(a));
         return (a.title || 'Assessment') + (day ? ' (' + day + ')' : '');
       }),
     );
@@ -258,14 +256,14 @@
         });
       var months = [];
       list.forEach(function (a) {
-        var m = _due(a).slice(0, 7);
+        var m = _day(a).slice(0, 7);
         if (m && months.indexOf(m) < 0) months.push(m);
       });
       var byMonth = months.sort().map(function (m) {
         return line(
-          'Due in ' + MONTHS[Number(m.slice(5, 7)) - 1],
+          'From ' + MONTHS[Number(m.slice(5, 7)) - 1],
           list.filter(function (a) {
-            return _due(a).slice(0, 7) === m;
+            return _day(a).slice(0, 7) === m;
           }),
           to,
           say,
