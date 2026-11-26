@@ -139,16 +139,27 @@ test('⋯ and ⠿ stay while the pointer goes to them, and a statement drags und
   };
   const row = page.locator('#rb-preview tr[data-wrow="items.1"]');
   await row.scrollIntoViewIfNeeded();
-  // Where the row is, once the pages have stopped moving: under load the test aimed mid-scroll and the
-  // pointer went to the row beside it, whose ⋯ showed instead (Nov 25, 2026).
-  await reportPagesStill(page);
-  const words = await mid(row.locator('.report-habit-name'));
+  /* Slowly from the statement to a button in the margin: it is still lit when
+     the pointer gets there. Where things are is read once the pages have
+     stopped moving, and again before each new try: on GitHub's runner the
+     pointer once arrived one row too high, and the row above lit instead
+     (Nov 26, 2026). A second try is noted on the test, so it is not silent. */
+  const reach = async button => {
+    let at = { x: 0, y: 0 };
+    for (let tries = 1; ; tries++) {
+      await reportPagesStill(page);
+      const words = await mid(row.locator('.report-habit-name'));
+      await page.mouse.move(words.x, words.y);
+      at = await mid(button);
+      await page.mouse.move(at.x, at.y, { steps: 50 });
+      const lit = await button.evaluate(el => el.classList.contains('one-w-on')).catch(() => false);
+      if (lit || tries === 3) return at;
+      test.info().annotations.push({ type: 'aimed again', description: 'try ' + tries + ' at ' + JSON.stringify(at) });
+    }
+  };
 
-  // Slowly from the statement to its ⋯ in the right margin: it is still there to click.
   const more = page.locator('#rb-preview [data-wmore="items.1"]');
-  await page.mouse.move(words.x, words.y);
-  const m = await mid(more);
-  await page.mouse.move(m.x, m.y, { steps: 50 });
+  const m = await reach(more);
   await expect(more).toHaveClass(/one-w-on/);
   await page.mouse.click(m.x, m.y);
   await expect(page.getByRole('menuitem', { name: 'Move Up' })).toBeVisible();
@@ -156,9 +167,7 @@ test('⋯ and ⠿ stay while the pointer goes to them, and a statement drags und
 
   // The same to its ⠿ in the left margin; then down under Relational & Identity.
   const grip = page.locator('#rb-preview [data-wgrip="items.1"]');
-  await page.mouse.move(words.x, words.y);
-  const g = await mid(grip);
-  await page.mouse.move(g.x, g.y, { steps: 50 });
+  const g = await reach(grip);
   await expect(grip).toHaveClass(/one-w-on/);
   // In the margin beside another row, that row's ⠿ shows.
   const other = page.locator('#rb-preview tr[data-wrow="items.2"]');
