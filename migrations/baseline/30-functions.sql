@@ -976,6 +976,45 @@ AS $function$
      where c.id = p_course_id;
 $function$;
 
+CREATE OR REPLACE FUNCTION public._class_is_fixed()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _was uuid;
+    _now uuid;
+begin
+    if tg_table_name in ('section', 'rubric') then
+        _was := old.course_id; _now := new.course_id;
+    elsif tg_table_name = 'tag' then
+        _was := (select s.course_id from section s where s.id = old.section_id);
+        _now := (select s.course_id from section s where s.id = new.section_id);
+    elsif tg_table_name = 'criterion' then
+        _was := (select r.course_id from rubric r where r.id = old.rubric_id);
+        _now := (select r.course_id from rubric r where r.id = new.rubric_id);
+    elsif tg_table_name = 'criterion_check' then
+        _was := (select r.course_id from criterion c join rubric r on r.id = c.rubric_id where c.id = old.criterion_id);
+        _now := (select r.course_id from criterion c join rubric r on r.id = c.rubric_id where c.id = new.criterion_id);
+    else
+        raise exception '_class_is_fixed() is not for table %', tg_table_name;
+    end if;
+    -- A parent that does not exist is the foreign key's to refuse.
+    if _now is not null and _now is distinct from _was then
+        -- Into another teacher's class: the answer row security gives a teacher today, word for word, so this
+        -- trigger (which runs before row security) tells no one whether the other teacher's id exists.
+        if (select c.teacher_id from course c where c.id = _now) is distinct from (select c.teacher_id from course c where c.id = _was) then
+            raise exception 'new row violates row-level security policy for table "%"', tg_table_name
+                using errcode = '42501';
+        end if;
+        raise exception 'a % cannot be moved to another class', tg_argv[0]
+            using errcode = '23503', table = tg_table_name, constraint = tg_name;
+    end if;
+    return new;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public._course_restored_opened()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2387,6 +2426,52 @@ begin
                 p_old_value, p_new_value, p_old_status, p_new_status);
     end if;
 end; $function$;
+
+CREATE OR REPLACE FUNCTION public._score_row_class()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+    new.course_id := (select e.course_id from enrollment e where e.id = new.enrollment_id);
+    return new;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public._score_row_parent_class()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+    _ok   boolean;
+    _what text;
+begin
+    if tg_table_name = 'tag_score' then
+        _what := 'competency';
+        _ok := exists (select 1 from tag t join section s on s.id = t.section_id
+                        where t.id = new.tag_id and s.course_id = new.course_id);
+    elsif tg_table_name = 'rubric_score' then
+        _what := 'criterion';
+        _ok := exists (select 1 from criterion c join rubric r on r.id = c.rubric_id
+                        where c.id = new.criterion_id and r.course_id = new.course_id);
+    elsif tg_table_name = 'rubric_check_score' then
+        _what := 'checkbox';
+        _ok := exists (select 1 from criterion_check k join criterion c on c.id = k.criterion_id
+                         join rubric r on r.id = c.rubric_id
+                        where k.id = new.check_id and r.course_id = new.course_id);
+    else
+        raise exception '_score_row_parent_class() is not for table %', tg_table_name;
+    end if;
+    if not _ok then
+        raise exception 'insert or update on table "%" names a % that is not in the row''s class', tg_table_name, _what
+            using errcode = '23503', table = tg_table_name, constraint = tg_name;
+    end if;
+    return null;
+end;
+$function$;
 
 CREATE OR REPLACE FUNCTION public._student_card_json(p_card_id uuid)
  RETURNS jsonb
