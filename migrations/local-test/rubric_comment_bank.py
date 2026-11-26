@@ -15,6 +15,10 @@ Never against gradebook-prod: a throwaway PostgreSQL 17 only.
   add       add_criterion_comment and add_rubric_overall_comment: append, a repeat is a no-op, the cap of 40,
             another teacher, a visitor, no sign-in, the idempotency key replays, the sync cursor moves (and
             get_class_bundle with the old version gives the new comment), a no-op does not move it.
+  scales    a six-level rubric's level 5 and 6 comments after it goes back to four levels: save back, add,
+            Duplicate Class and a backup restore all work; rubrics of two to five levels take levels 1 to 6.
+  table     a teacher's direct write to criterion or rubric past any limit is refused by the tables' checks;
+            the largest list the rule allows fills each byte cap exactly.
   readers   get_class_bundle carries comments and overall_comments and nothing else new; duplicate_course and
             import_json_restore carry both (missing means []); the student page carries neither, nor any
             banked text; get_assessment_detail (teacher only) now shows them too.
@@ -22,7 +26,8 @@ Never against gradebook-prod: a throwaway PostgreSQL 17 only.
             import_json_restore, duplicate_course, the two new ones) against an add, in both orders; an old
             app's save never loses a comment added meanwhile; the order that would deadlock over the sync
             cursor does not (and does, with the rubric lock taken out); a grade save is not held up.
-  apply     the guards stop with the catalog unchanged; only what the header names changes; every existing row
+  apply     a save in flight: waited for, or the file stops on the lock timeout; no deadlock with a save
+            that goes on to its criteria; the guards stop with the catalog unchanged; only what the header names changes; every existing row
             reads as before with [] in the new columns; the md5s; a second run; the three read-only files; lock
             timeout; size; plain ASCII, no backslash.
   undo      PART 0 (saves as before, Add to Bank refused, the bank kept); the full removal refuses while a

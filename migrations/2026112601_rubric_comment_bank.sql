@@ -5,19 +5,30 @@
 -- docs/plans/comment-bank-plan.md ("The shape", "Database").
 --
 -- == What it adds ==
---   1. public.criterion.comments jsonb not null default '[]': [{level, text}], in the order shown.
+--   1. public._rubric_comment_list(list, is_criterion): the one rule for a list, used by every function below
+--      and by the tables' checks. A criterion's comment is {level, text} with the level 1 to 6 whatever the
+--      rubric's own levels are now (a six-level rubric that goes back to four keeps what was banked, as a
+--      restored checkbox keeps its level); the level may be a number or the same digit as text and is
+--      stored as a number. A text is trimmed of spaces, tabs and line breaks and must be 1 to 500
+--      characters; a repeat is kept once, where it first came; at most 40. Anything else in a list stops
+--      the call with 22023 and a plain message, nothing saved (a level of 3.0, 7, true or a huge number
+--      too). Outside the lists the database's own errors stand: an id that is not a uuid is 22P02, and a
+--      p_level too big for add_criterion_comment's smallint is 22003 before the function runs.
+--   2. public.criterion.comments jsonb not null default '[]': [{level, text}], in the order shown.
 --      public.rubric.overall_comments jsonb not null default '[]': [text], in the order shown.
---      Each with a check that it is a list (criterion_comments_is_list, rubric_overall_comments_is_list).
---   2. public._rubric_comment_list(list, levels): the one rule for a list, used by every function below. A
---      level is 1..4, or 1..6 on a rubric with its own levels (as a check's level is read); a text is trimmed
---      of spaces, tabs and line breaks and must be 1 to 500 characters; a repeat of the same level and text
---      is kept once, where it first came; at most 40. Anything else stops the call with 22023, nothing saved.
+--      Three checks on each, so a teacher's direct write to the table (authenticated may update both) can
+--      store nothing the functions would refuse: criterion_comments_is_list, criterion_comments_size (at most
+--      40 items and 121,040 bytes as text, the most the rule allows; the arithmetic is at the checks),
+--      criterion_comments_rule (the list is exactly what the rule makes of it); rubric_overall_comments_is_list,
+--      rubric_overall_comments_size (40 items, 120,160 bytes), rubric_overall_comments_rule. A direct write
+--      that breaks them stops with 23514, or 22023 from the rule's own message.
 --   3. public.add_criterion_comment(criterion, level, text, key) and public.add_rubric_overall_comment(rubric,
 --      text, key), for Add to Bank: they append one comment unless the same one is there, refuse past 40, and
 --      return the whole list. They run as the teacher, check the class is theirs (fv_owns_course), replay a
 --      used idempotency key (fv_idem_check / fv_idem_store), and move the class's sync cursor (the existing
 --      triggers on criterion and rubric) so another device reloads the class. A repeat changes nothing and
---      does not move it.
+--      does not move it. Granted to authenticated and service_role, as upsert_rubric is; a visitor (anon)
+--      may run none of the four.
 --
 -- == What it changes that exists ==
 --   upsert_rubric           gains p_overall_comments (last, default null): null keeps the rubric's overall
@@ -31,7 +42,9 @@
 --                           row. Nothing else in the bundle changes.
 --   duplicate_course        copies both.
 --   import_json_restore     reads "comments" on each criteria row and "overall_comments" on each rubrics row of
---                           the backup, by the same rule; missing (or not a list) means [].
+--                           the backup, by the same rule: a list that breaks it stops the restore; a value
+--                           that is missing or not a list at all is read as [], as a "scale" that is not a
+--                           list is read as none.
 -- Each patched in place behind its live md5 (migrations/baseline), one exact edit at a time.
 -- Not changed: student_submit.page lists the criterion fields it sends, so neither column reaches a student
 -- (its md5 is checked; the harness reads a student's page for a class with a bank). get_assessment_detail, a
@@ -49,9 +62,12 @@
 -- rubric save from the new editor that carries a list replaces the criterion's list: an Add to Bank made on
 -- another device between that editor opening and its save is replaced too (the app's draft must carry it).
 -- A backup made before this file, restored over the same class, empties the bank of the rubrics it holds,
--- as it puts back every other rubric field. A backup whose comments break the rule stops the restore.
--- The undo's PART 0 puts saves back as before and stops Add to Bank, and keeps the bank; its full removal
--- deletes the bank, and refuses while one comment is kept.
+-- as it puts back every other rubric field. A backup whose comment lists break the rule stops the restore.
+-- The undo's PART 0 is the undo to reach for: it puts saves back as before, stops Add to Bank, and keeps
+-- the bank. Its PART 1, the full removal, deletes the bank (it refuses while one comment is kept) and drops
+-- the ten-argument upsert_rubric: once an app that sends p_overall_comments is released, every rubric save
+-- from it is refused after PART 1. PART 1 is only for when no app in use sends that argument.
+-- The file ends with notify pgrst, 'reload schema', so PostgREST can call the new functions at once.
 --
 -- == The checks it makes first ==
 -- It stops with nothing changed unless: the server is PostgreSQL 17; the running role owns criterion and rubric;
@@ -63,14 +79,18 @@
 --
 -- == What it does not depend on ==
 -- Collation, locale, time zone, search path and the applying role: comments are compared byte for byte (jsonb
--- containment), the one ordered aggregate sorts under collate "C", the file sets its own search path and each
--- function pins its own, the owner is checked and grants are read from proacl. Lengths count characters (the
+-- containment), a level is matched by a pattern under collate "C", the one ordered aggregate sorts under
+-- collate "C", the file sets its own search path and each function pins its own, the owner is checked and
+-- grants are read from proacl. Lengths count characters (the
 -- database is UTF-8). No backslash and no non-ASCII character is in the file.
 --
 -- == Locks ==
--- criterion and rubric for a moment each (add column with a constant default, and a check that reads the
--- table); it gives up after five seconds with nothing applied if a long transaction holds one: run it again.
--- One transaction.
+-- First thing, rubric then criterion (the order upsert_rubric writes them), access exclusive, both held to
+-- commit, for a moment (the new checks read every row once: 130 rubrics, 423 criteria on live). A
+-- teacher's save in flight when it starts is waited for, up to five seconds: the save finishes as it would
+-- have, then the file applies. If a save or a long read holds either table past five seconds, the file
+-- stops with "lock timeout" and nothing applied: run it again. A save or a class load that starts while the
+-- file holds the locks waits until it commits, then goes on. One transaction.
 --
 -- == How to apply ==
 -- Only on the owner's OK. Tested on a throwaway PostgreSQL 17, ICU en-US and C (local-test/README.md,
@@ -556,7 +576,8 @@ $function$;
 
 -- == 6. Who can run what ==
 -- As upsert_rubric is today: a signed-in teacher and the service role; a visitor never. The rule for a list
--- is run inside the teacher's own calls (they are not security definer), so the teacher needs it too.
+-- is run inside the teacher's own calls (they are not security definer) and by the tables' checks on every
+-- write, so the teacher and the service role need it too.
 revoke all on function public.upsert_rubric(uuid, uuid, text, jsonb, uuid, uuid, text, jsonb, jsonb, jsonb) from public, anon, authenticated, service_role;
 grant execute on function public.upsert_rubric(uuid, uuid, text, jsonb, uuid, uuid, text, jsonb, jsonb, jsonb) to authenticated, service_role;
 revoke all on function public.add_criterion_comment(uuid, smallint, text, uuid) from public, anon, authenticated, service_role;
