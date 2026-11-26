@@ -390,13 +390,14 @@ describe('print-file-names', () => {
     });
 
     it('the DIBELS sheet names its frame and the page while it prints', () => {
-      const src = readFileSync('teacher/page-assignments.js', 'utf-8');
+      const src = readFileSync('teacher/assign-dibels.js', 'utf-8');
       const body = src.slice(src.indexOf('function printDibels('), src.indexOf('frame.remove();'));
       expect(body.replace(/\s+/g, ' ')).toContain(
         "printFileName([ a.title || 'DIBELS 8 Benchmark', printClassName(course), DIBELS_PERIOD_NAMES[period], ])",
       );
       expect(body).toContain('esc(fileName)');
-      expect(body.indexOf('setPrintTitle([fileName])')).toBeLessThan(body.indexOf('contentWindow.print()'));
+      // (the type cast around frame.contentWindow puts a ")" before ".print()")
+      expect(body.indexOf('setPrintTitle([fileName])')).toBeLessThan(body.indexOf('contentWindow).print()'));
       expect(body).toContain('restoreTitle();');
     });
   });

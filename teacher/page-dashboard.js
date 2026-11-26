@@ -21,11 +21,6 @@ window.PageDashboard = (function () {
      Attention card went (plan F.8): it stays at its saved value or the
      default. */
   var studentView = 'cards';
-  // The page's competency filter (a Curricular Competencies row). Not
-  // remembered. The name is the old Needs Attention one; other code and
-  // the data-action use it.
-  // The column whose chips are lit on every student card while the pointer
-  // is on its Curricular Competencies row (plan F.7a).
 
   // The next render slides the student cards to their new places (the
   // filter was set or cleared, or the sort changed).
@@ -104,7 +99,6 @@ window.PageDashboard = (function () {
   async function switchCourse(cid) {
     if (window.DashInbox && activeCourse && activeCourse !== cid) DashInbox.leave(activeCourse);
     activeCourse = cid;
-    // Reset class manager state for new course
     CM.configure({ activeCourse: cid, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
     if (!(await switchActiveCourse(cid))) return;
@@ -126,7 +120,7 @@ window.PageDashboard = (function () {
     // switch, so the class the list was built for is kept on the mount.
     var rows = document.querySelectorAll('#gb-roster-list .student-row').length;
     if (mount.dataset.cid === activeCourse && rows === getStudents(activeCourse).length) return;
-    mount.innerHTML = renderSidebar(activeCourse, null);
+    SidebarKeep.draw(renderSidebar(activeCourse, null));
     mount.dataset.cid = activeCourse;
   }
 
@@ -228,7 +222,6 @@ window.PageDashboard = (function () {
     DashOverview.sizeRow();
     _watchAboveRow();
 
-    // Restore sort dropdown
     var sortSelect = document.querySelector('.dash-sort-select');
     if (sortSelect) sortSelect.value = sortMode;
   }
@@ -376,8 +369,18 @@ window.PageDashboard = (function () {
     });
   }
 
+  // The Inbox's own change (its view, a stack): the tile alone, else the page.
+  function _inboxTile() {
+    if (!DashTileRedraw.inbox(activeCourse) && document.querySelector('#main .dash-glance')) render();
+  }
+
+  // A flag changes the one card, unless the list itself changes.
+  function _flagInPlace(cid, sid) {
+    return DashTileRedraw.flag(cid, sid, { flaggedOnly: showFlaggedOnly, sortMode: sortMode, view: studentView });
+  }
+
   function _handleClick(e) {
-    if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: render })) return;
+    if (window.DashInbox && DashInbox.click(e, { cid: activeCourse, redraw: render, redrawTile: _inboxTile })) return;
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -386,7 +389,6 @@ window.PageDashboard = (function () {
     // Delegate cm/cw actions to class manager submodule
     if (CM.handleAction(action, el, e)) return;
 
-    // Dashboard-only actions
     var handlers = {
       // Open Class on a photo warning: an archived class opens in Class Settings.
       photoExpiryOpen: function () {
@@ -412,7 +414,7 @@ window.PageDashboard = (function () {
       },
       toggleFlag: function () {
         toggleFlag(el.dataset.cid, el.dataset.sid);
-        renderStudents();
+        if (!_flagInPlace(el.dataset.cid, el.dataset.sid)) renderStudents();
       },
       // Show: All lets everyone through; Flagged keeps the flagged, and a second
       // click on it lets go.
@@ -511,11 +513,11 @@ window.PageDashboard = (function () {
     var tab = DashCompetencies.show(document, key);
     if (tab && focus) tab.focus();
   }
-  /* This term | Year: the Dashboard draws again with the new count, and focus
+  /* This term | Year: the tile draws again with the new count, and focus
      stays on the control that was used. */
   function _setCompSpan(span, id) {
     _writePref(DashCompetencies.SPAN_KEY + activeCourse, DashCompetencies.spanOf(span));
-    render();
+    if (!DashTileRedraw.competencies(activeCourse, _readPref)) render();
     _focusSel(id ? '#' + id : '');
   }
 
@@ -526,7 +528,6 @@ window.PageDashboard = (function () {
 
   /* ── init / destroy ─────────────────────────────────────── */
   function init(params) {
-    // Reset state
     activeCourse = getActiveCourse();
     showFlaggedOnly = false;
     sortMode = 'last-asc';
@@ -537,22 +538,20 @@ window.PageDashboard = (function () {
     CM.resetState();
     if (window.DashInbox) DashInbox.configure({ read: _readPref, write: _writePref });
 
-    // The student list, as on the other pages (_syncSidebar in render)
-    document.getElementById('sidebar-mount').innerHTML = '';
+    // The student list, as on the other pages (_syncSidebar in render); the one
+    // from the last page is patched, not drawn again (teacher/sidebar-keep.js)
     delete document.getElementById('sidebar-mount').dataset.cid;
     initSidebarToggle();
 
     // Add page-specific class for scoped CSS
     document.getElementById('main').classList.add('page-dashboard');
 
-    // Show the sidebar toggle in the dock
     var sidebarBtn = document.querySelector('.tb-btn');
     if (sidebarBtn) sidebarBtn.style.display = '';
 
     // Expose switchCourse globally for dock course selector
     window._pageSwitchCourse = switchCourse;
 
-    // Add delegated listeners
     _addDocListener('click', _handleClick);
     _addDocListener('input', _handleInput);
     _addDocListener('change', _handleChange);
@@ -575,7 +574,6 @@ window.PageDashboard = (function () {
     // gradebook's Add Students): Class Settings open on that tab.
     else if (params && params.manage) openClassManager(params.manage, params.class);
 
-    // Ensure page starts at top
     requestAnimationFrame(function () {
       document.getElementById('main').scrollTop = 0;
     });

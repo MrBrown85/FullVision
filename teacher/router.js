@@ -159,40 +159,9 @@ window.Router = (function () {
   }
 
   /* ── Render dock ─────────────────────────────────────────── */
-  // Where the lit tab's pill sits in its row, read before the dock is
-  // redrawn. A pill still gliding (a page that loads its scripts draws the
-  // dock twice) is read where it has got to, so the glide carries on.
-  function _litTab(mount) {
-    var seg = typeof mount.querySelector === 'function' ? mount.querySelector('.tb-seg') : null;
-    var on = seg && seg.querySelector('.tb-seg-active');
-    if (!on || typeof on.getBoundingClientRect !== 'function') return null;
-    var glide = seg.querySelector('.seg-glide');
-    var box = (glide || on).getBoundingClientRect();
-    return {
-      href: glide ? '' : on.getAttribute('data-href'),
-      x: box.left - seg.getBoundingClientRect().left + seg.scrollLeft,
-      width: box.width,
-    };
-  }
-
+  // The top bar: drawn once, then only the lit tab changes (teacher/top-bar.js).
   function _renderDock(activePage) {
-    var mount = document.getElementById('dock-mount');
-    if (!mount) return;
-    var was = _litTab(mount);
-    mount.innerHTML = renderDock(activePage);
-    // On a phone the tabs scroll sideways; keep the open one in view.
-    var seg = typeof mount.querySelector === 'function' ? mount.querySelector('.tb-seg') : null;
-    var on = seg && seg.querySelector('.tb-seg-active');
-    if (on && seg.scrollWidth > seg.clientWidth) {
-      seg.scrollLeft = on.offsetLeft - seg.offsetLeft - (seg.clientWidth - on.offsetWidth) / 2;
-    }
-    // The lit tab's pill glides over from the tab just left (shared/seg-glide.js).
-    if (was && on && was.href !== on.getAttribute('data-href') && window.SegGlide) {
-      var from = { left: seg.getBoundingClientRect().left + was.x - seg.scrollLeft, width: was.width };
-      SegGlide.run(seg, from, on.getBoundingClientRect());
-    }
-    if (typeof _populateDockUser === 'function') _populateDockUser();
-    if (window.UI && typeof window.UI.refreshSyncStatusUI === 'function') window.UI.refreshSyncStatusUI();
+    if (window.TopBar) window.TopBar.draw(activePage);
   }
 
   /* ── Pages loaded on demand ──────────────────────────────── */
@@ -392,9 +361,7 @@ window.Router = (function () {
     // Clear DOM mounts
     document.getElementById('main').innerHTML = '';
     document.getElementById('page-toolbar-mount').innerHTML = '';
-    document.getElementById('sidebar-mount').innerHTML = '';
-    document.getElementById('sidebar-mount').style.display = '';
-    document.getElementById('page-layout').classList.remove('sidebar-hidden', 'sidebar-overlay');
+    SidebarKeep.release(); // the student list stays for the page to patch
 
     // Re-render dock on every route change
     _renderDock(dockPage);
@@ -410,6 +377,7 @@ window.Router = (function () {
           if (seq === _routeSeq) _onRoute();
         },
         function () {
+          SidebarKeep.settle();
           if (seq === _routeSeq) _showPageLoadFailed(title);
         },
       );
@@ -433,6 +401,7 @@ window.Router = (function () {
         }, 0);
       }
     }
+    SidebarKeep.settle();
     // The page sent the teacher on from its init (an old link's redirect);
     // that route has drawn and titled the page already.
     if (seq !== _routeSeq) return;

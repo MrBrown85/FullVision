@@ -3,6 +3,10 @@ declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
   // Build flags (shared/build-flags.js): unfinished work stays behind one.
   BuildFlags: { on(name: string): boolean };
+  // Draws markup into a place, keeping the parts that did not change (teacher/keep-dom.js).
+  KeepDom: { patch(root: Element, html: string | DocumentFragment, opts?: any): void };
+  // The top bar (teacher/top-bar.js): drawn once, then only its lit tab changes.
+  TopBar: { draw(activePage: string): void; barKey(html: string): string };
   SegGlide: {
     run(track: HTMLElement, from: { left: number; width: number }, to: DOMRect, ms?: number): void;
     lit(track: Element): HTMLElement | null;
@@ -106,6 +110,11 @@ declare var CommentBank: {
   gradeOf(facts: unknown): { kind: string; letter?: string; standing?: string; next?: string; word?: string } | null;
   angle(facts: unknown, picks: unknown): { id: string };
   stepOf(sentence: unknown): string | null;
+  // Called by the grader's Note for the Report (teacher/assign-grader-notes.js).
+  bestPieceSentence(...args: any[]): any;
+  bestPieceSkillOf(...args: any[]): any;
+  studentRef(...args: any[]): any;
+  facts(...args: any[]): any;
 };
 // Browse Sentences' cases (teacher/report-qn-browse-cases.js) and the
 // Observations card, the student's Voice and the class's report parts
@@ -118,6 +127,7 @@ interface Window {
   ReportQnBoxes: any;
   ReportQnMotion: any;
   CmStdHelp: unknown;
+  CmKeepDraw: unknown;
   CmKeepMenu: unknown;
   FocusBack: { from(el: Element | null): () => void };
   CmTerms: unknown;
@@ -195,11 +205,16 @@ interface Window {
 // the checked data files use are typed.
 declare var GradeState: {
   RETURNED: string;
+  DRAFT: string;
   holds(klass: unknown): boolean;
   stateOf(cid: string, sid: string, aid: string): string | null;
   copyOf(grade: unknown): unknown;
   sameCopy(a: unknown, b: unknown): boolean;
   partInUse(copy: unknown, scoring: unknown): unknown;
+  returnNGraded(...args: any[]): any;
+  draftsSentence(...args: any[]): any;
+  returnQuestion(...args: any[]): any;
+  returnTogether(...args: any[]): any;
 };
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
@@ -381,7 +396,23 @@ declare var AddWorkTwoClasses: any; // teacher/add-work-two-classes.js (B6)
 declare var PhotoExpiry: any; // shared/photo-expiry.js, for shared/data-courses-terms.js
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
-declare var GraderWork: { workShown(cid: string, a: unknown): boolean };
+declare var GraderWork: {
+  workShown(cid: string, a: unknown): boolean;
+  draftsIn(cid: string, aid: string, shownIds: unknown): any[];
+  workOnInClass(cid: string): boolean;
+  workCounts(cid: string, aid: string, shownIds: unknown): any;
+  draftsReturned(...args: any[]): any;
+  // Called by the Assignments pieces (teacher/assign-*.js).
+  deleteWork(...args: any[]): any;
+  returnArea(...args: any[]): any;
+  revisionsOnInClass(...args: any[]): any;
+  samePhotoAs(...args: any[]): any;
+  setToFromPaper(...args: any[]): any;
+  unsubmitAsk(...args: any[]): any;
+  workInIds(...args: any[]): any;
+  workOn(...args: any[]): any;
+  workStateOf(...args: any[]): any;
+};
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };
 declare function showConfirm(
@@ -411,6 +442,7 @@ declare var MGradePhotos: any;
 // (teacher/student-page-students.js), which are not typed.
 declare var DashClassManager: any;
 declare var DashOverview: any; // teacher/dash-overview.js
+declare var DashTileRedraw: any; // teacher/dash-tile-redraw.js
 declare var DashInsights: any; // teacher/dash-insights.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
 declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
@@ -500,10 +532,14 @@ interface Window {
   };
 }
 declare var Router: any;
+declare var SidebarKeep: { draw(html: string): void; release(): void; settle(): void };
+// teacher/keep-dom.js, as teacher/assign-form-tips.js calls it (window.KeepDom above is the same object).
+declare var KeepDom: Window['KeepDom'];
 declare var CmRosterFile: any;
 declare var closeColorPop: any;
 declare var CmBlockPicker: any;
 declare var renderBreadcrumb: any;
+declare var CmKeepDraw: any;
 declare var CmKeepMenu: any;
 declare var _avatarColor: any;
 declare var CmQuestionnaires: any;
@@ -514,3 +550,73 @@ declare var CmTerms: any;
 declare var CompetencyWording: any;
 declare var RubricDraft: any;
 declare var RubricPrint: any;
+// The Assignments page's pieces (teacher/assign-*.js, cut from page-assignments.js)
+// and the modules they call, which are not typed.
+declare var FactorField: any;
+declare var AssignShow: any;
+declare var AssignList: any;
+declare var CritComment: any;
+declare var AssessmentCopy: any;
+declare var AssessmentTypeField: any;
+declare var AssignDraft: any;
+declare var HandoutFiles: any;
+interface Window {
+  BANK_CORE_COMPETENCIES?: any;
+  AssessmentCopy?: any;
+  HandoutFiles?: any;
+}
+declare var RubricBank: any;
+interface Window {
+  RubricBank?: any;
+}
+declare var RubricChecks: any;
+declare var RubricCommentLines: any;
+declare var RubricGuard: any;
+declare var RubricScale: any;
+interface Window {
+  RubricChecks?: any;
+}
+declare var RubricLibrary: any;
+interface Window {
+  RubricLibrary?: any;
+}
+declare var AssignCompPicker: any;
+declare var GradeChange: any;
+declare var Grader: any;
+declare var QuizData: any;
+declare var refreshSidebarGrades: any;
+interface Window {
+  QuizData?: any;
+}
+declare var rerenderKeeping: any;
+declare var ExpandMotion: any;
+interface Window {
+  ExpandMotion?: any;
+}
+declare var AssignToolbar: any;
+declare var printFileName: any;
+declare var setPrintTitle: any;
+declare var ClassResults: any;
+interface Window {
+  ClassResults?: any;
+}
+declare var RubricWords: any;
+declare var ObsCapture: any;
+declare var ObsFollowUps: any;
+interface Window {
+  ObsFollowUps?: any;
+}
+declare var MarkUp: any;
+interface Window {
+  MarkUp?: any;
+}
+declare var CardMenu: any;
+declare var CommentLint: any;
+declare var ReportScores: any;
+interface Window {
+  CommentLint?: any;
+}
+declare var MarkupDraw: any;
+interface Window {
+  MarkupDraw?: any;
+}

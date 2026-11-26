@@ -10,17 +10,21 @@ import { fileURLToPath } from 'url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
+// _handleFocus and _handleBlur moved to teacher/assign-inputs.js (the last function there is _handleBlur).
+const inputs = readFileSync(resolve(root, 'teacher/assign-inputs.js'), 'utf-8');
+// The module header's markup (renderAssessmentList) moved to teacher/assign-dibels.js.
+const listing = readFileSync(resolve(root, 'teacher/assign-dibels.js'), 'utf-8');
 const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
 
 describe('module name box', () => {
   it('has a label', () => {
-    expect(src).toContain('aria-label="Module name"');
+    expect(listing).toContain('aria-label="Module name"');
   });
 
   it('stops the folder dragging while the name is edited', () => {
-    const focus = src.slice(src.indexOf('function _handleFocus'), src.indexOf('function _handleBlur'));
+    const focus = inputs.slice(inputs.indexOf('function _handleFocus'), inputs.indexOf('function _handleBlur'));
     expect(focus).toContain('_setModuleDraggable(el, false)');
-    const blur = src.slice(src.indexOf('function _handleBlur'), src.indexOf('function _handleKeydown'));
+    const blur = inputs.slice(inputs.indexOf('function _handleBlur'));
     expect(blur).toContain('_setModuleDraggable(el, true)');
   });
 
@@ -32,7 +36,7 @@ describe('module name box', () => {
   });
 
   it('shows the saved name again after an empty one', () => {
-    const blur = src.slice(src.indexOf('function _handleBlur'), src.indexOf('function _handleKeydown'));
+    const blur = inputs.slice(inputs.indexOf('function _handleBlur'));
     expect(blur).toContain('el.value = saved;');
   });
 

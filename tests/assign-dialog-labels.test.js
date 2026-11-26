@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { assignAll } from './helpers/assign-sources.js';
 
 /* Nov 3 sweep (step 4 group 3 #25): dialogs on Assignments use Title Case
    for their titles and buttons, and Set Everyone To's dialog has the
@@ -14,7 +15,7 @@ describe('Assignments dialog words', () => {
     expect(src).toContain("plans.length + ' Classes'");
   });
   it('Set Everyone To opens a dialog of the same name', () => {
-    const src = read('page-assignments.js');
+    const src = assignAll();
     expect(src).toContain("var title = 'Set Everyone To ' + label;");
     expect(src).not.toMatch(/Fill All Scores/);
   });

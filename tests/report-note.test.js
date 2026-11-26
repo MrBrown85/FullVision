@@ -11,6 +11,7 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { assignAll, assignBetween } from './helpers/assign-sources.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -324,10 +325,9 @@ describe('the engine uses the note only when it passes the check', () => {
 });
 
 describe('the grader card’s hint', () => {
-  const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
   const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
   it('turns orange when the note does not start with a past-tense verb, saving the note anyway', () => {
-    const preview = src.slice(src.indexOf('function _reportNotePreview('), src.indexOf('function _saveReportNote('));
+    const preview = assignBetween('function _reportNotePreview(', 'function _saveReportNote(');
     expect(preview).toContain('CommentLint.startsPastTense(typed)');
     expect(preview).toContain("preview.classList.toggle('warn', off)");
     expect(preview).toContain("hint.className = 'grader-report-note-hint'");
@@ -335,7 +335,7 @@ describe('the grader card’s hint', () => {
     expect(css).toMatch(
       /\.grader-report-note-preview\.warn \.grader-report-note-hint \{\n  color: var\(--score-2-text\);/,
     );
-    const save = src.slice(src.indexOf('function _saveReportNote('), src.indexOf('function _graderGrade('));
+    const save = assignBetween('function _saveReportNote(', 'function _graderGrade(');
     // Through Grader.setReportNote since S1-T3; tests/grader.test.js holds
     // that it calls saveScoreReportNote with the same arguments.
     expect(save).toContain('Grader.setReportNote(cid, sid, aid, input.value)');
@@ -430,7 +430,7 @@ describe('the comment engine', () => {
 });
 
 describe('the grader card', () => {
-  const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
+  const src = assignAll();
   const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
 
   it('sits under the grading, one quiet line until opened (Colin, Nov 13)', () => {
@@ -454,7 +454,7 @@ describe('the grader card', () => {
   });
 
   it('saves on change and on Enter, and previews on every key', () => {
-    const open = src.slice(src.indexOf('function openGrader('), src.indexOf('function _graderKeydown('));
+    const open = assignBetween('function openGrader(', 'function _graderKeydown(');
     expect(open).toContain('_reportNotePreview(e.target)');
     expect(open).toContain('_saveReportNote(e.target)');
     expect(open).toContain("e.key !== 'Enter'");

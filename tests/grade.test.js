@@ -193,7 +193,16 @@ describe('grade-format-guard', () => {
     'teacher/cm-grading.js': 1,
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
-    'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
+    'teacher/assign-blank-rubric.js': 4, // the compact rubric editor's column heads (moved from page-assignments.js, which keeps 23 of its 27)
+    'teacher/assign-copy-class-view.js': 1, // Edit My Wording's level labels (moved from page-assignments.js, which keeps 22 of its 23)
+    'teacher/assign-card-list.js': 3, // the card's level names (moved from page-assignments.js, which keeps 19 of its 22)
+    'teacher/assign-cards.js': 1, // the single-point card's level word (moved from page-assignments.js, which keeps 18 of its 19)
+    'teacher/assign-dibels.js': 2, // the benchmark card's level names (moved from page-assignments.js, which keeps 16 of its 18)
+    'teacher/assign-levels.js': 2, // the six-point rubric's level names (moved from page-assignments.js, which keeps 14 of its 16)
+    'teacher/assign-rubric-grading.js': 3, // the rubric rows' level names (moved from page-assignments.js, which keeps 11 of its 14)
+    'teacher/assign-grader-queue.js': 2, // the Work to grade rows' level names (moved from page-assignments.js, which keeps 9 of its 11)
+    'teacher/assign-grader-notes.js': 1, // the Note for the Report's level name (moved from page-assignments.js, which keeps 8 of its 9)
+    'teacher/page-assignments.js': 8, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
     'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,
@@ -296,7 +305,7 @@ describe('grade-format-guard', () => {
     'teacher/factor-field.js round Number(v) * 10': 'an assessment’s Factor',
     'teacher/grades-print.js round Math.max(8, r.right - menu.offsetWidth)': 'a menu’s position',
     'teacher/assign-competency-picker.js round r.left + r.width / 2 - boxRect.left - 8': 'a pointer’s position',
-    'teacher/page-assignments.js round (parseLocalDate(r.revise_by) - day) / 86400000': 'days',
+    'teacher/assign-revisions.js round (parseLocalDate(r.revise_by) - day) / 86400000': 'days',
     'teacher/student-outlook.js round p.R - lg.R': 'points between two course % as shown',
     'teacher/student-outlook.js round one.R - lg.R': 'points between two course % as shown',
     'teacher/page-student.js round levelBarPercent(cid, r.v)': 'a bar’s width',

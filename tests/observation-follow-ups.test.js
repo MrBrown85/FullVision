@@ -373,7 +373,7 @@ describe('teacher-only: no report, Comment Bank, export or student page reader s
       'teacher-mobile/shell.js', // the delete question
       'teacher-mobile/student-detail.js', // the phone profile's Open Concerns chip and its follow-ups (teacher-only)
       'teacher-mobile/tab-observe.js',
-      'teacher/page-assignments.js', // the delete question
+      'teacher/assign-comment-popover.js', // the delete question
       'teacher/page-observations.js',
       'teacher/student-evidence.js', // the delete question
     ]);

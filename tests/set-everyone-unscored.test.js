@@ -4,7 +4,7 @@
  * Missing, who looked scored. Colin (2026-11-03, DECISIONS "Set Everyone
  * To"): it sets only cells with no score yet, a rubric criterion at a time,
  * and leaves out Missing and Excused students. _setEveryonePlan
- * (teacher/page-assignments.js) picks those cells and the dialog's counts.
+ * (teacher/assign-rubric-grading.js) picks those cells and the dialog's counts.
  */
 import { describe, expect, it, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
@@ -12,9 +12,9 @@ import { readFileSync } from 'fs';
 const CID = 'set-everyone';
 
 function plan(aid) {
-  const src = readFileSync('teacher/page-assignments.js', 'utf-8');
+  const src = readFileSync('teacher/assign-rubric-grading.js', 'utf-8');
   const fn = src.match(/ {2}function _setEveryonePlan\([^)]*\) \{[\s\S]*?\n {2}\}\n/);
-  expect(fn, '_setEveryonePlan in page-assignments.js').toBeTruthy();
+  expect(fn, '_setEveryonePlan in assign-rubric-grading.js').toBeTruthy();
   // eslint-disable-next-line no-new-func
   return new Function(fn[0] + '\nreturn _setEveryonePlan;')()(CID, aid);
 }

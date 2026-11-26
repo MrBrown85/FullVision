@@ -6,6 +6,7 @@
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { assignAll, assignBetween, assignFiles } from './helpers/assign-sources.js';
 
 describe('score-comments', () => {
   /**
@@ -191,7 +192,7 @@ describe('score-save-parity', () => {
 
   describe('No score writer works out the type on its own', () => {
     const files = [
-      'teacher/page-assignments.js',
+      ...assignFiles(),
       'teacher/page-gradebook.js',
       'teacher-mobile/tab-grade.js',
       'shared/data.js',
@@ -222,19 +223,19 @@ describe('score-save-parity', () => {
     // Through Grader.setPoints since S1-T3; tests/grader.test.js holds that
     // setPoints calls setPointsScore with the same arguments.
     it('desktop points entry saves the score once, through setPointsScore', () => {
-      const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
-      const fn = src.slice(src.indexOf('function commitPointsScore('), src.indexOf('function focusPointsBox('));
+      const fn = assignBetween('function commitPointsScore(', 'function focusPointsBox(');
       expect(fn).toContain('Grader.setPoints(cid, sid, aid, raw)');
       expect(fn).not.toContain('setScore(cid, sid, aid, aid');
     });
 
     // Both through Grader.setPoints since S1-T3, as the points entry above.
     it('the grader dialog and Set Unmarked to max save points once, through setPointsScore', () => {
-      const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
-      const grader = src.slice(src.indexOf('function _graderCommitPoints('), src.indexOf('function _focusGraderCard('));
-      expect(grader).toContain('Grader.setPoints(cid, pageState.focusStudentId, aid, raw)');
+      const src = assignAll();
+      const grader = assignBetween('function _graderCommitPoints(', 'function _focusGraderCard(');
+      // For the box's own student, not the page's when the blur runs (tests/grader-box-student.test.js).
+      expect(grader).toContain('Grader.setPoints(cid, sid, aid, raw)');
       expect(grader).not.toMatch(/\bsetScore\(/);
-      const fill = src.slice(src.indexOf('function confirmFillPoints('), src.indexOf('function livePointsUpdate('));
+      const fill = assignBetween('function confirmFillPoints(', 'function livePointsUpdate(');
       expect(fill).toContain('Grader.setPoints(cid, st.id, aid, max)');
       expect(fill).not.toMatch(/\bsetScore\(/);
       // No points writer anywhere keys a score by the assessment's own id.
