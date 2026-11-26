@@ -2996,21 +2996,31 @@ window.ReportQuestionnaire = (function () {
      from, and Pick a Date on the deadline row. `i` and `handle` place it
      among the draft's rows (the Sentences card); without them it stands
      alone. */
+  // Where a Required part the comment has no sentence for would go: the
+  // number of rows before it, set as its row is drawn.
+  var _emptyGap = 0;
   function _requiredRowHtml(cid, student, f, p, path, i, handle) {
     var picked = _pickedDeadline(f);
     var date = p.key === 'ieDeadline';
     var flag = date && !picked;
     var source = p.source || _requiredSource(cid, student, f, p.key);
-    // The source reads as the sentence's tooltip; it stays as a line only
-    // where there is no sentence yet for it to sit under, or where the
-    // teacher has a date to pick.
-    var sourceHtml = p.text && !flag ? '' : `<span class="qn-req-source">${esc(source)}</span>`;
+    // The source reads as the box's tooltip. A part with no sentence shows
+    // one button in its place, never grey text; only a date that cannot
+    // stand says in a line what to pick.
+    var empty = !p.text && !date && path === 'ie';
+    var gap = i == null || i < 0 ? _emptyGap : i;
+    var sourceHtml = date && _staleDeadline(f) ? `<span class="qn-req-source">${esc(source)}</span>` : '';
+    var own = empty && _own && _own.where === 'gap' && _own.step === p.key ? _ownBoxHtml(student) : '';
+    var emptyHtml = !empty
+      ? ''
+      : own ||
+        `<span class="qn-line-empty-row"><button type="button" class="qn-line-choose" data-action="tqSentences" data-do="ownPart" data-step="${esc(p.key)}" data-gap="${gap}" title="${esc(source)}">+ ${esc(p.label)} Sentence</button></span>`;
     var ctrl = date
       ? `<button type="button" class="qn-req-ctrl" id="tq-deadline-btn" data-action="tqOpenDeadline" aria-haspopup="dialog" aria-expanded="${!!_cal}" title="Pick the date by which the IE must become a grade.">${CAL_ICON}${picked ? esc(_longDay(picked)) : 'Pick a Date'}</button>`
       : '';
     return `<div class="qn-req-row${flag ? ' flag' : ''}${path !== 'ie' ? ' statement' : ''}${date ? ' has-cal' : ''}"${_rowAttr(i)}>
           ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">${esc(p.label)}</span></div>
-          <div class="qn-req-body">${p.text ? `<span class="qn-req-text" title="${esc(source)}">${esc(p.text)}</span>` : ''}${sourceHtml}</div>
+          <div class="qn-req-body">${p.text ? `<span class="qn-req-text" title="${esc(source)}">${esc(p.text)}</span>` : ''}${sourceHtml}${emptyHtml}</div>
           ${ctrl}
           ${date ? _calendarHtml(picked) : ''}
         </div>`;
@@ -3029,6 +3039,7 @@ window.ReportQuestionnaire = (function () {
       // and the comment agree once it is pressed (Nov 3 sweep).
       if (p.text && next[p.key]) p = Object.assign({}, p, { text: next[p.key] });
       var kind = p.key === 'grade' ? (path === 'ie' ? 'grade' : 'statement') : p.key;
+      _emptyGap = 0;
       out.push({
         kind: kind,
         html: _requiredRowHtml(cid, student, f, p, path),
@@ -5303,7 +5314,7 @@ window.ReportQuestionnaire = (function () {
   }
   /* A sentence of the teacher's own, typed at a gap (Write Your Own…):
      a Your Sentence row there. Its Options menu offers Add to My Bank. */
-  function _insertTyped(st, g, text) {
+  function _insertTyped(st, g, text, step) {
     var t = String(text || '')
       .replace(/\s+/g, ' ')
       .trim();
@@ -5312,6 +5323,8 @@ window.ReportQuestionnaire = (function () {
     var key = _rowKey(st);
     var rows = _rows[key] || _rowsFor(st, _facts(st));
     var row = typedRow(t);
+    // Written in a Required part's box: it is that part's sentence.
+    if (step) row.step = step;
     _rows[key] = insertRow(rows, row, g);
     _markAdded(st, row);
     _addAt = null;
@@ -5555,12 +5568,14 @@ window.ReportQuestionnaire = (function () {
     });
     // After each row of the comment, the gap where a sentence can be put in
     // (the InsertRows mockup): its index is how many rows come before it.
+    var placed = 0;
     return _wrapBoxes(
       cid,
       student,
       f,
       items.reduce(function (out, it) {
         var row = it.unit[0];
+        _emptyGap = placed;
         var html = _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
         var kind = it.i >= 0 && it.i === meetAt ? 'ieMeeting' : _boxKind(row, path);
         var ownGap = '';
@@ -5569,8 +5584,9 @@ window.ReportQuestionnaire = (function () {
             if (it.unit.indexOf(rows[c.row]) >= 0) html += _claimHtml(c);
           });
           var g = rows.indexOf(it.unit[it.unit.length - 1]) + 1;
+          placed = g;
           html += _gapHtml(cid, student, f, ctx, rows, g);
-          if (_own && _own.where === 'gap' && _own.gap === g) ownGap = _gapOwnHtml(student);
+          if (_own && _own.where === 'gap' && _own.gap === g && !_own.step) ownGap = _gapOwnHtml(student);
         }
         out.push({
           kind: kind,
@@ -6381,6 +6397,9 @@ window.ReportQuestionnaire = (function () {
       case 'down':
         _moveRow(i, 1);
         return;
+      case 'ownPart':
+        _ownOpen('gap', 'write', { gap: ds.gap, step: ds.step });
+        return;
       case 'ownOpen':
         _ownOpen(ds.where, ds.mode || 'write', {
           index: i,
@@ -6703,6 +6722,7 @@ window.ReportQuestionnaire = (function () {
         where: 'gap',
         mode: 'write',
         gap: Number(opts.gap) || 0,
+        step: String(opts.step || ''),
         text: '',
         part: '',
         caseId: '',
@@ -6788,7 +6808,7 @@ window.ReportQuestionnaire = (function () {
       var atGap = _own;
       if (!atGap.text.trim()) return;
       _own = null;
-      _insertTyped(st, atGap.gap, atGap.text);
+      _insertTyped(st, atGap.gap, atGap.text, atGap.step);
       return;
     }
     var c = _ownCompose(st);

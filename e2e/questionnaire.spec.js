@@ -1896,6 +1896,52 @@ for (const font of FONTS) {
   );
 }
 
+/* An IE student with no comment: a Required part with no sentence shows one
+   button in its place, never the grey source line. */
+test('an IE with no comment shows + Problem Sentence and + Plan Sentence, and no Your gradebook text', async ({
+  page,
+}) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => {
+    COURSES.sci8.gradingSystem = 'letter';
+    COURSES.sci8.gradeLevel = '10';
+    clearProfCache();
+  });
+  await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
+  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#report-period').selectOption('Report 2');
+  await page.locator('#tq-narrative').waitFor();
+  await page.evaluate(() => {
+    upsertTermRating('sci8', 'st1', 'term-2', {
+      reportingBasis: 'ie',
+      ieDeadline: null,
+      narrative: '',
+      approvedAt: null,
+    });
+    clearProfCache();
+  });
+  await page.locator('#report-period').selectOption('Report 1');
+  await page.locator('#report-period').selectOption('Report 2');
+  await expect(page.locator('.qn-grade-big')).toHaveText('IE');
+  const card = page.locator('#tq-sentences');
+  await expect(card.getByRole('button', { name: '+ Problem Sentence' })).toBeVisible();
+  await expect(card.getByRole('button', { name: '+ Plan Sentence' })).toBeVisible();
+  await expect(card).not.toContainText('Your gradebook');
+  await expect(card.locator('.qn-req-source')).toHaveCount(0);
+  await page.screenshot({
+    path: '/private/tmp/claude-504/-Users-brown-colin-FullVision/87877a57-acb9-4f57-aeb7-42e409a2b08e/scratchpad/approve-ie-empty.png',
+  });
+  // The button opens a line for that part; what is written is the part's sentence.
+  await card.getByRole('button', { name: '+ Problem Sentence' }).click();
+  await page.locator('#tq-own-input').fill('Cece has handed in too little marked work for a grade.');
+  await page.locator('#tq-own-save').click();
+  await expect(card.getByRole('button', { name: '+ Problem Sentence' })).toHaveCount(0);
+  await expect(card.locator('.qn-req-text', { hasText: 'too little marked work' })).toBeVisible();
+  await expect(card.getByRole('button', { name: '+ Plan Sentence' })).toBeVisible();
+});
+
 /* The arrow keys (Nov 3 sweep, step 4 group 2 #53 and group 3 #68): on a Work
    Habits slider they step, set and clear a rating; in a menu they move
    between its items; neither opens another student. Menus stay inside a
