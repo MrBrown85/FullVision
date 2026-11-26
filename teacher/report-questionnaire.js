@@ -2215,7 +2215,7 @@ window.ReportQuestionnaire = (function () {
     var m = (f.grade && f.grade.marked) || { mine: 0, all: 0 };
     var they = p.subj === 'they';
     var lines = [];
-    if (c.ie)
+    if (c.ie && CommentBank.ieOffered(f))
       lines.push(
         'Only ' +
           m.mine +

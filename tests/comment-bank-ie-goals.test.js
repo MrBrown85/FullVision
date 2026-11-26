@@ -519,6 +519,21 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
     return RQ.renderTermQuestionnaire(CID);
   }
 
+  it('says "Only N of M are marked" only while IE is on offer, not when IE was only chosen before', () => {
+    const line = 'assignments are marked. You can report IE (Insufficient Evidence)';
+    // Offered (3 of 8 marked) and chosen: the line stays.
+    seed();
+    rate({ reportingBasis: 'ie' });
+    expect(open()).toContain(line);
+    // Chosen, but every assignment is marked: the switch stays, the claim goes.
+    seed({ noor: [3, 3, 3, 3, 3, 3, 3, 3] });
+    rate({ reportingBasis: 'ie' });
+    const html = open();
+    expect(html).toContain('data-basis="ie"');
+    expect(html).not.toContain(line);
+    expect(html).not.toContain('Only 8 of 8');
+  });
+
   it('shows Letter Grade | IE with the mockup’s line when IE is on offer', () => {
     seed();
     const html = open();
