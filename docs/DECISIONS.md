@@ -2,12 +2,21 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Moves that touch marks may travel grouped by area (2026-11-26)
+
+Context: the Nov 12 ruling below ("Marks may be moved; Colin and Karen must see no change") says every piece that touches marks is its own move-only pull request. `teacher/page-assignments.js` splits into about 20 pieces, about 14 of which read or save marks. Since Nov 12 the moves are made and proved by scripts kept in the repo (`scripts/split/`): `state.mjs` puts a page file's changing variables on one object, and `cut.mjs` moves lines as text; each has a `--prove` that fails on any other difference. Colin was asked whether to keep one pull request per piece or to group them, and chose: "Group by area (Recommended)".
+
+- **Rule:** pieces that touch marks may be grouped into one pull request per area (for Assignments: the form, the list and its handlers, scoring, the grader, returns and work). This replaces step 1 of the Nov 12 method for moves made with `scripts/split/cut.mjs`.
+- **What stays, per pull request:** every piece is its own commit with its own proof (`cut.mjs --prove`), so a fault still points at one piece; the side-by-side run against `main` (`scripts/differential-run.mjs`, three seeds); an independent reviewer who runs it with different seeds and tries to break the change; the full browser suite on GitHub before merge; small releases; and anything that cannot be shown identical stops and goes to Colin.
+- **A rename is not a move.** Putting a file's changing variables on one object (`state.mjs`) on a file that saves marks still goes to Colin first, with its proof, an independent review and the side-by-side run. He approved it for `teacher/dash-class-manager.js` on Nov 25 and for `teacher/page-assignments.js` on Nov 26.
+- Still needs Colin: changing how a mark is saved, queued, synced, returned or deleted.
+
 ## Size limits for new code (2026-11-26)
 
 Colin asked what would impress a senior development team taking FullVision over, and then: "Write the lint for it." No line count impresses on its own; what a team checks first is whether each part has one job and whether its functions are short. The limits below hold new code to that and stop old code growing while it is split.
 
 - **A file may have 400 lines; a function 50,** counted as ESLint's `max-lines` and `max-lines-per-function` count them (every line, comments included). A function invoked where it is written (the closure that wraps a page file) does not count. The numbers are in `scripts/size-limits.mjs`.
-- **Code already longer is listed with its length today** in `tests/file-size-baseline.json` (161 files) and `tests/function-size-baseline.json` (771 functions, named by file and place, such as `teacher/page-assignments.js :: _handleClick`). A listed file or function may not grow. When it shrinks, `node scripts/size-limits.mjs --update` lowers its number, so it cannot grow back; the tests fail until it is lowered. `--update` never raises a number or adds one, and it follows a function cut to another file.
+- **Code already longer is listed with its length today** in `tests/file-size-baseline.json` (161 files) and `tests/function-size-baseline.json` (771 functions, named by file and place, such as `teacher/page-assignments.js :: _handleClick`). A listed file or function may not grow. When it shrinks, `node scripts/size-limits.mjs --update` lowers its number, so it cannot grow back; the tests fail until it is lowered. `--update` never raises a number, and it follows a function cut to another file. It lists a new file over 400 lines only when the listed files shrank by nearly as much in the same change (within a quarter, for the wiring a cut writes): that file holds code that moved, not new code (2026-11-26, later).
 - **Raising a number is an edit to a baseline file by hand,** seen in the pull request, with the reason in its description. A rename of a page file's changing variables onto one object (`scripts/split/state.mjs`) is the expected case: it makes lines longer before the split shrinks them.
 - `tests/file-size.test.js` and `tests/function-size.test.js` enforce both, in `test-and-format`. This replaces the 1,500-line file limit of 2026-11-12.
 - Not yet enforced: layers (screens call the app logic, which calls the data layer). That needs browser modules first, so that a lint rule can read each file's imports.
