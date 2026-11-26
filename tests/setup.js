@@ -343,6 +343,7 @@ load('teacher/cm-std-help.js');
 load('teacher/cm-keep-menu.js');
 load('teacher/cm-terms.js');
 load('teacher/cm-grading-bars.js');
+load('teacher/cm-students.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-competencies.js');

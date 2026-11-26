@@ -499,3 +499,4 @@ interface Window {
     off(): void;
   };
 }
+declare var Router: any;

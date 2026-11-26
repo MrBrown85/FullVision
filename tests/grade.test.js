@@ -288,8 +288,7 @@ describe('grade-format-guard', () => {
     'teacher/comment-bank.js floor Number(v)': 'a saved limit, a whole number',
     'teacher/comment-bank.js round (nx.min - Number(g.pct)) * 10': 'the gap to the next letter from the shown course %',
     'teacher/comment-personal.js floor Number(v[k])': 'a count',
-    'teacher/dash-class-manager.js round up ? Math.max(8, r.top - 4 - menu.offsetHeight) : r.bottom + 4':
-      'a menu’s position',
+    'teacher/cm-students.js round up ? Math.max(8, r.top - 4 - menu.offsetHeight) : r.bottom + 4': 'a menu’s position',
     'teacher/dash-class-manager.js round v * 10': 'a Counts As % being set, to one decimal',
     'teacher/dash-class-manager.js round Math.max(0, Math.min(100, v)) * 10': 'a Counts As % being set',
     "teacher/dash-class-manager.js round (_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10":
