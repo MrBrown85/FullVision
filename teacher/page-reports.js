@@ -1946,11 +1946,6 @@ window.PageReports = (function () {
       RQ.tqSentences('ownBind', el);
       return;
     }
-    // "I checked this" on a highlighted row of the Sentences card.
-    if (el.dataset.tqCheck) {
-      RQ.tqSetCheck(el.dataset.tqCheck, !!el.checked);
-      return;
-    }
     var a = el.dataset.action;
     // One Report's own controls (data-action="one…").
     if (a && /^one[A-Z]/.test(a)) {

@@ -21,7 +21,7 @@
 
    page-reports.js shows and hides the pieces for each tab (.tq-only is the
    questionnaire's); report-questionnaire.js tells this file how many students
-   are Ready (setReady) and what keeps Approve and Next off (setApprove). */
+   are Ready (setReady) and whether a comment still waits on the teacher (setApprove). */
 /** @type {any} */ (window).ReportToolbar = (function () {
   'use strict';
 
@@ -52,7 +52,7 @@
     return _total > 0 && _ready >= _total;
   }
   // Whether the button now opens Print Reports. A comment that cannot be
-  // approved (Approve and Next is off) keeps its reason, so it is not.
+  // approved (it still waits on the teacher) is not.
   function printing() {
     return allReady() && !_off;
   }
@@ -80,7 +80,7 @@
   }
 
   /* ── Approve and Next ──────────────────────────────────────── */
-  // off: it cannot be pressed now; title: the reason, or its usual words.
+  // off: the comment still waits on the teacher; the button stays on.
   /** @param {any} btn @param {boolean} off @param {string} title */
   function setApprove(btn, off, title) {
     _off = off;
@@ -92,7 +92,7 @@
     if (!btn) return;
     var print = printing();
     btn.textContent = print ? PRINT_WORDS : APPROVE_WORDS;
-    btn.disabled = _off;
+    btn.disabled = false;
     if (print) btn.title = 'Opens Print Reports';
     else if (_title !== null) btn.title = _title;
   }

@@ -454,7 +454,7 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(html).toContain('<span class="qn-req-label">Missing Work</span>');
     expect(html).toMatch(/<span class="qn-req-text">[^<]*“Task 9”[^<]*“Task 10\.?”/);
     expect(html).toContain('>Late work is accepted until December 4.</button>');
-    expect(html).toContain('2 of 10 · check that both are really missing before you approve');
+    expect(html).toContain('2 of 10');
     expect(open(AVA.id)).not.toContain('Not Handed In');
   });
 

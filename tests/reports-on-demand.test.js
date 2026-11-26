@@ -64,8 +64,8 @@ describe('scripts loaded on demand', () => {
     expect(read('teacher/page-gradebook.js')).toMatch(
       /Router\.withScripts\('gradesPrint', function \(\) \{\s+if \(window\.GradesPrint\) GradesPrint\.open\(/,
     );
-    expect(read('teacher/dash-class-manager.js')).toMatch(
-      /Router\.withScripts\('gradingSetupCopy', function \(\) \{[\s\S]{0,400}GradingSetupCopy\.openDialog\(/,
+    expect(read('teacher/cm-edit-actions.js')).toMatch(
+      /Router\.withScripts\('gradingSetupCopy', function \(\) \{[\s\S]{0,600}GradingSetupCopy\.openDialog\(/,
     );
     // Every sheet of slips or cards prints through printSheet, the only caller of qrSvg's QR maker.
     expect(read('teacher/qr-slips.js')).toMatch(

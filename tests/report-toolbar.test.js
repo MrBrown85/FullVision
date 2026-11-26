@@ -83,13 +83,13 @@ describe('the Reports toolbar', () => {
     expect(t.btn.title).toBe('Saves this comment.');
   });
 
-  it('a comment that cannot be approved keeps Approve and Next and its reason', () => {
+  it('a comment that still waits on the teacher keeps Approve and Next, and the button stays on', () => {
     const RT = window.ReportToolbar;
     RT.setReady(27, 27);
-    RT.setApprove(t.btn, true, 'Pick the deadline first.');
+    RT.setApprove(t.btn, true, 'Saves this comment.');
     expect(t.btn.textContent).toBe('Approve and Next ›');
-    expect(t.btn.disabled).toBe(true);
-    expect(t.btn.title).toBe('Pick the deadline first.');
+    expect(t.btn.disabled).toBe(false);
+    expect(t.btn.title).toBe('Saves this comment.');
     expect(RT.printing()).toBe(false);
   });
 

@@ -2,6 +2,17 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Approve and Next is always on (2026-11-25)
+
+Colin, on the Term Questionnaire page: "Teachers should be able to approve and next regardless of the comment- don't grey it out. That will confuse users." Then: "Always on".
+
+This reverses the "I checked this" ticks of the Generate plan (PR 3 and PR 11c), which kept the button off until the missing-work row, an IE's Problem row and a low grade's row were ticked.
+
+1. **The ticks are gone**, everywhere: the missing-work row, the IE Problem row and the grade row of a low grade. The code is deleted, not hidden.
+2. **The button is never disabled and never greyed.** Where approving would print something wrong, pressing it does not approve. It scrolls to that box, focuses its control and draws the box's attention ring once (180 ms; no motion under Reduce Motion). The second press, after the teacher fixes it, approves and opens the next student. Today's two blockers: an IE with no deadline picked (the Deadline box, Pick a Date) and a sentence that no longer matches the gradebook (its row, Use the New Sentence / Keep as Written, or Keep as Approved on an approved comment).
+3. **The grey text that explained why it was off is gone** ("Approve and Next is off until…", "Tick “I checked this” first.", "Approve and Next stays off until you pick a date."). Where a box needs a word, it says what to pick: the Deadline row reads "Pick the date by which the IE must become a grade."
+4. **The button's tooltip is always its usual words.** `approveBlockers` now names only what would print wrong ('deadline', 'deadlineRange', 'claims'); `ReportToolbar.setApprove` keeps a flag so the button does not turn into Print Reports while a comment still waits.
+
 ## New Class in two steps (2026-11-25)
 
 Colin chose the shape on the Course Tabs Board ("Yes, two steps"), then "Build it now".
