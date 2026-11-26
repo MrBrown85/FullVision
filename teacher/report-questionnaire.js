@@ -7330,12 +7330,12 @@ window.ReportQuestionnaire = (function () {
       n > 0 || listed
         ? `<button type="button" class="qn-see-missing" data-action="tqSentences" data-do="missOpen" aria-haspopup="menu" aria-expanded="${!!listed}" title="Lists the missing work. Each piece opens in the grader.">See the ${seeN}</button>`
         : '';
-    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-missing"${_rowAttr(i)}>
+    // The count it rests on is the tooltip, not grey text (decision 2).
+    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-missing" title="${esc(_missingSource(f))}"${_rowAttr(i)}>
       ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">Missing Work</span></div>
       <div class="qn-req-body">
         <span class="qn-req-text">${esc(sentence)}${lateBtn}</span>
         ${line}
-        <span class="qn-req-source">${esc(_missingSource(f))}</span>
       </div>
       ${see}${listed ? _missMenuHtml(cid) : ''}
     </div>`;

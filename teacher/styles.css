@@ -2961,7 +2961,9 @@ body.offline-active #app-dock {
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--text);
+  /* Always a dark pill with white words: var(--text) turned near-white in
+     dark mode, under the same white words. */
+  background: #1d1d1f;
   color: #fff;
   font-family: var(--font-base);
   font-size: var(--text-md);
