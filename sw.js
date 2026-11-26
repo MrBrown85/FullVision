@@ -356,6 +356,7 @@ const PRECACHE_URLS = [
   '/teacher/page-observations.js',
   '/teacher/page-starters.js',
   '/teacher/page-reports.js',
+  '/teacher/top-bar.js',
   '/teacher/router.js',
   // Teacher mobile
   '/teacher-mobile/index.html',
