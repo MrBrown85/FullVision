@@ -401,6 +401,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/tabs.css',
   '/teacher-mobile/students.css',
   '/teacher-mobile/grade.css',
+  '/teacher-mobile/observe.css',
   '/teacher-mobile/pin-page.js',
   '/teacher-mobile/components.js',
   '/teacher-mobile/student-card.js',

@@ -149,8 +149,8 @@ describe('sweep screen', () => {
     expect(q('#m-sweep-count').textContent).toBe('1 of 4 observed today');
     expect(tile('s2').getAttribute('data-state')).toBe('done');
     expect(tile('s3').textContent).toBe('Sam C.');
-    expect(q('.m-sweep-order-btn.m-seg-active').textContent).toBe('Roster order');
-    expect(q('.m-sweep-hint').textContent).toBe('Tap a name to start.');
+    expect(q('.m-sweep-order-btn.m-seg-active').textContent).toBe('Roster Order');
+    expect(q('.m-sweep-hint')).toBeNull();
   });
 
   it("Save and next writes the text, the chosen type, the starter's context and tags", () => {
@@ -247,7 +247,7 @@ describe('sweep screen', () => {
     MSweep.close();
     open();
     expect(tile('s1').getAttribute('data-state')).toBe('skipped');
-    expect(q('.m-sweep-order-btn.m-seg-active').textContent).toBe('Longest since observed');
+    expect(q('.m-sweep-order-btn.m-seg-active').textContent).toBe('Longest Since Observed');
   });
 
   it('shows "Everyone has an observation today" when all are done', () => {

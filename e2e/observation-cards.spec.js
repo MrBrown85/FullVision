@@ -186,8 +186,8 @@ test.describe('Observation editor (D3), phone', () => {
     await sheet.locator('#m-obs-ctx-row').click();
     const rows = sheet.locator('.m-pick-row');
     await expect(rows.locator('span:first-child')).toHaveText([
-      'Whole class',
-      'Small group',
+      'Whole Class',
+      'Small Group',
       'Independent',
       'Presentation',
       'Discussion',
