@@ -61,7 +61,22 @@ export function cut(src, opts) {
   if (!a.closure) throw new Error('this file is not one closure');
   const host = a.closure.name;
   const G = opts.global;
-  const moving = picked(a, opts.ranges);
+  /* A `state.x = …;` line sets up the main file's own object while it loads:
+     it stays behind, even inside the lines asked for. */
+  const setsState = i => {
+    const n = a.body[i];
+    const e = n.type === 'ExpressionStatement' ? n.expression : null;
+    return !!(
+      e &&
+      e.type === 'AssignmentExpression' &&
+      e.left.type === 'MemberExpression' &&
+      e.left.object.type === 'Identifier' &&
+      e.left.object.name === 'state'
+    );
+  };
+  const asked = picked(a, opts.ranges);
+  const moving = asked.filter(i => !setsState(i));
+  const stayed = asked.length - moving.length;
   const inPiece = new Set(moving);
   const r = pieceReport(a, moving);
   const blockers = r.blockers.slice();
@@ -186,6 +201,7 @@ export function cut(src, opts) {
     piece,
     main: out.join('\n').replace(/\n{3,}/g, '\n\n'),
     lines: r.lines,
+    stayed,
     names,
     handed,
     given,
@@ -435,6 +451,7 @@ if (import.meta.url === 'file://' + process.argv[1]) {
       }
       console.log(
         `${r.lines} lines, ${r.names.length} names move to ${opt('--to')} (window.${opt('--global')}).\n` +
+          (r.stayed ? `${r.stayed} state.x = … lines inside those lines stay in the main file.\n` : '') +
           `Handed over (${r.handed.length}): ${r.handed.join(', ') || 'nothing'}\n` +
           `The main file still uses (${r.given.length}): ${r.given.join(', ') || 'nothing'}`,
       );
