@@ -510,3 +510,4 @@ declare var CmQuestionnaires: any;
 declare var CmGradingBars: any;
 declare var FVBackupRestore: any;
 declare var openColorPop: any;
+declare var CmTerms: any;

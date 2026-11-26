@@ -6,6 +6,13 @@ window.DashClassManager = (function () {
      assigned again as the teacher works. One object, so a part of this
      file that moves to its own file can be handed it once. */
   var state = {};
+  /* In cm-dispatch.js (moved 2026-11-26). */
+  var _cmRestoreKeptFocus = CmDispatch._cmRestoreKeptFocus;
+  var handleAction = CmDispatch.handleAction;
+  var handleBlur = CmDispatch.handleBlur;
+  var handleChange = CmDispatch.handleChange;
+  var handleInput = CmDispatch.handleInput;
+  var handleKeydown = CmDispatch.handleKeydown;
   /* In cm-curriculum.js (moved 2026-11-26). */
   var _cmAttr = CmCurriculum._cmAttr;
   var _cmCompTitle = CmCurriculum._cmCompTitle;
@@ -328,6 +335,165 @@ window.DashClassManager = (function () {
     _cmRemoveMessage: _cmRemoveMessage,
     _cmStdCode: _cmStdCode,
     _currentId: _currentId,
+    renderClassManager: renderClassManager,
+  });
+  CmDispatch.configure({
+    state: state,
+    _cmCloseStdMenus: _cmCloseStdMenus,
+    cmAddTag: cmAddTag,
+    cmCancelCreate: cmCancelCreate,
+    cmCompReviewApply: cmCompReviewApply,
+    cmCompReviewCancel: cmCompReviewCancel,
+    cmCompReviewPick: cmCompReviewPick,
+    cmCompReviewShowSame: cmCompReviewShowSame,
+    cmCompReviewToggle: cmCompReviewToggle,
+    cmCreateToggle: cmCreateToggle,
+    cmDeleteStd: cmDeleteStd,
+    cmDeleteTag: cmDeleteTag,
+    cmDeleteWithdrawn: cmDeleteWithdrawn,
+    cmIcanAdd: cmIcanAdd,
+    cmIcanDelete: cmIcanDelete,
+    cmIcanEdit: cmIcanEdit,
+    cmLevelsCancel: cmLevelsCancel,
+    cmLevelsDraft: cmLevelsDraft,
+    cmLevelsEdit: cmLevelsEdit,
+    cmLevelsSave: cmLevelsSave,
+    cmReenrolStudent: cmReenrolStudent,
+    cmRelinkCancel: cmRelinkCancel,
+    cmRelinkNext: cmRelinkNext,
+    cmSelectClass: cmSelectClass,
+    cmStartCreate: cmStartCreate,
+    cmStartRelink: cmStartRelink,
+    cmStdCodeLive: cmStdCodeLive,
+    cmStdEditWording: cmStdEditWording,
+    cmStdFinishWording: cmStdFinishWording,
+    cmStdLabelLive: cmStdLabelLive,
+    cmStdRestoreWording: cmStdRestoreWording,
+    cmStdToggleMenu: cmStdToggleMenu,
+    cmToggleStdCard: cmToggleStdCard,
+    cmToggleStdFolder: cmToggleStdFolder,
+    cmUpdateStdCode: cmUpdateStdCode,
+    cmUpdateStdLabel: cmUpdateStdLabel,
+    cmUpdateTagLabel: cmUpdateTagLabel,
+    cmUpdateTagText: cmUpdateTagText,
+    cwGradeInput: cwGradeInput,
+    _cmCloseRosterPicker: _cmCloseRosterPicker,
+    _cmPtsKeydown: _cmPtsKeydown,
+    _cmRosterKeydown: _cmRosterKeydown,
+    _cmShownTabs: _cmShownTabs,
+    _cmTabShown: _cmTabShown,
+    _cwRailSync: _cwRailSync,
+    blockChipSelect: blockChipSelect,
+    blockOtherInput: blockOtherInput,
+    closeClassManager: closeClassManager,
+    cmAddCompGroup: cmAddCompGroup,
+    cmAddStd: cmAddStd,
+    cmAddSubject: cmAddSubject,
+    cmBcPointsScale: cmBcPointsScale,
+    cmCancelImport: cmCancelImport,
+    cmCatAdd: cmCatAdd,
+    cmCatAssignUncategorized: cmCatAssignUncategorized,
+    cmCatDelete: cmCatDelete,
+    cmCatMode: cmCatMode,
+    cmCatMoveCancel: cmCatMoveCancel,
+    cmCatMoveDelete: cmCatMoveDelete,
+    cmCatNameLive: cmCatNameLive,
+    cmCatNoticeDone: cmCatNoticeDone,
+    cmCatSave: cmCatSave,
+    cmCatWeightLive: cmCatWeightLive,
+    cmCheckStudent: cmCheckStudent,
+    cmChooseRosterFile: cmChooseRosterFile,
+    cmCloseAddStudent: cmCloseAddStudent,
+    cmCloseImportDone: cmCloseImportDone,
+    cmCloseImportFormat: cmCloseImportFormat,
+    cmCompCSV: cmCompCSV,
+    cmCompExport: cmCompExport,
+    cmCompImport: cmCompImport,
+    cmCompMove: cmCompMove,
+    cmCompRemoveSelected: cmCompRemoveSelected,
+    cmCompSelectAll: cmCompSelectAll,
+    cmCompSelectDone: cmCompSelectDone,
+    cmCompSelectStart: cmCompSelectStart,
+    cmCompToggle: cmCompToggle,
+    cmConfirmImport: cmConfirmImport,
+    cmDeleteCompGroup: cmDeleteCompGroup,
+    cmDeleteCourse: cmDeleteCourse,
+    cmDeleteSubject: cmDeleteSubject,
+    cmDownloadBackup: cmDownloadBackup,
+    cmDuplicateCourse: cmDuplicateCourse,
+    cmFolderCountChoice: cmFolderCountChoice,
+    cmHandleCSV: cmHandleCSV,
+    cmImportChooseNames: cmImportChooseNames,
+    cmImportDateOrder: cmImportDateOrder,
+    cmImportFix: cmImportFix,
+    cmImportMap: cmImportMap,
+    cmImportPick: cmImportPick,
+    cmImportRoster: cmImportRoster,
+    cmImportShowAll: cmImportShowAll,
+    cmImportShowBlanks: cmImportShowBlanks,
+    cmImportShowColumns: cmImportShowColumns,
+    cmImportToggle: cmImportToggle,
+    cmImportToggleAll: cmImportToggleAll,
+    cmMatchPointsScale: cmMatchPointsScale,
+    cmOpenDemoMode: cmOpenDemoMode,
+    cmOpenGradebook: cmOpenGradebook,
+    cmOpenGroupColorPop: cmOpenGroupColorPop,
+    cmOpenSetupCopy: cmOpenSetupCopy,
+    cmOpenStudentPage: cmOpenStudentPage,
+    cmPickColor: cmPickColor,
+    cmPtsLive: cmPtsLive,
+    cmPtsPick: cmPtsPick,
+    cmRemoveStudent: cmRemoveStudent,
+    cmResetPointsScale: cmResetPointsScale,
+    cmRestoreBackup: cmRestoreBackup,
+    cmRosterDesigAdd: cmRosterDesigAdd,
+    cmRosterDesigOpen: cmRosterDesigOpen,
+    cmRosterDesigRemove: cmRosterDesigRemove,
+    cmRosterEll: cmRosterEll,
+    cmRosterField: cmRosterField,
+    cmRosterSearch: cmRosterSearch,
+    cmRosterSort: cmRosterSort,
+    cmRoundPercentSelect: cmRoundPercentSelect,
+    cmSaveDecay: cmSaveDecay,
+    cmSavePointsScale: cmSavePointsScale,
+    cmSaveStudent: cmSaveStudent,
+    cmSetCalcMethod: cmSetCalcMethod,
+    cmSetCoursesCountEqually: cmSetCoursesCountEqually,
+    cmSetFolderCountsAsOne: cmSetFolderCountsAsOne,
+    cmSetFoldersCountAsOne: cmSetFoldersCountAsOne,
+    cmSetGradingSystem: cmSetGradingSystem,
+    cmSetLevelOrder: cmSetLevelOrder,
+    cmSetRecentLimit: cmSetRecentLimit,
+    cmSetRoundPercent: cmSetRoundPercent,
+    cmSetTab: cmSetTab,
+    cmShowAddStudent: cmShowAddStudent,
+    cmToggleArchive: cmToggleArchive,
+    cmToggleColorPalette: cmToggleColorPalette,
+    cmUndoImport: cmUndoImport,
+    cmUpdateCompGroupName: cmUpdateCompGroupName,
+    cmUpdateDecay: cmUpdateDecay,
+    cmUpdateField: cmUpdateField,
+    cmUpdateStdColor: cmUpdateStdColor,
+    cmUpdateStdGroup: cmUpdateStdGroup,
+    cmUpdateStdName: cmUpdateStdName,
+    cmUpdateStdSubject: cmUpdateStdSubject,
+    cmUpdateSubjectColor: cmUpdateSubjectColor,
+    cmUpdateSubjectName: cmUpdateSubjectName,
+    cwCompToggle: cwCompToggle,
+    cwFindInput: cwFindInput,
+    cwFinishCreate: cwFinishCreate,
+    cwFolderSet: cwFolderSet,
+    cwGoBack: cwGoBack,
+    cwGoToStep2: cwGoToStep2,
+    cwNameInput: cwNameInput,
+    cwOpenRow: cwOpenRow,
+    cwSelectGrade: cwSelectGrade,
+    cwSetRollup: cwSetRollup,
+    cwSkipToCustom: cwSkipToCustom,
+    cwToggleCourse: cwToggleCourse,
+    cwTogglePreset: cwTogglePreset,
+    openClassManager: openClassManager,
+    readBlockPicker: readBlockPicker,
     renderClassManager: renderClassManager,
   });
 
@@ -1612,6 +1778,7 @@ window.DashClassManager = (function () {
   });
   var cmTermSchool = CmTerms.cmTermSchool;
   var cmTermLive = CmTerms.cmTermLive;
+  CmDispatch.configure({ cmShowStdHelp: cmShowStdHelp, cmTermLive: cmTermLive, cmTermSchool: cmTermSchool });
 
   /* ── Re-link Curriculum ─────────────────────────────────── */
   function cmStartRelink(cid) {
@@ -3350,416 +3517,6 @@ window.DashClassManager = (function () {
     cmDeleteStd(secId);
   }
 
-  /* ── Action dispatcher (called from parent's _handleClick) ── */
-  function handleAction(action, el, e) {
-    state._cmKeepFocusSel = null;
-    // Any click other than on a card's More button closes its open menu.
-    if (action !== 'cmStdMenu') _cmCloseStdMenus();
-    if (action !== 'cmRosterDesigOpen') _cmCloseRosterPicker();
-    if (/^sq[A-Z]/.test(action) && typeof CmQuestionnaires !== 'undefined')
-      return CmQuestionnaires.handleAction(action, el);
-    if (/^sp[A-Z]/.test(action) && _cmTabShown('student-page', state.cmSelectedCourse))
-      return CmStudentPage.handleAction(action, el);
-    if (/^cmTerm[A-Z]/.test(action) && CmTerms.handleAction(action, el)) return true;
-    var handlers = {
-      openClassManager: function () {
-        openClassManager();
-      },
-      closeClassManager: function () {
-        closeClassManager();
-      },
-      cmStartCreate: function () {
-        cmStartCreate();
-      },
-      cmOpenDemoMode: function () {
-        cmOpenDemoMode();
-      },
-      cmCancelCreate: function () {
-        cmCancelCreate();
-      },
-      cmSelectClass: function () {
-        cmSelectClass(el.dataset.cid);
-      },
-      cmRemoveStudent: function () {
-        cmRemoveStudent(el.dataset.sid);
-      },
-      cmOpenStudentPage: function () {
-        cmOpenStudentPage(el.dataset.sid);
-      },
-      cmRosterSort: function () {
-        cmRosterSort(el.dataset.sort);
-      },
-      cmRosterDesigOpen: function () {
-        cmRosterDesigOpen(el);
-      },
-      cmRosterDesigAdd: function () {
-        cmRosterDesigAdd(el.dataset.sid, el.dataset.code);
-      },
-      cmRosterDesigRemove: function () {
-        cmRosterDesigRemove(el.dataset.sid, el.dataset.code);
-      },
-      cmReenrolStudent: function () {
-        cmReenrolStudent(el.dataset.sid);
-      },
-      cmDeleteWithdrawn: function () {
-        cmDeleteWithdrawn(el.dataset.sid);
-      },
-      cmCancelStudent: function () {
-        cmCloseAddStudent();
-      },
-      cmSaveStudent: function () {
-        cmSaveStudent(false);
-      },
-      cmSaveStudentAndAnother: function () {
-        cmSaveStudent(true);
-      },
-      cmShowAddStudent: function () {
-        cmShowAddStudent();
-      },
-      cmImportRoster: function () {
-        cmImportRoster();
-      },
-      cmChooseRosterFile: function () {
-        cmChooseRosterFile();
-      },
-      cmCloseImportFormat: function () {
-        cmCloseImportFormat();
-      },
-      cmConfirmImport: function () {
-        cmConfirmImport();
-      },
-      cmCancelImport: function () {
-        cmCancelImport();
-      },
-      cmImportPick: function () {
-        _cmCloseStdMenus();
-        cmImportPick(el.dataset.col, el.dataset.field);
-      },
-      cmImportDateOrder: function () {
-        cmImportDateOrder(el.dataset.col, el.dataset.order);
-      },
-      cmImportShowColumns: function () {
-        cmImportShowColumns();
-      },
-      cmImportShowAll: function () {
-        cmImportShowAll();
-      },
-      cmImportChooseNames: function () {
-        cmImportChooseNames();
-      },
-      cmImportShowBlanks: function () {
-        cmImportShowBlanks();
-      },
-      cmCloseImportDone: function () {
-        cmCloseImportDone();
-      },
-      cmUndoImport: function () {
-        cmUndoImport();
-      },
-      cmSetGradingSystem: function () {
-        cmSetGradingSystem(el.dataset.value);
-      },
-      cmSetCalcMethod: function () {
-        cmSetCalcMethod(el.dataset.value);
-      },
-      cmSetRoundPercent: function () {
-        cmSetRoundPercent(el.dataset.value);
-      },
-      cmSetLevelOrder: function () {
-        cmSetLevelOrder(el.dataset.value);
-      },
-      cmCatAdd: function () {
-        cmCatAdd();
-      },
-      cmCatNoticeDone: function () {
-        cmCatNoticeDone();
-      },
-      cmCatCopyFrom: function () {
-        cmOpenSetupCopy({ mode: 'from', only: 'categories' });
-      },
-      cmCopySetup: function () {
-        cmOpenSetupCopy({});
-      },
-      cmPointsScaleReset: function () {
-        cmResetPointsScale();
-      },
-      cmPointsScaleMatch: function () {
-        cmMatchPointsScale();
-      },
-      cmPointsScaleBc: function () {
-        cmBcPointsScale();
-      },
-      cmPtsPick: function () {
-        cmPtsPick(el);
-      },
-      cmCatSave: function () {
-        cmCatSave();
-      },
-      cmCatDelete: function () {
-        cmCatDelete(parseInt(el.dataset.idx, 10));
-      },
-      cmCatMoveCancel: function () {
-        cmCatMoveCancel();
-      },
-      cmCatMoveDelete: function () {
-        cmCatMoveDelete(parseInt(el.dataset.idx, 10));
-      },
-      cmCatAssignUncategorized: function () {
-        cmCatAssignUncategorized();
-      },
-      cmToggleColorPalette: function () {
-        cmToggleColorPalette(el);
-      },
-      cmPickColor: function () {
-        cmPickColor(el);
-      },
-      cmDeleteSubject: function () {
-        cmDeleteSubject(el.dataset.subid);
-      },
-      cmAddSubject: function () {
-        cmAddSubject();
-      },
-      cmDeleteStd: function () {
-        cmDeleteStd(el.dataset.secid);
-      },
-      cmDeleteTag: function () {
-        cmDeleteTag(el.dataset.secid, el.dataset.tagid);
-      },
-      cmAddTag: function () {
-        cmAddTag(el.dataset.secid);
-      },
-      cmAddStd: function () {
-        cmAddStd();
-      },
-      cmStartRelink: function () {
-        cmStartRelink(el.dataset.cid);
-      },
-      cmDuplicateCourse: function () {
-        cmDuplicateCourse(el.dataset.cid);
-      },
-      cmDownloadBackup: function () {
-        cmDownloadBackup(el.dataset.cid);
-      },
-      cmRestoreBackup: function () {
-        cmRestoreBackup();
-      },
-      cmToggleArchive: function () {
-        cmToggleArchive(el.dataset.cid);
-      },
-      cmDeleteCourse: function () {
-        cmDeleteCourse(el.dataset.cid);
-      },
-      cwSelectGrade: function () {
-        cwSelectGrade(parseInt(el.dataset.grade, 10));
-      },
-      cwToggleCourse: function () {
-        cwToggleCourse(el.dataset.tag);
-      },
-      cwSkipToCustom: function () {
-        cwSkipToCustom();
-      },
-      cwGoToStep2: function () {
-        cwGoToStep2();
-      },
-      cwTogglePreset: function () {
-        cwTogglePreset(el.dataset.tag);
-      },
-      cwFolderAll: function () {
-        cwFolderSet(el.dataset.tag, parseInt(el.dataset.idx, 10), true);
-      },
-      cwFolderNone: function () {
-        cwFolderSet(el.dataset.tag, parseInt(el.dataset.idx, 10), false);
-      },
-      cwOpenRow: function () {
-        cwOpenRow(el.dataset.row);
-      },
-      cwGoBack: function () {
-        cwGoBack();
-      },
-      cwFinishCreate: function () {
-        cwFinishCreate();
-      },
-      cmAddCompGroup: function () {
-        cmAddCompGroup();
-      },
-      cmDeleteCompGroup: function () {
-        cmDeleteCompGroup(el.dataset.grpid);
-      },
-      cmToggleStdCard: function () {
-        cmToggleStdCard(el.dataset.secid);
-      },
-      cmStdHelp: function () {
-        cmShowStdHelp(el.dataset.secid);
-      },
-      cmStdMenu: function () {
-        cmStdToggleMenu(el);
-      },
-      cmSetTab: function () {
-        cmSetTab(el.dataset.tab);
-      },
-      cmOpenGradebook: function () {
-        cmOpenGradebook(el.dataset.cid);
-      },
-      cmStdEditWording: function () {
-        cmStdEditWording(el.dataset.secid);
-      },
-      cmLevelsEdit: function () {
-        cmLevelsEdit(el.dataset.secid);
-      },
-      cmLevelsCancel: function () {
-        cmLevelsCancel(el.dataset.secid);
-      },
-      cmLevelsSave: function () {
-        cmLevelsSave(el.dataset.secid);
-      },
-      cmStdRestoreWording: function () {
-        cmStdRestoreWording(el.dataset.secid);
-      },
-      cmIcanDelete: function () {
-        cmIcanDelete(el.dataset.secid, Number(el.dataset.idx));
-      },
-      cmFolderCountChoice: function () {
-        cmFolderCountChoice(el.dataset.grpid, el.dataset.value);
-      },
-      cmToggleStdFolder: function () {
-        cmToggleStdFolder(el.dataset.uid);
-      },
-      cmOpenGroupColorPop: function () {
-        cmOpenGroupColorPop(el);
-      },
-      cmBlockChip: function () {
-        blockChipSelect(el);
-        if (el.dataset.picker === 'cm-block') cmUpdateField('block', el.dataset.val || '');
-        if (el.dataset.picker === 'cm-new-block') {
-          state.cwStep2Block = el.dataset.val || '';
-          _cwRailSync();
-        }
-      },
-      cmCreateToggle: function () {
-        cmCreateToggle(el, el.dataset.group);
-        var dp = document.getElementById('cm-cg-decay');
-        if (dp) dp.style.display = 'none';
-      },
-      cmCreateToggleDecay: function () {
-        cmCreateToggle(el, el.dataset.group);
-        document.getElementById('cm-cg-decay').style.display =
-          el.classList.contains('active') && el.dataset.val === 'decayingAvg' ? '' : 'none';
-      },
-      cmRelinkCancel: function () {
-        cmRelinkCancel();
-      },
-      cmRelinkNext: function () {
-        cmRelinkNext();
-      },
-      cmCompSelectStart: function () {
-        cmCompSelectStart();
-      },
-      cmCompSelectDone: function () {
-        cmCompSelectDone();
-      },
-      cmCompSelectAll: function () {
-        cmCompSelectAll();
-      },
-      cmCompMove: function () {
-        cmCompMove(el.dataset.grpid);
-      },
-      cmCompRemoveSelected: function () {
-        cmCompRemoveSelected();
-      },
-      cmCompExport: function () {
-        cmCompExport();
-      },
-      cmCompImport: function () {
-        cmCompImport();
-      },
-      cmCompReviewShowSame: function () {
-        cmCompReviewShowSame();
-      },
-      cmCompReviewCancel: function () {
-        cmCompReviewCancel();
-      },
-      cmCompReviewApply: function () {
-        cmCompReviewApply();
-      },
-    };
-    // A folder's Counts as One switch sits on its header. A click there is
-    // the switch's own: the folder stays as it is, and the click isn't
-    // cancelled, which would undo the switch.
-    if (action === 'cmToggleStdFolder' && e && e.target && e.target.closest && e.target.closest('.cm-folder-count'))
-      return true;
-    if (handlers[action]) {
-      if (el.tagName !== 'SELECT' && e) e.preventDefault();
-      handlers[action]();
-      return true;
-    }
-    return false;
-  }
-
-  function handleInput(el) {
-    if (el.dataset.actionInput === 'cwNameInput') {
-      cwNameInput(el);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmRosterSearch') {
-      cmRosterSearch(el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmBlockOtherInput') {
-      blockOtherInput(el);
-      if (el.dataset.picker === 'cm-new-block') {
-        state.cwStep2Block = readBlockPicker('cm-new-block');
-        _cwRailSync();
-      }
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmPtsLive') {
-      cmPtsLive(el);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmDecaySlider') {
-      cmUpdateDecay(el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cwFind') {
-      cwFindInput(el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cwGradeInput') {
-      cwGradeInput(el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmCreateDecaySlider') {
-      var dv = document.getElementById('cm-cg-decay-val');
-      if (dv) dv.textContent = el.value + '%';
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmCatWeightLive') {
-      cmCatWeightLive(parseInt(el.dataset.idx, 10), el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmCatNameLive') {
-      cmCatNameLive(parseInt(el.dataset.idx, 10), el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmStdCodeLive') {
-      cmStdCodeLive(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmLevelsDraft') {
-      cmLevelsDraft(el.dataset.secid, Number(el.dataset.level), el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmStdLabelLive') {
-      cmStdLabelLive(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionInput === 'cmTermLive') {
-      cmTermLive(parseInt(el.dataset.idx, 10), el.dataset.field, el.value);
-      return true;
-    }
-    return false;
-  }
-
   /* A switch, checkbox, radio or menu changed with the keyboard keeps the
      focus: most changes redraw Class Settings, which made the control a
      new element and dropped the focus to the page. Until the next click or
@@ -3767,297 +3524,6 @@ window.DashClassManager = (function () {
      control (by id, else by its data attributes), including the redraws
      around a "Change Grades?" question and its answer. */
   state._cmKeepFocusSel = null;
-
-  function handleChange(el) {
-    state._cmKeepFocusSel = _cmControlSelector(el);
-    return _handleChange(el);
-  }
-
-  function _cmRestoreKeptFocus() {
-    if (!state._cmKeepFocusSel) return;
-    var active = document.activeElement;
-    if (active && active !== document.body) return;
-    var again = document.querySelector(state._cmKeepFocusSel);
-    if (again && typeof again.focus === 'function') again.focus({ preventScroll: true });
-  }
-
-  function _cmControlSelector(el) {
-    if (!el || !el.tagName || typeof CSS === 'undefined' || !CSS.escape) return null;
-    var keep = el.tagName === 'SELECT' || (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio'));
-    if (!keep) return null;
-    if (el.id) return '#' + CSS.escape(el.id);
-    var attrs = el.attributes || [];
-    var parts = [];
-    for (var i = 0; i < attrs.length; i++) {
-      var n = attrs[i].name;
-      if (n.indexOf('data-') === 0 || n === 'name' || (n === 'value' && el.type === 'radio'))
-        parts.push('[' + n + '="' + CSS.escape(attrs[i].value) + '"]');
-    }
-    return parts.length ? el.tagName.toLowerCase() + parts.join('') : null;
-  }
-
-  function _handleChange(el) {
-    if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleChange(el)) return true;
-    if (_cmTabShown('student-page', state.cmSelectedCourse) && CmStudentPage.handleChange(el)) return true;
-    if (el.dataset.actionChange === 'cmCSV') {
-      cmHandleCSV(el);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCompCSV') {
-      cmCompCSV(el);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCompToggle') {
-      cmCompToggle(el.dataset.secid, el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCompReviewToggle') {
-      cmCompReviewToggle(Number(el.dataset.idx), el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCompReviewPick') {
-      cmCompReviewPick(el.dataset.group, Number(el.dataset.idx), el.dataset.pick);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmImportToggle') {
-      cmImportToggle(el.dataset.kind, Number(el.dataset.idx), el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmImportToggleAll') {
-      cmImportToggleAll(el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmImportFix') {
-      cmImportFix(el.dataset.line, el.dataset.field, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCheckStudent') {
-      cmCheckStudent(el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmRoundPercentSelect') {
-      cmRoundPercentSelect(el.value);
-      return true;
-    }
-    // Letting go of the decay slider saves it and redraws the examples and the student check.
-    if (el.dataset.actionChange === 'cmDecayCommit') {
-      cmSaveDecay(el.value);
-      renderClassManager();
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmTermSchool') {
-      cmTermSchool(el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmSubjectColor') {
-      cmUpdateSubjectColor(el.dataset.subid, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmStdSubject') {
-      cmUpdateStdSubject(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmStdColor') {
-      cmUpdateStdColor(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmRecentLimit') {
-      cmSetRecentLimit(el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmFoldersCountAsOne') {
-      // How Folders Count's two choices.
-      cmSetFoldersCountAsOne(el.type === 'radio' ? el.value === 'folder' : el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cwCompToggle') {
-      cwCompToggle(el.dataset.key, el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cwRollup') {
-      cwSetRollup(el.dataset.key, el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCoursesCountEqually') {
-      cmSetCoursesCountEqually(el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmFolderCountsAsOne') {
-      cmSetFolderCountsAsOne(el.dataset.grpid, el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCatMode') {
-      cmCatMode(parseInt(el.dataset.idx, 10), el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmPointsScale') {
-      cmSavePointsScale(el);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmStdGroup') {
-      cmUpdateStdGroup(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmImportMap') {
-      cmImportMap(el.dataset.col, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmRosterEll') {
-      cmRosterEll(el);
-      return true;
-    }
-    return false;
-  }
-
-  // Enter in an Add/Edit Student field saves, as the Save button does.
-  // In the starter editor Enter saves and Escape cancels.
-  function handleKeydown(e) {
-    var el = e.target;
-    if (e.key === 'Escape' && _cmCloseStdMenus()) {
-      var wrap = el && el.closest && el.closest('.cm-std-menu-wrap');
-      var opener = wrap && wrap.querySelector('[aria-haspopup="menu"]');
-      if (opener) opener.focus();
-      e.preventDefault();
-      return true;
-    }
-    if (e.key === 'Escape' && _cmCloseRosterPicker()) {
-      e.preventDefault();
-      return true;
-    }
-    if (e.key === 'Escape' && el && el.closest && el.closest('#cm-add-student-form') && cmCloseAddStudent()) {
-      e.preventDefault();
-      return true;
-    }
-    if (_cmRosterKeydown(e)) return true;
-    if (_cmPtsKeydown(e) || CmGradingBars.keydown(e)) return true;
-    // A course row in New Class or Re-link ticks with Space or Enter, and
-    // keeps the focus through the redraw so the next row is one Tab away.
-    if (
-      el &&
-      el.classList &&
-      el.classList.contains('cw-course-item') &&
-      (e.key === ' ' || e.key === 'Enter') &&
-      !e.isComposing
-    ) {
-      e.preventDefault();
-      var courseTag = el.dataset.tag;
-      el.click();
-      var again = document.querySelector('.cw-course-item[data-tag="' + CSS.escape(courseTag) + '"]');
-      if (again) again.focus();
-      return true;
-    }
-    // Arrow keys move between the class tabs, as in any tab list.
-    if (el && el.classList && el.classList.contains('cm-tab') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-      var ids = _cmShownTabs(state.cmSelectedCourse).map(function (t) {
-        return t.id;
-      });
-      var at = ids.indexOf(el.dataset.tab);
-      var next = ids[(at + (e.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length];
-      e.preventDefault();
-      cmSetTab(next);
-      return true;
-    }
-    if (el && el.classList && !e.isComposing && e.key === 'Enter' && !e.shiftKey) {
-      // Enter adds the typed I Can statement, or ends an edit to one.
-      if (el.classList.contains('cm-ican-new')) {
-        e.preventDefault();
-        var typed = el.value;
-        el.value = ''; // so the blur that follows the redraw adds nothing twice
-        cmIcanAdd(el.dataset.secid, typed);
-        return true;
-      }
-      if (el.classList.contains('cm-ican-text')) {
-        e.preventDefault();
-        el.blur();
-        return true;
-      }
-    }
-    if (e.key !== 'Enter' || e.isComposing) return false;
-    if (!el || el.tagName !== 'INPUT' || el.type === 'checkbox') return false;
-    if (!el.closest || !el.closest('#cm-add-student-form')) return false;
-    e.preventDefault();
-    cmSaveStudent(true);
-    return true;
-  }
-
-  function handleBlur(el) {
-    if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleBlur(el)) return true;
-    if (_cmTabShown('student-page', state.cmSelectedCourse) && CmStudentPage.handleBlur(el)) return true;
-    if (el.dataset.actionBlur === 'cmRosterField') {
-      cmRosterField(el);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmBlockOtherBlur') {
-      var typed = normalizeCourseBlock(el.value);
-      var cur = normalizeCourseBlock(COURSES[state.cmSelectedCourse] && COURSES[state.cmSelectedCourse].block);
-      var isChip = COURSE_BLOCK_CHOICES.indexOf(cur) >= 0;
-      // Leaving the box empty keeps a chosen chip; a typed label replaces it.
-      if (typed) cmUpdateField('block', typed);
-      else if (!isChip && cur) cmUpdateField('block', '');
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmUpdateName') {
-      cmUpdateField('name', el.value, el);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmUpdateGrade') {
-      cmUpdateField('gradeLevel', el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmUpdateDesc') {
-      cmUpdateField('description', el.value);
-      return true;
-    }
-    // Late Work Policy — empty becomes null (matches Phoneox `value || null`
-    // pattern, so blanking the textarea clears the server-side column).
-    if (el.dataset.actionBlur === 'cmLateWorkPolicy') {
-      var _lp = (el.value || '').trim();
-      cmUpdateField('lateWorkPolicy', _lp || null);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmCompGroupName') {
-      cmUpdateCompGroupName(el.dataset.grpid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmSubjectName') {
-      cmUpdateSubjectName(el.dataset.subid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmStdCode') {
-      cmUpdateStdCode(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmStdName') {
-      cmUpdateStdName(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmStdLabel') {
-      cmUpdateStdLabel(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmStdText') {
-      cmStdFinishWording(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmIcanAdd') {
-      // Typed but never pressed Enter: keep the statement anyway.
-      if (el.value.trim()) cmIcanAdd(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmIcanEdit') {
-      cmIcanEdit(el.dataset.secid, Number(el.dataset.idx), el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmTagLabel') {
-      cmUpdateTagLabel(el.dataset.secid, el.dataset.tagid, el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmTagText') {
-      cmUpdateTagText(el.dataset.secid, el.dataset.tagid, el.value);
-      return true;
-    }
-    return false;
-  }
 
   /* ── Namespace ──────────────────────────────────────────── */
   return {
