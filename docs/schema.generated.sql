@@ -588,6 +588,12 @@ table public.fv_idempotency (rls on)
   CREATE UNIQUE INDEX fv_idempotency_pkey ON public.fv_idempotency USING btree (key, teacher_id)
   CREATE INDEX fv_idempotency_teacher_id_idx ON public.fv_idempotency USING btree (teacher_id)
   policy fv_idempotency_self for select to public using ((teacher_id = ( SELECT auth.uid() AS uid)))
+table public.fv_owner (rls on)
+  teacher_id uuid not null
+  added_at timestamp with time zone not null default now()
+  constraint owner_pkey PRIMARY KEY (teacher_id)
+  constraint owner_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teacher(id) ON DELETE CASCADE
+  CREATE UNIQUE INDEX owner_pkey ON public.fv_owner USING btree (teacher_id)
 table public.goal (rls on)
   id uuid not null default gen_random_uuid()
   enrollment_id uuid not null

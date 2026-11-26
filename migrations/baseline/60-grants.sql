@@ -9,7 +9,6 @@ grant usage on schema public to authenticated;
 grant create, usage on schema public to service_role;
 revoke all on schema student_submit from public;
 grant usage on schema student_submit to service_role;
-revoke all on table fv_private.owner from public;
 revoke all on table public.answer from public;
 grant delete, insert, select, update on table public.answer to authenticated;
 revoke all on table public.assessment from public;
@@ -55,6 +54,7 @@ grant delete, insert, select, update on table public.enrollment to authenticated
 revoke all on table public.feedback_reflection from public;
 revoke all on table public.fv_idempotency from public;
 grant delete, insert, select, update on table public.fv_idempotency to authenticated;
+revoke all on table public.fv_owner from public;
 revoke all on table public.goal from public;
 grant delete, insert, select, update on table public.goal to authenticated;
 revoke all on table public.grade_return from public;

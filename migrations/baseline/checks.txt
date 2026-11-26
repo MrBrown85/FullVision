@@ -45,7 +45,6 @@ identity column (made in 50-table-extras.sql): public.submission_file_removal.id
 identity column (made in 50-table-extras.sql): student_submit.attempt.id identity=a generated=
 identity column (made in 50-table-extras.sql): student_submit.send_log.id identity=a generated=
 identity column (made in 50-table-extras.sql): student_submit.write_log.id identity=a generated=
-not loaded, relation outside the snapshot (only public and student_submit are in it): fv_private.owner
 policy outside the app schemas: cron_job_policy on cron.job
 policy outside the app schemas: cron_job_run_details_policy on cron.job_run_details
 policy outside the app schemas: fv_bulletin_files_fence on storage.objects

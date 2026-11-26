@@ -5084,7 +5084,7 @@ AS $function$
 declare
     _uid uuid := (select auth.uid());
 begin
-    if _uid is null or not exists (select 1 from fv_private.owner o where o.teacher_id = _uid) then
+    if _uid is null or not exists (select 1 from public.fv_owner o where o.teacher_id = _uid) then
         raise exception 'owner only' using errcode = '42501';
     end if;
 
