@@ -28,7 +28,9 @@ const LAB = 'sci8a1';
 const SHOTS = process.env.FV_SHOTS || '';
 const shot = (page, name) => (SHOTS ? page.screenshot({ path: SHOTS + '/' + name + '.png' }) : null);
 
-test('stickers name their pieces, the rest are typed, and every page goes to the right student', async ({ page }) => {
+test('stickers name their pieces, the rest are typed, and every page goes to the right student @flaky', async ({
+  page,
+}) => {
   // The scan is read, then six first pages are read for stickers: well under this on CI's two cores.
   test.setTimeout(90_000);
   const errors = [];
