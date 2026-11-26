@@ -4,6 +4,7 @@
     "teacher/obs-toolbar.js",
     "teacher/card-show.js",
     "teacher/print-legal.js",
+    "teacher/top-bar.js",
     "teacher/report-one-word-ops.js",
     "teacher/report-one-words.js",
     "teacher/report-one-copy.js",
