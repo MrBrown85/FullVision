@@ -6,6 +6,11 @@ window.PageAssignments = (function () {
      assigned again as the teacher works. One object, so a part of this
      file that moves to its own file can be handed it once. */
   var pageState = {};
+  /* In assign-inputs.js (moved 2026-11-26). */
+  var _handleBlur = AssignInputs._handleBlur;
+  var _handleChange = AssignInputs._handleChange;
+  var _handleFocus = AssignInputs._handleFocus;
+  var _handleInput = AssignInputs._handleInput;
   /* In assign-drag-events.js (moved 2026-11-26). */
   var _handleDragEnd = AssignDragEvents._handleDragEnd;
   var _handleDragLeave = AssignDragEvents._handleDragLeave;
@@ -527,6 +532,34 @@ window.PageAssignments = (function () {
     onModuleDragStart: onModuleDragStart,
     onModuleDropZoneDrop: onModuleDropZoneDrop,
     reorderAssessment: reorderAssessment,
+  });
+  AssignInputs.configure({
+    pageState: pageState,
+    _attachWorkFiles: _attachWorkFiles,
+    _commitDibelsField: _commitDibelsField,
+    _graderAid: _graderAid,
+    _graderCommitPoints: _graderCommitPoints,
+    _graderCriterion: _graderCriterion,
+    _queueOverallComment: _queueOverallComment,
+    _saveOverallComment: _saveOverallComment,
+    collabToggleStudent: collabToggleStudent,
+    commitPointsScore: commitPointsScore,
+    getRubricCriterion: getRubricCriterion,
+    livePointsUpdate: livePointsUpdate,
+    switchCourse: switchCourse,
+    _copyFromChanged: _copyFromChanged,
+    _formResFiles: _formResFiles,
+    _hideChipTip: _hideChipTip,
+    _setFormWorkUntil: _setFormWorkUntil,
+    _setModuleDraggable: _setModuleDraggable,
+    _showChipTip: _showChipTip,
+    _syncCodes: _syncCodes,
+    _tickGroup: _tickGroup,
+    autoSetDueDate: autoSetDueDate,
+    onRubricSelect: onRubricSelect,
+    onTagChange: onTagChange,
+    setAssessSearch: setAssessSearch,
+    updateModuleName: updateModuleName,
   });
 
   /* ── Listener tracking for cleanup ──────────────────────── */
@@ -5120,193 +5153,6 @@ window.PageAssignments = (function () {
       var ownLabel = innerLabel && innerLabel !== el && el.contains(innerLabel);
       if (action !== 'rubricModalBackdrop' && el.tagName !== 'SELECT' && !ownLabel) e.preventDefault();
       handlers[action]();
-    }
-  }
-
-  /* ── Input/change/blur handler ──────────────────────────── */
-  function _handleInput(e) {
-    var el = e.target;
-    // The box grows with the name where field-sizing isn't supported.
-    if (el.dataset.actionBlur === 'moduleName') {
-      el.size = Math.max(4, el.value.length);
-      return;
-    }
-    if (el.dataset.actionInput === 'assessSearch') {
-      setAssessSearch(el.value);
-      return;
-    }
-    // T-UI-09 · live weight mutation (mark dirty, no re-render — weight shows up
-    // in the input itself, so the input's own value stays in sync).
-    if (el.dataset.actionInput === 'rsgOverallComment') {
-      _queueOverallComment(el);
-      return;
-    }
-    if (el.dataset.actionInput === 'critCommentInput' || el.dataset.actionInput === 'critOwnInput') {
-      CritComment.input(el);
-      return;
-    }
-    // Points input live update
-    if (el.classList.contains('gb-pts-input')) {
-      livePointsUpdate(el);
-      return;
-    }
-  }
-
-  function _handleChange(e) {
-    var el = e.target;
-    if (el.dataset.action === 'assessSwitchCourse') {
-      switchCourse(el.value);
-      return;
-    }
-    if (el.dataset.actionChange === 'onRubricSelect') {
-      onRubricSelect(el.value);
-      return;
-    }
-    if (el.dataset.actionChange === 'afResFiles') {
-      _formResFiles(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'attachWorkFile') {
-      _attachWorkFiles(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'setFormWorkUntil') {
-      _setFormWorkUntil(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'autoSetDueDate') {
-      autoSetDueDate();
-      return;
-    }
-    if (el.dataset.actionChange === 'copyFrom') {
-      _copyFromChanged(el.value);
-      return;
-    }
-    if (el.dataset.actionChange === 'tickGroup') {
-      _tickGroup(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'tagCheckbox') {
-      onTagChange(el, el.dataset.section);
-      _syncCodes();
-      return;
-    }
-    if (el.dataset.actionChange === 'collabToggleStudent') {
-      collabToggleStudent(el.dataset.sid, el.checked);
-      return;
-    }
-    if (el.dataset.actionChange === 'copyTargetsChanged') {
-      if (window.AssessmentCopy) AssessmentCopy.onTargetsChanged();
-      return;
-    }
-  }
-
-  function _handleFocus(e) {
-    var el = e.target;
-    if (e.type === 'focus' && el && el.dataset && el.dataset.chipTip) _showChipTip(el);
-    if (el && el.dataset && el.dataset.actionBlur === 'moduleName') _setModuleDraggable(el, false);
-  }
-
-  function _handleBlur(e) {
-    var el = e.target;
-    if (el === pageState._chipTipSource) _hideChipTip();
-    if (el.dataset.actionBlur === 'moduleName') {
-      // An empty name is not saved, so the box shows the saved one again.
-      var saved = updateModuleName(el.dataset.moduleid, el.value);
-      el.value = saved;
-      el.title = saved;
-      el.size = Math.max(4, saved.length);
-      el.scrollLeft = 0;
-      _setModuleDraggable(el, true);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderPoints') {
-      _graderCommitPoints(el, e.relatedTarget);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderCritNote') {
-      var noteAid = _graderAid(el);
-      var text = el.value.trim();
-      if (!noteAid || !pageState.focusStudentId) return;
-      if (
-        text !==
-        getRubricCriterionComment(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          noteAid,
-          _graderCriterion(noteAid, el.dataset.critid),
-        )
-      )
-        Grader.setCriterionComment(pageState.activeCourse, pageState.focusStudentId, noteAid, el.dataset.critid, text);
-      el.classList.toggle('has-text', !!text);
-      return;
-    }
-    if (el.dataset.actionBlur === 'dibelsField') {
-      if (el.isConnected) _commitDibelsField(el);
-      return;
-    }
-    if (el.dataset.actionBlur === 'rsgOverallComment') {
-      CritComment.flowBlur(el);
-      _saveOverallComment(el);
-      return;
-    }
-    if (el.dataset.actionBlur === 'critCommentBlur') {
-      CritComment.save();
-      return;
-    }
-    if (el.dataset.actionBlur === 'rsgWorkOn' || el.dataset.actionBlur === 'rsgBeyond') {
-      var spCrit = getRubricCriterion(el.dataset.aid, el.dataset.critid);
-      if (!spCrit || !el.isConnected) return;
-      var spText = el.value.trim();
-      var beyond = el.dataset.actionBlur === 'rsgBeyond';
-      var spSaved = beyond
-        ? getRubricCriterionBeyond(pageState.activeCourse, el.dataset.sid, el.dataset.aid, spCrit)
-        : getRubricCriterionComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid, spCrit);
-      if (spText === spSaved) return;
-      if (beyond)
-        Grader.setWentBeyond(pageState.activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
-      else
-        Grader.setCriterionComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderCritBeyond') {
-      var beyondAid = _graderAid(el);
-      var beyondText = el.value.trim();
-      if (!beyondAid || !pageState.focusStudentId) return;
-      if (
-        beyondText !==
-        getRubricCriterionBeyond(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          beyondAid,
-          _graderCriterion(beyondAid, el.dataset.critid),
-        )
-      )
-        Grader.setWentBeyond(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          beyondAid,
-          el.dataset.critid,
-          beyondText,
-        );
-      el.classList.toggle('has-text', !!beyondText);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderTagNote') {
-      var tagAid = _graderAid(el);
-      var tagText = el.value.trim();
-      if (!tagAid || !pageState.focusStudentId) return;
-      if (tagText !== getTagComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag))
-        Grader.setCompetencyComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag, tagText);
-      el.classList.toggle('has-text', !!tagText);
-      return;
-    }
-    // Points input commit on blur. A re-render that removes the input also
-    // blurs it; that is not the teacher leaving the field.
-    if (el.classList.contains('gb-pts-input')) {
-      if (!el.isConnected) return;
-      commitPointsScore(el);
-      return;
     }
   }
 
