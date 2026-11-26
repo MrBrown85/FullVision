@@ -120,7 +120,7 @@ window.PageDashboard = (function () {
     // switch, so the class the list was built for is kept on the mount.
     var rows = document.querySelectorAll('#gb-roster-list .student-row').length;
     if (mount.dataset.cid === activeCourse && rows === getStudents(activeCourse).length) return;
-    mount.innerHTML = renderSidebar(activeCourse, null);
+    SidebarKeep.draw(renderSidebar(activeCourse, null));
     mount.dataset.cid = activeCourse;
   }
 
@@ -538,8 +538,8 @@ window.PageDashboard = (function () {
     CM.resetState();
     if (window.DashInbox) DashInbox.configure({ read: _readPref, write: _writePref });
 
-    // The student list, as on the other pages (_syncSidebar in render)
-    document.getElementById('sidebar-mount').innerHTML = '';
+    // The student list, as on the other pages (_syncSidebar in render); the one
+    // from the last page is patched, not drawn again (teacher/sidebar-keep.js)
     delete document.getElementById('sidebar-mount').dataset.cid;
     initSidebarToggle();
 
