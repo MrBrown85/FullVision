@@ -3,7 +3,9 @@
 
    A slider is a row of buttons with one lit: the desktop's .seg-btn (the top
    tabs among them), the phone's .m-seg-btn, the Work Wall's .ww-seg-btn, the
-   student preview's .ps-seg-btn and Add Work's .awc-seg-btn. When the lit
+   student preview's .ps-seg-btn, Add Work's .awc-seg-btn and .awc-choice,
+   the Sentences sheet's parts (.qn-browse-tab) and the rubric's scope
+   (.rb-scope-btn) (KINDS). When the lit
    button changes, a copy of its pill slides from the old place to the new
    one in 220 ms, the way the top tabs do (router.js), then the real pill is
    back. Nothing waits on it: the change itself has already happened.
@@ -18,9 +20,22 @@ window.SegGlide = (function () {
   'use strict';
 
   var MS = 220;
-  var BTN = '.seg-btn, .m-seg-btn, .ww-seg-btn, .ps-seg-btn, .awc-seg-btn';
+  // The slider buttons, by the class each kind uses.
+  var KINDS = [
+    'seg-btn',
+    'm-seg-btn',
+    'ww-seg-btn',
+    'ps-seg-btn',
+    'awc-seg-btn',
+    'awc-choice',
+    'qn-browse-tab',
+    'rb-scope-btn',
+  ];
+  var BTN = KINDS.map(function (k) {
+    return '.' + k;
+  }).join(', ');
   var LIT =
-    '.active, .is-on, .m-seg-active, .tb-seg-active, [aria-selected="true"], [aria-checked="true"], [aria-pressed="true"], [aria-current="page"]';
+    '.active, .is-on, .is-active, .m-seg-active, .tb-seg-active, [aria-selected="true"], [aria-checked="true"], [aria-pressed="true"], [aria-current="page"]';
 
   /** @returns {boolean} */
   function motionOK() {
@@ -194,8 +209,9 @@ window.SegGlide = (function () {
     var track = trackOf(e.target);
     var on = track && lit(track);
     if (!track || !on || /** @type {any} */ (track)._fvGlide) return;
-    var btn = on.className.split(/\s+/).filter(function (c) {
-      return /seg-btn$/.test(c);
+    var litBtn = on;
+    var btn = KINDS.filter(function (k) {
+      return litBtn.classList.contains(k);
     })[0];
     _was = {
       track: track,
