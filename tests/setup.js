@@ -411,6 +411,7 @@ load('teacher/assign-show.js');
 load('teacher/assign-toolbar.js');
 load('teacher/grade-change.js');
 load('teacher/assign-list.js');
+load('teacher/assign-dibels.js');
 load('teacher/assign-inputs.js');
 load('teacher/assign-drag-events.js');
 load('teacher/assign-card-open.js');
