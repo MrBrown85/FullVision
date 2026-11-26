@@ -288,6 +288,7 @@ load('shared/name-match.js');
 load('shared/work-thumbs.js');
 // Mark Up: drawing over a page of student work (S9).
 load('shared/markup-draw.js');
+load('s/rubric-whole.js');
 load('s/page-view.js');
 // A handout's pages on a card still to do, to swipe through.
 load('s/page-carousel.js');
@@ -447,6 +448,7 @@ load('teacher/student-outlook.js');
 load('teacher/gradebook-chrome.js');
 load('teacher/gradebook-student-menu.js');
 load('teacher/gradebook-toolbar.js');
+load('teacher/top-bar.js');
 load('teacher/router.js');
 
 // Restore real setTimeout after loading (tests may need it)
