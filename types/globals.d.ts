@@ -548,3 +548,10 @@ interface Window {
   RubricLibrary?: any;
 }
 declare var AssignCompPicker: any;
+declare var GradeChange: any;
+declare var Grader: any;
+declare var QuizData: any;
+declare var refreshSidebarGrades: any;
+interface Window {
+  QuizData?: any;
+}

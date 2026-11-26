@@ -101,7 +101,7 @@ const ALLOWED = {
     how: 'saves',
     why: 'Delete Assignment: Grader.deleteAssessmentScores saves the list',
   },
-  'teacher/page-assignments.js: _confirmDeleteAssess': {
+  'teacher/assign-past.js: _confirmDeleteAssess': {
     how: 'saves',
     why: 'Delete Assignment: Grader.deleteAssessmentScores saves the list',
   },
