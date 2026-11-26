@@ -6272,8 +6272,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   min-height: 28px;
   border: 0;
   border-radius: 7px;
-  background: #0066cc;
-  color: #fff;
+  background: var(--qn-tint-bg);
+  color: var(--link);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -6281,7 +6281,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   cursor: pointer;
 }
 .qn-add-sentence:hover {
-  background: #0059b3;
+  background: rgba(0, 102, 204, 0.16);
 }
 .qn-add-sentence:focus-visible,
 .qn-gap-add:focus-visible {
