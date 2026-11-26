@@ -83,10 +83,17 @@ window.TopBar = (function () {
     finish(kept);
   }
 
-  /** A bar drawn new gets the teacher's name and the sync dot's state.
+  /** A bar drawn new gets the teacher's name and the sync dot's state. A bar
+   * kept shows its sidebar button again: Gradebook and My Sentence Starters
+   * hide it while they are open (an inline display), and the next page draws
+   * it afresh.
    * @param {boolean} kept */
   function finish(kept) {
-    if (kept) return;
+    if (kept) {
+      var btn = /** @type {HTMLElement | null} */ (document.querySelector('#app-dock [data-action="toggleSidebar"]'));
+      if (btn) btn.style.display = '';
+      return;
+    }
     var w = /** @type {any} */ (window);
     if (typeof w._populateDockUser === 'function') w._populateDockUser();
     if (w.UI && typeof w.UI.refreshSyncStatusUI === 'function') w.UI.refreshSyncStatusUI();

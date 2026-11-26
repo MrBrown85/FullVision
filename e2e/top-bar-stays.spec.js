@@ -55,6 +55,14 @@ test('the bar stays as it is from page to page; only the lit tab changes', async
   await expect(page.locator('.tb-seg-active')).toHaveText('Assignments');
   await expect(page.locator('.tb-help-btn')).toHaveAttribute('aria-expanded', 'true');
   expect(await same()).toBe(true);
+  // Gradebook hides the sidebar button (no class list there); the next page shows it again.
+  await page.click('.tb-seg-link[data-href="/gradebook"]');
+  await expect(page.locator('.tb-seg-active')).toHaveText('Gradebook');
+  await expect(page.locator('[data-action="toggleSidebar"]')).toBeHidden();
+  await page.click('.tb-seg-link[data-href="/observations"]');
+  await expect(page.locator('.tb-seg-active')).toHaveText('Observations');
+  await expect(page.locator('[data-action="toggleSidebar"]')).toBeVisible();
+  expect(await same()).toBe(true);
   expect(await page.evaluate(() => window.__changes)).toBe(0);
   expect(errors).toEqual([]);
 });
