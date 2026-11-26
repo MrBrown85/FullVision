@@ -1547,51 +1547,6 @@ window.MGrade = (function () {
         : prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
     }
 
-    // html-safe: names, titles and criterion names go through MC.esc; ids are ours or escaped; labels are fixed words
-    function _revisionSheetHtml(cid, a, st) {
-      var rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
-      var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
-      return (
-        '<div class="m-revision-sheet" role="dialog" aria-labelledby="m-revision-title">' +
-        // Cancel on the left and the title in the middle, in one row (the
-        // board "Phone: Return for Revision"); the sheet's grabber is over it.
-        '<div class="m-revision-head"><button type="button" class="m-revision-cancel" data-action="m-sheet-cancel">Cancel</button>' +
-        '<h2 class="m-revision-title" id="m-revision-title">Return for Revision</h2><span aria-hidden="true"></span></div>' +
-        '<p class="m-revision-sub">' +
-        MC.esc(displayNameWithLast(st) + ' · ' + (a.title || 'Assessment')) +
-        '</p>' +
-        '<label class="m-revision-label" for="m-revision-fix">What to Fix</label>' +
-        '<textarea id="m-revision-fix" class="m-revision-fix" rows="3" maxlength="2000"></textarea>' +
-        // Revise By, then Revise under it (grade.css).
-        '<div class="m-revision-row"><div class="m-revision-field">' +
-        '<label class="m-revision-label" for="m-revision-by">Revise By</label>' +
-        '<input type="date" id="m-revision-by" class="m-revision-by"></div>' +
-        (criteria.length > 1
-          ? '<div class="m-revision-field"><label class="m-revision-label" for="m-revision-crit">Revise</label>' +
-            '<select id="m-revision-crit" class="m-revision-crit"><option value="">The Whole Assignment</option>' +
-            criteria
-              .map(function (c) {
-                return (
-                  '<option value="' + MC.esc(c.id) + '">' + MC.esc((c.name || 'Criterion') + ' only') + '</option>'
-                );
-              })
-              .join('') +
-            '</select></div>'
-          : '') +
-        '</div>' +
-        // The grade until then: kept. The board's Hide is left out (Colin, Nov 11).
-        '<h3 class="m-revision-label">Until the New Version Is Graded</h3>' +
-        '<p class="m-revision-keep">Keep this grade. The new version replaces it.</p>' +
-        '<p class="m-revision-msg" role="status"></p>' +
-        '<button type="button" class="m-revision-send" data-action="m-grade-revision-send" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        a.id +
-        '">Return for Revision</button>' +
-        '</div>'
-      );
-    }
-
     function openRevisionSheet(cid, aid, sid) {
       var a = _assessmentById(cid, aid);
       var st = (getStudents(cid) || []).find(function (x) {
@@ -1599,7 +1554,8 @@ window.MGrade = (function () {
       });
       if (!a || !st || _revisionBusy || !_stillOn(cid, aid, sid)) return;
       _saveTyped(cid, sid);
-      MC.presentSheet(_revisionSheetHtml(cid, a, st));
+      MC.presentSheet(MRevisionSheet.html(cid, a, st));
+      MRevisionSheet.wire();
       var fix = document.getElementById('m-revision-fix');
       if (fix) fix.focus();
     }

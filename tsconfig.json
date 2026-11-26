@@ -158,6 +158,7 @@
     "teacher/card-menu.js",
     "teacher-mobile/tab-bar.js",
     "teacher-mobile/crit-own.js",
+    "teacher-mobile/revision-sheet.js",
     "teacher-mobile/grade-look.js",
     "teacher-mobile/student-card.js",
     "teacher-mobile/grade-reader.js",

@@ -719,7 +719,10 @@ button.m-tabbar-class {
 .m-bulletin-label {
   margin: 8px 0 0;
 }
-.m-bulletin-row {
+/* A form row: the label at the left, the value at the right in link blue. Write a Bulletin's, and the
+   grader's Return for Revision (.m-form-row, grade.css). */
+.m-bulletin-row,
+.m-form-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -734,17 +737,22 @@ button.m-tabbar-class {
 /* Safari draws a select at its own height unless it draws it plainly: the row's value
    shows in link blue, as Settings rows do, and the whole 44 px is the target. A chevron
    drawn from two borders (not a font glyph) says it opens a list. */
-.m-bulletin-row select {
+.m-bulletin-row select,
+.m-form-row select,
+.m-form-row input {
   -webkit-appearance: none;
   appearance: none;
 }
-.m-bulletin-row-pick {
+.m-bulletin-row-pick,
+.m-form-pick {
   position: relative;
 }
-.m-bulletin-row-pick select {
+.m-bulletin-row-pick select,
+.m-form-pick select {
   padding-right: 18px;
 }
-.m-bulletin-row-pick::after {
+.m-bulletin-row-pick::after,
+.m-form-pick::after {
   content: '';
   position: absolute;
   right: 14px;
@@ -758,7 +766,9 @@ button.m-tabbar-class {
   pointer-events: none;
 }
 .m-bulletin-row input,
-.m-bulletin-row select {
+.m-bulletin-row select,
+.m-form-row input,
+.m-form-row select {
   min-height: 44px;
   min-width: 0;
   max-width: 60%;
