@@ -244,6 +244,7 @@ const PRECACHE_URLS = [
   '/teacher/cm-roster-import.js',
   '/teacher/cm-guardians.js',
   '/teacher/cm-other-classes.js',
+  '/teacher/cm-grading.js',
   '/teacher/dash-class-manager.js',
   '/teacher/dash-overview.js',
   '/teacher/dash-competencies.js',

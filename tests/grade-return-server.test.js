@@ -373,7 +373,8 @@ describe('every caller of saveCourseConfig and update_course', () => {
       // Reflect on Feedback's and Show My Learning's switches (S10, S13-W2: setCourseFeedbackOptions, Demo Mode only)
       'shared/data-reflect.js': 1,
       'shared/seed-data.js': 1,
-      'teacher/dash-class-manager.js': 10,
+      'teacher/cm-grading.js': 1,
+      'teacher/dash-class-manager.js': 9,
       'teacher/grading-setup-copy.js': 1,
     });
   });
