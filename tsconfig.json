@@ -69,6 +69,7 @@
     "teacher/focus-back.js",
     "teacher/cm-terms.js",
     "teacher/cm-grading-bars.js",
+    "teacher/cm-competency-import.js",
     "teacher/cm-relink.js",
     "teacher/cm-competency-edit.js",
     "teacher/cm-dispatch.js",

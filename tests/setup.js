@@ -355,6 +355,7 @@ load('teacher/cm-curriculum.js');
 load('teacher/cm-dispatch.js');
 load('teacher/cm-competency-edit.js');
 load('teacher/cm-relink.js');
+load('teacher/cm-competency-import.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-competencies.js');

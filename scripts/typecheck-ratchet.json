@@ -47,6 +47,7 @@
     "teacher/dash-inbox-rollcall.js",
     "teacher/dash-inbox-targets.js",
     "teacher/cm-grading-bars.js",
+    "teacher/cm-competency-import.js",
     "teacher/cm-relink.js",
     "teacher/cm-competency-edit.js",
     "teacher/cm-dispatch.js",
