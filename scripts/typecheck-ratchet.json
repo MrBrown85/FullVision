@@ -99,6 +99,7 @@
     "teacher/student-outlook.js",
     "teacher/gradebook-student-menu.js",
     "teacher/assign-list.js",
+    "teacher/assign-crud.js",
     "teacher/assign-copy-class-view.js",
     "teacher/assign-copy-class.js",
     "teacher/assign-blank-rubric.js",

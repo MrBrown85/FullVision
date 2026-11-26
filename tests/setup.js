@@ -411,6 +411,7 @@ load('teacher/assign-show.js');
 load('teacher/assign-toolbar.js');
 load('teacher/grade-change.js');
 load('teacher/assign-list.js');
+load('teacher/assign-crud.js');
 load('teacher/assign-copy-class-view.js');
 load('teacher/assign-copy-class.js');
 load('teacher/assign-blank-rubric.js');
