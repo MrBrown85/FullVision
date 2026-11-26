@@ -12,11 +12,13 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
 // _handleFocus and _handleBlur moved to teacher/assign-inputs.js (the last function there is _handleBlur).
 const inputs = readFileSync(resolve(root, 'teacher/assign-inputs.js'), 'utf-8');
+// The module header's markup (renderAssessmentList) moved to teacher/assign-dibels.js.
+const listing = readFileSync(resolve(root, 'teacher/assign-dibels.js'), 'utf-8');
 const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
 
 describe('module name box', () => {
   it('has a label', () => {
-    expect(src).toContain('aria-label="Module name"');
+    expect(listing).toContain('aria-label="Module name"');
   });
 
   it('stops the folder dragging while the name is edited', () => {
