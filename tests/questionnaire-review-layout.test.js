@@ -11,21 +11,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const RQ = ReportQuestionnaire;
 
-describe('standingWord', () => {
-  it('gives the Letter Grades Order word for each letter, nothing for IE or F', () => {
-    expect(['A', 'B', 'C+', 'C', 'C-', 'IE', 'F', ''].map(RQ.standingWord)).toEqual([
-      'Excellent',
-      'Very good',
-      'Good',
-      'Satisfactory',
-      'Minimally acceptable',
-      '',
-      '',
-      '',
-    ]);
-  });
-});
-
 describe('bestPiece', () => {
   it('is the comment’s best piece: the highest-marked, the latest when two tie, none without work', () => {
     const work = [
@@ -40,18 +25,18 @@ describe('bestPiece', () => {
 
 describe('skillTags', () => {
   const scored = (id, level, n = 3) => ({ id, level, scores: Array.from({ length: n }, () => ({ v: level })) });
-  it('marks Strongest by the comment’s evidence gate and the lowest Next step', () => {
+  it('marks Strength by the comment’s evidence gate and the lowest Next step', () => {
     const comps = [scored('a', 4), scored('b', 4), scored('c', 3), scored('d', 2.7), scored('e', 2.7)];
-    expect(RQ.skillTags(comps)).toEqual({ a: 'Strongest', b: 'Strongest', d: 'Next step' });
-    expect(Object.keys(RQ.skillTags(comps)).filter(k => RQ.skillTags(comps)[k] === 'Strongest')).toEqual(
+    expect(RQ.skillTags(comps)).toEqual({ a: 'Strength', b: 'Strength', d: 'Next step' });
+    expect(Object.keys(RQ.skillTags(comps)).filter(k => RQ.skillTags(comps)[k] === 'Strength')).toEqual(
       CommentBank.strongestOf(comps).map(c => c.id),
     );
   });
-  it('tags no Strongest below the gate: fewer than three pieces, or under half a step clear', () => {
+  it('tags no Strength below the gate: fewer than three pieces, or under half a step clear', () => {
     expect(RQ.skillTags([scored('a', 4, 2), scored('b', 3), scored('c', 2)])).toEqual({ c: 'Next step' });
     expect(RQ.skillTags([scored('a', 3.4), scored('b', 3), scored('c', 2.8)])).toEqual({ c: 'Next step' });
     expect(RQ.skillTags([scored('a', 3.5), scored('b', 3), scored('c', 2)])).toEqual({
-      a: 'Strongest',
+      a: 'Strength',
       c: 'Next step',
     });
   });
@@ -129,16 +114,15 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
   const cece = () => getStudents(cid).find(s => s.firstName === 'Cece');
 
-  it('headerGrade: the level and the proficiency word in a Proficiency class, with the count', () => {
+  it('headerGrade: the level in a Proficiency class, with the count handed in and no word under it', () => {
     const st = cece();
     const f = CommentBank.facts(cid, st, 'term-2');
     const g = RQ.headerGrade(cid, st.id, f);
     expect(g.big).toMatch(/^\d\.\d$/);
-    expect(g.small).toMatch(/^(Emerging|Developing|Proficient|Extending) · \d+ of \d+ assignments$/);
-    expect(g.small).toContain(f.record.handed + ' of ' + f.record.total + ' assignments');
+    expect(g.small).toBe(f.record.handed + ' of ' + f.record.total + ' handed in');
   });
 
-  it('headerGrade: the letter and percent with the standing word in a Letter class', () => {
+  it('headerGrade: the letter and percent in a Letter class, with the count handed in', () => {
     const st = cece();
     const was = COURSES[cid].gradingSystem;
     COURSES[cid].gradingSystem = 'letter';
@@ -146,8 +130,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       const f = CommentBank.facts(cid, st, 'term-2');
       const g = RQ.headerGrade(cid, st.id, f);
       expect(g.big).toMatch(/^[A-F][+-]? · \d+(\.\d)?%$/);
-      const letter = g.big.split(' · ')[0];
-      expect(g.small.split(' · ')[0]).toBe(RQ.standingWord(letter));
+      expect(g.small).toBe(f.record.handed + ' of ' + f.record.total + ' handed in');
     } finally {
       COURSES[cid].gradingSystem = was;
     }
@@ -190,7 +173,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(html).not.toContain('From assignments:');
     expect(html).toContain('At a Glance');
     expect(html).toContain('Best Piece');
-    expect(html).toContain('<span class="qn-fact-label">Missing and Late</span>');
+    expect(html).toContain('<span class="qn-fact-label">Missing Work</span>');
     expect(html).toContain('Cece’s Voice');
     expect(html).toContain('Questionnaires ›');
     expect(html).toContain('Teacher Comment');
@@ -248,7 +231,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       'Grade',
       'Work Habits',
       'Best Piece',
-      'Not Handed In',
+      'Missing Work',
       'Skills',
       'Goal and Voice',
       'Attendance',

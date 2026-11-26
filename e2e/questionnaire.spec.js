@@ -130,7 +130,7 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
     'Grade',
     'Work Habits',
     'Best Piece',
-    'Not Handed In',
+    'Missing Work',
     'Skills',
     'Goal and Voice',
     'Attendance',
@@ -176,25 +176,23 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
   await expect(page.locator('.qn-head-sub')).toHaveText('she/her · Student Dashboard ›');
   await expect(page.locator('.qn-grade-big')).toHaveText(/^\d\.\d$/);
-  await expect(page.locator('.qn-grade-sub')).toHaveText(
-    /^(Emerging|Developing|Proficient|Extending) · \d+ of \d+ assignments$/,
-  );
+  await expect(page.locator('.qn-grade-sub')).toHaveText(/^\d+ of \d+ handed in$/);
   await page.locator('.qn-head-link').click();
   await page.waitForURL(/\/student\?id=st1/);
   await page.getByRole('link', { name: 'Term Questionnaire' }).click();
   await page.locator('#tq-narrative').waitFor();
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
 
-  // The Closing row shows the class's shared next step, while it is edited too (last: it opens the line editor).
+  // The class's shared next step shows inside the Closing editor, not on the closed row (last: it opens the line editor).
   const r = await page.evaluate(() =>
     CommentBank.sharedNextStep('sci8', { termId: ReportBlocks.getTermId(), students: getStudents('sci8') }),
   );
   const closing = page.locator('#tq-row-closing');
-  await expect(closing.locator('.qn-shared-step')).toContainText('Shared next step:');
-  await expect(closing.locator('.qn-shared-step')).toContainText(r.count + ' of ' + r.total + ' students');
+  await expect(closing.locator('.qn-shared-step')).toHaveCount(0);
   await closing.locator('[data-do="editClosing"]').click();
   await expect(page.locator('#tq-row-closing .qn-line-input')).toBeVisible();
   await expect(page.locator('#tq-row-closing .qn-shared-step')).toContainText('Shared next step:');
+  await expect(page.locator('#tq-row-closing .qn-shared-step')).toContainText(r.count + ' of ' + r.total + ' students');
 });
 
 test('Approve and Next sets Ready and the roster tick and opens the next student; an edit clears it', async ({
@@ -462,10 +460,8 @@ test('At a Glance: the year so far, the best piece and View All Skills', async (
       pieces: rows.strongest.scores.length,
     };
   });
-  const labels = ['Strongest', 'Next Step'].concat(expected.change ? ['Biggest Change'] : []);
-  await expect(page.locator('.qno-glance .qn-fact-label')).toHaveText(
-    labels.concat(['Best Piece', 'Missing and Late']),
-  );
+  const labels = ['Strength', 'Next Step'].concat(expected.change ? ['Biggest Change'] : []);
+  await expect(page.locator('.qno-glance .qn-fact-label')).toHaveText(labels.concat(['Best Piece', 'Missing Work']));
   await expect(page.locator('.qno-glance .qn-fact').nth(0)).toContainText(expected.strongest);
   await expect(page.locator('.qno-glance .qn-fact').nth(1)).toContainText(expected.next);
   await expect(page.locator('.qn-best .qn-fact-body')).toContainText(expected.best);
@@ -741,15 +737,16 @@ test.describe('the Sentences card', () => {
     expect(perRow.reduce((a, b) => a + b, 0)).toBe(n);
     expect(perRow.some(k => k > 1)).toBe(true);
     await expect(rowByLabel(page, 'Next Step')).toHaveCount(1);
-    await expect(rowByLabel(page, 'Next Step').locator('.qn-req-source')).toHaveCount(1);
+    await expect(page.locator('#tq-sentences .qn-srow-facts, #tq-sentences .qn-srow .qn-req-source')).toHaveCount(0);
     const rowCount = perRow.length;
     await expect(rows(page)).toHaveCount(rowCount);
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
-    await expect(rows(page).first().locator('.qn-req-source')).toContainText('from the year’s scores to this report');
-    await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Options ▾');
-    await expect(page.locator('#tq-sentences .qn-sub')).toHaveText(
-      'Reword, edit or drag to reorder. The comment above follows.',
+    await expect(rows(page).first().locator('.qn-req-text')).toHaveAttribute(
+      'title',
+      /from the year’s scores to this report/,
     );
+    await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Options ▾');
+    await expect(page.locator('#tq-sentences .qn-sub')).toHaveCount(0);
     await expect(page.locator('#tq-sentences .qn-srow-handle[draggable="true"]')).toHaveCount(rowCount);
     await expect(page.locator('[data-do="reset"]')).toHaveCount(0);
     // The best piece's row, moved first, names Cece; the grade sentence now
@@ -762,7 +759,7 @@ test.describe('the Sentences card', () => {
     await expect(best).toHaveClass(/\bbest\b/);
     await expect(page.locator('#tq-sentences .qn-srow.best')).toHaveCount(1);
     expect(bestText).toContain('she kept a field journal with dated sketches');
-    await expect(best.locator('.qn-req-source')).toContainText('· your note for the report');
+    await expect(best.locator('.qn-req-text')).toHaveAttribute('title', /· your note for the report/);
     await expect(page.locator('#tq-marks .qn-mark.best')).toHaveText(bestText);
     await expect(page.locator('#tq-marks .qn-mark')).toHaveCount(1);
     await best.locator('.qn-srow-handle').focus();
@@ -804,7 +801,7 @@ test.describe('the Sentences card', () => {
       await page.locator(`.qn-hs-stop[data-habit="${key}"][data-value="4"]`).click();
     }
     await page.locator('#tq-generate').click();
-    const home = rowByLabel(page, 'Habits').first();
+    const home = rowByLabel(page, 'Work Habits').first();
     await home.locator('[data-do="wording"]').click();
     const menu = page.locator('#tq-wording-menu');
     await expect(menu).toBeVisible();
@@ -818,7 +815,7 @@ test.describe('the Sentences card', () => {
     await expect(items.nth(1).locator('.qn-menu-meta')).toHaveText(
       /^(Not used yet in this class|Used for \d+ classmates?)$/,
     );
-    await expect(menu.locator('.qn-menu-all')).toHaveText(/^All \d+ habits sentences…$/);
+    await expect(menu.locator('.qn-menu-all')).toHaveText(/^All \d+ work habits sentences…$/);
     const alt = await items.nth(1).locator('.qn-menu-text').textContent();
     await items.nth(1).click();
     await expect(menu).toHaveCount(0);
@@ -829,7 +826,7 @@ test.describe('the Sentences card', () => {
     await menu.locator('.qn-menu-all').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet).toBeVisible();
-    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Habits');
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Work Habits');
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-sentence', { hasText: alt })).toHaveCount(1);
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
@@ -847,7 +844,7 @@ test.describe('the Sentences card', () => {
     }, was);
     await expect(first.locator('.qn-edited')).toHaveText('Edited');
     await expect(first.locator('.qn-req-text')).toHaveText('Cece had a steady term in Science 8.');
-    await expect(first.locator('.qn-req-source')).toHaveText('Edited by you · kept when you regenerate');
+    await expect(first.locator('.qn-req-text')).toHaveAttribute('title', 'Edited by you · kept when you regenerate');
     // Other Wording stays, so the sentence can go back to a bank wording.
     await expect(first.locator('[data-do="wording"]')).toHaveCount(1);
     await page.locator('#tq-generate').click();
@@ -860,7 +857,7 @@ test.describe('the Sentences card', () => {
     const last = rows(page).last();
     await expect(last.locator('.qn-req-text')).toHaveText('She asks good questions.');
     await expect(last.locator('.qn-req-label')).toHaveText('Your Sentence');
-    await expect(last.locator('.qn-req-source')).toHaveText('Typed by you · kept when you regenerate');
+    await expect(last.locator('.qn-req-text')).toHaveAttribute('title', 'Typed by you · kept when you regenerate');
     await expect(last.locator('[data-do="options"]')).toHaveText('Options ▾');
     await expect(last.locator('.qn-edited')).toHaveCount(0);
   });
@@ -899,7 +896,7 @@ test.describe('the Sentences card', () => {
     const typed = rows(page).filter({ hasText: 'explained her lab results' });
     await expect(typed).toHaveCount(1);
     await expect(typed.locator('.qn-req-label')).toHaveText('Your Sentence');
-    await expect(typed.locator('.qn-req-source')).toHaveText('Typed by you · kept when you regenerate');
+    await expect(typed.locator('.qn-req-text')).toHaveAttribute('title', 'Typed by you · kept when you regenerate');
     await expect(typed.locator('.qn-srow-handle[draggable="true"]')).toHaveCount(1);
     await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
     // Generate again: still there, second, with the bank's parts around it.
@@ -1031,7 +1028,7 @@ test.describe('the Sentences card', () => {
     const added = rows(page).nth(2);
     await expect(added.locator('.qn-req-label')).toHaveText('Best Piece');
     await expect(added).toHaveClass(/\badded\b/);
-    await expect(added.locator('.qn-req-source')).toHaveText(/ · added just now$/);
+    await expect(added.locator('.qn-req-text')).toHaveAttribute('title', / · added just now$/);
     // The sentence is tinted in the comment too, like the best piece.
     await expect(page.locator('#tq-marks .qn-mark.added')).toHaveText(
       await added.locator('.qn-req-text').textContent(),
@@ -1056,14 +1053,17 @@ test.describe('the Sentences card', () => {
     await expect(gaps.nth(1).locator('.qn-gap-add')).toBeFocused();
     // When the fade ends the tint, the mark and "added just now" go, in place.
     await expect(added).not.toHaveClass(/\badded\b/, { timeout: 7000 });
-    await expect(added.locator('.qn-req-source')).not.toHaveText(/added just now/);
+    await expect(added.locator('.qn-req-text')).not.toHaveAttribute('title', /added just now/);
     await expect(page.locator('#tq-marks .qn-mark.added')).toHaveCount(0);
     // With her words in too, every part is in: the menu says so.
     const last = gaps.nth((await gaps.count()) - 1);
     await last.locator('.qn-gap-add').click();
     await menu.locator('.qn-add-item').first().click();
     await expect(menu).toHaveCount(0);
-    await expect(rows(page).last().locator('.qn-req-source')).toHaveText(/^Her words, from her questionnaire/);
+    await expect(rows(page).last().locator('.qn-req-text')).toHaveAttribute(
+      'title',
+      /^Her words, from her questionnaire/,
+    );
     await gaps.nth(1).locator('.qn-gap-add').click();
     await expect(menu.locator('.qn-add-item')).toHaveCount(0);
     await expect(menu.locator('.qn-add-none')).toHaveText(
@@ -1088,7 +1088,7 @@ test.describe('the Sentences card', () => {
     await gaps.last().locator('.qn-gap-add').click();
     await page.locator('#tq-add-menu [data-do="browseAt"]').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
-    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Habits');
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Work Habits');
     // Use adds, even a second grade sentence (Colin, 2026-11-02: "i should
     // be able to add ones i like, and make the comment longer"): it goes
     // in at the gap and the first Grade row stays as it was.
@@ -1280,9 +1280,9 @@ test.describe('the Sentences card', () => {
     await expect(sheet.locator('[role="tab"]')).toHaveText([
       'Grade',
       'Best Piece',
-      'Strengths',
-      'Habits',
-      'Not Handed In',
+      'Strength',
+      'Work Habits',
+      'Missing Work',
       'Next Step',
       'Support',
       'Closing',
@@ -1336,7 +1336,7 @@ test.describe('the Sentences card', () => {
     // Every sentence, each with its frames (hl001–hl120, four or more a
     // cell); Cece's rated cells come first and open, the rest closed; a
     // closed case opens on a click.
-    await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
+    await sheet.locator('[role="tab"]', { hasText: 'Work Habits' }).click();
     await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
     const labels = await heads.locator('.qn-browse-head-label').allTextContents();
     const cells = labels.filter(l => / · (Consistently|Usually|Sometimes|Rarely)$/.test(l));
@@ -1457,7 +1457,7 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   const rowByLabel = label =>
     page.locator('#tq-sentences .qn-srow', { has: page.locator('.qn-req-label:text-is("' + label + '")') });
   await page.locator('#tq-generate').click();
-  await expect(rowByLabel('Habits')).toHaveCount(0);
+  await expect(rowByLabel('Work Habits')).toHaveCount(0);
   for (const k of ['completes', 'ready', 'others', 'part', 'feedback', 'devices']) {
     await page.locator(`.qn-hs-stop[data-habit="${k}"][data-value="4"]`).click();
   }
@@ -1468,8 +1468,8 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   await expect(page.locator('#tq-narrative')).toHaveValue(
     /listens to others, joins in class discussions, and uses feedback/,
   );
-  await expect(rowByLabel('Habits')).toHaveCount(2);
-  await expect(rowByLabel('Habits').first().locator('.qn-req-text')).toHaveText(excellent);
+  await expect(rowByLabel('Work Habits')).toHaveCount(2);
+  await expect(rowByLabel('Work Habits').first().locator('.qn-req-text')).toHaveText(excellent);
 
   await page.locator('#tq-att-absences').fill('3');
   await page.locator('#tq-att-absences').press('Tab');
@@ -1483,7 +1483,10 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   await expect(rowByLabel('Attendance')).toHaveCount(1);
   await expect(rowByLabel('Attendance')).toHaveClass(/\battendance\b/);
   await expect(rowByLabel('Attendance').locator('.qn-req-text')).toHaveText(attendance);
-  await expect(rowByLabel('Attendance').locator('.qn-req-source')).toHaveText('From Attendance above · new');
+  await expect(rowByLabel('Attendance').locator('.qn-req-text')).toHaveAttribute(
+    'title',
+    'From Attendance above · new',
+  );
 
   // Cleared: the sentence and its row go.
   await page.locator('#tq-att-absences').fill('');
@@ -1493,7 +1496,7 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
   await expect(page.locator('#tq-narrative')).not.toHaveValue(/three classes/);
   await expect(rowByLabel('Attendance')).toHaveCount(0);
-  await expect(rowByLabel('Habits')).toHaveCount(2);
+  await expect(rowByLabel('Work Habits')).toHaveCount(2);
 });
 
 /* A sentence of the teacher's own (Colin, Nov 1): "+ Write Your Own" in
@@ -1509,7 +1512,7 @@ test('Write Your Own: saved from Browse Sentences, shown as Yours, used, and sti
   await page.locator('#tq-generate').click();
   await page.locator('#tq-browse-btn').click();
   const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
-  await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
+  await sheet.locator('[role="tab"]', { hasText: 'Work Habits' }).click();
   // Under a case heading: "+ Write Your Own", bound to that case (no picker).
   const inCase = sheet.locator('.qn-browse-group-rows:not([hidden]) .qn-browse-add').first();
   await expect(inCase).toHaveText('+ Write Your Own');
@@ -1560,7 +1563,7 @@ test('Write Your Own: saved from Browse Sentences, shown as Yours, used, and sti
   await page.locator('#tq-narrative').waitFor();
   await expect(page.locator('#tq-narrative')).toHaveValue(/She brings her notebook/);
   await page.locator('#tq-browse-btn').click();
-  await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
+  await sheet.locator('[role="tab"]', { hasText: 'Work Habits' }).click();
   await expect(sheet.locator('.qn-chip-yours')).toHaveText(['Yours · Any Student']);
   // × removes it, Undo brings it back.
   await sheet.locator('.qn-browse-del').click();
@@ -1606,9 +1609,9 @@ test('Write Your Own from Other Wording goes into the row; Add to My Bank on a t
   await expect(box.locator('#tq-own-input')).toHaveValue('Cece asks a question when a step is unclear.');
   await expect(box.locator('#tq-own-part option')).toHaveText([
     'Best Piece',
-    'Strengths',
-    'Habits',
-    'Not Handed In',
+    'Strength',
+    'Work Habits',
+    'Missing Work',
     'Next Step',
   ]);
   await box.locator('#tq-own-part').selectOption('habits');
@@ -1664,7 +1667,7 @@ test('Add to My Bank from the comment box: the pill shows only on a typed senten
   // called here so the test does not wait on a timer) the sentence is purged.
   await page.locator('#tq-browse-btn').click();
   const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
-  await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+  await sheet.locator('[role="tab"]', { hasText: 'Strength' }).click();
   await expect(sheet.locator('.qn-chip-yours')).toHaveText(['Yours · Any Student']);
   await sheet.locator('.qn-browse-del').click();
   await expect(page.locator('#undo-toast')).toBeVisible();
@@ -1676,7 +1679,7 @@ test('Add to My Bank from the comment box: the pill shows only on a typed senten
   await page.locator('#tq-narrative').waitFor();
   expect(await page.evaluate(() => PersonalBank.list().length)).toBe(0);
   await page.locator('#tq-browse-btn').click();
-  await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+  await sheet.locator('[role="tab"]', { hasText: 'Strength' }).click();
   await expect(sheet.locator('.qn-chip-yours')).toHaveCount(0);
 });
 
@@ -1920,8 +1923,8 @@ test('Add to My Bank: Belongs Under starts on the part it was opened from and sa
   await page.locator('#tq-browse-btn').click();
   const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
   const box = sheet.locator('#tq-own');
-  // From the Strengths tab: Strengths.
-  await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+  // From the Strength tab: Strengths.
+  await sheet.locator('[role="tab"]', { hasText: 'Strength' }).click();
   await sheet.locator('.qn-browse-add-top').click();
   await expect(box.locator('#tq-own-part')).toHaveValue('strengths');
   await expect(box.locator('.qn-own-hint', { hasText: 'My Bank keeps no' })).toHaveCount(0);

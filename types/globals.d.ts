@@ -115,6 +115,7 @@ interface Window {
   RubricScale: any;
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
+  ReportQnBoxes: any;
   CmStdHelp: unknown;
   CmKeepMenu: unknown;
   FocusBack: { from(el: Element | null): () => void };

@@ -76,21 +76,21 @@ describe('At a Glance', () => {
     expect(html.indexOf('>Skills<')).toBeLessThan(html.indexOf('>Work<'));
     const r = rows(html);
     expect(r.map(x => x.split(' | ')[0])).toEqual([
-      'Strongest',
+      'Strength',
       'Next Step',
       'Biggest Change',
       'Best Piece',
-      'Missing and Late',
+      'Missing Work',
     ]);
     // The competency's name only (no wording), the figure and pieces, then
     // the word and the change.
-    expect(r[0]).toBe('Strongest | Data Representation | 3.3 · 5 pieces | Proficient · ↑ from 3.0');
+    expect(r[0]).toBe('Strength | Data Representation | 3.3 · 5 pieces | Proficient · ↑ from 3.0');
     expect(html).not.toContain('qn-glance-wording');
     // The comment's next step: the lowest with 2+ pieces in the year to date
     // (NEXT_STEP_PIECES), first assessed in Term 2.
     expect(r[1]).toMatch(/^Next Step \| Sustained Inquiry \| 2\.5 · 2 pieces \| Proficient · New since the report$/);
     expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| 3\.2 · 11 pieces \| 2\.8 → 3\.2$/);
-    expect(r[4]).toBe('Missing and Late | None so far this year');
+    expect(r[4]).toBe('Missing Work | None so far this year');
   });
 
   it('shows the highest skill with 3+ pieces when none clears the comment’s gate', () => {
@@ -135,7 +135,7 @@ describe('At a Glance', () => {
     clearProfCache();
     try {
       const r = rows(glance(cece()));
-      expect(r[4]).toBe('Missing and Late | 1 missing | 1');
+      expect(r[4]).toBe('Missing Work | 1 missing | 1');
       expect(glance(cece())).toMatch(
         /data-aid="sci8a3"[^>]*>Disease Research Poster<\/button><span class="qn-glance-mark missing">Missing</,
       );
@@ -179,7 +179,7 @@ describe('At a Glance', () => {
     clearProfCache();
     try {
       const r = rows(glance(cece()));
-      expect(r[0]).toMatch(/^Strongest \| [^|]+ \| \d+% · \d+ pieces \| [↑↓] from \d+%$/);
+      expect(r[0]).toMatch(/^Strength \| [^|]+ \| \d+% · \d+ pieces \| [↑↓] from \d+%$/);
       expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| \d+% · 11 pieces \| \d+% → \d+%$/);
     } finally {
       COURSES[CID].gradingSystem = was;
