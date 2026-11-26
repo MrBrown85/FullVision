@@ -40,7 +40,7 @@ export function parse(src) {
 /* The closure a file is made of, if it is one: the function in
    `window.Name = (function () { … })();` when that statement is most of the
    file. */
-function closureOf(ast, src) {
+export function closureOf(ast, src) {
   for (const st of ast.body) {
     if (st.type !== 'ExpressionStatement') continue;
     let e = st.expression;
@@ -59,7 +59,7 @@ function closureOf(ast, src) {
   return null;
 }
 
-function setParents(node, parent) {
+export function setParents(node, parent) {
   if (!node || typeof node.type !== 'string') return;
   node.parent = parent;
   for (const key of Object.keys(node)) {
