@@ -4737,6 +4737,9 @@ window.CommentBank = (function () {
     // A saved one is still checked (verify passes story: false).
     if (!(opts && opts.story === false) && (s.claims || []).indexOf('attendance') >= 0 && /\bthis term\b/i.test(s.text))
       return false;
+    // "Since the last report": not before Report 1, when there is none.
+    if (!(opts && opts.story === false) && ctx._f && !ctx._f.lastReport && /\bsince the last report\b/i.test(s.text))
+      return false;
     // Missing work is counted so far this year: with a piece from outside
     // the term, no missing-work sentence that says "this term".
     if (

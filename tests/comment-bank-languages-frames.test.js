@@ -164,6 +164,8 @@ describe('the languages Overall frames', () => {
       overall: 3.2,
       record: { total: 4, handed: 4, late: 0, missing: 0 },
       grade: { mode: 'proficiency', pieces, marked: { mine: 4, all: 4 } },
+      // The climb frames say "since the last report": a report before this one.
+      lastReport: { label: 'Term 1', endsOn: '2026-10-01' },
     });
     const ctx = CommentBank.context(f, {});
     expect(ctx.climb).toBe('yes');

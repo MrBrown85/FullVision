@@ -27,7 +27,7 @@ afterAll(() => vi.useRealTimers());
 
 const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
 const words = t => t.trim().split(/\s+/).length;
-const IE_IDS = ['gv81', 'ie01', 'ie02', 'ie03', 'ie04', 'ie05', 'ie06', 'ie07', 'ie08', 'ie09', 'ie10'];
+const IE_IDS = ['gv81', 'ie01', 'ie39', 'ie03', 'ie04', 'ie05', 'ie06', 'ie07', 'ie08', 'ie40', 'ie10'];
 const claimsGrade = id => ((byId(id) || {}).claims || []).indexOf('grade') >= 0;
 /* The Required parts of a draft as [group, ieProblem]: the IE grade
    sentence and the IE Problem, Plan, Deadline and Meeting groups, in the

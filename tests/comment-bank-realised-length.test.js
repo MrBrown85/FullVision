@@ -80,12 +80,14 @@ describe('{strengths} falls back to one skill when two run past 20 words', () =>
     expect(ctx.climb).toBe('yes');
     expect(ctx.strengths).toBe(DESIGNING + ' and ' + SHARING);
     expect(ctx.strength).toBe(DESIGNING);
-    // n415 ("{He} can {strengths}, and {his} marks rose over the term.")
-    // is 9 words before the slot: 32 with two skills, 20 with one.
-    const n415 = byId('n415');
+    // n1031 ("{He} can {strengths}, and {his} marks rose since the last report.")
+    // is 9 words before the slot: 33 with two skills, 21 with one (the
+    // longest skill of the fixture, so the engine offers this frame only for
+    // a shorter one).
+    const n415 = byId('n1031');
     const t = CommentBank.fill(n415, ctx);
-    expect(t).toBe('They can ' + DESIGNING + ', and their marks rose over the term.');
-    expect(words(t)).toBe(20);
+    expect(t).toBe('They can ' + DESIGNING + ', and their marks rose since the last report.');
+    expect(words(t)).toBe(21);
     expect(t).not.toContain(SHARING);
     expect(CommentBank.provenance(n415, ctx).values.strengths).toBe(DESIGNING);
     expect(CommentBank.ctxFor(n415, ctx).strengths).toBe(DESIGNING);
@@ -122,9 +124,9 @@ describe('{strengths} falls back to one skill when two run past 20 words', () =>
       const v = CommentBank.verify(d, f, {});
       expect(v.replaced).toEqual([]);
     }
-    // The climb frames (n411, n413-n415) fit with one skill; a draft has
+    // The climb frames (n1030, n413, n414, n1031) fit with one skill; a draft has
     // one of them, with the strongest skill alone.
-    const climb = ['n411', 'n413', 'n414', 'n415'].filter(id => seen[id]);
+    const climb = ['n1030', 'n413', 'n414', 'n1031'].filter(id => seen[id]);
     expect(climb.length).toBeGreaterThan(0);
     const LONG = { id: 'x2', part: 'now', group: 'Overall', text: TOO_LONG, needs: ['climb', 'strengths'], claims: [] };
     const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([LONG]) };
