@@ -243,9 +243,16 @@ test.describe('The Comment Bank in the grader', () => {
     await expect(box.locator('.rsg-crit-bank-chip')).toHaveCount(2);
     await box.locator('.rsg-crit-bank-chip').first().click();
     await expect(overall).toHaveValue(/You planned a fair test/);
+    // The pick is saved, not only shown.
+    expect(await page.evaluate(aid => getScoreComment(getActiveCourse(), 'st2', aid), AID)).toMatch(
+      /^You planned a fair test/,
+    );
     await overall.pressSequentially(' Then reread your units on every table');
     await box.locator('.rsg-crit-bank-add').click();
     await expect(box.locator('.rsg-crit-bank-kept')).toHaveText('In the Bank');
+    expect(await page.evaluate(aid => getScoreComment(getActiveCourse(), 'st2', aid), AID)).toMatch(
+      /Then reread your units on every table$/,
+    );
     await page.locator('#ac-' + AID + ' .rsg-overall-comment[data-sid="st3"]').focus();
     await expect(box).toHaveCount(0);
   });
