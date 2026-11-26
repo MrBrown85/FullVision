@@ -594,3 +594,7 @@ declare var ReportScores: any;
 interface Window {
   CommentLint?: any;
 }
+declare var MarkupDraw: any;
+interface Window {
+  MarkupDraw?: any;
+}

@@ -99,6 +99,7 @@
     "teacher/student-outlook.js",
     "teacher/gradebook-student-menu.js",
     "teacher/assign-list.js",
+    "teacher/assign-grader-work.js",
     "teacher/assign-returns.js",
     "teacher/assign-grader-notes.js",
     "teacher/assign-grader-queue.js",
