@@ -147,7 +147,7 @@ describe('the Not Handed In row and Approve and Next', () => {
     seed({ missing: ['a3', 'a7'] });
     let html = open();
     expect(html).toContain('id="tq-row-missing"');
-    expect(html).toContain('class="qn-req-row flag qn-line-row" id="tq-row-missing"');
+    expect(html).toContain('class="qn-req-row flag qn-line-row has-menu" id="tq-row-missing"');
     expect(html).toContain('data-tq-check="missing"');
     expect(html).toContain(
       'title="Tick once you have checked these are really missing. Approve and Next stays off until you do."',
@@ -164,7 +164,7 @@ describe('the Not Handed In row and Approve and Next', () => {
     expect(btn.disabled).toBe(false);
     expect(btn.title).toBe('Saves this comment to the report card and opens the next student. ⌘ Return');
     html = open();
-    expect(html).toContain('class="qn-req-row qn-line-row" id="tq-row-missing"');
+    expect(html).toContain('class="qn-req-row qn-line-row has-menu" id="tq-row-missing"');
     expect(html).toContain('class="qn-req-ctrl on"');
     expect(html).toContain('2 of 10 · checked</span>');
     // Untick: highlighted again.

@@ -58,8 +58,10 @@ window.ReportQnBoxes = (function () {
   // html-safe: kind is a fixed key, label and the chip text esc()'d, evidence and rows are html the caller drew with esc()
   function box(opts, rows) {
     var l = look(opts.kind, opts.label);
-    var chip = opts.required ? '<span class="qn-req-chip">Required</span>' : '';
-    return `<div class="qn-box" data-part="${_esc(opts.kind)}" role="group" aria-label="${_esc(l.label)}">
+    var chip = opts.required
+      ? `<span class="qn-req-chip" title="${_esc(opts.requiredTip || 'Required.')}">Required</span>`
+      : '';
+    return `<div class="qn-box" data-bk="${_esc(opts.bk || opts.kind)}" data-part="${_esc(opts.kind)}" role="group" aria-label="${_esc(l.label)}">
       <div class="qn-box-head">${_tile(l)}<span class="qn-box-name">${_esc(l.label)}</span>${chip}<span class="qn-box-evidence">${opts.evidence || ''}</span></div>
       ${rows}
     </div>`;
@@ -145,14 +147,23 @@ window.ReportQnBoxes = (function () {
   // html-safe: the boxes are drawn by box(), which esc()s every text
   function wrap(entries, opts) {
     var out = '';
+    var seen = /** @type {Record<string, number>} */ ({});
     /** @type {any} */
     var cur = null;
     var flush = function () {
       if (!cur) return;
       var kind = cur.kind;
       var label = LABELS[kind] || (kind === 'voice' ? opts.first + '’s Voice' : cur.label || '');
+      seen[kind] = (seen[kind] || 0) + 1;
       out += box(
-        { kind: kind, label: label, required: cur.required, evidence: evidence(kind, opts.facts(kind, cur.row)) },
+        {
+          bk: kind + '#' + seen[kind],
+          kind: kind,
+          label: label,
+          required: cur.required,
+          requiredTip: opts.requiredTip,
+          evidence: evidence(kind, opts.facts(kind, cur.row)),
+        },
         cur.html,
       );
       cur = null;

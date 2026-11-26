@@ -23,10 +23,11 @@ Colin, Nov 25: "build the page first, and we'll wire in the database afterwards.
 11. **Motion** is 140 to 200 ms and continuous: a dragged sentence lifts and follows the pointer, a slot shows where it lands, the others glide, a new sentence opens downward, nothing fades in. Reduce Motion turns it off.
 12. **The projected grade never prints.** If it is built, it is a teacher-only note on the Missing Work box.
 13. **Next Step.** A curricular competency's name is never the step. A step is something the student can do; the competency is only the reason. The sentences for this come from a bank written by subject and grade, which is its own project (below).
+14. **Comments only.** This page writes the comment and never changes a gradebook status; work is excused or handed in from the grader (Colin, Nov 25: "No, comments only.").
 
 ## Slices
 
-One pull request each, in this order. Each keeps Demo Mode working and rewrites the browser tests it changes.
+The slices are grouped into three pieces, each built by one builder in one pull request: the Sentences card (slices 1, 4, 5 and 6), the wording (slice 3), and Approve, the left cards and Work Habits (slices 2, 7 and 8). Each keeps Demo Mode working and rewrites the browser tests it changes.
 
 | Slice | What it builds                                                                                                                                          |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -43,7 +44,6 @@ One pull request each, in this order. Each keeps Demo Mode working and rewrites 
 
 Each of these is drawn. None is built until he says so.
 
-- **Excused from this page.** It moves a grade, so it asks first and offers Undo, and it needs his review.
 - **"If Handed In"**, the teacher-only projected grade. New grade math.
 - **Grade So Far This Year**, the line of the grade since September. It reads `calc.js` at earlier dates; his review.
 - **"+ What You Wrote on It"**, which quotes the teacher's feedback on the best piece.
