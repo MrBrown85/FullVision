@@ -353,11 +353,7 @@ window.StudentEditDialog = (function () {
       return _focusEditOpener(opener);
     }
     // Re-render sidebar with updated name
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(
-      activeCourse,
-      studentId,
-      'PageStudent.switchStudent',
-    );
+    SidebarKeep.draw(renderSidebar(activeCourse, studentId, 'PageStudent.switchStudent'));
     render();
     _focusEditOpener(opener);
   }

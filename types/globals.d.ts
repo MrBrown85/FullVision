@@ -3,6 +3,8 @@ declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
   // Build flags (shared/build-flags.js): unfinished work stays behind one.
   BuildFlags: { on(name: string): boolean };
+  // Draws markup into a place, keeping the parts that did not change (teacher/keep-dom.js).
+  KeepDom: { patch(root: Element, html: string): void };
   // The top bar (teacher/top-bar.js): drawn once, then only its lit tab changes.
   TopBar: { draw(activePage: string): void; barKey(html: string): string };
   SegGlide: {
@@ -508,6 +510,9 @@ interface Window {
   };
 }
 declare var Router: any;
+declare var SidebarKeep: { draw(html: string): void; release(): void; settle(): void };
+// teacher/keep-dom.js, as teacher/assign-form-tips.js calls it (window.KeepDom above is the same object).
+declare var KeepDom: Window['KeepDom'];
 declare var CmRosterFile: any;
 declare var closeColorPop: any;
 declare var CmBlockPicker: any;

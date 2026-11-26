@@ -136,14 +136,14 @@
   "teacher/learner-profile.js": 773,
   "teacher/markup.js": 706,
   "teacher/obs-toolbar.js": 606,
-  "teacher/page-assignments.js": 6953,
+  "teacher/page-assignments.js": 6945,
   "teacher/page-bulletins.js": 1572,
   "teacher/page-dashboard.js": 606,
   "teacher/page-gradebook.js": 4464,
   "teacher/page-observations.js": 1130,
   "teacher/page-reports.js": 2230,
   "teacher/page-starters.js": 412,
-  "teacher/page-student.js": 3136,
+  "teacher/page-student.js": 3132,
   "teacher/preview-student.js": 1150,
   "teacher/question-cards.js": 548,
   "teacher/quiz-builder.js": 1466,
@@ -169,5 +169,5 @@
   "teacher/student-evidence.js": 955,
   "teacher/student-overview.js": 524,
   "teacher/student-page-students.js": 1157,
-  "teacher/ui.js": 2829
+  "teacher/ui.js": 2828
 }
