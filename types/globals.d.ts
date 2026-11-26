@@ -3,6 +3,8 @@ declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
   // Build flags (shared/build-flags.js): unfinished work stays behind one.
   BuildFlags: { on(name: string): boolean };
+  // The top bar (teacher/top-bar.js): drawn once, then only its lit tab changes.
+  TopBar: { draw(activePage: string): void; barKey(html: string): string };
   SegGlide: {
     run(track: HTMLElement, from: { left: number; width: number }, to: DOMRect, ms?: number): void;
     lit(track: Element): HTMLElement | null;
@@ -414,6 +416,7 @@ declare var MGradePhotos: any;
 // (teacher/student-page-students.js), which are not typed.
 declare var DashClassManager: any;
 declare var DashOverview: any; // teacher/dash-overview.js
+declare var DashTileRedraw: any; // teacher/dash-tile-redraw.js
 declare var DashInsights: any; // teacher/dash-insights.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
 declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
