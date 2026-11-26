@@ -499,3 +499,18 @@ interface Window {
     off(): void;
   };
 }
+declare var Router: any;
+declare var CmRosterFile: any;
+declare var closeColorPop: any;
+declare var CmBlockPicker: any;
+declare var renderBreadcrumb: any;
+declare var CmKeepMenu: any;
+declare var _avatarColor: any;
+declare var CmQuestionnaires: any;
+declare var CmGradingBars: any;
+declare var FVBackupRestore: any;
+declare var openColorPop: any;
+declare var CmTerms: any;
+declare var CompetencyWording: any;
+declare var RubricDraft: any;
+declare var RubricPrint: any;

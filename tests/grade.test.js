@@ -190,7 +190,7 @@ describe('grade-format-guard', () => {
     // The level word as a line's label ("Developing: …").
     'shared/competency-wording.js': 1,
     'teacher/cm-std-help.js': 1, // the sample level's scale name (moved from dash-class-manager.js)
-    'teacher/dash-class-manager.js': 1,
+    'teacher/cm-grading.js': 1,
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
     'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
@@ -271,8 +271,8 @@ describe('grade-format-guard', () => {
     'shared/constants.js round n * 100': 'a points score as saved, to two decimals',
     'teacher/class-results.js round (n / total) * 100': 'a share of students',
     'teacher/cm-questionnaires.js round (answered / students.length) * 100': 'a share answered',
-    'teacher/dash-class-manager.js round dw * 100': 'a Decaying Average weight, a setting',
-    'teacher/dash-class-manager.js round ((e.clientX - d.rect.left) / d.rect.width) * 100 * (1 / snap)':
+    'teacher/cm-grading.js round dw * 100': 'a Decaying Average weight, a setting',
+    'teacher/cm-grading.js round ((e.clientX - d.rect.left) / d.rect.width) * 100 * (1 / snap)':
       'a Counts As % dragged on its slider',
     'teacher/grading-setup-copy.js round calc.decayWeight * 100': 'a Decaying Average weight, a setting',
     'teacher/rubric-print.js round (f - 0.05) * 100': 'a print scale',
@@ -288,11 +288,10 @@ describe('grade-format-guard', () => {
     'teacher/comment-bank.js floor Number(v)': 'a saved limit, a whole number',
     'teacher/comment-bank.js round (nx.min - Number(g.pct)) * 10': 'the gap to the next letter from the shown course %',
     'teacher/comment-personal.js floor Number(v[k])': 'a count',
-    'teacher/dash-class-manager.js round up ? Math.max(8, r.top - 4 - menu.offsetHeight) : r.bottom + 4':
-      'a menu’s position',
-    'teacher/dash-class-manager.js round v * 10': 'a Counts As % being set, to one decimal',
-    'teacher/dash-class-manager.js round Math.max(0, Math.min(100, v)) * 10': 'a Counts As % being set',
-    "teacher/dash-class-manager.js round (_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10":
+    'teacher/cm-students.js round up ? Math.max(8, r.top - 4 - menu.offsetHeight) : r.bottom + 4': 'a menu’s position',
+    'teacher/cm-grading.js round v * 10': 'a Counts As % being set, to one decimal',
+    'teacher/cm-grading.js round Math.max(0, Math.min(100, v)) * 10': 'a Counts As % being set',
+    "teacher/cm-grading.js round (_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10":
       'a Points to Proficiency start being set',
     'teacher/factor-field.js round Number(v) * 10': 'an assessment’s Factor',
     'teacher/grades-print.js round Math.max(8, r.right - menu.offsetWidth)': 'a menu’s position',
