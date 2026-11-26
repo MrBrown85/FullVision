@@ -374,7 +374,7 @@
   "teacher/cm-other-classes.js :: _cmCompetenciesPanel > forEach callback 5": 71,
   "teacher/cm-other-classes.js :: _cmRenderHeader": 60,
   "teacher/cm-other-classes.js :: _cmStudentsPanel": 109,
-  "teacher/cm-other-classes.js :: renderClassManager": 89,
+  "teacher/cm-other-classes.js :: renderClassManager": 85,
   "teacher/cm-other-classes.js :: renderCmSidebar": 54,
   "teacher/cm-questionnaires.js :: handleAction": 139,
   "teacher/cm-reflect-answers.js :: _answerHtml": 68,

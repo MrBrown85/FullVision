@@ -1,0 +1,188 @@
+// @ts-check
+/* cm-keep-draw.js — Class Settings is drawn over what is already on screen.
+
+   Every tab click and every switch flipped drew the class list, the toolbar
+   and the tab again from nothing: open menus closed, the scroll and the
+   focus were lost, and the page flashed (Nov 26, 2026). CmKeepDraw.draw
+   takes the new markup and changes the page into it: an element that is
+   still there stays the same element, with only its attributes, text and
+   children changed, so the class list, the toolbar, the header, the lit tab
+   and every control that did not change are never replaced, and the sliders
+   glide (shared/seg-glide.js) because the same bar stays.
+
+   A part that really is something else is replaced whole: `fresh(old)` says
+   so (the tab body when the tab changes, the whole detail when the class
+   changes). Elements match by id, else by place and tag. A box the teacher
+   is typing in keeps what was typed unless the page has a newer value of its
+   own. */
+window.CmKeepDraw = (function () {
+  'use strict';
+
+  /** @typedef {(old: Element) => boolean} CmFresh */
+
+  /** @param {Node} a @param {Node} b @returns {boolean} */
+  function _same(a, b) {
+    if (a.nodeType !== b.nodeType) return false;
+    if (a.nodeType !== 1) return true;
+    var x = /** @type {Element} */ (a);
+    var y = /** @type {Element} */ (b);
+    return x.tagName === y.tagName && x.id === y.id;
+  }
+
+  /** @param {Element} old @param {Element} next */
+  function _attrs(old, next) {
+    var i;
+    for (i = old.attributes.length - 1; i >= 0; i--) {
+      var n = old.attributes[i].name;
+      if (!next.hasAttribute(n)) old.removeAttribute(n);
+    }
+    for (i = 0; i < next.attributes.length; i++) {
+      var a = next.attributes[i];
+      if (old.getAttribute(a.name) !== a.value) old.setAttribute(a.name, a.value);
+    }
+  }
+
+  /** The typed value and the checked state, which the attributes stop
+   * carrying once the teacher has touched a control.
+   * @param {Element} old @param {Element} next @param {string | null} before what the old markup held */
+  function _controls(old, next, before) {
+    var typing = old === document.activeElement;
+    if (old.tagName === 'INPUT') {
+      var inp = /** @type {HTMLInputElement} */ (old);
+      var want = next.getAttribute('value') || '';
+      if (inp.type === 'checkbox' || inp.type === 'radio') {
+        var on = next.hasAttribute('checked');
+        if (inp.checked !== on) inp.checked = on;
+      } else if (!(typing && before === next.getAttribute('value')) && inp.value !== want) {
+        inp.value = want;
+      }
+    } else if (old.tagName === 'TEXTAREA') {
+      var ta = /** @type {HTMLTextAreaElement} */ (old);
+      var text = next.textContent || '';
+      if (!(typing && before === text) && ta.value !== text) ta.value = text;
+      ta.defaultValue = text;
+    } else if (old.tagName === 'SELECT') {
+      var sel = /** @type {HTMLSelectElement} */ (old);
+      var pick = /** @type {HTMLSelectElement} */ (next).selectedIndex;
+      if (sel.selectedIndex !== pick) sel.selectedIndex = pick;
+    }
+  }
+
+  /** @param {Element} old @param {Element} next @param {CmFresh} fresh */
+  function _element(old, next, fresh) {
+    /** @type {string | null} */
+    var before = null;
+    if (old.tagName === 'TEXTAREA') before = /** @type {HTMLTextAreaElement} */ (old).defaultValue;
+    else if (old.tagName === 'INPUT') before = old.getAttribute('value');
+    _attrs(old, next);
+    if (old.tagName !== 'TEXTAREA') _children(old, next, fresh);
+    _controls(old, next, before);
+  }
+
+  /** @param {Element} old @param {Element} next @param {CmFresh} fresh */
+  function _children(old, next, fresh) {
+    var byId = /** @type {Record<string, Element>} */ ({});
+    Array.prototype.forEach.call(old.children, function (/** @type {Element} */ c) {
+      if (c.id) byId[c.id] = c;
+    });
+    var oc = old.firstChild;
+    var wanted = Array.prototype.slice.call(next.childNodes);
+    wanted.forEach(function (/** @type {ChildNode} */ nc) {
+      var id = nc.nodeType === 1 ? /** @type {Element} */ (nc).id : '';
+      var match = id ? byId[id] || null : oc;
+      var isEl = !!match && match.nodeType === 1;
+      if (match && _same(match, nc) && !(isEl && fresh(/** @type {Element} */ (match)))) {
+        if (match === oc) oc = oc.nextSibling;
+        else old.insertBefore(match, oc);
+        if (isEl) _element(/** @type {Element} */ (match), /** @type {Element} */ (nc), fresh);
+        else if (match.nodeValue !== nc.nodeValue) match.nodeValue = nc.nodeValue;
+        return;
+      }
+      if (match && _same(match, nc)) {
+        // Meant to be replaced whole.
+        if (match === oc) oc = oc.nextSibling;
+        old.removeChild(match);
+      }
+      old.insertBefore(nc, oc);
+    });
+    while (oc) {
+      var gone = oc;
+      oc = oc.nextSibling;
+      old.removeChild(gone);
+    }
+  }
+
+  /** @returns {boolean} */
+  function _never() {
+    return false;
+  }
+
+  /**
+   * Changes what is inside `target` into `html`, keeping the elements that
+   * are still there.
+   * @param {Element} target
+   * @param {string} html
+   * @param {CmFresh} [fresh] true for an old element that is replaced whole
+   */
+  function draw(target, html, fresh) {
+    var tpl = document.createElement('template');
+    // html-safe: as in paint, the caller's markup is escaped where it is built.
+    tpl.innerHTML = html;
+    var next = document.createElement(target.tagName);
+    next.appendChild(tpl.content);
+    _children(target, next, fresh || _never);
+  }
+
+  /* What the last draw of #main showed, so the next one knows that the class
+     or the tab changed and that part is replaced instead of changed. */
+  var _drawn = { shape: '', tab: '' };
+
+  /** Draws into a mount over what Class Settings already put there (found by
+   * `own`), or from nothing when the mount holds another page.
+   * @param {Element} mount @param {string} own @param {string} html */
+  function paint(mount, own, html) {
+    if (mount.querySelector && mount.querySelector(':scope > ' + own)) draw(mount, html);
+    // html-safe: the markup comes from Class Settings' own renderers, which escape every text with esc.
+    else mount.innerHTML = html;
+  }
+
+  /** Draws the detail into #main. `shape` names the class and mode shown
+   * (a change replaces the whole detail), `tab` the tab (a change replaces
+   * the tab body).
+   * @param {Element} main @param {string} html @param {string} shape @param {string} tab */
+  function paintMain(main, html, shape, tab) {
+    var was = _drawn;
+    _drawn = { shape: shape, tab: tab };
+    if (main.querySelector && main.querySelector(':scope > .cm-layout > .cm-detail')) {
+      draw(main, html, function (old) {
+        if (old.classList.contains('cm-detail')) return shape !== was.shape;
+        return old.id === 'cm-tabpanel' && tab !== was.tab;
+      });
+      // html-safe: as above.
+    } else main.innerHTML = html;
+  }
+
+  /* The roster is wider than most windows (twelve columns). While columns
+     are hidden off its right edge, the edge fades and a line says to scroll
+     sideways, so the scrolling is plain to see. A roster kept from the last
+     draw is listened to once. */
+  function rosterCue() {
+    var scroller = /** @type {HTMLElement | null} */ (document.querySelector('.cm-rs-scroll'));
+    if (!scroller || !scroller.addEventListener) return;
+    var box = scroller;
+    function update() {
+      var section = box.closest('.cm-rs-section');
+      var note = document.getElementById('cm-rs-more');
+      var more = box.scrollLeft + box.clientWidth < box.scrollWidth - 1;
+      if (section) section.classList.toggle('cm-rs-more-right', more);
+      if (note) note.hidden = box.scrollWidth <= box.clientWidth + 1;
+    }
+    if (!box.dataset.cue) {
+      box.dataset.cue = '1';
+      box.addEventListener('scroll', update, { passive: true });
+    }
+    update();
+  }
+
+  return { draw: draw, paint: paint, paintMain: paintMain, rosterCue: rosterCue };
+})();
