@@ -68,6 +68,6 @@ describe('saving a rubric from the assessment form', () => {
   const save = src.slice(src.indexOf('function saveRubricEdit'), src.indexOf('function newRubricFromForm'));
 
   it('re-renders the page around the open form', () => {
-    expect(save).toContain("if (_showingNewForm) rerenderKeeping('new-assess-form', render);");
+    expect(save).toContain("if (pageState._showingNewForm) rerenderKeeping('new-assess-form', render);");
   });
 });
