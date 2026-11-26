@@ -48,6 +48,7 @@
     "teacher/dash-inbox-targets.js",
     "teacher/cm-grading-bars.js",
     "teacher/cm-competency-import.js",
+    "teacher/cm-withdrawn.js",
     "teacher/cm-competency-cards.js",
     "teacher/cm-relink.js",
     "teacher/cm-competency-edit.js",
