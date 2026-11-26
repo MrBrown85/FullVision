@@ -4,7 +4,7 @@ rm -rf dist
 mkdir -p dist
 
 # Root-level public files
-cp index.html launch.html login.html login.css login-auth.js privacy.html dist/
+cp index.html launch.html login.html login.css login-auth.js privacy.html health.html dist/
 cp manifest.json sw.js dist/
 cp favicon.svg dist/
 cp curriculum_data.js curriculum_by_course.json curriculum_crosswalk.json dist/

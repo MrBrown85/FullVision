@@ -2,28 +2,33 @@
 window.PageAssignments = (function () {
   'use strict';
 
+  /* What this file holds while its page is open: every variable that is
+     assigned again as the teacher works. One object, so a part of this
+     file that moves to its own file can be handed it once. */
+  var pageState = {};
+
   /* ── Listener tracking for cleanup ──────────────────────── */
-  var _listeners = [];
+  pageState._listeners = [];
   function _addDocListener(type, handler, options) {
     document.addEventListener(type, handler, options);
-    _listeners.push({ type: type, handler: handler, options: options });
+    pageState._listeners.push({ type: type, handler: handler, options: options });
   }
 
   /* ── State variables ────────────────────────────────────── */
-  var activeCourse;
-  var openAssessIds = new Set();
-  var focusStudentParam = null;
-  var _allExpanded = true;
-  var _collapsedIds = new Set();
-  var filterCategories = [];
-  var assessSearch = '';
-  var showUngraded = false;
+  pageState.activeCourse = undefined;
+  pageState.openAssessIds = new Set();
+  pageState.focusStudentParam = null;
+  pageState._allExpanded = true;
+  pageState._collapsedIds = new Set();
+  pageState.filterCategories = [];
+  pageState.assessSearch = '';
+  pageState.showUngraded = false;
   // "N to return" pressed: only the assessments with a draft (S1-F2).
-  var _toReturnOnly = false;
+  pageState._toReturnOnly = false;
   // The drafts on screen, summed over the listed assessments at the last
   // render or refresh.
-  var _toReturnTotal = 0;
-  var rubricViewStates = {};
+  pageState._toReturnTotal = 0;
+  pageState.rubricViewStates = {};
   // Advanced Rubric checklists open under their criterion rows, keyed
   // aid:sid:critId. In All mode every one is open except those closed.
   var _openChecklists = new Set();
@@ -31,35 +36,38 @@ window.PageAssignments = (function () {
   // Checklists: Show | Hide on Advanced rubrics (decision 2, Oct 27): Show
   // opens every checklist, Hide closes them; a row's ☑ opens or closes one.
   var CHECKLIST_MODE_KEY = 'rsg-checklists';
-  var _showingNewForm = false;
-  var _editingAssessId = null;
-  var collapsedModules = {};
+  pageState._showingNewForm = false;
+  pageState._editingAssessId = null;
+  pageState.collapsedModules = {};
   // While a search or filter is on, every module with matches shows open;
   // a module the teacher closes during it is kept here, not saved.
-  var _filterClosedModules = {};
+  pageState._filterClosedModules = {};
   // Closed modules stay closed per class, saved with the teacher's
   // preferences so they survive signing out. This key is the old
   // browser-only copy, read once when a class has nothing saved yet.
   var MODULES_CLOSED_KEY = 'gb-assign-modules-closed-';
-  var _dragAssessId = null;
-  var _dragModuleId = null;
-  var _dragSid = null;
-  var _dragFromGroup = null;
-  var _mergeTargetId = null;
-  var _mergeHoverTimer = null;
-  var _mergeAnimating = false;
-  var focusStudentId = null;
-  var _searchTimer = null;
+  pageState._dragAssessId = null;
+  pageState._dragModuleId = null;
+  pageState._dragSid = null;
+  pageState._dragFromGroup = null;
+  pageState._mergeTargetId = null;
+  pageState._mergeHoverTimer = null;
+  pageState._mergeAnimating = false;
+  pageState.focusStudentId = null;
+  pageState._searchTimer = null;
   // Collaboration delegation (now in assign-collab.js)
   var AC = AssignCollab;
-  var newCollaboration; // alias for reads in save logic
-  var collabExcluded, collabPairs, collabGroups, collabGroupCount;
+  pageState.newCollaboration = undefined; // alias for reads in save logic
+  pageState.collabExcluded = undefined;
+  pageState.collabPairs = undefined;
+  pageState.collabGroups = undefined;
+  pageState.collabGroupCount = undefined;
   function _syncCollabState() {
-    newCollaboration = AC.collaboration;
-    collabExcluded = AC.excluded;
-    collabPairs = AC.pairs;
-    collabGroups = AC.groups;
-    collabGroupCount = AC.groupCount;
+    pageState.newCollaboration = AC.collaboration;
+    pageState.collabExcluded = AC.excluded;
+    pageState.collabPairs = AC.pairs;
+    pageState.collabGroups = AC.groups;
+    pageState.collabGroupCount = AC.groupCount;
   }
   function setCollaboration(mode) {
     AC.setCollaboration(mode);
@@ -121,26 +129,26 @@ window.PageAssignments = (function () {
   }
 
   // Rubric editor state
-  var _editingRubric = null;
+  pageState._editingRubric = null;
   // A rubric made from the assessment form (blank, drafted or a copy) waits
   // here, unsaved, until the assessment is created (redesign PR 8).
-  var _pendingFormRubric = null;
+  pageState._pendingFormRubric = null;
   // Scores to move to a copied rubric once the edit is saved (PR 10).
-  var _scoreMoveAfterSave = null;
-  var _rubricDirty = false;
+  pageState._scoreMoveAfterSave = null;
+  pageState._rubricDirty = false;
   // The rubric as saved and its scored-student counts, for the edit guard.
-  var _rubricBefore = null;
-  var _rubricScored = {};
-  var _rubricAutoTags = [];
+  pageState._rubricBefore = null;
+  pageState._rubricScored = {};
+  pageState._rubricAutoTags = [];
 
   // Comment popover state
-  var _commentPopoverState = null;
+  pageState._commentPopoverState = null;
 
   // Keyboard navigation state
-  var _kbFocusEl = null;
+  pageState._kbFocusEl = null;
 
   // Status debounce
-  var _statusDebounce = {};
+  pageState._statusDebounce = {};
 
   // Module colors
   var MODULE_COLORS = [
@@ -175,33 +183,33 @@ window.PageAssignments = (function () {
   }
 
   function _saveClosedModules() {
-    var ids = Object.keys(collapsedModules).filter(function (id) {
-      return collapsedModules[id];
+    var ids = Object.keys(pageState.collapsedModules).filter(function (id) {
+      return pageState.collapsedModules[id];
     });
     var byClass = Object.assign({}, getDashboardPrefs().closedModules || {});
-    byClass[activeCourse] = ids;
+    byClass[pageState.activeCourse] = ids;
     var picked = {};
-    picked[activeCourse] = true;
+    picked[pageState.activeCourse] = true;
     saveDashboardPrefs({ closedModules: byClass }, { closedModules: picked });
   }
 
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
-    activeCourse = cid;
+    pageState.activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
-    filterCategories = [];
-    assessSearch = '';
-    showUngraded = false;
+    pageState.filterCategories = [];
+    pageState.assessSearch = '';
+    pageState.showUngraded = false;
     AssignShow.reset();
     AssignToolbar.reset();
-    focusStudentId = null;
-    collapsedModules = _loadClosedModules(cid);
-    rubricViewStates = {};
+    pageState.focusStudentId = null;
+    pageState.collapsedModules = _loadClosedModules(cid);
+    pageState.rubricViewStates = {};
     // The roster's grades are the year so far, as on the Gradebook.
-    if (typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
+    if (typeof setActiveTerm === 'function') setActiveTerm(pageState.activeCourse, null);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
-      activeCourse,
-      focusStudentId,
+      pageState.activeCourse,
+      pageState.focusStudentId,
       'toggleFocusStudent',
     );
     render();
@@ -210,9 +218,9 @@ window.PageAssignments = (function () {
   /* The copy of an assessment in another class: switch there and open it. */
   function openCopyIn(cid, aid) {
     if (!cid || !aid) return;
-    var done = cid === activeCourse ? Promise.resolve() : switchCourse(cid);
+    var done = cid === pageState.activeCourse ? Promise.resolve() : switchCourse(cid);
     Promise.resolve(done).then(function () {
-      openAssessIds.add(aid);
+      pageState.openAssessIds.add(aid);
       render();
       var card = document.getElementById('ac-' + aid);
       if (card && typeof card.scrollIntoView === 'function')
@@ -225,19 +233,19 @@ window.PageAssignments = (function () {
      class) keeps just those open, for that student; with none open, every
      assessment opens. Leaving keeps the class on those same assessments. */
   function toggleFocusStudent(sid) {
-    if (focusStudentId === sid) {
+    if (pageState.focusStudentId === sid) {
       _leaveFocus();
-    } else if (!focusStudentId) {
-      focusStudentId = sid;
-      _collapsedIds.clear();
-      _allExpanded = openAssessIds.size === 0;
+    } else if (!pageState.focusStudentId) {
+      pageState.focusStudentId = sid;
+      pageState._collapsedIds.clear();
+      pageState._allExpanded = pageState.openAssessIds.size === 0;
     } else {
-      focusStudentId = sid;
+      pageState.focusStudentId = sid;
     }
     _syncSidebarSelection();
     render();
     // One points card open: its box is ready to type in.
-    var boxes = focusStudentId ? document.querySelectorAll('.assess-card.open .grdp-input') : [];
+    var boxes = pageState.focusStudentId ? document.querySelectorAll('.assess-card.open .grdp-input') : [];
     if (boxes.length === 1) _focusGraderPoints(_graderAid(boxes[0]));
   }
 
@@ -248,28 +256,28 @@ window.PageAssignments = (function () {
   }
 
   function _leaveFocus() {
-    focusStudentId = null;
-    if (_allExpanded) openAssessIds.clear();
-    _allExpanded = true;
-    _collapsedIds.clear();
+    pageState.focusStudentId = null;
+    if (pageState._allExpanded) pageState.openAssessIds.clear();
+    pageState._allExpanded = true;
+    pageState._collapsedIds.clear();
   }
 
   /* Mark the focused student in the roster without redrawing it, so the
      names and the roster's scroll stay put. */
   function _syncSidebarSelection() {
-    if (_grader) return;
+    if (pageState._grader) return;
     var rows = document.querySelectorAll('#gb-roster-list .student-row');
     if (!rows.length) {
       document.getElementById('sidebar-mount').innerHTML = renderSidebar(
-        activeCourse,
-        focusStudentId,
+        pageState.activeCourse,
+        pageState.focusStudentId,
         'toggleFocusStudent',
       );
       return;
     }
     var picked = null;
     rows.forEach(function (r) {
-      var on = r.dataset.sid === focusStudentId;
+      var on = r.dataset.sid === pageState.focusStudentId;
       r.classList.toggle('selected', on);
       if (on) picked = r;
     });
@@ -305,28 +313,28 @@ window.PageAssignments = (function () {
      student in the roster (as filtered by its search), on the same open
      assessments. A focused rubric row moves to the new student's first row. */
   function stepFocusStudent(dir) {
-    if (!focusStudentId) return;
+    if (!pageState.focusStudentId) return;
     // The All Caught Up panel (I3): Previous takes it away; nothing else steps.
-    if (_grader && _grader.caughtUp) {
+    if (pageState._grader && pageState._grader.caughtUp) {
       if (dir < 0) _graderHideCaughtUp();
       return;
     }
     var memo = _graderFocusMemo();
     // With a queue (I3), a step past either end of this piece carries into the next or previous piece.
-    if (_grader && _graderQueueStep(dir)) return;
+    if (pageState._grader && _graderQueueStep(dir)) return;
     // Show is on To Return or Returned: the next student it lists (S1-F2).
-    if (_grader && _graderStepShown(dir)) {
+    if (pageState._grader && _graderStepShown(dir)) {
       _graderToTop();
       _restoreGraderFocus(memo);
       return;
     }
-    if (_grader && _graderStepGroup(dir)) {
+    if (pageState._grader && _graderStepGroup(dir)) {
       _graderToTop();
       _restoreGraderFocus(memo);
       return;
     }
-    var ids = _grader
-      ? _grader.studentIds
+    var ids = pageState._grader
+      ? pageState._grader.studentIds
       : Array.prototype.filter
           .call(document.querySelectorAll('#gb-roster-list .student-row'), function (r) {
             return r.style.display !== 'none';
@@ -335,19 +343,19 @@ window.PageAssignments = (function () {
             return r.dataset.sid;
           });
     if (!ids.length) {
-      ids = sortStudents(getStudents(activeCourse), 'lastName').map(function (s) {
+      ids = sortStudents(getStudents(pageState.activeCourse), 'lastName').map(function (s) {
         return s.id;
       });
     }
-    var i = ids.indexOf(focusStudentId);
+    var i = ids.indexOf(pageState.focusStudentId);
     var next = ids[i + dir];
     if (i < 0 || !next) return;
-    var hadKbFocus = !!_kbFocusEl;
-    focusStudentId = next;
+    var hadKbFocus = !!pageState._kbFocusEl;
+    pageState.focusStudentId = next;
     _syncSidebarSelection();
     render();
     var card = document.querySelector('.assess-card.open');
-    if (_grader) _graderToTop();
+    if (pageState._grader) _graderToTop();
     else _scrollIntoViewIfNeeded(card, { block: 'nearest' }, true);
     if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
     else _restoreGraderFocus(memo);
@@ -357,7 +365,7 @@ window.PageAssignments = (function () {
      scrolled down, the name was off screen and a teacher could score the
      wrong student (Nov 3 sweep). The same card keeps the focus. */
   function _graderToTop() {
-    var sc = _grader && _grader.overlay.querySelector('.grader-scroll');
+    var sc = pageState._grader && pageState._grader.overlay.querySelector('.grader-scroll');
     if (sc) {
       sc.scrollTop = 0;
       // The next student comes in with a short fade. A script-driven fade
@@ -391,7 +399,7 @@ window.PageAssignments = (function () {
       if (el) el.focus({ preventScroll: true });
       return;
     }
-    if (_grader) _focusGraderPoints(_grader.aid);
+    if (pageState._grader) _focusGraderPoints(pageState._grader.aid);
   }
   // The student's points box for `aid`, focused with its text selected.
   function _focusGraderPoints(aid) {
@@ -404,9 +412,9 @@ window.PageAssignments = (function () {
 
   /* ── Assessment Filters ────────────────────────────────── */
   function toggleCategoryFilter(catId) {
-    var idx = filterCategories.indexOf(catId);
-    if (idx >= 0) filterCategories.splice(idx, 1);
-    else filterCategories.push(catId);
+    var idx = pageState.filterCategories.indexOf(catId);
+    if (idx >= 0) pageState.filterCategories.splice(idx, 1);
+    else pageState.filterCategories.push(catId);
     render();
   }
 
@@ -441,9 +449,9 @@ window.PageAssignments = (function () {
   }
 
   function setAssessSearch(val) {
-    assessSearch = (val || '').trim();
-    clearTimeout(_searchTimer);
-    _searchTimer = setTimeout(function () {
+    pageState.assessSearch = (val || '').trim();
+    clearTimeout(pageState._searchTimer);
+    pageState._searchTimer = setTimeout(function () {
       render();
       var inp = document.querySelector('.assess-search-input');
       if (inp) {
@@ -476,15 +484,15 @@ window.PageAssignments = (function () {
     return {
       cid: cid,
       courses: getPickerCourses(cid),
-      search: assessSearch,
+      search: pageState.assessSearch,
       cats: _getSortedCategories(cid).map(function (cat, i) {
         var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
-        return { id: cat.id, name: cat.name, color: t.fg, on: filterCategories.indexOf(cat.id) >= 0 };
+        return { id: cat.id, name: cat.name, color: t.fg, on: pageState.filterCategories.indexOf(cat.id) >= 0 };
       }),
-      ungraded: showUngraded,
+      ungraded: pageState.showUngraded,
       toReturn: _returnState(cid),
       bulk: AssignList.on(),
-      focusStudent: !!focusStudentId,
+      focusStudent: !!pageState.focusStudentId,
       cards: all.length,
       allOpen: open[0],
       noneOpen: open[1],
@@ -493,7 +501,7 @@ window.PageAssignments = (function () {
     };
   }
   function _returnState(cid) {
-    return { holds: _holdsGrades(cid), total: _toReturnTotal, pressed: _toReturnOnly };
+    return { holds: _holdsGrades(cid), total: pageState._toReturnTotal, pressed: pageState._toReturnOnly };
   }
   function renderAssessToolbar(cid) {
     var toolbarHtml = AssignToolbar.html(
@@ -502,9 +510,9 @@ window.PageAssignments = (function () {
     );
 
     // Focus banner when grading a single student
-    if (focusStudentId) {
+    if (pageState.focusStudentId) {
       var focusSt = getStudents(cid).find(function (s) {
-        return s.id === focusStudentId;
+        return s.id === pageState.focusStudentId;
       });
       if (focusSt) {
         toolbarHtml +=
@@ -553,7 +561,7 @@ window.PageAssignments = (function () {
         ? _pointsCardHtml(cid, a, one) + _graderOverallCommentHtml(cid, a, one)
         : renderPointsGrid(cid, a, students, scores);
     if (a.rubricId && getRubricById(cid, a.rubricId)) {
-      var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+      var showRubric = pageState.rubricViewStates[a.id] !== undefined ? pageState.rubricViewStates[a.id] : true;
       var rubric = getRubricById(cid, a.rubricId);
       if (showRubric && oneStudent && students.length === 1)
         return (
@@ -895,7 +903,7 @@ window.PageAssignments = (function () {
   var _dibelsPeriods = {};
   var _dibelsLoaded = {};
   function _dibelsPeriodOf(a) {
-    return _dibelsPeriods[a.id] || dibelsPeriodFor(courseToday(activeCourse));
+    return _dibelsPeriods[a.id] || dibelsPeriodFor(courseToday(pageState.activeCourse));
   }
   // html-safe: tone and label come from DIBELS_LEVELS for a computed level; text through esc
   function _dibelsChip(level, text) {
@@ -1148,7 +1156,7 @@ window.PageAssignments = (function () {
   // A field left: save the window's four numbers, then redraw what they
   // work out to without redrawing the inputs, so Tab keeps moving on.
   function _commitDibelsField(el) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var sid = el.dataset.sid;
     var aid = el.dataset.aid;
     var a = getAssessments(cid).find(function (x) {
@@ -1205,13 +1213,13 @@ window.PageAssignments = (function () {
     if (!any) return;
     _dibelsLoaded[cid] = true;
     loadDibelsScores(cid).then(function (changed) {
-      if (changed && activeCourse === cid) render();
+      if (changed && pageState.activeCourse === cid) render();
     });
   }
   /* A plain black-and-white sheet of the class's scores in the shown
      window, printed from a hidden frame. */
   function printDibels(aid) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var a = getAssessments(cid).find(function (x) {
       return x.id === aid;
     });
@@ -1532,7 +1540,9 @@ window.PageAssignments = (function () {
   // Whether a card is drawn open: one student's view opens every card but
   // the ones closed (Expand), or the ones opened.
   function _cardOpen(aid) {
-    return focusStudentId && _allExpanded ? !_collapsedIds.has(aid) : openAssessIds.has(aid);
+    return pageState.focusStudentId && pageState._allExpanded
+      ? !pageState._collapsedIds.has(aid)
+      : pageState.openAssessIds.has(aid);
   }
 
   // An open card's body: its description and its grading controls.
@@ -1548,7 +1558,7 @@ window.PageAssignments = (function () {
         : '') +
       (focusSt
         ? _inlineGraderHtml(cid, a, tagObjs, focusSt, scores)
-        : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : _groupRowStudents(cid, a, students), scores))
+        : _graderHtml(cid, a, tagObjs, pageState.focusStudentId ? [] : _groupRowStudents(cid, a, students), scores))
     );
   }
 
@@ -1622,15 +1632,15 @@ window.PageAssignments = (function () {
       '<div id="new-assess-form" data-cid="' +
       esc(cid) +
       '" style="display:' +
-      (_showingNewForm ? 'block' : 'none') +
+      (pageState._showingNewForm ? 'block' : 'none') +
       ';background:var(--bg);border:2px solid var(--active);border-radius:var(--radius);padding:16px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,122,255,0.12)">' +
       // An open form kept through this redraw is put back by render().
-      (_showingNewForm && !_keepingForm
+      (pageState._showingNewForm && !pageState._keepingForm
         ? renderAssessForm(
             cid,
-            _editingAssessId
+            pageState._editingAssessId
               ? getAssessments(cid).find(function (a) {
-                  return a.id === _editingAssessId;
+                  return a.id === pageState._editingAssessId;
                 })
               : null,
           )
@@ -1648,9 +1658,9 @@ window.PageAssignments = (function () {
     html += _newFormHtml(cid);
 
     // Assessment cards grouped by module folders
-    var focusSt = focusStudentId
+    var focusSt = pageState.focusStudentId
       ? students.find(function (st) {
-          return st.id === focusStudentId;
+          return st.id === pageState.focusStudentId;
         })
       : null;
     // What is waiting to return (S1-F2), in a class that holds grades.
@@ -1709,7 +1719,7 @@ window.PageAssignments = (function () {
               ? 'button type="button" data-action="toggleCategoryFilter" data-catid="' +
                 esc(categoryId) +
                 '" aria-pressed="' +
-                (filterCategories.indexOf(categoryId) >= 0) +
+                (pageState.filterCategories.indexOf(categoryId) >= 0) +
                 '"'
               : 'span') +
             ' class="type-badge ' +
@@ -1819,9 +1829,13 @@ window.PageAssignments = (function () {
 
     // A search or filter opens every module with matches; the Show bar only
     // lists, and leaves folders and cards as the teacher has them.
-    var opensFolders = filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly;
+    var opensFolders =
+      pageState.filterCategories.length > 0 ||
+      pageState.showUngraded ||
+      !!pageState.assessSearch ||
+      pageState._toReturnOnly;
     var filtersActive = opensFolders || AssignShow.on();
-    if (!opensFolders) _filterClosedModules = {};
+    if (!opensFolders) pageState._filterClosedModules = {};
 
     // Nothing to show: say so first, above any modules.
     if (assessments.length === 0 && allAssessments.length > 0) {
@@ -1846,14 +1860,14 @@ window.PageAssignments = (function () {
     modules.forEach(function (u, idx) {
       var items = grouped[u.id];
       if (filtersActive && items.length === 0) return;
-      var isOpen = !collapsedModules[u.id];
+      var isOpen = !pageState.collapsedModules[u.id];
       var containsOpen =
-        openAssessIds.size > 0 &&
+        pageState.openAssessIds.size > 0 &&
         items.some(function (a) {
-          return openAssessIds.has(a.id);
+          return pageState.openAssessIds.has(a.id);
         });
       // Searching or filtering shows every module with matches open.
-      var folderOpen = opensFolders ? !_filterClosedModules[u.id] : isOpen || containsOpen;
+      var folderOpen = opensFolders ? !pageState._filterClosedModules[u.id] : isOpen || containsOpen;
       html += '<div class="mod-drop-zone" data-drop-index="' + idx + '" data-mod-drop-zone="true"></div>';
       html +=
         '<div class="mod-folder' +
@@ -1929,14 +1943,14 @@ window.PageAssignments = (function () {
     } else if (filtersActive && ungrouped.length === 0) {
       // hide
     } else {
-      var noModOpen = !collapsedModules['__none__'];
+      var noModOpen = !pageState.collapsedModules['__none__'];
       var containsOpenNoMod =
-        openAssessIds.size > 0 &&
+        pageState.openAssessIds.size > 0 &&
         ungrouped.some(function (a) {
-          return openAssessIds.has(a.id);
+          return pageState.openAssessIds.has(a.id);
         });
       var folderOpen = opensFolders
-        ? !_filterClosedModules['__none__']
+        ? !pageState._filterClosedModules['__none__']
         : (ungrouped.length > 0 && noModOpen) || containsOpenNoMod;
       html +=
         '<div class="mod-folder no-module' +
@@ -1977,7 +1991,7 @@ window.PageAssignments = (function () {
      Hovering or focusing a card's category, rubric or Core Competency chip
      shows its name and a plain sentence in the shared #gb-tooltip, which is
      fixed to the window so no scrolling box clips it. */
-  var _chipTipSource = null;
+  pageState._chipTipSource = null;
 
   function _chipTipAttrs(name, text) {
     return ' tabindex="0" data-chip-tip="' + esc(text) + '" data-chip-tip-name="' + esc(name) + '"';
@@ -1999,7 +2013,7 @@ window.PageAssignments = (function () {
     } else if (mode === 'dibels') {
       kind = 'DIBELS';
       tip = 'A DIBELS 8 benchmark. It counts toward no grade.';
-    } else if (!a.rubricId || !getRubricById(activeCourse, a.rubricId)) {
+    } else if (!a.rubricId || !getRubricById(pageState.activeCourse, a.rubricId)) {
       kind = 'Competencies';
       tip = 'Scored on each competency, with no rubric.';
     }
@@ -2043,7 +2057,7 @@ window.PageAssignments = (function () {
         : '') +
       '</div>';
     tip.style.display = 'block';
-    _chipTipSource = chip;
+    pageState._chipTipSource = chip;
     chip.setAttribute('aria-describedby', 'gb-tooltip');
     var rect = chip.getBoundingClientRect();
     var left = rect.left + rect.width / 2 - tip.offsetWidth / 2;
@@ -2059,24 +2073,24 @@ window.PageAssignments = (function () {
      tip (a competency row adds its wording): after a short hover, so it
      doesn't flash up while grading, or at once on a tap. */
   var NAME_TIP_MS = 600;
-  var _nameTipTimer = null;
+  pageState._nameTipTimer = null;
   function _hasNameTip(label) {
     var name = label.querySelector('.rsg-criterion-name');
     return !!label.dataset.nameTipText || (!!name && name.scrollWidth > name.clientWidth);
   }
   function _queueNameTip(label) {
-    clearTimeout(_nameTipTimer);
+    clearTimeout(pageState._nameTipTimer);
     if (!_hasNameTip(label)) return;
-    _nameTipTimer = setTimeout(function () {
+    pageState._nameTipTimer = setTimeout(function () {
       if (label.isConnected) _showChipTip(label);
     }, NAME_TIP_MS);
   }
 
   function _hideChipTip() {
-    clearTimeout(_nameTipTimer);
-    if (!_chipTipSource) return;
-    _chipTipSource.removeAttribute('aria-describedby');
-    _chipTipSource = null;
+    clearTimeout(pageState._nameTipTimer);
+    if (!pageState._chipTipSource) return;
+    pageState._chipTipSource.removeAttribute('aria-describedby');
+    pageState._chipTipSource = null;
     var tip = document.getElementById('gb-tooltip');
     if (tip) {
       tip.style.display = 'none';
@@ -2091,7 +2105,7 @@ window.PageAssignments = (function () {
      Codes folder, the rubric, the Factor and a Core Competency. Category,
      Date Assigned and List rows have none (Colin, Nov 2). On hover (under the field) and keyboard focus (over it when
      there's room, so the next field stays in view). */
-  var _afTipSource = null;
+  pageState._afTipSource = null;
 
   /* A folder's checkbox ticks or unticks every competency in it; it shows a
      dash when only some are ticked (Colin, Nov 2). _syncCodes keeps it in
@@ -2136,7 +2150,7 @@ window.PageAssignments = (function () {
   function _afOtherAssessments(cid) {
     return getAssessments(cid)
       .filter(function (a) {
-        return a && a.id !== _editingAssessId;
+        return a && a.id !== pageState._editingAssessId;
       })
       .sort(function (a, b) {
         return String(b.dateAssigned || b.date || '').localeCompare(String(a.dateAssigned || a.date || ''));
@@ -2156,7 +2170,7 @@ window.PageAssignments = (function () {
 
   // { html, dark } for one hover target, or null.
   function _afTipContent(el) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var kind = el.dataset.afTip;
     var all = _afOtherAssessments(cid);
     if (kind === 'comp') {
@@ -2212,7 +2226,7 @@ window.PageAssignments = (function () {
         .split(',')
         .filter(Boolean);
       if (!ids.length) return null;
-      var counts = _compCounts(cid, _editingAssessId);
+      var counts = _compCounts(cid, pageState._editingAssessId);
       return {
         dark: false,
         html:
@@ -2238,7 +2252,11 @@ window.PageAssignments = (function () {
     if (kind === 'rubric') {
       var rid = (document.getElementById('af-rubric') || {}).value;
       var rubric =
-        _pendingFormRubric && _pendingFormRubric.id === rid ? _pendingFormRubric : rid ? getRubricById(cid, rid) : null;
+        pageState._pendingFormRubric && pageState._pendingFormRubric.id === rid
+          ? pageState._pendingFormRubric
+          : rid
+            ? getRubricById(cid, rid)
+            : null;
       if (!rubric) return null;
       var on = all.filter(function (a) {
         return a.rubricId === rubric.id;
@@ -2341,10 +2359,11 @@ window.PageAssignments = (function () {
   }
 
   // The Ministry's Core Competency descriptions load the first time they're needed.
-  var _afCoreLoading = null;
+  pageState._afCoreLoading = null;
   function _afLoadCore() {
-    if (window.BANK_CORE_COMPETENCIES || _afCoreLoading || typeof document === 'undefined') return _afCoreLoading;
-    _afCoreLoading = new Promise(function (resolve) {
+    if (window.BANK_CORE_COMPETENCIES || pageState._afCoreLoading || typeof document === 'undefined')
+      return pageState._afCoreLoading;
+    pageState._afCoreLoading = new Promise(function (resolve) {
       var s = document.createElement('script');
       s.src = '/shared/bank-core-competencies.js';
       s.onload = s.onerror = function () {
@@ -2352,7 +2371,7 @@ window.PageAssignments = (function () {
       };
       document.head.appendChild(s);
     });
-    return _afCoreLoading;
+    return pageState._afCoreLoading;
   }
 
   function _showAfTip(el, byKeyboard) {
@@ -2362,7 +2381,7 @@ window.PageAssignments = (function () {
       var load = _afLoadCore();
       if (load)
         load.then(function () {
-          if (_afTipSource === el) _showAfTip(el, byKeyboard);
+          if (pageState._afTipSource === el) _showAfTip(el, byKeyboard);
         });
     }
     var content = _afTipContent(el);
@@ -2373,13 +2392,13 @@ window.PageAssignments = (function () {
     // html-safe: _afTipContent escapes every value
     tip.innerHTML = content.html;
     tip.style.display = 'block';
-    if (_afTipSource && _afTipSource !== el) _afUndescribe(_afTipSource);
-    if (_afTipSource !== el) {
+    if (pageState._afTipSource && pageState._afTipSource !== el) _afUndescribe(pageState._afTipSource);
+    if (pageState._afTipSource !== el) {
       // Keep what the field was already described by (the category's hint).
       el.dataset.afDescribedBy = el.getAttribute('aria-describedby') || '';
       el.setAttribute('aria-describedby', (el.dataset.afDescribedBy + ' gb-tooltip').trim());
     }
-    _afTipSource = el;
+    pageState._afTipSource = el;
     var rect = el.getBoundingClientRect();
     var left = rect.left + rect.width / 2 - tip.offsetWidth / 2;
     if (left < 8) left = 8;
@@ -2400,9 +2419,9 @@ window.PageAssignments = (function () {
   }
 
   function _hideAfTip() {
-    if (!_afTipSource) return;
-    _afUndescribe(_afTipSource);
-    _afTipSource = null;
+    if (!pageState._afTipSource) return;
+    _afUndescribe(pageState._afTipSource);
+    pageState._afTipSource = null;
     var tip = document.getElementById('gb-tooltip');
     if (tip) {
       tip.style.display = 'none';
@@ -2417,7 +2436,7 @@ window.PageAssignments = (function () {
   }
   function _afTipOver(e) {
     var el = _afTipTarget(e);
-    if (!el || el === _afTipSource) return;
+    if (!el || el === pageState._afTipSource) return;
     _afAfterPause(el, function () {
       _showAfTip(el, false);
     });
@@ -2426,7 +2445,7 @@ window.PageAssignments = (function () {
     var el = _afTipTarget(e);
     if (
       el &&
-      el === _afTipSource &&
+      el === pageState._afTipSource &&
       !(e.relatedTarget && el.contains(e.relatedTarget)) &&
       el !== document.activeElement
     )
@@ -2438,12 +2457,12 @@ window.PageAssignments = (function () {
   }
   function _afTipBlur(e) {
     var el = _afTipTarget(e);
-    if (el && el === _afTipSource) _hideAfTip();
+    if (el && el === pageState._afTipSource) _hideAfTip();
   }
   // Scrolling closes a hovered tip; a focused field's tip (the browser
   // scrolls a field into view as it's focused) moves with it.
   function _afTipScroll() {
-    var el = _afTipSource;
+    var el = pageState._afTipSource;
     if (!el) return;
     var a = document.activeElement;
     if (a && (a === el || el.contains(a)) && document.body.contains(el)) _showAfTip(el, true);
@@ -2452,7 +2471,7 @@ window.PageAssignments = (function () {
   // A changed category, date or Factor updates its open tip.
   function _afTipChange(e) {
     var el = _afTipTarget(e);
-    if (el && el === _afTipSource) _showAfTip(el, el === document.activeElement);
+    if (el && el === pageState._afTipSource) _showAfTip(el, el === document.activeElement);
   }
 
   /* An open New or Edit Assessment form is kept as the teacher has it
@@ -2461,9 +2480,9 @@ window.PageAssignments = (function () {
      dates and scoring back to the defaults, a Blank Rubric's name gone), and
      the click that left the field (Points, Complete/Incomplete, a Category)
      landed on the old form. A form drawn for another class is not kept. */
-  var _keepingForm = false;
+  pageState._keepingForm = false;
   function _openFormToKeep(cid) {
-    if (!_showingNewForm) return null;
+    if (!pageState._showingNewForm) return null;
     var form = document.getElementById('new-assess-form');
     if (!form || form.dataset.cid !== cid || !form.querySelector('#af-title')) return null;
     return form;
@@ -2472,11 +2491,11 @@ window.PageAssignments = (function () {
   function render() {
     _hideChipTip();
     _hideAfTip();
-    if (_grader) return _renderGrader();
-    var cid = activeCourse;
+    if (pageState._grader) return _renderGrader();
+    var cid = pageState.activeCourse;
     var course = COURSES[cid];
     if (!course) return;
-    _pageBehind = false;
+    pageState._pageBehind = false;
     // A signed-in class's student work, read again now and then (S6-W1).
     if (typeof refreshStudentWork === 'function') refreshStudentWork(cid);
     _loadDibelsOnce(cid);
@@ -2488,14 +2507,14 @@ window.PageAssignments = (function () {
 
     // Apply filters
     var assessments = allAssessments;
-    if (filterCategories.length > 0) {
+    if (pageState.filterCategories.length > 0) {
       assessments = assessments.filter(function (a) {
         var catId = _getAssessmentCategoryId(a);
-        return catId && filterCategories.indexOf(catId) >= 0;
+        return catId && pageState.filterCategories.indexOf(catId) >= 0;
       });
     }
-    if (assessSearch) {
-      var q = assessSearch.toLowerCase();
+    if (pageState.assessSearch) {
+      var q = pageState.assessSearch.toLowerCase();
       assessments = assessments.filter(function (a) {
         return (
           (a.title || '').toLowerCase().includes(q) ||
@@ -2512,7 +2531,7 @@ window.PageAssignments = (function () {
         );
       });
     }
-    if (showUngraded) {
+    if (pageState.showUngraded) {
       assessments = assessments.filter(function (a) {
         return students.some(function (st) {
           var sc = scores[st.id] || [];
@@ -2535,19 +2554,19 @@ window.PageAssignments = (function () {
     assessments.forEach(function (a) {
       nums[a.id] = {};
     });
-    _toReturnTotal = 0;
+    pageState._toReturnTotal = 0;
     if (_holdsGrades(cid)) {
       assessments.forEach(function (a) {
         nums[a.id].drafts = GraderWork.draftsIn(cid, a.id, shownIds).length;
-        _toReturnTotal += nums[a.id].drafts;
+        pageState._toReturnTotal += nums[a.id].drafts;
       });
       // Returning the last draft turns the filter off.
-      if (!_toReturnTotal) _toReturnOnly = false;
-      if (_toReturnOnly)
+      if (!pageState._toReturnTotal) pageState._toReturnOnly = false;
+      if (pageState._toReturnOnly)
         assessments = assessments.filter(function (a) {
           return nums[a.id].drafts > 0;
         });
-    } else _toReturnOnly = false;
+    } else pageState._toReturnOnly = false;
 
     // The Show bar (assign-show.js): each card's To Grade, Not In and
     // Submitted, the same counts as the gradebook's bar and the dashboard's
@@ -2563,15 +2582,15 @@ window.PageAssignments = (function () {
     // Render assessment list
     var keptForm = _openFormToKeep(cid);
     var keptFocus = keptForm && keptForm.contains(document.activeElement) ? document.activeElement : null;
-    _keepingForm = !!keptForm;
-    _drawnReturns = {};
+    pageState._keepingForm = !!keptForm;
+    pageState._drawnReturns = {};
     try {
       // html-safe: AssignList.html escapes every title and name (assign-list.js); renderAssessmentList is reviewed
       document.getElementById('main').innerHTML = AssignList.on()
         ? AssignList.html(cid, assessments, allAssessments, _newFormHtml(cid))
         : renderAssessmentList(cid, assessments, allAssessments, students, scores, modules, nums, shownIds);
     } finally {
-      _keepingForm = false;
+      pageState._keepingForm = false;
     }
     if (keptForm) {
       var freshForm = document.getElementById('new-assess-form');
@@ -2585,21 +2604,21 @@ window.PageAssignments = (function () {
   /* After a draw of the list or of cards: the ledgers' counts, the Class
      Results panel, and what was drawn to return remembered (S1-F2). */
   function _afterCardsDrawn(root) {
-    var kept = _drawnReturns || {};
+    var kept = pageState._drawnReturns || {};
     root.querySelectorAll('.assess-header[data-aid]').forEach(function (head) {
       head._countsHtml = kept['n' + head.dataset.aid];
     });
     root.querySelectorAll('.ldg-grid').forEach(refreshLedgerSummary);
     _refreshClassResultsSoon();
     _seedReturns(root);
-    _drawnReturns = null;
+    pageState._drawnReturns = null;
     CritComment.afterDraw();
   }
 
   /* ── Assessment Form ────────────────────────────────────── */
   // One row of the competency checklist. The row reads the competency's own
   // wording; the section name (often just the category) is the last fallback.
-  var _afIcanSeq = 0;
+  pageState._afIcanSeq = 0;
   function _afTagRow(sec, selTags) {
     var tag = sec.tags[0];
     if (!tag) return '';
@@ -2611,7 +2630,7 @@ window.PageAssignments = (function () {
       return String(x || '').trim();
     });
     // Unique per drawing, so two open forms never share a list.
-    var listId = 'af-icans-' + sec.id + '-' + ++_afIcanSeq;
+    var listId = 'af-icans-' + sec.id + '-' + ++pageState._afIcanSeq;
     return (
       '<div class="af-tag-row">' +
       '<label class="af-tag-item' +
@@ -2663,9 +2682,9 @@ window.PageAssignments = (function () {
   // html-safe: titles, descriptions, names and dates through esc; colours through cssColor or constants; ids are ours
   function renderAssessForm(cid, assess) {
     // Blank Rubric is open on a new assessment (Colin, Nov 2).
-    _startOpen = assess ? null : 'blank';
-    _blank = null;
-    _categoryTried = false;
+    pageState._startOpen = assess ? null : 'blank';
+    pageState._blank = null;
+    pageState._categoryTried = false;
     var sections = getSections(cid);
     var isEdit = !!assess;
     var title = assess ? assess.title : '';
@@ -2678,7 +2697,7 @@ window.PageAssignments = (function () {
     var moduleId = assess ? assess.moduleId || '' : '';
     var collaboration = assess ? assess.collaboration || 'individual' : 'individual';
     AC.collaboration = collaboration;
-    newCollaboration = collaboration;
+    pageState.newCollaboration = collaboration;
     var allModules = getModules(cid);
     var categories = _getSortedCategories(cid);
     var needsPick =
@@ -2689,7 +2708,7 @@ window.PageAssignments = (function () {
     // A new assessment starts on the scoring the last one used (Colin, Nov 11).
     var lastMode = assess ? null : _lastScoreMode(cid);
     var scoreMode = assess ? _formModeOf(assess) : lastMode || 'proficiency';
-    if (!assess && scoreMode !== 'proficiency') _startOpen = null;
+    if (!assess && scoreMode !== 'proficiency') pageState._startOpen = null;
     var maxPoints = assess ? assess.maxPoints || 100 : 100;
     var weight = getAssessmentWeight(assess);
 
@@ -2747,8 +2766,8 @@ window.PageAssignments = (function () {
       '</div>';
     // Handouts and Links, right under the Description: what students open
     // from the card (board 3a). Only where students read the page.
-    _formRes = _formResOffered(cid) ? _formResFor(cid, assess) : null;
-    if (_formRes) html += _formResHtml();
+    pageState._formRes = _formResOffered(cid) ? _formResFor(cid, assess) : null;
+    if (pageState._formRes) html += _formResHtml();
 
     // Which classes this assessment goes to (Teams' "Assign to"), right
     // under the title so it is seen before the details are filled in.
@@ -3084,11 +3103,11 @@ window.PageAssignments = (function () {
       '</section>';
 
     // Student Work (S5-F1): only in a class with Send Work on.
-    _formWork = _formWorkOffered(cid) ? _formWorkFor(cid, assess) : null;
-    _formSeedDue = defaultDue;
+    pageState._formWork = _formWorkOffered(cid) ? _formWorkFor(cid, assess) : null;
+    pageState._formSeedDue = defaultDue;
     // The Quiz card under it (teacher/quiz-builder.js): '' with the quizzes switch off.
-    var quizMount = window.QuizBuilder ? QuizBuilder.mountHtml(cid, assess, !!_formWork) : '';
-    if (_formWork) html += _formWorkCardHtml(cid);
+    var quizMount = window.QuizBuilder ? QuizBuilder.mountHtml(cid, assess, !!pageState._formWork) : '';
+    if (pageState._formWork) html += _formWorkCardHtml(cid);
     html += quizMount;
 
     // Actions, in a footer that stays at the bottom of the window while the
@@ -3157,8 +3176,8 @@ window.PageAssignments = (function () {
      copy at Nothing (Colin). After the Due Date starts at Keep Accepting
      (Colin); Until is the last day work is taken, a week after the due
      date until the teacher picks another. */
-  var _formWork = null; // the open form's Student Work choices, or null when the card is not drawn
-  var _formSeedDue = ''; // the due date the form was drawn with, until it is in the page
+  pageState._formWork = null; // the open form's Student Work choices, or null when the card is not drawn
+  pageState._formSeedDue = ''; // the due date the form was drawn with, until it is in the page
 
   var WORK_SEND = [
     { value: 'nothing', label: 'Nothing' },
@@ -3271,9 +3290,9 @@ window.PageAssignments = (function () {
 
   // html-safe: built from fixed labels, esc'd dates and the form's own values
   function _formWorkCardHtml(cid) {
-    var w = _formWork;
+    var w = pageState._formWork;
     var dueEl = document.getElementById('af-due');
-    var due = dueEl ? dueEl.value || '' : _formSeedDue;
+    var due = dueEl ? dueEl.value || '' : pageState._formSeedDue;
     var sending = w.students_send !== 'nothing';
     var collab = typeof AC !== 'undefined' && AC.collaboration ? AC.collaboration : 'individual';
     var until = w.accept_until || _formWorkUntilDefault(cid);
@@ -3391,7 +3410,7 @@ window.PageAssignments = (function () {
      form as typed; nothing is saved. */
   // html-safe: every value goes through esc
   function _workPeekHtml(cid) {
-    var w = _formWork;
+    var w = pageState._formWork;
     if (!w) return '';
     var val = function (id) {
       return (document.getElementById(id) || {}).value || '';
@@ -3453,18 +3472,18 @@ window.PageAssignments = (function () {
   // Cece Sees follows the form as it's typed.
   function _refreshWorkPeek() {
     var peek = document.getElementById('af-work-peek');
-    if (!peek || !_formWork) return;
+    if (!peek || !pageState._formWork) return;
     // html-safe: built by _workPeekHtml
-    peek.innerHTML = _workPeekHtml(activeCourse);
+    peek.innerHTML = _workPeekHtml(pageState.activeCourse);
   }
 
   // Redraws the card where it is; the rest of the form is left as typed.
   function _refreshFormWorkCard(focusSel) {
     var card = document.querySelector('.af-card-work');
-    if (!card || !_formWork) return;
+    if (!card || !pageState._formWork) return;
     var tpl = document.createElement('template');
     // html-safe: built by _formWorkCardHtml
-    tpl.innerHTML = _formWorkCardHtml(activeCourse);
+    tpl.innerHTML = _formWorkCardHtml(pageState.activeCourse);
     card.replaceWith(tpl.content.firstChild);
     var to = focusSel && document.querySelector(focusSel);
     if (to) to.focus({ preventScroll: true });
@@ -3476,29 +3495,30 @@ window.PageAssignments = (function () {
     });
 
   function _setFormWork(field, value) {
-    if (!_formWork) return;
+    if (!pageState._formWork) return;
     var again = function () {
       _setFormWork(field, value);
     };
     // They Answer a Quiz: Students Send stays Nothing (teacher/quiz-builder.js).
-    if (field === 'students_send' && window.QuizBuilder && QuizBuilder.takeAnswer(value, _formWork, again))
+    if (field === 'students_send' && window.QuizBuilder && QuizBuilder.takeAnswer(value, pageState._formWork, again))
       return _refreshFormWorkCard('.af-card-work [data-field="students_send"][data-value="' + value + '"]');
-    if (field === 'students_send' && _hasChoice(WORK_SEND, value)) _formWork.students_send = value;
-    else if (field === 'group_work' && _hasChoice(WORK_GROUP, value)) _formWork.group_work = value;
+    if (field === 'students_send' && _hasChoice(WORK_SEND, value)) pageState._formWork.students_send = value;
+    else if (field === 'group_work' && _hasChoice(WORK_GROUP, value)) pageState._formWork.group_work = value;
     else if (field === 'students_see_markup' && (value === 'yes' || value === 'no'))
-      _formWork.students_see_markup = value === 'yes';
+      pageState._formWork.students_see_markup = value === 'yes';
     else if (field === 'after_due' && ['keep', 'until', 'stop'].indexOf(value) >= 0) {
-      _formWork.after_due = value;
-      if (value === 'until' && !_formWork.accept_until) _formWork.accept_until = _formWorkUntilDefault(activeCourse);
+      pageState._formWork.after_due = value;
+      if (value === 'until' && !pageState._formWork.accept_until)
+        pageState._formWork.accept_until = _formWorkUntilDefault(pageState.activeCourse);
     } else return;
     _refreshFormWorkCard('.af-card-work [data-field="' + field + '"][data-value="' + value + '"]');
   }
 
   function _setFormWorkUntil(el) {
-    if (!_formWork || !el) return;
+    if (!pageState._formWork || !el) return;
     var v = String(el.value || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
-    _formWork.accept_until = v;
+    pageState._formWork.accept_until = v;
     _refreshFormWorkCard('#af-accept-until');
   }
 
@@ -3508,7 +3528,7 @@ window.PageAssignments = (function () {
   }
   // Group Work and Students See Your Mark Up work in a signed-in class the server keeps rows for too (S9-W1, S12-W1).
   function _formWorkLive() {
-    return typeof studentWorkLive === 'function' && studentWorkLive(activeCourse);
+    return typeof studentWorkLive === 'function' && studentWorkLive(pageState.activeCourse);
   }
 
   /* After a save: the card's choices for `aid` (saveAssessmentStudentWork).
@@ -3537,7 +3557,7 @@ window.PageAssignments = (function () {
      before, or a web page, a text file or an EPUB, kept as it is, 20 MB at
      most (shared/handout-files.js). A web page is chosen together with its
      pictures; the field says which pictures it names were not chosen. */
-  var _formRes = null; // { cid, aid, items, linkOpen, busy, msg, next } while the field is drawn
+  pageState._formRes = null; // { cid, aid, items, linkOpen, busy, msg, next } while the field is drawn
   var RES_MAX_PAGES = 20;
   var RES_ICON_DOC =
     '<svg class="af-res-icon af-res-icon-doc" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M9 14h6M9 17h4"></path></svg>';
@@ -3572,9 +3592,9 @@ window.PageAssignments = (function () {
 
   // What the field holds, for the form's unsaved-changes check.
   function _formResSnapshot() {
-    if (!_formRes) return '';
+    if (!pageState._formRes) return '';
     return JSON.stringify(
-      _formRes.items
+      pageState._formRes.items
         .filter(function (it) {
           return !it.saved || it.removed;
         })
@@ -3607,7 +3627,7 @@ window.PageAssignments = (function () {
         : ' · ' + (it.host || '');
     return (
       '<li class="af-res-item' +
-      (_formRes && _formRes.fresh === it.key ? ' af-res-in' : '') +
+      (pageState._formRes && pageState._formRes.fresh === it.key ? ' af-res-in' : '') +
       '" data-key="' +
       esc(it.key) +
       '">' +
@@ -3630,7 +3650,7 @@ window.PageAssignments = (function () {
   }
 
   function _formResHtml() {
-    var res = _formRes;
+    var res = pageState._formRes;
     var shown = res.items.filter(function (it) {
       return !it.removed;
     });
@@ -3670,7 +3690,7 @@ window.PageAssignments = (function () {
   // Draw the field again in place; `focus` is where the keyboard goes after.
   function _refreshFormRes(focus) {
     var el = document.getElementById('af-res');
-    if (!el || !_formRes) return;
+    if (!el || !pageState._formRes) return;
     var keep = {};
     ['af-res-url', 'af-res-title'].forEach(function (id) {
       var input = document.getElementById(id);
@@ -3678,7 +3698,7 @@ window.PageAssignments = (function () {
     });
     // html-safe: built by _formResHtml, which escapes every name, address and line
     el.outerHTML = _formResHtml();
-    _formRes.fresh = '';
+    pageState._formRes.fresh = '';
     Object.keys(keep).forEach(function (id) {
       var input = document.getElementById(id);
       if (input) input.value = keep[id];
@@ -3688,20 +3708,20 @@ window.PageAssignments = (function () {
   }
 
   function _formResSay(text) {
-    if (!_formRes) return;
-    _formRes.msg = text || '';
+    if (!pageState._formRes) return;
+    pageState._formRes.msg = text || '';
     var p = document.getElementById('af-res-msg');
     if (!p) return;
-    p.textContent = _formRes.msg;
-    p.hidden = !_formRes.msg;
+    p.textContent = pageState._formRes.msg;
+    p.hidden = !pageState._formRes.msg;
   }
 
   function _formResOpenLink() {
-    if (!_formRes) return;
-    _formRes.msg = '';
-    if (!_formRes.linkOpen) {
-      _formRes.linkOpen = true;
-      _formRes.fresh = 'link';
+    if (!pageState._formRes) return;
+    pageState._formRes.msg = '';
+    if (!pageState._formRes.linkOpen) {
+      pageState._formRes.linkOpen = true;
+      pageState._formRes.fresh = 'link';
       _refreshFormRes('#af-res-url');
     } else {
       var url = document.getElementById('af-res-url');
@@ -3710,9 +3730,9 @@ window.PageAssignments = (function () {
   }
 
   function _formResCloseLink() {
-    if (!_formRes) return;
-    _formRes.linkOpen = false;
-    _formRes.msg = '';
+    if (!pageState._formRes) return;
+    pageState._formRes.linkOpen = false;
+    pageState._formRes.msg = '';
     _refreshFormRes('[data-action="afResAddLink"]');
   }
 
@@ -3723,7 +3743,7 @@ window.PageAssignments = (function () {
   };
 
   function _formResAddLink() {
-    var res = _formRes;
+    var res = pageState._formRes;
     if (!res || !res.linkOpen) return;
     var urlEl = document.getElementById('af-res-url');
     var titleEl = document.getElementById('af-res-title');
@@ -3764,7 +3784,7 @@ window.PageAssignments = (function () {
   }
 
   function _formResRemove(key) {
-    var res = _formRes;
+    var res = pageState._formRes;
     if (!res) return;
     var at = -1;
     res.items.forEach(function (it, i) {
@@ -3843,7 +3863,7 @@ window.PageAssignments = (function () {
      kept as it is (HandoutFiles.prepare). What could not be added, and
      any picture a page names that was not picked, is said in the field. */
   function _formResFiles(input) {
-    var res = _formRes;
+    var res = pageState._formRes;
     var picked = input && input.files ? Array.prototype.slice.call(input.files) : [];
     if (input) input.value = '';
     if (!res || res.busy || !picked.length) return;
@@ -3857,7 +3877,7 @@ window.PageAssignments = (function () {
     var words = [];
     HandoutFiles.prepare(picked)
       .then(function (out) {
-        if (_formRes !== res) return;
+        if (pageState._formRes !== res) return;
         out.ready.forEach(function (f) {
           res.next += 1;
           res.items.push({
@@ -3875,7 +3895,7 @@ window.PageAssignments = (function () {
         if (said) words.push(said);
         return out.pdfs.reduce(function (p, file) {
           return p.then(function () {
-            if (_formRes !== res) return;
+            if (pageState._formRes !== res) return;
             return _formResReadPdf(res, file).then(function (why) {
               if (why) words.push(out.pdfs.length > 1 || out.ready.length ? file.name + ': ' + why : why);
             });
@@ -3886,7 +3906,7 @@ window.PageAssignments = (function () {
         words.push("That file couldn't be read. Try another copy of it.");
       })
       .then(function () {
-        if (_formRes !== res) return;
+        if (pageState._formRes !== res) return;
         res.busy = false;
         res.msg = words.join(' ');
         _refreshFormRes('[data-action="afResAddFile"]');
@@ -3934,15 +3954,15 @@ window.PageAssignments = (function () {
      is not a web address, holds the save with the reason), so neither is
      lost. */
   function _formResBusy() {
-    if (!_formRes) return false;
-    if (_formRes.busy) {
+    if (!pageState._formRes) return false;
+    if (pageState._formRes.busy) {
       _formResSay('The file is still being read. Save once it is in the list.');
       return true;
     }
     var url = document.getElementById('af-res-url');
-    if (_formRes.linkOpen && url && url.value.trim()) {
+    if (pageState._formRes.linkOpen && url && url.value.trim()) {
       _formResAddLink();
-      return !!_formRes.linkOpen;
+      return !!pageState._formRes.linkOpen;
     }
     return false;
   }
@@ -3964,13 +3984,13 @@ window.PageAssignments = (function () {
      upload done): the field shows them, unless the teacher has changed
      it, which is kept as it is. A server without the calls hides it. */
   function _formResChanged(e) {
-    var res = _formRes;
+    var res = pageState._formRes;
     var d = e && e.detail;
     if (!res || !d || d.cid !== res.cid) return;
     var el = document.getElementById('af-res');
     if (!el) return;
     if (!_formResOffered(res.cid)) {
-      _formRes = null;
+      pageState._formRes = null;
       el.remove();
       return;
     }
@@ -3983,9 +4003,9 @@ window.PageAssignments = (function () {
     if (touched || !res.aid) return;
     var fresh = _formResFor(res.cid, { id: res.aid });
     res.items = fresh.items;
-    var before = _formStart && _formStart.res;
+    var before = pageState._formStart && pageState._formStart.res;
     _refreshFormRes();
-    if (_formStart && before !== undefined) _formStart.res = _formResSnapshot();
+    if (pageState._formStart && before !== undefined) pageState._formStart.res = _formResSnapshot();
   }
 
   /* ── Assessment Form Helpers ────────────────────────────── */
@@ -4058,8 +4078,8 @@ window.PageAssignments = (function () {
   // cid: the class the work is in (Start From Past can bring it from another).
   function _formModeOf(a, cid) {
     var m = (a && a.scoreMode) || 'proficiency';
-    var held = !!a.rubricId && _pendingFormRubric && _pendingFormRubric.id === a.rubricId;
-    var gone = !!a.rubricId && !held && !getRubricById(cid || activeCourse, a.rubricId);
+    var held = !!a.rubricId && pageState._pendingFormRubric && pageState._pendingFormRubric.id === a.rubricId;
+    var gone = !!a.rubricId && !held && !getRubricById(cid || pageState.activeCourse, a.rubricId);
     return m === 'proficiency' && (!a.rubricId || gone) ? 'competencies' : m;
   }
   /* The scoring of the class's most recently made assessment, when it can be
@@ -4164,8 +4184,8 @@ window.PageAssignments = (function () {
      Rubric while it is open or written in, else a rubric made on the form
      and held unsaved. Null: a saved rubric, looked up by its id. */
   function _formDraftRubric(rid) {
-    if (_blank && (_startOpen === 'blank' || _blankWritten())) return _blank.draft;
-    if (_pendingFormRubric && _pendingFormRubric.id === rid) return _pendingFormRubric;
+    if (pageState._blank && (pageState._startOpen === 'blank' || _blankWritten())) return pageState._blank.draft;
+    if (pageState._pendingFormRubric && pageState._pendingFormRubric.id === rid) return pageState._pendingFormRubric;
     return null;
   }
 
@@ -4184,8 +4204,8 @@ window.PageAssignments = (function () {
     }
     var rid = mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '';
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
-    var info = assessmentCategoryShare(activeCourse, {
-      id: _editingAssessId,
+    var info = assessmentCategoryShare(pageState.activeCourse, {
+      id: pageState._editingAssessId,
       title: title,
       categoryId: (document.getElementById('af-category') || {}).value || '',
       rubricId: rid,
@@ -4199,14 +4219,14 @@ window.PageAssignments = (function () {
   /* Shows the Category field's hint while scored work in a class with
      categories has none chosen; true when it shows. A choice clears the
      red outline a stopped save left. */
-  var _categoryTried = false; // a save stopped for a category since the form opened
+  pageState._categoryTried = false; // a save stopped for a category since the form opened
   function _refreshCategoryHint() {
     var sel = document.getElementById('af-category');
     var hint = document.getElementById('af-category-hint');
     if (!sel || !hint) return false;
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    var show = !sel.value && categoryRequired(activeCourse, { scoreMode: _storedScoreMode(mode) });
-    hint.hidden = !(show && _categoryTried);
+    var show = !sel.value && categoryRequired(pageState.activeCourse, { scoreMode: _storedScoreMode(mode) });
+    hint.hidden = !(show && pageState._categoryTried);
     if (!show) {
       sel.style.border = '';
       sel.removeAttribute('aria-invalid');
@@ -4218,7 +4238,7 @@ window.PageAssignments = (function () {
      stops at the Category field. */
   function _formCategoryChosen() {
     if (!_refreshCategoryHint()) return true;
-    _categoryTried = true;
+    pageState._categoryTried = true;
     _refreshCategoryHint();
     var sel = document.getElementById('af-category');
     sel.style.border = '2px solid var(--score-1)';
@@ -4268,7 +4288,7 @@ window.PageAssignments = (function () {
   function _refreshCountsToward() {
     var line = document.getElementById('af-counts-toward');
     if (!line) return;
-    var t = _countsTowardText(activeCourse);
+    var t = _countsTowardText(pageState.activeCourse);
     line.textContent = '';
     if (t.strong) {
       var b = document.createElement('strong');
@@ -4283,7 +4303,7 @@ window.PageAssignments = (function () {
      taken when the form opens, compared on Save Changes (fields left alone
      keep their stored value) and on Cancel (asks only when something
      changed). Classes to copy to are not part of it. */
-  var _formStart = null;
+  pageState._formStart = null;
   function _formSnapshot() {
     var val = function (id) {
       return (document.getElementById(id) || {}).value || '';
@@ -4318,21 +4338,21 @@ window.PageAssignments = (function () {
       res: _formResSnapshot(),
       quiz: window.QuizBuilder ? QuizBuilder.snapshot() : '',
       collab: JSON.stringify([
-        newCollaboration || 'individual',
-        Array.from(collabExcluded || []).sort(),
-        collabPairs || [],
-        collabGroups || [],
-        collabGroupCount || 0,
+        pageState.newCollaboration || 'individual',
+        Array.from(pageState.collabExcluded || []).sort(),
+        pageState.collabPairs || [],
+        pageState.collabGroups || [],
+        pageState.collabGroupCount || 0,
       ]),
     };
   }
   function _markFormStart() {
-    _formStart = _formSnapshot();
+    pageState._formStart = _formSnapshot();
   }
   // The fields that differ from when the form opened.
   function _formChanges() {
     var now = _formSnapshot();
-    var start = _formStart || {};
+    var start = pageState._formStart || {};
     return Object.keys(now).filter(function (k) {
       return JSON.stringify(now[k]) !== JSON.stringify(start[k]);
     });
@@ -4404,15 +4424,15 @@ window.PageAssignments = (function () {
   function _formEscape(e) {
     if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
     var form = document.getElementById('new-assess-form');
-    if (!_showingNewForm || !form || form.style.display === 'none') return;
+    if (!pageState._showingNewForm || !form || form.style.display === 'none') return;
     var t = e.target;
     var inForm = t && t.closest && t.closest('#new-assess-form');
     if (!inForm && t !== document.body) return;
     if (document.querySelector('.confirm-overlay, #rubric-modal') || _compPickerOpen()) return;
     if (window.RubricBank && RubricBank.isOpen()) return;
     e.preventDefault();
-    if (_afTipSource) return _hideAfTip();
-    var aid = _editingAssessId;
+    if (pageState._afTipSource) return _hideAfTip();
+    var aid = pageState._editingAssessId;
     cancelAssessForm(function () {
       // Back to the button that opened the form: the card's ⋯ for Edit
       // Assessment, which sits in its menu.
@@ -4471,19 +4491,22 @@ window.PageAssignments = (function () {
     var view = document.getElementById('af-rubric-view');
     var sel = document.getElementById('af-rubric');
     if (!view || !sel) return;
-    var cid = activeCourse;
-    var pending = _pendingFormRubric && sel.value === _pendingFormRubric.id ? _pendingFormRubric : null;
+    var cid = pageState.activeCourse;
+    var pending =
+      pageState._pendingFormRubric && sel.value === pageState._pendingFormRubric.id
+        ? pageState._pendingFormRubric
+        : null;
     var rubric = pending || (sel.value ? getRubricById(cid, sel.value) : null);
     var picking = !document.getElementById('af-rubric-pick').hidden;
     // Pick Another Rubric opens Choose in the chosen rubric's place.
-    if (rubric && (_startOpen === 'choose' || _startOpen === 'blank')) {
+    if (rubric && (pageState._startOpen === 'choose' || pageState._startOpen === 'blank')) {
       // html-safe: _startCardHtml escapes every name, code and title; the grid is RubricBank.gridHtml
-      view.innerHTML = _startCardHtml(cid, _startOpen, true);
+      view.innerHTML = _startCardHtml(cid, pageState._startOpen, true);
       _afterStartRender();
       return;
     }
     if (rubric) {
-      var editingId = _editingAssessId;
+      var editingId = pageState._editingAssessId;
       var others = getAssessments(cid).filter(function (a) {
         return a.rubricId === rubric.id && a.id !== editingId;
       }).length;
@@ -4542,13 +4565,13 @@ window.PageAssignments = (function () {
         off: !canCopy,
       },
     ];
-    var stop = _startOpen || 'blank';
+    var stop = pageState._startOpen || 'blank';
     // html-safe: fixed labels, counts, _startCardHtml (escapes its values) and esc() on the last-used name and id
     view.innerHTML =
       '<div class="af-rubric-starts" role="tablist" aria-label="Start a Rubric">' +
       starts
         .map(function (st) {
-          var open = _startOpen === st.name;
+          var open = pageState._startOpen === st.name;
           return (
             '<button type="button" class="af-rubric-start' +
             (open ? ' is-open' : '') +
@@ -4577,8 +4600,8 @@ window.PageAssignments = (function () {
         })
         .join('') +
       '</div>' +
-      (_startOpen ? _startCardHtml(cid, _startOpen, false) : '') +
-      (last && (!_startOpen || _startOpen === 'blank')
+      (pageState._startOpen ? _startCardHtml(cid, pageState._startOpen, false) : '') +
+      (last && (!pageState._startOpen || pageState._startOpen === 'blank')
         ? '<p class="af-rubric-last">Last used <b>' +
           esc(last.name) +
           '</b><button type="button" class="af-link-btn" data-action="useLastRubric" data-rid="' +
@@ -4586,7 +4609,7 @@ window.PageAssignments = (function () {
           '">Use It Again</button></p>'
         : '');
     var row = view.querySelector('.af-rubric-starts');
-    if (row) row.classList.toggle('has-open', !!_startOpen);
+    if (row) row.classList.toggle('has-open', !!pageState._startOpen);
     _afterStartRender();
   }
 
@@ -4595,32 +4618,32 @@ window.PageAssignments = (function () {
      Competency Rubric's look: grey head with the title and buttons, the
      body, a grey footer line. One is open at a time; Close, Esc, another
      start, or a scoring mode without a rubric closes it. */
-  var _startOpen = null;
-  var _choose = { query: '', selected: null };
+  pageState._startOpen = null;
+  pageState._choose = { query: '', selected: null };
 
   function openStart(name) {
-    if (_startOpen === name) return closeStart();
-    _startOpen = name;
+    if (pageState._startOpen === name) return closeStart();
+    pageState._startOpen = name;
     if (name === 'choose') {
       var sel = document.getElementById('af-rubric');
       var current = sel && sel.value ? sel.value : null;
       var g = _chooseGroups('');
       var top = g.suggested[0] || g.recent[0] || g.rest[0];
-      _choose = { query: '', selected: current || (top ? top.id : null), focusSearch: true };
+      pageState._choose = { query: '', selected: current || (top ? top.id : null), focusSearch: true };
     }
     // A Blank draft the teacher has written in is kept while another start
     // is open, and shows again when Blank reopens; Cancel on it asks first.
     if (name === 'blank') {
       if (_blankWritten()) {
-        _blank.focusName = true;
-        _blank.picker = null;
-        _blank.menu = null;
-      } else _blank = _blankState(_newBlankDraft(), false);
-      _blank.focusName = true;
-    } else if (!_blankWritten()) _blank = null;
+        pageState._blank.focusName = true;
+        pageState._blank.picker = null;
+        pageState._blank.menu = null;
+      } else pageState._blank = _blankState(_newBlankDraft(), false);
+      pageState._blank.focusName = true;
+    } else if (!_blankWritten()) pageState._blank = null;
     if (name === 'copy') {
-      var first = _copySources(activeCourse)[0];
-      _copy = { from: first ? first.id : null, selected: null, focusFrom: true };
+      var first = _copySources(pageState.activeCourse)[0];
+      pageState._copy = { from: first ? first.id : null, selected: null, focusFrom: true };
       _copyLoad();
     }
     _renderRubricView();
@@ -4628,13 +4651,13 @@ window.PageAssignments = (function () {
   /* Closes the open start. A written Blank draft is kept (the Blank tab
      opens it again) unless `discard`. */
   function closeStart(discard) {
-    if (!_startOpen) return;
-    var was = _startOpen;
-    _startOpen = null;
-    if (was === 'blank' && (discard === true || !_blankWritten())) _blank = null;
-    if (_blank) {
-      _blank.picker = null;
-      _blank.menu = null;
+    if (!pageState._startOpen) return;
+    var was = pageState._startOpen;
+    pageState._startOpen = null;
+    if (was === 'blank' && (discard === true || !_blankWritten())) pageState._blank = null;
+    if (pageState._blank) {
+      pageState._blank.picker = null;
+      pageState._blank.menu = null;
     }
     _renderRubricView();
     var back = document.querySelector('.af-rubric-start[data-start="' + was + '"]');
@@ -4648,8 +4671,8 @@ window.PageAssignments = (function () {
       return cb.value;
     });
     return window.RubricBank && RubricBank.pickGroups
-      ? RubricBank.pickGroups(activeCourse, query, ticked)
-      : { suggested: [], recent: [], rest: getRubrics(activeCourse) };
+      ? RubricBank.pickGroups(pageState.activeCourse, query, ticked)
+      : { suggested: [], recent: [], rest: getRubrics(pageState.activeCourse) };
   }
 
   // The codes of the competencies a rubric scores, in order.
@@ -4664,7 +4687,7 @@ window.PageAssignments = (function () {
     if (name === 'copy') return _copyCardHtml(cid);
     if (name === 'blank') return _blankCardHtml(cid, inPlace);
     if (name !== 'choose') return '';
-    var r = _choose.selected ? getRubricById(cid, _choose.selected) : null;
+    var r = pageState._choose.selected ? getRubricById(cid, pageState._choose.selected) : null;
     var sel = document.getElementById('af-rubric');
     var current = sel && sel.value ? sel.value : '';
     var codes = r ? _rubricCodes(cid, r) : [];
@@ -4691,7 +4714,7 @@ window.PageAssignments = (function () {
       '<div class="af-start-pick">' +
       '<div class="af-start-side">' +
       '<input class="af-input af-start-search" id="af-start-search" type="search" autocomplete="off" placeholder="Search this class’s rubrics" aria-label="Search this class’s rubrics" value="' +
-      esc(_choose.query) +
+      esc(pageState._choose.query) +
       '">' +
       '<div class="af-start-list" id="af-start-list" role="listbox" aria-label="Rubrics">' +
       _chooseListHtml(cid) +
@@ -4731,7 +4754,7 @@ window.PageAssignments = (function () {
   }
 
   function _chooseListHtml(cid) {
-    var g = _chooseGroups(_choose.query);
+    var g = _chooseGroups(pageState._choose.query);
     if (!g.suggested.length && !g.recent.length && !g.rest.length) {
       return (
         '<p class="af-start-empty">' + (getRubrics(cid).length ? 'No rubric matches.' : 'No rubrics yet.') + '</p>'
@@ -4748,9 +4771,9 @@ window.PageAssignments = (function () {
         .join(' · ');
       return (
         '<button type="button" class="af-start-row' +
-        (r.id === _choose.selected ? ' is-on' : '') +
+        (r.id === pageState._choose.selected ? ' is-on' : '') +
         '" role="option" aria-selected="' +
-        (r.id === _choose.selected) +
+        (r.id === pageState._choose.selected) +
         '" data-action="startPickRow" data-rid="' +
         esc(r.id) +
         '"><b>' +
@@ -4787,8 +4810,8 @@ window.PageAssignments = (function () {
     }
     if (card.dataset.start === 'blank') {
       _blankSizeCells();
-      if (_blank && _blank.focusName) {
-        _blank.focusName = false;
+      if (pageState._blank && pageState._blank.focusName) {
+        pageState._blank.focusName = false;
         var nm = document.getElementById('af-ge-name');
         if (nm) nm.focus({ preventScroll: true });
       }
@@ -4802,13 +4825,13 @@ window.PageAssignments = (function () {
     }
     var on = card.querySelector('.af-start-row.is-on');
     _scrollIntoViewIfNeeded(on, { block: 'nearest' });
-    if (_copy.focusFrom && _startOpen === 'copy') {
-      _copy.focusFrom = false;
+    if (pageState._copy.focusFrom && pageState._startOpen === 'copy') {
+      pageState._copy.focusFrom = false;
       var from = document.getElementById('af-copy-from');
       if (from) from.focus({ preventScroll: true });
     }
-    if (_choose.focusSearch) {
-      _choose.focusSearch = false;
+    if (pageState._choose.focusSearch) {
+      pageState._choose.focusSearch = false;
       var search = document.getElementById('af-start-search');
       if (search) search.focus({ preventScroll: true });
     }
@@ -4824,8 +4847,8 @@ window.PageAssignments = (function () {
   }
 
   function _startPickRow(rid, focusRow) {
-    if (_startOpen === 'copy') _copy.selected = rid;
-    else _choose.selected = rid;
+    if (pageState._startOpen === 'copy') pageState._copy.selected = rid;
+    else pageState._choose.selected = rid;
     _renderRubricView();
     if (focusRow) {
       var row = document.querySelector('.af-start-row[data-rid="' + CSS.escape(rid) + '"]');
@@ -4833,10 +4856,10 @@ window.PageAssignments = (function () {
     }
   }
   function _startPickUse() {
-    if (_startOpen === 'copy') return _copyUse();
-    var rid = _choose.selected;
+    if (pageState._startOpen === 'copy') return _copyUse();
+    var rid = pageState._choose.selected;
     if (!rid) return;
-    _startOpen = null;
+    pageState._startOpen = null;
     var sel = document.getElementById('af-rubric');
     if (sel && sel.value === rid) {
       _renderRubricView();
@@ -4848,7 +4871,7 @@ window.PageAssignments = (function () {
     _focusRubricCard('chooseRubric');
   }
   function _startPickNone() {
-    _startOpen = null;
+    pageState._startOpen = null;
     _useRubricInForm('');
     _renderRubricView();
   }
@@ -4856,15 +4879,15 @@ window.PageAssignments = (function () {
   function _startSearch(e) {
     var t = e.target;
     if (!t || t.id !== 'af-start-search') return;
-    _choose.query = t.value;
-    var g = _chooseGroups(_choose.query);
+    pageState._choose.query = t.value;
+    var g = _chooseGroups(pageState._choose.query);
     var all = g.suggested.concat(g.recent, g.rest);
     if (
       !all.some(function (r) {
-        return r.id === _choose.selected;
+        return r.id === pageState._choose.selected;
       })
     )
-      _choose.selected = all[0] ? all[0].id : null;
+      pageState._choose.selected = all[0] ? all[0].id : null;
     var pos = t.selectionStart;
     _renderRubricView();
     var again = document.getElementById('af-start-search');
@@ -4919,13 +4942,13 @@ window.PageAssignments = (function () {
       // In the editor, Esc closes its picker or menu; it never throws away
       // what the teacher wrote (Cancel does that).
       if (card.dataset.start === 'blank') {
-        if (_blank && (_blank.picker || _blank.menu != null)) {
+        if (pageState._blank && (pageState._blank.picker || pageState._blank.menu != null)) {
           // Back to the button that opened it.
-          var back = _blank.picker
-            ? '[data-action="gePicker"][data-i="' + _blank.picker.i + '"]'
-            : '[data-action="geMenu"][data-i="' + _blank.menu + '"]';
-          _blank.picker = null;
-          _blank.menu = null;
+          var back = pageState._blank.picker
+            ? '[data-action="gePicker"][data-i="' + pageState._blank.picker.i + '"]'
+            : '[data-action="geMenu"][data-i="' + pageState._blank.menu + '"]';
+          pageState._blank.picker = null;
+          pageState._blank.menu = null;
           _blankRender(back);
         }
         return;
@@ -4935,7 +4958,7 @@ window.PageAssignments = (function () {
     }
     if (card.dataset.start === 'blank' && e.target.closest('.af-ge-picker')) return _blankPickerKey(e);
     if (card.dataset.start !== 'choose' && card.dataset.start !== 'copy') return;
-    var picked = card.dataset.start === 'copy' ? _copy.selected : _choose.selected;
+    var picked = card.dataset.start === 'copy' ? pageState._copy.selected : pageState._choose.selected;
     var rows = Array.from(card.querySelectorAll('.af-start-row'));
     var at = rows.findIndex(function (r) {
       return r.dataset.rid === picked;
@@ -4965,7 +4988,7 @@ window.PageAssignments = (function () {
      Copy Grading Setup and assessment copies match them); from any other,
      the copy brings its criteria and wording only (Colin, Nov 2). The copy
      is held like any rubric made on the form, saved when the assessment is. */
-  var _copy = { from: null, selected: null };
+  pageState._copy = { from: null, selected: null };
 
   function _copySources(cid) {
     if (!window.AssessmentCopy) return [];
@@ -4981,19 +5004,19 @@ window.PageAssignments = (function () {
   }
 
   function _copyLoad() {
-    var from = _copy.from;
+    var from = pageState._copy.from;
     if (!from || !window.RubricLibrary) return;
-    _copy.loading = true;
+    pageState._copy.loading = true;
     RubricLibrary.loadClass(from).then(function () {
-      if (_startOpen !== 'copy' || _copy.from !== from) return;
-      _copy.loading = false;
+      if (pageState._startOpen !== 'copy' || pageState._copy.from !== from) return;
+      pageState._copy.loading = false;
       var list = getRubrics(from) || [];
       if (
         !list.some(function (r) {
-          return r.id === _copy.selected;
+          return r.id === pageState._copy.selected;
         })
       )
-        _copy.selected = list[0] ? list[0].id : null;
+        pageState._copy.selected = list[0] ? list[0].id : null;
       // Keep the teacher's place: the From menu (or a row) stays focused.
       var had = document.activeElement;
       var hadId = had && had.id;
@@ -5006,7 +5029,7 @@ window.PageAssignments = (function () {
   }
 
   function _copyFromChanged(cidFrom) {
-    _copy = { from: cidFrom, selected: null };
+    pageState._copy = { from: cidFrom, selected: null };
     _copyLoad();
     _renderRubricView();
     var sel = document.getElementById('af-copy-from');
@@ -5016,7 +5039,7 @@ window.PageAssignments = (function () {
   // The rubric as it would arrive: without the other class's competencies
   // when the curricula differ.
   function _copyPreviewRubric(from, r) {
-    if (_sameCurriculum(activeCourse, from)) return r;
+    if (_sameCurriculum(pageState.activeCourse, from)) return r;
     var bare = structuredClone(r);
     bare.tagIds = [];
     bare.criteria = (bare.criteria || []).map(function (c) {
@@ -5026,11 +5049,11 @@ window.PageAssignments = (function () {
   }
 
   function _copyCardHtml(cid) {
-    var from = _copy.from;
+    var from = pageState._copy.from;
     var sources = _copySources(cid);
     var same = from && _sameCurriculum(cid, from);
-    var list = from && !_copy.loading ? getRubrics(from) || [] : [];
-    var r = _copy.selected && from ? getRubricById(from, _copy.selected) : null;
+    var list = from && !pageState._copy.loading ? getRubrics(from) || [] : [];
+    var r = pageState._copy.selected && from ? getRubricById(from, pageState._copy.selected) : null;
     var fromName = from ? _pastClassName(from) : '';
     var head =
       '<div class="af-rubric-card-head">' +
@@ -5041,7 +5064,7 @@ window.PageAssignments = (function () {
       '<button type="button" class="btn btn-primary" data-action="startPickUse"' +
       (r ? '' : ' disabled') +
       '>Copy and Use</button></div>';
-    var rows = _copy.loading
+    var rows = pageState._copy.loading
       ? '<p class="af-start-empty">Loading…</p>'
       : list.length
         ? '<div class="af-start-group">' +
@@ -5052,9 +5075,9 @@ window.PageAssignments = (function () {
               var codes = same ? _rubricCodes(from, x) : [];
               return (
                 '<button type="button" class="af-start-row' +
-                (x.id === _copy.selected ? ' is-on' : '') +
+                (x.id === pageState._copy.selected ? ' is-on' : '') +
                 '" role="option" aria-selected="' +
-                (x.id === _copy.selected) +
+                (x.id === pageState._copy.selected) +
                 '" data-action="startPickRow" data-rid="' +
                 esc(x.id) +
                 '"><b>' +
@@ -5106,10 +5129,10 @@ window.PageAssignments = (function () {
   }
 
   function _copyUse() {
-    var from = _copy.from;
-    var r = from && _copy.selected ? getRubricById(from, _copy.selected) : null;
+    var from = pageState._copy.from;
+    var r = from && pageState._copy.selected ? getRubricById(from, pageState._copy.selected) : null;
     if (!r || !window.RubricLibrary) return;
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var go = function () {
       var held = RubricLibrary.cloneRubric(from, cid, r);
       if (!_sameCurriculum(cid, from)) {
@@ -5120,7 +5143,7 @@ window.PageAssignments = (function () {
       }
       delete held.copyGroup;
       held.name = RubricLibrary.uniqueName(r.name, getRubrics(cid) || []);
-      _startOpen = null;
+      pageState._startOpen = null;
       _holdFormRubric(held);
       _renderRubricView();
     };
@@ -5138,7 +5161,7 @@ window.PageAssignments = (function () {
      a new assessment. Save Rubric holds the rubric like any made on the
      form; Create holds a touched blank on its own, and an untouched one is
      never saved. Edit Rubric on a held rubric opens it here. */
-  var _blank = null;
+  pageState._blank = null;
 
   // The editor's state: the draft, whether it was typed in, and the draft
   // as it opened (to tell a real edit from a click).
@@ -5147,18 +5170,22 @@ window.PageAssignments = (function () {
   }
   // True when the open or kept Blank draft differs from how it opened.
   function _blankWritten() {
-    return !!(_blank && _blank.touched && JSON.stringify(_blank.draft) !== _blank.orig);
+    return !!(
+      pageState._blank &&
+      pageState._blank.touched &&
+      JSON.stringify(pageState._blank.draft) !== pageState._blank.orig
+    );
   }
   /* The editor's Cancel: a draft with writing in it asks first. Editing a
      rubric made on the form leaves that rubric as it was. */
   function _cancelBlank() {
-    var inModal = _blank && _blank.host === 'modal';
+    var inModal = pageState._blank && pageState._blank.host === 'modal';
     var done = function () {
       if (inModal) _closeRubricModal();
       else closeStart(true);
     };
     if (!_blankWritten()) return done();
-    var name = String((_blank && _blank.draft.name) || '').trim();
+    var name = String((pageState._blank && pageState._blank.draft.name) || '').trim();
     _formDialog('Discard This Rubric?', (name || 'This rubric') + ' isn\u2019t saved. What you wrote in it is lost.', [
       { label: 'Keep Editing', style: 'cancel' },
       {
@@ -5203,7 +5230,7 @@ window.PageAssignments = (function () {
     var own = window.RubricScale && RubricScale.has(d);
     var name = own ? RubricScale.name(d, lv) : PROF_LABELS[lv];
     var tone = own ? RubricScale.tone(d, lv) : lv;
-    var open = _blank.colMenu === lv;
+    var open = pageState._blank.colMenu === lv;
     var cols = own ? RubricScale.columns(d).length : 4;
     var menu = '';
     if (open) {
@@ -5274,8 +5301,8 @@ window.PageAssignments = (function () {
   }
 
   function _blankCardHtml(cid, inPlace) {
-    if (!_blank) _blank = _blankState(_newBlankDraft(), false);
-    var d = _blank.draft;
+    if (!pageState._blank) pageState._blank = _blankState(_newBlankDraft(), false);
+    var d = pageState._blank.draft;
     var style = rubricStyle(d);
     var levels = _blankLevels(cid, d);
     var own = !!window.RubricScale && RubricScale.has(d);
@@ -5307,7 +5334,7 @@ window.PageAssignments = (function () {
       '<div class="af-ge-whole"><span class="af-ge-whole-label">Whole Rubric Scores</span>' +
       _blankChipsHtml(cid, d.tagIds || [], -2) +
       '<button type="button" class="af-link-btn" data-action="gePicker" data-i="-2">+ Competency</button>' +
-      (_blank.picker && _blank.picker.i === -2 ? _blankPickerHtml(cid, -2) : '') +
+      (pageState._blank.picker && pageState._blank.picker.i === -2 ? _blankPickerHtml(cid, -2) : '') +
       '</div>';
     var grid =
       '<table class="rb-grid af-ge-grid' +
@@ -5340,7 +5367,7 @@ window.PageAssignments = (function () {
         ? ''
         : '<button type="button" class="af-link-btn" data-action="gePicker" data-i="-1">+ From Competency</button>') +
       _cm('foot') +
-      (_blank.picker && _blank.picker.i === -1 ? _blankPickerHtml(cid, -1) : '') +
+      (pageState._blank.picker && pageState._blank.picker.i === -1 ? _blankPickerHtml(cid, -1) : '') +
       '</div>';
     return (
       '<div class="af-rubric-card af-start-card af-ge-card" data-start="blank"' +
@@ -5382,11 +5409,11 @@ window.PageAssignments = (function () {
 
   // Comments in the editor (teacher/rubric-comment-lines.js): '' while its switch is off.
   function _cm(what, a, b, c) {
-    return window.RubricCommentLines ? RubricCommentLines[what](_blank, activeCourse, a, b, c) : '';
+    return window.RubricCommentLines ? RubricCommentLines[what](pageState._blank, pageState.activeCourse, a, b, c) : '';
   }
   function _blankRowHtml(cid, d, c, i, levels, style) {
     var chips = _blankChipsHtml(cid, c.tagIds || [], i);
-    var menuOpen = _blank.menu === i;
+    var menuOpen = pageState._blank.menu === i;
     var menu = menuOpen
       ? '<div class="af-ge-menu" role="group" aria-label="Criterion settings">' +
         '<label>Weight <input class="af-input" type="number" min="0" step="0.5" data-ge="weight" data-i="' +
@@ -5498,7 +5525,7 @@ window.PageAssignments = (function () {
       _cm('tools', i) +
       '</div>' +
       menu +
-      (_blank.picker && _blank.picker.i === i ? _blankPickerHtml(cid, i) : '') +
+      (pageState._blank.picker && pageState._blank.picker.i === i ? _blankPickerHtml(cid, i) : '') +
       '</th>' +
       cells +
       // The + column's empty cell, so the rows line up under it.
@@ -5519,20 +5546,20 @@ window.PageAssignments = (function () {
           ? 'Add a competency the whole rubric scores'
           : 'Add a competency') +
       '"><input class="af-input" id="af-ge-pick-search" type="search" autocomplete="off" placeholder="Type a code or words" aria-label="Find a competency" value="' +
-      esc((_blank.picker && _blank.picker.query) || '') +
+      esc((pageState._blank.picker && pageState._blank.picker.query) || '') +
       '"><div class="af-ge-pick-list" id="af-ge-pick-list">' +
       _blankPickListHtml(cid, i) +
       '</div></div>'
     );
   }
   function _blankPickListHtml(cid, i) {
-    var q = String((_blank.picker && _blank.picker.query) || '')
+    var q = String((pageState._blank.picker && pageState._blank.picker.query) || '')
       .trim()
       .toLowerCase();
     // A competency is on the whole rubric or on criteria, never both: the
     // whole rubric's picker leaves out every criterion's, and a criterion's
     // leaves out the whole rubric's.
-    var d = _blank.draft;
+    var d = pageState._blank.draft;
     var have = (d.tagIds || []).slice();
     if (i >= 0) have = have.concat((d.criteria[i] || {}).tagIds || []);
     if (i === -2)
@@ -5596,12 +5623,12 @@ window.PageAssignments = (function () {
   }
   // A click outside an open ··· menu or picker closes it, as Esc does.
   function _blankOutside(e) {
-    if (!_blank || (_blank.menu == null && !_blank.picker)) return;
+    if (!pageState._blank || (pageState._blank.menu == null && !pageState._blank.picker)) return;
     var t = e.target;
     if (!t || !t.closest) return;
     if (t.closest('.af-ge-menu, .af-ge-picker, [data-action="geMenu"], [data-action="gePicker"]')) return;
-    _blank.menu = null;
-    _blank.picker = null;
+    pageState._blank.menu = null;
+    pageState._blank.picker = null;
     document.querySelectorAll('.af-ge-card .af-ge-menu, .af-ge-card .af-ge-picker').forEach(function (el) {
       el.remove();
     });
@@ -5650,7 +5677,7 @@ window.PageAssignments = (function () {
           : a && a.id
             ? '#' + a.id
             : null);
-    var inModal = _blank && _blank.host === 'modal';
+    var inModal = pageState._blank && pageState._blank.host === 'modal';
     if (inModal) _renderRubricModal();
     else _renderRubricView();
     var back = keep ? document.querySelector((inModal ? '#rubric-modal ' : '') + '.af-ge-card ' + keep) : null;
@@ -5697,25 +5724,25 @@ window.PageAssignments = (function () {
   // Typing: the draft follows each field; nothing redraws.
   function _blankInput(e) {
     var t = e.target;
-    if (!_blank || !t || !t.closest || !t.closest('.af-ge-card')) return;
-    var d = _blank.draft;
+    if (!pageState._blank || !t || !t.closest || !t.closest('.af-ge-card')) return;
+    var d = pageState._blank.draft;
     if (t.id === 'af-ge-name') {
       d.name = t.value;
-      _blank.touched = true;
+      pageState._blank.touched = true;
       return;
     }
     if (t.id === 'af-ge-pick-search') {
-      _blank.picker.query = t.value;
+      pageState._blank.picker.query = t.value;
       var list = document.getElementById('af-ge-pick-list');
       // html-safe: _blankPickListHtml escapes every code and name
-      if (list) list.innerHTML = _blankPickListHtml(activeCourse, _blank.picker.i);
+      if (list) list.innerHTML = _blankPickListHtml(pageState.activeCourse, pageState._blank.picker.i);
       return;
     }
     var kind = t.dataset && t.dataset.ge;
     if (!kind) return;
     // A level's name, typed in its header; Counts As, picked in its menu.
     if (kind === 'colname' || kind === 'colcounts') {
-      _blank.touched = true;
+      pageState._blank.touched = true;
       var k = Number(t.dataset.k);
       if (kind === 'colname') {
         var was = window.RubricScale && RubricScale.has(d);
@@ -5732,7 +5759,7 @@ window.PageAssignments = (function () {
     }
     var c = d.criteria[Number(t.dataset.i)];
     if (!c) return;
-    _blank.touched = true;
+    pageState._blank.touched = true;
     var lv = Number(t.dataset.level);
     if (kind === 'name') {
       c.name = t.value.replace(/\n/g, ' ');
@@ -5756,24 +5783,24 @@ window.PageAssignments = (function () {
   }
 
   function _blankAct(action, el) {
-    if (!_blank) return;
-    var d = _blank.draft;
+    if (!pageState._blank) return;
+    var d = pageState._blank.draft;
     var i = Number(el.dataset.i);
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     if (action === 'geStyle') {
       d.style = el.dataset.style;
       // A Single-Point rubric states one standard: its own columns go.
       if (d.style === 'single_point' && d.scale) d.scale = null;
-      _blank.colMenu = null;
-      _blank.touched = true;
+      pageState._blank.colMenu = null;
+      pageState._blank.touched = true;
     } else if (action === 'geAddCrit') {
       d.criteria.push(_newBlankCriterion(d.criteria.length + 1));
-      _blank.touched = true;
+      pageState._blank.touched = true;
       _blankRender('[data-ge="name"][data-i="' + (d.criteria.length - 1) + '"]');
       return;
     } else if (action === 'geRemoveCrit') {
       var gone = d.criteria[i];
-      var scoredOn = gone && _blank.host === 'modal' ? _rubricScored[gone.id] || 0 : 0;
+      var scoredOn = gone && pageState._blank.host === 'modal' ? pageState._rubricScored[gone.id] || 0 : 0;
       if (scoredOn && !el.dataset.confirmed) {
         showConfirm(
           'Remove a scored criterion?',
@@ -5788,21 +5815,23 @@ window.PageAssignments = (function () {
         return;
       }
       if (d.criteria.length > 1) d.criteria.splice(i, 1);
-      _blank.menu = null;
-      _blank.touched = true;
+      pageState._blank.menu = null;
+      pageState._blank.touched = true;
     } else if (action === 'geMenu') {
-      _blank.menu = _blank.menu === i ? null : i;
-      _blank.picker = null;
+      pageState._blank.menu = pageState._blank.menu === i ? null : i;
+      pageState._blank.picker = null;
       // Open: the cursor goes to its Weight; closed: back to the ··· button.
       _blankRender(
-        _blank.menu != null ? '[data-ge="weight"][data-i="' + i + '"]' : '[data-action="geMenu"][data-i="' + i + '"]',
+        pageState._blank.menu != null
+          ? '[data-ge="weight"][data-i="' + i + '"]'
+          : '[data-action="geMenu"][data-i="' + i + '"]',
       );
       _blankClearFooter();
       return;
     } else if (action === 'gePicker') {
-      _blank.picker = _blank.picker && _blank.picker.i === i ? null : { i: i, query: '' };
-      _blank.menu = null;
-      _blankRender(_blank.picker ? '#af-ge-pick-search' : null);
+      pageState._blank.picker = pageState._blank.picker && pageState._blank.picker.i === i ? null : { i: i, query: '' };
+      pageState._blank.menu = null;
+      _blankRender(pageState._blank.picker ? '#af-ge-pick-search' : null);
       _blankClearFooter();
       return;
     } else if (action === 'geRemoveTag') {
@@ -5811,11 +5840,11 @@ window.PageAssignments = (function () {
         c.tagIds = (c.tagIds || []).filter(function (t) {
           return t !== el.dataset.tag;
         });
-      _blank.touched = true;
+      pageState._blank.touched = true;
     } else if (action === 'gePick') {
       var tag = getTagById(cid, el.dataset.tag);
-      _blank.picker = null;
-      _blank.touched = true;
+      pageState._blank.picker = null;
+      pageState._blank.touched = true;
       if (!tag) return _blankRender();
       if (i === -2) {
         if ((d.tagIds || []).indexOf(tag.id) < 0) d.tagIds = (d.tagIds || []).concat([tag.id]);
@@ -5860,16 +5889,16 @@ window.PageAssignments = (function () {
         cc.checks = (cc.checks || []).concat([
           { id: uid(), level: lv, label: '', displayOrder: RubricChecks.checksAt(cc, lv).length },
         ]);
-        _blank.touched = true;
+        pageState._blank.touched = true;
         var k = RubricChecks.checksAt(cc, lv).length - 1;
         _blankRender('[data-ge="check"][data-i="' + i + '"][data-level="' + lv + '"][data-k="' + k + '"]');
         return;
       }
     } else if (action === 'geColMenu') {
       var mk = Number(el.dataset.k);
-      _blank.colMenu = _blank.colMenu === mk ? null : mk;
-      _blank.menu = null;
-      _blank.picker = null;
+      pageState._blank.colMenu = pageState._blank.colMenu === mk ? null : mk;
+      pageState._blank.menu = null;
+      pageState._blank.picker = null;
       _blankRender('[data-action="geColMenu"][data-k="' + mk + '"]');
       return;
     } else if (action === 'geColAdd' || action === 'geColInsert' || action === 'geColRemove') {
@@ -5894,8 +5923,8 @@ window.PageAssignments = (function () {
         done = RubricScale.insertLevel(d, at, 'New Level');
       }
       if (!done) return;
-      _blank.colMenu = null;
-      _blank.touched = true;
+      pageState._blank.colMenu = null;
+      pageState._blank.touched = true;
       if (action === 'geColRemove') return _blankRender();
       var made = RubricScale.columns(d).filter(function (cc) {
         return cc.name === 'New Level';
@@ -5905,7 +5934,7 @@ window.PageAssignments = (function () {
       if (box) box.select();
       return;
     } else if (action === 'geSave') {
-      if (_blank.host === 'modal') _saveModalRubric();
+      if (pageState._blank.host === 'modal') _saveModalRubric();
       else _blankSave(false);
       return;
     } else if (action === 'geDupCrit' || action === 'geMoveCrit') {
@@ -5921,8 +5950,8 @@ window.PageAssignments = (function () {
           return Object.assign({}, k, { id: uid() });
         });
         d.criteria.splice(i + 1, 0, copy);
-        _blank.menu = null;
-        _blank.touched = true;
+        pageState._blank.menu = null;
+        pageState._blank.touched = true;
         _blankRender('[data-ge="name"][data-i="' + (i + 1) + '"]');
         return;
       }
@@ -5930,8 +5959,8 @@ window.PageAssignments = (function () {
       if (to < 0 || to >= d.criteria.length) return;
       d.criteria.splice(i, 1);
       d.criteria.splice(to, 0, src);
-      _blank.menu = to;
-      _blank.touched = true;
+      pageState._blank.menu = to;
+      pageState._blank.touched = true;
       _blankRender('[data-action="geMoveCrit"][data-i="' + to + '"][data-dir="' + el.dataset.dir + '"]');
       return;
     }
@@ -5943,8 +5972,8 @@ window.PageAssignments = (function () {
      assessment. On scored work a new rubric asks first, as any rubric change
      does; `then` runs once it is held. */
   function _blankSave(auto, then) {
-    if (!_blank) return false;
-    var d = _blank.draft;
+    if (!pageState._blank) return false;
+    var d = pageState._blank.draft;
     var name = String(d.name || '').trim();
     if (!name) {
       if (!auto) {
@@ -5967,8 +5996,8 @@ window.PageAssignments = (function () {
     });
     _dropBlankChecks(held);
     var hold = function () {
-      _startOpen = null;
-      _blank = null;
+      pageState._startOpen = null;
+      pageState._blank = null;
       _holdFormRubric(held);
       _renderRubricView();
       if (then) then();
@@ -5992,7 +6021,7 @@ window.PageAssignments = (function () {
      teacher changes the rubric. */
   function _commitOpenBlank(resume) {
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    var written = _blank && (_startOpen === 'blank' ? _blank.touched : _blankWritten());
+    var written = pageState._blank && (pageState._startOpen === 'blank' ? pageState._blank.touched : _blankWritten());
     if (!(written && mode === 'proficiency')) return false;
     var asking = true;
     var held = false;
@@ -6006,7 +6035,7 @@ window.PageAssignments = (function () {
 
   // The rubric on this class's most recent assessment (by date), for Use It Again.
   function _lastUsedRubric(cid) {
-    var editingId = _editingAssessId;
+    var editingId = pageState._editingAssessId;
     var latest = getAssessments(cid)
       .filter(function (a) {
         return a && a.id !== editingId && a.rubricId && getRubricById(cid, a.rubricId);
@@ -6032,7 +6061,7 @@ window.PageAssignments = (function () {
     var keep = dd.value;
     dd.innerHTML =
       '<option value="">None</option>' +
-      getRubrics(activeCourse)
+      getRubrics(pageState.activeCourse)
         .map(function (r) {
           return '<option value="' + esc(r.id) + '">' + esc(r.name) + ' (' + r.criteria.length + ' criteria)</option>';
         })
@@ -6049,8 +6078,8 @@ window.PageAssignments = (function () {
       return;
     }
     if (rid) {
-      _startOpen = null;
-      _blank = null;
+      pageState._startOpen = null;
+      pageState._blank = null;
     }
     if (!rid) {
       dd.value = '';
@@ -6076,18 +6105,18 @@ window.PageAssignments = (function () {
   function editRubricFromForm() {
     var sel = document.getElementById('af-rubric');
     if (!sel || !sel.value) return;
-    var cid = activeCourse;
-    if (_pendingFormRubric && _pendingFormRubric.id === sel.value) {
+    var cid = pageState.activeCourse;
+    if (pageState._pendingFormRubric && pageState._pendingFormRubric.id === sel.value) {
       // A rubric made on this form is edited in place (rubric starts PR 5).
-      _startOpen = 'blank';
-      _blank = _blankState(structuredClone(_pendingFormRubric), true);
-      _blank.focusName = true;
+      pageState._startOpen = 'blank';
+      pageState._blank = _blankState(structuredClone(pageState._pendingFormRubric), true);
+      pageState._blank.focusName = true;
       _renderRubricView();
       return;
     }
     var rubric = getRubricById(cid, sel.value);
     if (!rubric) return;
-    var editingId = _editingAssessId;
+    var editingId = pageState._editingAssessId;
     var others = getAssessments(cid).filter(function (a) {
       return a.rubricId === rubric.id && a.id !== editingId;
     }).length;
@@ -6134,8 +6163,8 @@ window.PageAssignments = (function () {
      asks first and names how many students it touches. Scores are kept
      under the rubric's criteria and the scoring they were given in. */
   function _askBeforeScoredChange(what, go, nextMode) {
-    var aid = _editingAssessId;
-    var scored = aid ? _scoredStudentCount(activeCourse, aid) : 0;
+    var aid = pageState._editingAssessId;
+    var scored = aid ? _scoredStudentCount(pageState.activeCourse, aid) : 0;
     var current = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     var keepsScores =
       what === 'scoring' &&
@@ -6173,7 +6202,7 @@ window.PageAssignments = (function () {
   /* Edit a Copy: the rubric with new ids, named after the assessment, opened
      in the editor; it's saved only when the assessment is created. */
   function editRubricCopyForForm(rid) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var src = getRubricById(cid, rid);
     if (!src) return;
     var copy = structuredClone(src);
@@ -6193,7 +6222,7 @@ window.PageAssignments = (function () {
     // so this assessment's scores can move to the copy when it's saved
     // (PR 10). Criteria added, removed or reordered in the editor keep or
     // lose their entry by id, never by position.
-    if (_editingAssessId && _scoredStudentCount(cid, _editingAssessId)) {
+    if (pageState._editingAssessId && _scoredStudentCount(cid, pageState._editingAssessId)) {
       var from = { criteria: {}, checks: {} };
       (src.criteria || []).forEach(function (c, i) {
         var made = copy.criteria[i];
@@ -6215,7 +6244,7 @@ window.PageAssignments = (function () {
   // Edit a Copy: the copy opens in the editor window, held for the form on save.
   function _openFormRubricEditor(rubric) {
     _openRubricModal(rubric, true, true);
-    _blank.forForm = true;
+    pageState._blank.forForm = true;
   }
 
   /* Use This Rubric (rubric starts PR 2, replacing Draft From
@@ -6231,7 +6260,7 @@ window.PageAssignments = (function () {
     _useCompetencyRubric();
   }
   function _useCompetencyRubric() {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
       .map(function (cb) {
         return getTagById(cid, cb.value);
@@ -6271,7 +6300,7 @@ window.PageAssignments = (function () {
   function _renderTagRubric() {
     var slot = document.getElementById('af-tag-rubric');
     if (!slot) return;
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     var hasRubric = !!(document.getElementById('af-rubric') || {}).value;
     var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
@@ -6316,7 +6345,7 @@ window.PageAssignments = (function () {
      teacher's own words, kept in the descriptor bank (per teacher, every
      class, every later rubric and handout). */
   function editMyWording() {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
       .map(function (cb) {
         return getTagById(cid, cb.value);
@@ -6389,7 +6418,7 @@ window.PageAssignments = (function () {
      form helpers it uses. */
   function _cp() {
     AssignCompPicker.configure({
-      activeCourse: activeCourse,
+      activeCourse: pageState.activeCourse,
       onTagChange: onTagChange,
       _hideAfTip: _hideAfTip,
       _refreshCompHint: _refreshCompHint,
@@ -6450,11 +6479,11 @@ window.PageAssignments = (function () {
      shows at once; a click's focus waits like a hover. The Codes focus box
      is not a hover-over: it follows the pointer at once. */
   var AF_HOVER_DELAY = 500;
-  var _afHoverTimer = null;
+  pageState._afHoverTimer = null;
   function _afAfterPause(el, show) {
-    clearTimeout(_afHoverTimer);
-    _afHoverTimer = setTimeout(function () {
-      _afHoverTimer = null;
+    clearTimeout(pageState._afHoverTimer);
+    pageState._afHoverTimer = setTimeout(function () {
+      pageState._afHoverTimer = null;
       if (document.body.contains(el) && el.matches(':hover')) show();
     }, AF_HOVER_DELAY);
   }
@@ -6465,12 +6494,12 @@ window.PageAssignments = (function () {
   /* ── Assessment CRUD ────────────────────────────────────── */
   function showNewForm() {
     _resetCollabState();
-    _showingNewForm = true;
-    _editingAssessId = null;
+    pageState._showingNewForm = true;
+    pageState._editingAssessId = null;
     var form = document.getElementById('new-assess-form');
     if (form) {
       form.style.display = 'block';
-      form.innerHTML = renderAssessForm(activeCourse, null);
+      form.innerHTML = renderAssessForm(pageState.activeCourse, null);
       form.scrollIntoView({ behavior: 'smooth' });
       renderCollabPanel();
       _refreshCountsToward();
@@ -6503,11 +6532,11 @@ window.PageAssignments = (function () {
   }
   function hideNewForm() {
     _hideAfTip();
-    _showingNewForm = false;
-    _editingAssessId = null;
-    _pendingFormRubric = null;
-    _scoreMoveAfterSave = null;
-    _formStart = null;
+    pageState._showingNewForm = false;
+    pageState._editingAssessId = null;
+    pageState._pendingFormRubric = null;
+    pageState._scoreMoveAfterSave = null;
+    pageState._formStart = null;
     var form = document.getElementById('new-assess-form');
     if (form) form.style.display = 'none';
   }
@@ -6516,14 +6545,14 @@ window.PageAssignments = (function () {
      calls `then` again; true while that's under way. The teacher's own
      wording in it starts their next drafts, as a saved rubric's does. */
   function _persistPendingFormRubric(then) {
-    var held = _pendingFormRubric;
+    var held = pageState._pendingFormRubric;
     var dd = document.getElementById('af-rubric');
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (!held || !dd || dd.value !== held.id || mode !== 'proficiency') return false;
-    var cid = activeCourse;
-    _pendingFormRubric = null;
+    var cid = pageState.activeCourse;
+    pageState._pendingFormRubric = null;
     var copiedFrom = held._copiedFrom;
-    var editing = _editingAssessId;
+    var editing = pageState._editingAssessId;
     held = structuredClone(held);
     delete held._copiedFrom;
     // Signed in, saving gives `held` and its criteria the server's ids in
@@ -6543,7 +6572,8 @@ window.PageAssignments = (function () {
     }
     Promise.resolve(saveRubrics(cid, list)).then(function (result) {
       var finalId = result && result.idMap && result.idMap[sent.id] ? result.idMap[sent.id] : held.id;
-      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, sent, result);
+      if (copiedFrom && editing)
+        pageState._scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, sent, result);
       var box = document.getElementById('af-rubric');
       if (box) {
         var opt = box.querySelector('option[value="' + sent.id + '"]');
@@ -6607,8 +6637,8 @@ window.PageAssignments = (function () {
      closes): a form with changes asks first. */
   function cancelAssessForm(then) {
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
-    var editing = !!_editingAssessId;
-    var dirty = _formChanges().length > 0 || !!_pendingFormRubric || _blankWritten();
+    var editing = !!pageState._editingAssessId;
+    var dirty = _formChanges().length > 0 || !!pageState._pendingFormRubric || _blankWritten();
     var close = function () {
       hideNewForm();
       if (typeof then === 'function') then();
@@ -6623,7 +6653,7 @@ window.PageAssignments = (function () {
         ? 'Your changes to ' + (title || 'this assessment') + ' aren\u2019t saved.'
         : (title || 'This assessment') +
             ' hasn\u2019t been created.' +
-            (_pendingFormRubric ? ' The rubric you made for it isn\u2019t kept either.' : ''),
+            (pageState._pendingFormRubric ? ' The rubric you made for it isn\u2019t kept either.' : ''),
       [
         { label: 'Keep Editing', style: 'cancel' },
         { label: 'Discard', style: 'danger', run: close },
@@ -6723,7 +6753,7 @@ window.PageAssignments = (function () {
       } else {
         var header = group.querySelector('.af-section-header');
         var selectAll = header.querySelector('.af-select-all');
-        var sec = getSections(activeCourse).find(function (s) {
+        var sec = getSections(pageState.activeCourse).find(function (s) {
           return s.id === secId;
         });
         var b = document.createElement('span');
@@ -6768,7 +6798,7 @@ window.PageAssignments = (function () {
       })
     )
       return;
-    var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
+    var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(pageState.activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
     var tagIds = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
@@ -6780,7 +6810,7 @@ window.PageAssignments = (function () {
     var coreCompetencyIds = Array.from(document.querySelectorAll('.af-cc-chip.active')).map(function (el) {
       return el.dataset.cc;
     });
-    var assessments = getAssessments(activeCourse);
+    var assessments = getAssessments(pageState.activeCourse);
     var id = uid();
     var rubricId = (document.getElementById('af-rubric') || {}).value || '';
     var dueDate = (document.getElementById('af-due') || {}).value || '';
@@ -6808,12 +6838,13 @@ window.PageAssignments = (function () {
     var formMode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (rubricId && formMode === 'proficiency') newAssess.rubricId = rubricId;
     if (coreCompetencyIds.length > 0) newAssess.coreCompetencyIds = coreCompetencyIds;
-    if (newCollaboration !== 'individual') newAssess.collaboration = newCollaboration;
-    if (collabExcluded.size > 0) newAssess.excludedStudents = Array.from(collabExcluded);
-    if (newCollaboration === 'pair' && collabPairs.length > 0) newAssess.pairs = collabPairs;
-    if (newCollaboration === 'group') {
-      if (collabGroups.length > 0) newAssess.groups = collabGroups;
-      newAssess.groupCount = collabGroupCount;
+    if (pageState.newCollaboration !== 'individual') newAssess.collaboration = pageState.newCollaboration;
+    if (pageState.collabExcluded.size > 0) newAssess.excludedStudents = Array.from(pageState.collabExcluded);
+    if (pageState.newCollaboration === 'pair' && pageState.collabPairs.length > 0)
+      newAssess.pairs = pageState.collabPairs;
+    if (pageState.newCollaboration === 'group') {
+      if (pageState.collabGroups.length > 0) newAssess.groups = pageState.collabGroups;
+      newAssess.groupCount = pageState.collabGroupCount;
     }
     var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (scoreModeVal === 'points') {
@@ -6829,21 +6860,21 @@ window.PageAssignments = (function () {
     if (assessWeight !== 1) newAssess.weight = assessWeight;
     if (FactorField.factoredOn(document)) newAssess.studentsSeeFactored = true;
     // Read before render() replaces the form.
-    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
+    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(pageState.activeCourse) : [];
     if (copyTargets.length) newAssess.copyGroup = AssessmentCopy.newCopyGroup();
-    var formWork = _formWork;
-    var formRes = _formRes;
-    var srcCid = activeCourse;
+    var formWork = pageState._formWork;
+    var formRes = pageState._formRes;
+    var srcCid = pageState.activeCourse;
     assessments.push(newAssess);
-    saveAssessments(activeCourse, assessments);
-    _saveFormWork(activeCourse, id, formWork);
-    if (window.QuizBuilder) QuizBuilder.save(activeCourse, id);
-    _saveFormRes(activeCourse, id, formRes);
+    saveAssessments(pageState.activeCourse, assessments);
+    _saveFormWork(pageState.activeCourse, id, formWork);
+    if (window.QuizBuilder) QuizBuilder.save(pageState.activeCourse, id);
+    _saveFormRes(pageState.activeCourse, id, formRes);
     var keep = addAnother ? _formKeepForNext() : null;
-    openAssessIds.clear();
-    openAssessIds.add(id);
-    _showingNewForm = false;
-    _editingAssessId = null;
+    pageState.openAssessIds.clear();
+    pageState.openAssessIds.add(id);
+    pageState._showingNewForm = false;
+    pageState._editingAssessId = null;
     render();
     if (keep) {
       _reopenWith(keep);
@@ -6859,7 +6890,7 @@ window.PageAssignments = (function () {
       AssessmentCopy.copyToClasses(srcCid, newAssess, copyTargets).then(function () {
         // A form reopened for the next one is left as the teacher has it;
         // the "Also in …" chips show at the next render.
-        if (keep && _showingNewForm && !_editingAssessId) return;
+        if (keep && pageState._showingNewForm && !pageState._editingAssessId) return;
         render();
       });
   }
@@ -6872,7 +6903,7 @@ window.PageAssignments = (function () {
      copy held until Create). Dates reset to today; the title is selected.
      Nothing is saved until Create Assessment. */
   function startFromPast() {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var trigger = document.activeElement;
     var others = Object.keys(COURSES || {}).filter(function (id) {
       return id !== cid;
@@ -7026,7 +7057,7 @@ window.PageAssignments = (function () {
   }
 
   function _fillFromPast(srcCid, a) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var title = document.getElementById('af-title');
     if (!title) return;
     title.value = a.title || '';
@@ -7081,9 +7112,9 @@ window.PageAssignments = (function () {
      choose it. */
   function _holdFormRubric(held) {
     // A chosen rubric closes whichever start was open.
-    _startOpen = null;
-    _blank = null;
-    _pendingFormRubric = held;
+    pageState._startOpen = null;
+    pageState._blank = null;
+    pageState._pendingFormRubric = held;
     var dd = document.getElementById('af-rubric');
     if (dd) {
       var opt = dd.querySelector('option[value="' + held.id + '"]');
@@ -7144,15 +7175,15 @@ window.PageAssignments = (function () {
   }
 
   function editAssess(aid) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
     if (!assess) return;
     AC.collaboration = assess.collaboration || 'individual';
     loadCollabData(assess);
-    _showingNewForm = true;
-    _editingAssessId = aid;
+    pageState._showingNewForm = true;
+    pageState._editingAssessId = aid;
     var form = document.getElementById('new-assess-form');
     if (form) {
       form.style.display = 'block';
@@ -7201,7 +7232,7 @@ window.PageAssignments = (function () {
       })
     )
       return;
-    var assessments = getAssessments(activeCourse);
+    var assessments = getAssessments(pageState.activeCourse);
     var idx = assessments.findIndex(function (a) {
       return a.id === aid;
     });
@@ -7211,7 +7242,7 @@ window.PageAssignments = (function () {
     // stored value, so Save Changes with no edits changes nothing.
     var changes = _formChanges();
     var changed = function (k) {
-      return !_formStart || changes.indexOf(k) >= 0;
+      return !pageState._formStart || changes.indexOf(k) >= 0;
     };
     var val = function (id) {
       return (document.getElementById(id) || {}).value || '';
@@ -7219,7 +7250,7 @@ window.PageAssignments = (function () {
     var next = structuredClone(before);
     if (changed('title')) next.title = title;
     if (changed('assigned')) {
-      var dateAssigned = val('af-date-assigned') || courseToday(activeCourse);
+      var dateAssigned = val('af-date-assigned') || courseToday(pageState.activeCourse);
       next.date = dateAssigned;
       next.dateAssigned = dateAssigned;
     }
@@ -7245,11 +7276,15 @@ window.PageAssignments = (function () {
       next.coreCompetencyIds = ccIds.length > 0 ? ccIds : undefined;
     }
     if (changed('collab')) {
-      next.collaboration = newCollaboration !== 'individual' ? newCollaboration : undefined;
-      next.excludedStudents = collabExcluded.size > 0 ? Array.from(collabExcluded) : undefined;
-      next.pairs = newCollaboration === 'pair' && collabPairs.length > 0 ? collabPairs : undefined;
-      next.groups = newCollaboration === 'group' && collabGroups.length > 0 ? collabGroups : undefined;
-      next.groupCount = newCollaboration === 'group' ? collabGroupCount : undefined;
+      next.collaboration = pageState.newCollaboration !== 'individual' ? pageState.newCollaboration : undefined;
+      next.excludedStudents = pageState.collabExcluded.size > 0 ? Array.from(pageState.collabExcluded) : undefined;
+      next.pairs =
+        pageState.newCollaboration === 'pair' && pageState.collabPairs.length > 0 ? pageState.collabPairs : undefined;
+      next.groups =
+        pageState.newCollaboration === 'group' && pageState.collabGroups.length > 0
+          ? pageState.collabGroups
+          : undefined;
+      next.groupCount = pageState.newCollaboration === 'group' ? pageState.collabGroupCount : undefined;
     }
     if (changed('mode') || changed('maxPoints')) {
       if (scoreModeVal === 'points') {
@@ -7271,10 +7306,10 @@ window.PageAssignments = (function () {
       next.weight = assessWeight !== 1 ? assessWeight : undefined;
     }
     if (changed('factored')) next.studentsSeeFactored = FactorField.factoredOn(document) || undefined;
-    if (AssignDraft.assigning === aid && next.isDraft) AssignDraft.assignInto(activeCourse, next);
+    if (AssignDraft.assigning === aid && next.isDraft) AssignDraft.assignInto(pageState.activeCourse, next);
     // A change that moves grades asks first (grade-change.js).
     if (
-      GradeChange.askFirst(activeCourse, before, next, function () {
+      GradeChange.askFirst(pageState.activeCourse, before, next, function () {
         saveEditAssess(aid);
       })
     )
@@ -7282,13 +7317,13 @@ window.PageAssignments = (function () {
     var edited = JSON.stringify(next) !== JSON.stringify(before);
     if (edited) next.successCriteria = undefined;
     // Read before hideNewForm()/render() replace the form.
-    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
+    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(pageState.activeCourse) : [];
     if (copyTargets.length && !next.copyGroup) next.copyGroup = AssessmentCopy.newCopyGroup();
     if (!edited && !copyTargets.length) {
       // Only the Student Work card or Handouts and Links changed, or nothing: they are kept apart.
-      _saveFormWork(activeCourse, aid, _formWork);
-      if (window.QuizBuilder) QuizBuilder.save(activeCourse, aid);
-      _saveFormRes(activeCourse, aid, _formRes);
+      _saveFormWork(pageState.activeCourse, aid, pageState._formWork);
+      if (window.QuizBuilder) QuizBuilder.save(pageState.activeCourse, aid);
+      _saveFormRes(pageState.activeCourse, aid, pageState._formRes);
       hideNewForm();
       render();
       return;
@@ -7300,21 +7335,22 @@ window.PageAssignments = (function () {
     });
     Object.assign(cur, next);
     var after = structuredClone(cur);
-    var formWork = _formWork;
-    var formRes = _formRes;
-    var srcCid = activeCourse;
-    saveAssessments(activeCourse, assessments);
-    _saveFormWork(activeCourse, aid, formWork);
-    if (window.QuizBuilder) QuizBuilder.save(activeCourse, aid);
-    _saveFormRes(activeCourse, aid, formRes);
-    var move = _scoreMoveAfterSave;
-    _scoreMoveAfterSave = null;
-    if (move && move.aid === aid && after.rubricId === move.rubricId) Grader.moveToRubric(activeCourse, aid, move);
-    var carried = _carryOverallToCompetencies(activeCourse, before, after);
-    openAssessIds.add(aid);
+    var formWork = pageState._formWork;
+    var formRes = pageState._formRes;
+    var srcCid = pageState.activeCourse;
+    saveAssessments(pageState.activeCourse, assessments);
+    _saveFormWork(pageState.activeCourse, aid, formWork);
+    if (window.QuizBuilder) QuizBuilder.save(pageState.activeCourse, aid);
+    _saveFormRes(pageState.activeCourse, aid, formRes);
+    var move = pageState._scoreMoveAfterSave;
+    pageState._scoreMoveAfterSave = null;
+    if (move && move.aid === aid && after.rubricId === move.rubricId)
+      Grader.moveToRubric(pageState.activeCourse, aid, move);
+    var carried = _carryOverallToCompetencies(pageState.activeCourse, before, after);
+    pageState.openAssessIds.add(aid);
     hideNewForm();
     render();
-    GradeChange.offerUndo(activeCourse, before, after, render);
+    GradeChange.offerUndo(pageState.activeCourse, before, after, render);
     if (carried) refreshSidebarGrades();
     if (window.AssessmentCopy && (before.copyGroup || copyTargets.length)) {
       // One dialog at a time: the edit offer first, then any new copies.
@@ -7358,7 +7394,7 @@ window.PageAssignments = (function () {
   }
 
   function dupeAssess(aid) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var assessments = getAssessments(cid);
     var orig = assessments.find(function (a) {
       return a.id === aid;
@@ -7373,7 +7409,7 @@ window.PageAssignments = (function () {
     assessments.push(dupe);
     saveAssessments(cid, assessments);
     if (window.AssessmentCopy) AssessmentCopy.carryQuiz(cid, orig, cid, dupe); // its quiz too (Q7)
-    openAssessIds.add(id);
+    pageState.openAssessIds.add(id);
     render();
   }
 
@@ -7403,26 +7439,26 @@ window.PageAssignments = (function () {
      the dialog: if that read failed it says photos may go. At once when
      nothing needs reading. */
   function deleteAssess(aid) {
-    var cid0 = activeCourse;
+    var cid0 = pageState.activeCourse;
     var read = typeof readStudentWorkForDelete === 'function' ? readStudentWorkForDelete(cid0) : null;
     if (!read) return _confirmDeleteAssess(aid, false);
     return read.then(function (res) {
-      if (activeCourse === cid0) _confirmDeleteAssess(aid, !(res && res.known));
+      if (pageState.activeCourse === cid0) _confirmDeleteAssess(aid, !(res && res.known));
     });
   }
 
   function _confirmDeleteAssess(aid, maybe) {
-    var target = getAssessments(activeCourse).find(function (a) {
+    var target = getAssessments(pageState.activeCourse).find(function (a) {
       return a.id === aid;
     });
-    var note = window.AssessmentCopy && target ? AssessmentCopy.deleteNote(activeCourse, target) : '';
+    var note = window.AssessmentCopy && target ? AssessmentCopy.deleteNote(pageState.activeCourse, target) : '';
     showConfirm(
       'Delete Assessment',
-      'Delete this assessment and all its scores?' + _photosGoNote(activeCourse, aid, maybe) + note,
+      'Delete this assessment and all its scores?' + _photosGoNote(pageState.activeCourse, aid, maybe) + note,
       'Delete',
       'danger',
       function () {
-        var cid = activeCourse;
+        var cid = pageState.activeCourse;
         saveAssessments(
           cid,
           getAssessments(cid).filter(function (a) {
@@ -7451,8 +7487,8 @@ window.PageAssignments = (function () {
         deleteAssessmentObservations(cid, aid);
         // Its quiz goes with it (Demo Mode's store; signed in, the server's own cascade).
         if (window.QuizData) QuizData.forget(cid, aid);
-        openAssessIds.delete(aid);
-        _collapsedIds.delete(aid);
+        pageState.openAssessIds.delete(aid);
+        pageState._collapsedIds.delete(aid);
         render();
         refreshSidebarGrades();
       },
@@ -7462,9 +7498,16 @@ window.PageAssignments = (function () {
   /* ── Expand/Collapse ────────────────────────────────────── */
   // Whether Expand and Collapse show pressed.
   function _expandSegOn() {
-    return focusStudentId
-      ? [_allExpanded && _collapsedIds.size === 0, !_allExpanded && openAssessIds.size === 0]
-      : [openAssessIds.size > 0 && openAssessIds.size >= getAssessments(activeCourse).length, openAssessIds.size === 0];
+    return pageState.focusStudentId
+      ? [
+          pageState._allExpanded && pageState._collapsedIds.size === 0,
+          !pageState._allExpanded && pageState.openAssessIds.size === 0,
+        ]
+      : [
+          pageState.openAssessIds.size > 0 &&
+            pageState.openAssessIds.size >= getAssessments(pageState.activeCourse).length,
+          pageState.openAssessIds.size === 0,
+        ];
   }
 
   /* Opening or closing cards draws or empties those cards' bodies and sets
@@ -7473,12 +7516,12 @@ window.PageAssignments = (function () {
      again instead: a card not on the page, or a folder the teacher closed
      that must now open or close. */
   function _redrawCards(aids) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var main = document.getElementById('main');
-    if (_grader || !main || !COURSES[cid]) return false;
+    if (pageState._grader || !main || !COURSES[cid]) return false;
     // A filter on grades (Ungraded, To Return) can drop a card graded since the draw.
-    if (showUngraded || _toReturnOnly) return false;
-    var opensFolders = filterCategories.length > 0 || !!assessSearch;
+    if (pageState.showUngraded || pageState._toReturnOnly) return false;
+    var opensFolders = pageState.filterCategories.length > 0 || !!pageState.assessSearch;
     var all = getAssessments(cid);
     var byId = {};
     all.forEach(function (a) {
@@ -7496,9 +7539,9 @@ window.PageAssignments = (function () {
     // lets go of cards that stay open.
     var folders = opensFolders ? [] : main.querySelectorAll('.mod-folder');
     for (var f = 0; f < folders.length; f++) {
-      if (!collapsedModules[folders[f].dataset.moduleId]) continue;
+      if (!pageState.collapsedModules[folders[f].dataset.moduleId]) continue;
       var holds = Array.prototype.some.call(folders[f].querySelectorAll('.assess-card'), function (el) {
-        return openAssessIds.has(el.id.slice(3));
+        return pageState.openAssessIds.has(el.id.slice(3));
       });
       if (holds !== folders[f].classList.contains('open')) return false;
     }
@@ -7511,15 +7554,15 @@ window.PageAssignments = (function () {
       cid,
       byId,
       students,
-      focusStudentId
-        ? [focusStudentId]
+      pageState.focusStudentId
+        ? [pageState.focusStudentId]
         : students.map(function (st) {
             return st.id;
           }),
     );
-    var focusSt = focusStudentId
+    var focusSt = pageState.focusStudentId
       ? students.find(function (st) {
-          return st.id === focusStudentId;
+          return st.id === pageState.focusStudentId;
         })
       : null;
     // One card opened or closed moves (teacher/expand-motion.js); Expand
@@ -7540,7 +7583,7 @@ window.PageAssignments = (function () {
         });
         return;
       }
-      _drawnReturns = {};
+      pageState._drawnReturns = {};
       // html-safe: _cardBodyHtml escapes the description; the grading builders are reviewed
       body.innerHTML = open ? _cardBodyHtml(cid, c.a, focusSt, students, scores) : '';
       _afterCardsDrawn(body);
@@ -7551,17 +7594,17 @@ window.PageAssignments = (function () {
   }
 
   function toggleAssess(aid) {
-    if (focusStudentId) {
-      if (_allExpanded) {
-        if (_collapsedIds.has(aid)) _collapsedIds.delete(aid);
-        else _collapsedIds.add(aid);
+    if (pageState.focusStudentId) {
+      if (pageState._allExpanded) {
+        if (pageState._collapsedIds.has(aid)) pageState._collapsedIds.delete(aid);
+        else pageState._collapsedIds.add(aid);
       } else {
-        if (openAssessIds.has(aid)) openAssessIds.delete(aid);
-        else openAssessIds.add(aid);
+        if (pageState.openAssessIds.has(aid)) pageState.openAssessIds.delete(aid);
+        else pageState.openAssessIds.add(aid);
       }
     } else {
-      if (openAssessIds.has(aid)) openAssessIds.delete(aid);
-      else openAssessIds.add(aid);
+      if (pageState.openAssessIds.has(aid)) pageState.openAssessIds.delete(aid);
+      else pageState.openAssessIds.add(aid);
     }
     if (!_redrawCards([aid])) render();
   }
@@ -7583,26 +7626,26 @@ window.PageAssignments = (function () {
   }
   function expandAllAssess() {
     _setAllOpen(function () {
-      _allExpanded = true;
-      _collapsedIds.clear();
-      openAssessIds.clear();
-      if (!focusStudentId)
-        getAssessments(activeCourse).forEach(function (a) {
-          openAssessIds.add(a.id);
+      pageState._allExpanded = true;
+      pageState._collapsedIds.clear();
+      pageState.openAssessIds.clear();
+      if (!pageState.focusStudentId)
+        getAssessments(pageState.activeCourse).forEach(function (a) {
+          pageState.openAssessIds.add(a.id);
         });
     });
   }
   function collapseAllAssess() {
     _setAllOpen(function () {
-      _allExpanded = false;
-      _collapsedIds.clear();
-      openAssessIds.clear();
+      pageState._allExpanded = false;
+      pageState._collapsedIds.clear();
+      pageState.openAssessIds.clear();
     });
   }
 
   /* ── Rubric view toggle ─────────────────────────────────── */
   function setRubricView(aid, isRubric) {
-    rubricViewStates[aid] = isRubric;
+    pageState.rubricViewStates[aid] = isRubric;
     render();
   }
 
@@ -7692,12 +7735,12 @@ window.PageAssignments = (function () {
     var disableRow = stStatus && stStatus !== 'LATE';
     // Draft or Returned beside the name (S1-F2); '' in a class that holds
     // no grades, where the row is as it was.
-    var mark = _returnMarkHtml(activeCourse, aid, st.id);
+    var mark = _returnMarkHtml(pageState.activeCourse, aid, st.id);
     var group = _groupRowFor(aid, st.id);
     // The work icon, as on a rubric's or competencies' rows (Colin, Nov 16:
     // every kind of work takes Add Work and See the Work). A group's row
     // has none, as there.
-    var work = group && group.view ? '' : _workIconHtml(activeCourse, aid, st);
+    var work = group && group.view ? '' : _workIconHtml(pageState.activeCourse, aid, st);
     var wrap = mark || work;
     return (
       '<div class="score-row ldg-row ldg-' +
@@ -7738,12 +7781,12 @@ window.PageAssignments = (function () {
     );
   }
   // The open panel follows the page's changes, once per frame.
-  var _crRefreshQueued = false;
+  pageState._crRefreshQueued = false;
   function _refreshClassResultsSoon() {
-    if (_crRefreshQueued || !window.ClassResults || !ClassResults.isOpen()) return;
-    _crRefreshQueued = true;
+    if (pageState._crRefreshQueued || !window.ClassResults || !ClassResults.isOpen()) return;
+    pageState._crRefreshQueued = true;
     requestAnimationFrame(function () {
-      _crRefreshQueued = false;
+      pageState._crRefreshQueued = false;
       if (window.ClassResults && ClassResults.isOpen()) ClassResults.refresh();
     });
   }
@@ -7771,7 +7814,7 @@ window.PageAssignments = (function () {
         '</b> Incomplete</span><span><b>' +
         n.u +
         '</b> Unmarked</span>' +
-        (grid.dataset.aid ? _classResultsLinkHtml(activeCourse, grid.dataset.aid) : '');
+        (grid.dataset.aid ? _classResultsLinkHtml(pageState.activeCourse, grid.dataset.aid) : '');
       _refreshClassResultsSoon();
       return;
     }
@@ -7811,7 +7854,7 @@ window.PageAssignments = (function () {
         // html-safe: figures from formatPoints; the class and assessment ids are escaped
         stats.innerHTML =
           (grid.dataset.aid
-            ? _classResultsLinkHtml(activeCourse, grid.dataset.aid)
+            ? _classResultsLinkHtml(pageState.activeCourse, grid.dataset.aid)
             : '<span class="ldg-name">Class</span>') +
           '<span>Median <b>' +
           formatPoints(mid) +
@@ -7890,7 +7933,7 @@ window.PageAssignments = (function () {
 
   // Clicking the active mark again clears it.
   function setCompletion(el) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var aid = el.dataset.aid;
     var sid = el.dataset.sid;
     var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
@@ -7911,7 +7954,7 @@ window.PageAssignments = (function () {
       'Set to Complete',
       'primary',
       function () {
-        var cid = activeCourse;
+        var cid = pageState.activeCourse;
         var prevScores = structuredClone(getScores(cid));
         var statuses = getAssignmentStatuses(cid);
         getStudents(cid).forEach(function (st) {
@@ -7995,7 +8038,7 @@ window.PageAssignments = (function () {
       'Set to Missing',
       'primary',
       function () {
-        var cid = activeCourse;
+        var cid = pageState.activeCourse;
         var statuses = getAssignmentStatuses(cid);
         var marked = [];
         getStudents(cid).forEach(function (st) {
@@ -8019,7 +8062,7 @@ window.PageAssignments = (function () {
   }
 
   function confirmFillPoints(aid) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var a = getAssessments(cid).find(function (x) {
       return x.id === aid;
     });
@@ -8058,7 +8101,7 @@ window.PageAssignments = (function () {
     FactorField.refreshChip(inp.closest('.score-row'), parsePointsInput(inp.value, max), max);
   }
   function commitPointsScore(inp) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var sid = inp.dataset.sid;
     var aid = inp.dataset.aid;
     var max = parseFloat(inp.dataset.max) || 100;
@@ -8139,7 +8182,7 @@ window.PageAssignments = (function () {
       commitPointsScore(inp);
       focusPointsBox(inp.closest('.score-row'), 1);
     } else if (e.key === 'Escape') {
-      var raw = getPointsScore(activeCourse, inp.dataset.sid, inp.dataset.aid);
+      var raw = getPointsScore(pageState.activeCourse, inp.dataset.sid, inp.dataset.aid);
       inp.value = raw != null ? formatPoints(raw) : '';
       inp.blur();
     } else if (e.key === 'ArrowDown') {
@@ -8166,7 +8209,7 @@ window.PageAssignments = (function () {
   }
 
   function renderStatusToggles(aid, sid, currentStatus) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var commentCount = _assignmentCommentCount(cid, sid, aid);
     return (
       '<div class="student-status-toggles">' +
@@ -8208,12 +8251,12 @@ window.PageAssignments = (function () {
 
   function toggleStudentStatus(aid, sid, status) {
     var debounceKey = sid + ':' + aid + ':' + status;
-    if (_statusDebounce[debounceKey]) return;
-    _statusDebounce[debounceKey] = true;
+    if (pageState._statusDebounce[debounceKey]) return;
+    pageState._statusDebounce[debounceKey] = true;
     setTimeout(function () {
-      delete _statusDebounce[debounceKey];
+      delete pageState._statusDebounce[debounceKey];
     }, 300);
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var current = getAssignmentStatus(cid, sid, aid);
     var newStatus = current === status ? null : status;
     if (!canSetAssignmentStatus(cid, sid, aid, newStatus)) return;
@@ -8254,13 +8297,13 @@ window.PageAssignments = (function () {
       refreshLedgerSummary(row.closest('.ldg-grid'));
       // DIBELS counts leave out Missing and Excused students.
       if (row.closest('.dbl-grid')) render();
-    } else if (!_grader && document.querySelector('.grader-inline')) {
+    } else if (!pageState._grader && document.querySelector('.grader-inline')) {
       // One student's grader on the page: redraw its status, lock and grade.
       render();
     }
     // Group work: a member's status can change which member the group's
     // rows come from, and the strip has no row of its own to update.
-    if (!_grader && _groupRows[aid]) render();
+    if (!pageState._grader && _groupRows[aid]) render();
     refreshSidebarGrades(sid);
   }
 
@@ -8270,12 +8313,12 @@ window.PageAssignments = (function () {
   function rowScoreState(row) {
     var aid = row.dataset.assess;
     var tagIds = [];
-    if (row.dataset.tag) tagIds = _tagScoreKeys(activeCourse, aid, row.dataset.tag);
+    if (row.dataset.tag) tagIds = _tagScoreKeys(pageState.activeCourse, aid, row.dataset.tag);
     else {
       var crit = getRubricCriterion(aid, row.dataset.criterion);
       if (crit) tagIds = rubricCriterionScoreKeys(crit);
     }
-    var entries = getScores(activeCourse)[row.dataset.student] || [];
+    var entries = getScores(pageState.activeCourse)[row.dataset.student] || [];
     var states = [];
     tagIds.forEach(function (tid) {
       var e = entries.find(function (s) {
@@ -8358,7 +8401,7 @@ window.PageAssignments = (function () {
     var next = st.mod === mod ? 0 : mod;
     if (normalizeScoreMod(st.level, next) !== next) return;
     st.tagIds.forEach(function (tid) {
-      Grader.setPlusMinus(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
+      Grader.setPlusMinus(pageState.activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
     });
     if (row.dataset.tag) _syncTagRows(row.dataset.assess, row.dataset.student);
     else syncModRow(row);
@@ -8370,11 +8413,11 @@ window.PageAssignments = (function () {
     // them all to it rather than clearing.
     var wasActive = el.classList.contains('active') && !el.classList.contains('mixed');
     var next = wasActive ? 0 : value;
-    var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
-    _setTagScore(activeCourse, sid, aid, tagId, next);
+    var before = wasActive ? structuredClone(getScores(pageState.activeCourse)) : null;
+    _setTagScore(pageState.activeCourse, sid, aid, tagId, next);
     _syncTagRows(aid, sid);
     refreshSidebarGrades(sid);
-    if (before) _offerClearUndo(activeCourse, before);
+    if (before) _offerClearUndo(pageState.activeCourse, before);
   }
 
   /* A click on the chosen level clears it. A misclick is put right from the
@@ -8395,7 +8438,7 @@ window.PageAssignments = (function () {
   function _syncTagRows(aid, sid) {
     var selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-student="' + sid + '"]';
     document.querySelectorAll(selector).forEach(function (row) {
-      var st = _tagState(activeCourse, sid, aid, row.dataset.tag);
+      var st = _tagState(pageState.activeCourse, sid, aid, row.dataset.tag);
       updateRubricRowUI(row, st.level);
       var active = st.mixed && row.querySelector('.rsg-level.active');
       if (active) active.classList.add('mixed');
@@ -8460,23 +8503,23 @@ window.PageAssignments = (function () {
   }
   /* A fill's Undo toast. While it is up, Cmd+Z (Ctrl+Z) outside a text
      field takes the same Undo (_handleKeydown). */
-  var _fillUndoOpen = false;
+  pageState._fillUndoOpen = false;
   function _showFillUndo(message, undo) {
     showUndoToast(
       message,
       function () {
-        _fillUndoOpen = false;
+        pageState._fillUndoOpen = false;
         undo();
       },
       function () {
-        _fillUndoOpen = false;
+        pageState._fillUndoOpen = false;
       },
     );
-    _fillUndoOpen = true;
+    pageState._fillUndoOpen = true;
   }
   // label: the level's name, for Set Everyone To's toast (scope 'all').
   function fillScores(aid, tagId, value, scope, label) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid);
     var assess = getAssessments(cid).find(function (a) {
@@ -8717,7 +8760,7 @@ window.PageAssignments = (function () {
   }
   /* Picking a score sets it; picking the chosen one again clears it. */
   function selectSixScore(aid, sid, critId, key) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var crit = getRubricCriterion(aid, critId);
     if (!crit || !RubricScale.isKey(_sixRubricOf(cid, aid), key)) return;
     var current = _sixScoreNow(cid, sid, aid, crit);
@@ -8732,11 +8775,11 @@ window.PageAssignments = (function () {
 
   /* ── Rubric Grading ─────────────────────────────────────── */
   function getRubricCriterion(aid, critId) {
-    var assess = getAssessments(activeCourse).find(function (a) {
+    var assess = getAssessments(pageState.activeCourse).find(function (a) {
       return a.id === aid;
     });
     if (!assess || !assess.rubricId) return null;
-    var rubric = getRubricById(activeCourse, assess.rubricId);
+    var rubric = getRubricById(pageState.activeCourse, assess.rubricId);
     if (!rubric) return null;
     return rubric.criteria.find(function (c) {
       return c.id === critId;
@@ -8748,10 +8791,10 @@ window.PageAssignments = (function () {
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
     // Missing and Excused work takes no level (isScoreLocked); 1–4 reach here by key.
-    if (next && isScoreLocked(activeCourse, sid, aid)) return;
-    var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
+    if (next && isScoreLocked(pageState.activeCourse, sid, aid)) return;
+    var before = wasActive ? structuredClone(getScores(pageState.activeCourse)) : null;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-      Grader.setLevel(activeCourse, sid, aid, tagId, next);
+      Grader.setLevel(pageState.activeCourse, sid, aid, tagId, next);
     });
     el.parentElement.querySelectorAll('.rsg-level').forEach(function (o) {
       o.classList.remove('active', 'mixed');
@@ -8762,7 +8805,7 @@ window.PageAssignments = (function () {
     // An open checklist's hint says whether the level is the boxes' or picked.
     if (RubricChecks.hasChecks(crit) && _isChecklistOpen(aid, sid, critId))
       _refreshChecklistRow(aid, sid, critId, false);
-    if (before) _offerClearUndo(activeCourse, before);
+    if (before) _offerClearUndo(pageState.activeCourse, before);
   }
   function updateRubricRowUI(row, value) {
     row.querySelectorAll('.rsg-level').forEach(function (l) {
@@ -8775,7 +8818,7 @@ window.PageAssignments = (function () {
     }
   }
   function fillRubricScores(aid, critId, value, scope, label) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid);
     var assess = getAssessments(cid).find(function (a) {
@@ -8897,7 +8940,7 @@ window.PageAssignments = (function () {
     return n + ' ' + words[n === 1 ? 0 : 1];
   }
   function _confirmSetEveryone(aid, value, label, fill) {
-    var plan = _setEveryonePlan(activeCourse, aid);
+    var plan = _setEveryonePlan(pageState.activeCourse, aid);
     var n = plan.cells.length;
     var title = 'Set Everyone To ' + label;
     var skipped = plan.locked
@@ -9033,7 +9076,7 @@ window.PageAssignments = (function () {
      Separately From and Back to Group Grade. DIBELS stays per student. */
   var _groupRows = {};
   // Set while the rubric view draws its Additional Tags rows.
-  var _groupStripOff = false;
+  pageState._groupStripOff = false;
 
   // The students the list shows for `a`: one per group (the member its
   // grade comes from), members graded separately and students in no group,
@@ -9174,7 +9217,8 @@ window.PageAssignments = (function () {
   }
   // A level, comment or status may have changed what the sheet would show.
   function _refreshPrintMarks() {
-    if (window.RubricPrint && RubricPrint.refreshMarks && activeCourse) RubricPrint.refreshMarks(activeCourse);
+    if (window.RubricPrint && RubricPrint.refreshMarks && pageState.activeCourse)
+      RubricPrint.refreshMarks(pageState.activeCourse);
   }
   function _queuePrintMarks() {
     setTimeout(_refreshPrintMarks, 0);
@@ -9192,7 +9236,7 @@ window.PageAssignments = (function () {
       (row && row.view ? '' : _printMarkHtml(cid, aid, st.id)) +
       // Draft or Returned (S1-F2). A rubric's second grid, Competencies Not
       // in the Rubric, repeats the head: the mark is drawn once, above.
-      (_groupStripOff ? '' : _returnMarkHtml(cid, aid, st.id)) +
+      (pageState._groupStripOff ? '' : _returnMarkHtml(cid, aid, st.id)) +
       (row && row.view
         ? ''
         : '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
@@ -9213,7 +9257,7 @@ window.PageAssignments = (function () {
       '" data-score="0" data-scope="row"><div class="col-fill-dot" style="background:var(--surface-2);color:var(--text-3)">0</div> Clear</div>' +
       '</div></div></div>' +
       '</div>' +
-      (row && row.view && !_groupStripOff ? _groupMembersStripHtml(cid, aid, row.view) : '')
+      (row && row.view && !pageState._groupStripOff ? _groupMembersStripHtml(cid, aid, row.view) : '')
     );
   }
   /* The student's Overall Comment under their criteria (score.comment, the
@@ -9275,8 +9319,8 @@ window.PageAssignments = (function () {
     delete _overallCommentTimers[key];
     var text = el.value.trim();
     el.classList.toggle('has-text', !!text);
-    if (text === getScoreComment(activeCourse, el.dataset.sid, el.dataset.aid)) return;
-    Grader.setOverallComment(activeCourse, el.dataset.sid, el.dataset.aid, text);
+    if (text === getScoreComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid)) return;
+    Grader.setOverallComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid, text);
     // A comment saved off its timer follows no click: the status locks and
     // the Draft marks do (the locks followed the next key typed).
     var scope = _gradingScope(el.dataset.aid, el.dataset.sid);
@@ -9524,11 +9568,11 @@ window.PageAssignments = (function () {
   /* Redraw one criterion row after its checklist opens, closes or ticks,
      keeping keyboard focus on it. */
   function _refreshChecklistRow(aid, sid, critId, focusButton) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var crit = getRubricCriterion(aid, critId);
     var row = _criterionRow(aid, sid, critId);
     if (!crit || !row) return;
-    var hadKb = _kbFocusEl === row;
+    var hadKb = pageState._kbFocusEl === row;
     row.outerHTML = _rubricCriterionRowHtml(cid, aid, sid, crit, getScores(cid)[sid] || [], true);
     var fresh = _criterionRow(aid, sid, critId);
     if (hadKb && fresh) kbFocusCell(fresh);
@@ -9538,7 +9582,7 @@ window.PageAssignments = (function () {
     }
   }
   function tickRubricCheck(el) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var aid = el.dataset.aid,
       sid = el.dataset.sid,
       critId = el.dataset.critid,
@@ -9633,11 +9677,11 @@ window.PageAssignments = (function () {
         '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">' +
         '<div style="font-size:0.75rem;color:var(--text-3);font-weight:600;margin-bottom:6px">Competencies Not in the Rubric</div>';
       // The group's name and members strip are drawn once, above.
-      _groupStripOff = true;
+      pageState._groupStripOff = true;
       try {
         html += renderTagGrid(cid, a, extraTagObjs, students, scores);
       } finally {
-        _groupStripOff = false;
+        pageState._groupStripOff = false;
       }
       html += '</div>';
     }
@@ -9764,18 +9808,18 @@ window.PageAssignments = (function () {
     var sel = document.getElementById('af-rubric');
     var rid = sel ? sel.value : '';
     if (!rid) return null;
-    if (_pendingFormRubric && _pendingFormRubric.id === rid) return _pendingFormRubric;
-    return getRubricById(activeCourse, rid);
+    if (pageState._pendingFormRubric && pageState._pendingFormRubric.id === rid) return pageState._pendingFormRubric;
+    return getRubricById(pageState.activeCourse, rid);
   }
 
   function onRubricSelect(rubricId) {
     var rubric =
-      _pendingFormRubric && rubricId === _pendingFormRubric.id
-        ? _pendingFormRubric
+      pageState._pendingFormRubric && rubricId === pageState._pendingFormRubric.id
+        ? pageState._pendingFormRubric
         : rubricId
-          ? getRubricById(activeCourse, rubricId)
+          ? getRubricById(pageState.activeCourse, rubricId)
           : null;
-    _rubricAutoTags = [];
+    pageState._rubricAutoTags = [];
     var rubricTagIds = new Set(_rubricTagIds(rubric));
     // A rubric whose criteria score no competency (a Blank draft) leaves
     // the teacher's ticks as they are; one that does ticks exactly its own.
@@ -9785,7 +9829,7 @@ window.PageAssignments = (function () {
         if (cb.checked === on) return;
         cb.checked = on;
         cb.parentElement.classList.toggle('checked', on);
-        if (on) _rubricAutoTags.push(cb.value);
+        if (on) pageState._rubricAutoTags.push(cb.value);
         var secId = cb.dataset.section;
         if (secId) updateSectionBadge(secId);
       });
@@ -9801,15 +9845,15 @@ window.PageAssignments = (function () {
      closes before the editor opens. */
   function openRubricBank() {
     if (!window.RubricBank) return;
-    RubricBank.open(activeCourse, {
+    RubricBank.open(pageState.activeCourse, {
       edit: editRubricUI,
       newRubric: newRubricUI,
       remove: deleteRubricUI,
       // Another class's rubric prints blank; this class's opens on its uses.
       print: function (rid, cid) {
         if (!window.RubricPrint) return;
-        var other = cid && cid !== activeCourse;
-        RubricPrint.open(other ? cid : activeCourse, null, {
+        var other = cid && cid !== pageState.activeCourse;
+        RubricPrint.open(other ? cid : pageState.activeCourse, null, {
           rubricId: rid,
           mode: other ? 'blank' : '',
           blankOnly: other,
@@ -9825,7 +9869,7 @@ window.PageAssignments = (function () {
         _renderRubricView();
       },
       goToAssessment: function (aid) {
-        openCopyIn(activeCourse, aid);
+        openCopyIn(pageState.activeCourse, aid);
       },
       changed: render,
     });
@@ -9840,7 +9884,7 @@ window.PageAssignments = (function () {
   function newRubricUI(style, template) {
     _closeRubricsPanel();
     _whenWordingLoaded();
-    _rubricBefore = null;
+    pageState._rubricBefore = null;
     var next = rubricStyle({ style: style });
     var draft;
     if (template && window.RubricScale) draft = RubricScale.fromTemplate(template, uid);
@@ -9860,10 +9904,10 @@ window.PageAssignments = (function () {
     _openRubricModal(draft, true, !!template);
   }
   function editRubricUI(rubricId) {
-    var rubric = getRubricById(activeCourse, rubricId);
+    var rubric = getRubricById(pageState.activeCourse, rubricId);
     if (!rubric) return;
-    _rubricBefore = structuredClone(rubric);
-    _rubricScored = RubricGuard.scoredStudentsByCriterion(activeCourse, rubric);
+    pageState._rubricBefore = structuredClone(rubric);
+    pageState._rubricScored = RubricGuard.scoredStudentsByCriterion(pageState.activeCourse, rubric);
     _openRubricModal(structuredClone(rubric), false, false);
   }
 
@@ -9872,25 +9916,25 @@ window.PageAssignments = (function () {
      assessment form's editor) in a large window, so a rubric is built the
      same way wherever it is built. The card's state is `_blank`, with
      host 'modal'; a Blank draft open on the form waits in _formBlank. */
-  var _formBlank = null;
+  pageState._formBlank = null;
   function _openRubricModal(draft, isNew, touched) {
     _closeRubricsPanel();
     _whenWordingLoaded();
     if (isNew) {
-      _rubricBefore = null;
-      _rubricScored = {};
+      pageState._rubricBefore = null;
+      pageState._rubricScored = {};
     }
-    if (_blank && _blank.host !== 'modal') _formBlank = _blank;
-    _blank = _blankState(draft, true);
-    _blank.host = 'modal';
-    _blank.isNew = isNew;
+    if (pageState._blank && pageState._blank.host !== 'modal') pageState._formBlank = pageState._blank;
+    pageState._blank = _blankState(draft, true);
+    pageState._blank.host = 'modal';
+    pageState._blank.isNew = isNew;
     // A template is written in already: Cancel asks before dropping it.
-    if (touched) _blank.orig = '';
+    if (touched) pageState._blank.orig = '';
     _renderRubricModal('#af-ge-name');
     _blankSizeCells();
   }
   function _renderRubricModal(focusSel) {
-    if (!_blank || _blank.host !== 'modal') return;
+    if (!pageState._blank || pageState._blank.host !== 'modal') return;
     var modal = document.getElementById('rubric-modal');
     if (!modal) {
       modal = document.createElement('div');
@@ -9899,23 +9943,25 @@ window.PageAssignments = (function () {
       modal.setAttribute('data-action', 'rubricModalBackdrop');
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('aria-modal', 'true');
-      modal.setAttribute('aria-label', _blank.isNew ? 'New Rubric' : 'Edit Rubric');
+      modal.setAttribute('aria-label', pageState._blank.isNew ? 'New Rubric' : 'Edit Rubric');
       document.body.appendChild(modal);
     }
-    var note = _rubricBefore
-      ? RubricGuard.topChangeNote(RubricGuard.reviewEdit(_rubricBefore, _blank.draft, _rubricScored))
+    var note = pageState._rubricBefore
+      ? RubricGuard.topChangeNote(
+          RubricGuard.reviewEdit(pageState._rubricBefore, pageState._blank.draft, pageState._rubricScored),
+        )
       : '';
     // html-safe: _blankCardHtml escapes every name, label and descriptor; the note is set as text below
     modal.innerHTML =
       '<div class="rb-ed-window"><div class="rb-ed-head"><h2 class="rb-ed-title">' +
-      (_blank.isNew ? 'New Rubric' : 'Edit Rubric') +
+      (pageState._blank.isNew ? 'New Rubric' : 'Edit Rubric') +
       '</h2><p class="rb-ed-hint" id="rb-ed-hint"></p>' +
       '<button type="button" class="rubric-editor-close" data-action="cancelRubricEdit" title="Close" aria-label="Close">\u2715</button></div>' +
       '<p class="rubric-guard-note" id="re-guard-note" hidden></p>' +
-      _blankCardHtml(activeCourse, true) +
+      _blankCardHtml(pageState.activeCourse, true) +
       '</div>';
     var hint = document.getElementById('rb-ed-hint');
-    if (hint) hint.textContent = _RUBRIC_STYLE_HINTS[rubricStyle(_blank.draft)] || '';
+    if (hint) hint.textContent = _RUBRIC_STYLE_HINTS[rubricStyle(pageState._blank.draft)] || '';
     var guard = document.getElementById('re-guard-note');
     if (guard) {
       guard.textContent = note;
@@ -9929,17 +9975,17 @@ window.PageAssignments = (function () {
   function _closeRubricModal() {
     var modal = document.getElementById('rubric-modal');
     if (modal) modal.remove();
-    _blank = _formBlank;
-    _formBlank = null;
-    _editingRubric = null;
-    _rubricBefore = null;
-    _rubricScored = {};
-    _rubricDirty = false;
+    pageState._blank = pageState._formBlank;
+    pageState._formBlank = null;
+    pageState._editingRubric = null;
+    pageState._rubricBefore = null;
+    pageState._rubricScored = {};
+    pageState._rubricDirty = false;
   }
   /* Save Rubric in the window: into the class's rubrics, as the editor
      always saved (saveRubricEdit). */
   function _saveModalRubric() {
-    var d = _blank.draft;
+    var d = pageState._blank.draft;
     var name = String(d.name || '').trim();
     var input = document.querySelector('#rubric-modal #af-ge-name');
     if (!name) {
@@ -9955,29 +10001,29 @@ window.PageAssignments = (function () {
     held.criteria = held.criteria.map(function (c, n) {
       return Object.assign(c, { name: String(c.name || '').trim() || 'Criterion ' + (n + 1) });
     });
-    if (_blank.isNew) held._isNew = true;
-    if (_blank.forForm) held._forForm = true;
-    _editingRubric = held;
-    var before = _rubricBefore;
-    var scored = _rubricScored;
-    _blank = _formBlank;
-    _formBlank = null;
-    _rubricBefore = before;
-    _rubricScored = scored;
+    if (pageState._blank.isNew) held._isNew = true;
+    if (pageState._blank.forForm) held._forForm = true;
+    pageState._editingRubric = held;
+    var before = pageState._rubricBefore;
+    var scored = pageState._rubricScored;
+    pageState._blank = pageState._formBlank;
+    pageState._formBlank = null;
+    pageState._rubricBefore = before;
+    pageState._rubricScored = scored;
     saveRubricEdit(name);
   }
   function deleteRubricUI(rubricId) {
-    var rubric = getRubricById(activeCourse, rubricId);
+    var rubric = getRubricById(pageState.activeCourse, rubricId);
     if (!rubric) return;
     if (window.RubricBank) {
-      RubricBank.confirmDelete(activeCourse, rubricId, function () {
-        deleteRubric(activeCourse, rubricId);
+      RubricBank.confirmDelete(pageState.activeCourse, rubricId, function () {
+        deleteRubric(pageState.activeCourse, rubricId);
         render();
         RubricBank.refresh();
       });
       return;
     }
-    var linked = getAssessments(activeCourse).filter(function (a) {
+    var linked = getAssessments(pageState.activeCourse).filter(function (a) {
       return a.rubricId === rubricId;
     }).length;
     var msg =
@@ -9988,9 +10034,9 @@ window.PageAssignments = (function () {
           linked +
           ' assessment(s). They will lose their rubric link. Delete anyway?'
         : 'Delete rubric "' + rubric.name + '"?';
-    if (window.RubricLibrary) msg += RubricLibrary.deleteNote(activeCourse, rubric);
+    if (window.RubricLibrary) msg += RubricLibrary.deleteNote(pageState.activeCourse, rubric);
     showConfirm('Delete Rubric', msg, 'Delete', 'danger', function () {
-      deleteRubric(activeCourse, rubricId);
+      deleteRubric(pageState.activeCourse, rubricId);
       render();
       if (window.RubricBank) RubricBank.refresh();
     });
@@ -10048,18 +10094,18 @@ window.PageAssignments = (function () {
     );
   }
   function cancelRubricEdit() {
-    if (_blank && _blank.host === 'modal') return _cancelBlank();
+    if (pageState._blank && pageState._blank.host === 'modal') return _cancelBlank();
     // P7.8: route through the in-app confirm dialog so it matches the rest of
     // the destructive-action UX (focus trap, Esc handling, restored focus).
     function _doCancel() {
-      _editingRubric = null;
-      _rubricBefore = null;
-      _rubricScored = {};
-      _rubricDirty = false;
+      pageState._editingRubric = null;
+      pageState._rubricBefore = null;
+      pageState._rubricScored = {};
+      pageState._rubricDirty = false;
       var modal = document.getElementById('rubric-modal');
       if (modal) modal.remove();
     }
-    if (!_rubricDirty) {
+    if (!pageState._rubricDirty) {
       _doCancel();
       return;
     }
@@ -10072,7 +10118,7 @@ window.PageAssignments = (function () {
     );
   }
   function saveRubricEdit(givenName) {
-    if (!_editingRubric) return;
+    if (!pageState._editingRubric) return;
     var nameInput = document.getElementById('re-name');
     var rubricName = givenName || (nameInput ? nameInput.value : '').trim();
     if (!rubricName) {
@@ -10083,51 +10129,51 @@ window.PageAssignments = (function () {
       }
       return;
     }
-    _editingRubric.name = rubricName;
-    if (!_editingRubric.criteria || _editingRubric.criteria.length === 0) {
+    pageState._editingRubric.name = rubricName;
+    if (!pageState._editingRubric.criteria || pageState._editingRubric.criteria.length === 0) {
       alert('Add at least one criterion.');
       return;
     }
-    _editingRubric.style = rubricStyle(_editingRubric);
-    _dropBlankChecks(_editingRubric);
+    pageState._editingRubric.style = rubricStyle(pageState._editingRubric);
+    _dropBlankChecks(pageState._editingRubric);
     // A criterion with no competency is allowed: it counts toward the
     // overall grade only.
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     // Made from the assessment form: held, unsaved, until the assessment is
     // created (redesign PR 8).
-    if (_editingRubric._forForm && _showingNewForm) {
-      var held = structuredClone(_editingRubric);
+    if (pageState._editingRubric._forForm && pageState._showingNewForm) {
+      var held = structuredClone(pageState._editingRubric);
       delete held._forForm;
       delete held._isNew;
-      _editingRubric = null;
-      _rubricBefore = null;
-      _rubricScored = {};
-      _rubricDirty = false;
+      pageState._editingRubric = null;
+      pageState._rubricBefore = null;
+      pageState._rubricScored = {};
+      pageState._rubricDirty = false;
       var heldModal = document.getElementById('rubric-modal');
       if (heldModal) heldModal.remove();
       _holdFormRubric(held);
       return;
     }
-    delete _editingRubric._forForm;
+    delete pageState._editingRubric._forForm;
     var rubrics = structuredClone(getRubrics(cid));
-    var isNew = _editingRubric._isNew;
-    delete _editingRubric._isNew;
-    if (isNew) rubrics.push(_editingRubric);
+    var isNew = pageState._editingRubric._isNew;
+    delete pageState._editingRubric._isNew;
+    if (isNew) rubrics.push(pageState._editingRubric);
     else {
       var idx = rubrics.findIndex(function (r) {
-        return r.id === _editingRubric.id;
+        return r.id === pageState._editingRubric.id;
       });
-      if (idx >= 0) rubrics[idx] = _editingRubric;
-      else rubrics.push(_editingRubric);
+      if (idx >= 0) rubrics[idx] = pageState._editingRubric;
+      else rubrics.push(pageState._editingRubric);
     }
-    var savedId = _editingRubric.id;
-    var criteriaCount = (_editingRubric.criteria || []).length;
+    var savedId = pageState._editingRubric.id;
+    var criteriaCount = (pageState._editingRubric.criteria || []).length;
     var savePromise = saveRubrics(cid, rubrics);
     // The teacher's own wording for a competency starts its next draft.
     if (window.RubricDraft && typeof saveCompetencyDescriptors === 'function') {
       saveCompetencyDescriptors(
         RubricDraft.savedEntries(
-          _editingRubric,
+          pageState._editingRubric,
           function (id) {
             return getTagById(cid, id);
           },
@@ -10136,16 +10182,16 @@ window.PageAssignments = (function () {
       );
     }
     // The rubric as it was and as saved, for "Update the other classes too?".
-    var linkedBefore = _rubricBefore;
-    var linkedAfter = structuredClone(_editingRubric);
-    _editingRubric = null;
-    _rubricBefore = null;
-    _rubricScored = {};
-    _rubricDirty = false;
+    var linkedBefore = pageState._rubricBefore;
+    var linkedAfter = structuredClone(pageState._editingRubric);
+    pageState._editingRubric = null;
+    pageState._rubricBefore = null;
+    pageState._rubricScored = {};
+    pageState._rubricDirty = false;
     var modal = document.getElementById('rubric-modal');
     if (modal) modal.remove();
     // "+ New Rubric" opens over a half-filled assessment form: keep it.
-    if (_showingNewForm) rerenderKeeping('new-assess-form', render);
+    if (pageState._showingNewForm) rerenderKeeping('new-assess-form', render);
     else render();
     Promise.resolve(savePromise).then(function (result) {
       if (linkedBefore && linkedAfter.copyGroup && window.RubricLibrary) {
@@ -10211,7 +10257,7 @@ window.PageAssignments = (function () {
       return s.id === sid;
     });
     if (!assess || !student) return;
-    _commentPopoverState = { cid: cid, sid: sid, aid: aid };
+    pageState._commentPopoverState = { cid: cid, sid: sid, aid: aid };
     renderCommentPopover();
   }
   /* The Comment button counts the comments left on the work and its
@@ -10224,7 +10270,7 @@ window.PageAssignments = (function () {
     var text = getScoreComment(cid, sid, aid);
     if (!text) return '';
     var pill = '<span class="comment-entry-pills"><span class="obs-pill">Overall Comment</span></span>';
-    if (_commentEditId === OVERALL_COMMENT_ID) {
+    if (pageState._commentEditId === OVERALL_COMMENT_ID) {
       return (
         '<div class="comment-entry is-editing"><span class="comment-entry-date"></span><span class="comment-entry-main"><textarea class="comment-entry-input" rows="3" aria-label="Edit overall comment">' +
         esc(text) +
@@ -10271,7 +10317,7 @@ window.PageAssignments = (function () {
               })
               .join('') +
             ObsCapture.linkPillsHtml(cid, o);
-          if (o.id === _commentEditId) {
+          if (o.id === pageState._commentEditId) {
             return (
               '<div class="comment-entry is-editing"><span class="comment-entry-date">' +
               ds +
@@ -10301,12 +10347,12 @@ window.PageAssignments = (function () {
   /* The comment box is the shared capture strip, with the student and the
      assessment fixed. The overlay is built once per student and assessment
      so the strip keeps its state; adding or deleting redraws the list. */
-  var _commentCapture = null;
+  pageState._commentCapture = null;
   function renderCommentPopover() {
-    if (!_commentPopoverState) return;
-    var cid = _commentPopoverState.cid,
-      sid = _commentPopoverState.sid,
-      aid = _commentPopoverState.aid;
+    if (!pageState._commentPopoverState) return;
+    var cid = pageState._commentPopoverState.cid,
+      sid = pageState._commentPopoverState.sid,
+      aid = pageState._commentPopoverState.aid;
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
@@ -10330,8 +10376,8 @@ window.PageAssignments = (function () {
       document.body.appendChild(overlay);
     }
     var key = cid + '|' + sid + '|' + aid;
-    if (overlay.dataset.key !== key || !_commentCapture) {
-      if (_commentCapture) _commentCapture.destroy();
+    if (overlay.dataset.key !== key || !pageState._commentCapture) {
+      if (pageState._commentCapture) pageState._commentCapture.destroy();
       overlay.dataset.key = key;
       overlay.innerHTML =
         '<div class="comment-popover" role="dialog" aria-labelledby="comment-popover-title"><div class="comment-popover-header"><div><div class="comment-popover-title" id="comment-popover-title">' +
@@ -10339,7 +10385,7 @@ window.PageAssignments = (function () {
         '</div><div class="comment-popover-subtitle">' +
         esc(assess.title) +
         '</div></div><button class="comment-popover-close" data-action="closeCommentPopover" aria-label="Close">\u2715</button></div><div class="comment-popover-body"></div><div class="comment-popover-footer comment-popover-capture"></div></div>';
-      _commentCapture = ObsCapture.create({
+      pageState._commentCapture = ObsCapture.create({
         cid: cid,
         idPrefix: 'asg-',
         students: [sid],
@@ -10353,9 +10399,9 @@ window.PageAssignments = (function () {
           updateCommentBadge(sid, aid);
         },
       });
-      _commentCapture.mount(overlay.querySelector('.comment-popover-capture'));
+      pageState._commentCapture.mount(overlay.querySelector('.comment-popover-capture'));
       setTimeout(function () {
-        if (_commentCapture) _commentCapture.focus();
+        if (pageState._commentCapture) pageState._commentCapture.focus();
       }, 50);
     }
     overlay.querySelector('.comment-popover-body').innerHTML = _commentEntriesHtml(cid, sid, aid);
@@ -10378,40 +10424,40 @@ window.PageAssignments = (function () {
     }
   }
   /* One comment at a time is edited in place; nothing is written until Save. */
-  var _commentEditId = null;
+  pageState._commentEditId = null;
   function editComment(obId) {
-    _commentEditId = obId;
+    pageState._commentEditId = obId;
     renderCommentPopover();
   }
   function cancelCommentEdit() {
-    _commentEditId = null;
+    pageState._commentEditId = null;
     renderCommentPopover();
-    if (_commentCapture) _commentCapture.focus();
+    if (pageState._commentCapture) pageState._commentCapture.focus();
   }
   function saveCommentEdit() {
-    if (!_commentPopoverState || !_commentEditId) return;
-    var cid = _commentPopoverState.cid,
-      sid = _commentPopoverState.sid;
+    if (!pageState._commentPopoverState || !pageState._commentEditId) return;
+    var cid = pageState._commentPopoverState.cid,
+      sid = pageState._commentPopoverState.sid;
     var input = document.querySelector('#comment-popover-overlay .comment-entry-input');
     var text = input ? input.value.trim() : '';
     if (!text) {
       if (input) input.focus();
       return;
     }
-    if (_commentEditId === OVERALL_COMMENT_ID) {
-      Grader.setOverallComment(cid, sid, _commentPopoverState.aid, text);
+    if (pageState._commentEditId === OVERALL_COMMENT_ID) {
+      Grader.setOverallComment(cid, sid, pageState._commentPopoverState.aid, text);
     } else {
       // The comment may have been re-keyed to its server id since the list drew.
-      updateQuickOb(cid, sid, resolveObservationId(cid, _commentEditId), { text: text });
+      updateQuickOb(cid, sid, resolveObservationId(cid, pageState._commentEditId), { text: text });
     }
     cancelCommentEdit();
   }
   function deleteComment(obId) {
-    if (!_commentPopoverState) return;
-    var cid = _commentPopoverState.cid,
-      sid = _commentPopoverState.sid,
-      aid = _commentPopoverState.aid;
-    if (obId === _commentEditId) _commentEditId = null;
+    if (!pageState._commentPopoverState) return;
+    var cid = pageState._commentPopoverState.cid,
+      sid = pageState._commentPopoverState.sid,
+      aid = pageState._commentPopoverState.aid;
+    if (obId === pageState._commentEditId) pageState._commentEditId = null;
     var after = function () {
       renderCommentPopover();
       updateCommentBadge(sid, aid);
@@ -10424,10 +10470,10 @@ window.PageAssignments = (function () {
     after();
   }
   function closeCommentPopover() {
-    _commentPopoverState = null;
-    _commentEditId = null;
-    if (_commentCapture) _commentCapture.destroy();
-    _commentCapture = null;
+    pageState._commentPopoverState = null;
+    pageState._commentEditId = null;
+    if (pageState._commentCapture) pageState._commentCapture.destroy();
+    pageState._commentCapture = null;
     var overlay = document.getElementById('comment-popover-overlay');
     if (overlay) {
       overlay.style.display = 'none';
@@ -10436,7 +10482,7 @@ window.PageAssignments = (function () {
     }
   }
   function updateCommentBadge(sid, aid) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var count = _assignmentCommentCount(cid, sid, aid);
     document.querySelectorAll('.comment-btn').forEach(function (btn) {
       if (btn.dataset.sid === sid && btn.dataset.aid === aid)
@@ -10447,7 +10493,7 @@ window.PageAssignments = (function () {
 
   /* ── Module management ──────────────────────────────────── */
   function updateModuleName(moduleId, name) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var modules = getModules(cid);
     var u = modules.find(function (x) {
       return x.id === moduleId;
@@ -10459,7 +10505,7 @@ window.PageAssignments = (function () {
     return u ? u.name : name;
   }
   function _moduleNameSaved(input) {
-    var u = getModules(activeCourse).find(function (x) {
+    var u = getModules(pageState.activeCourse).find(function (x) {
       return x.id === input.dataset.moduleid;
     });
     return u ? u.name : input.value;
@@ -10472,7 +10518,7 @@ window.PageAssignments = (function () {
     if (folder) folder.draggable = on;
   }
   function updateModuleColor(moduleId, color) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var modules = getModules(cid);
     var u = modules.find(function (x) {
       return x.id === moduleId;
@@ -10486,7 +10532,7 @@ window.PageAssignments = (function () {
   /* Module colour: the swatch opens the shared colour popover (ui.js). */
   function openModuleColorPop(swatch) {
     var moduleId = swatch.dataset.moduleid;
-    var u = getModules(activeCourse).find(function (x) {
+    var u = getModules(pageState.activeCourse).find(function (x) {
       return x.id === moduleId;
     });
     if (!u) return;
@@ -10509,7 +10555,7 @@ window.PageAssignments = (function () {
         ? assessCount + ' assessment(s) use this module. They will move to Ungrouped Assignments. Delete anyway?'
         : 'Delete this module?';
     showConfirm('Delete Module', msg, 'Delete', 'danger', function () {
-      var cid = activeCourse;
+      var cid = pageState.activeCourse;
       saveModules(
         cid,
         getModules(cid).filter(function (u) {
@@ -10533,21 +10579,21 @@ window.PageAssignments = (function () {
     var folder = document.querySelector('.mod-folder[data-module-id="' + moduleId + '"]');
     // The header acts on what the teacher sees: a module shown open closes,
     // even one open only because it holds an open card or a search is on.
-    var shownOpen = folder ? folder.classList.contains('open') : !collapsedModules[moduleId];
-    if (filterCategories.length > 0 || showUngraded || !!assessSearch) {
+    var shownOpen = folder ? folder.classList.contains('open') : !pageState.collapsedModules[moduleId];
+    if (pageState.filterCategories.length > 0 || pageState.showUngraded || !!pageState.assessSearch) {
       // A search or filter's open/closed is for now; the saved state stays.
-      _filterClosedModules[moduleId] = shownOpen;
+      pageState._filterClosedModules[moduleId] = shownOpen;
       if (folder) _showFolderOpen(folder, !shownOpen);
       return;
     }
-    collapsedModules[moduleId] = shownOpen;
+    pageState.collapsedModules[moduleId] = shownOpen;
     _saveClosedModules();
     // Closing a module closes the cards in it, so the next redraw doesn't
     // open it again to show them.
     var closedCards = false;
     if (shownOpen && folder) {
       folder.querySelectorAll('.assess-card.open').forEach(function (card) {
-        if (openAssessIds.delete(card.id.replace(/^ac-/, ''))) closedCards = true;
+        if (pageState.openAssessIds.delete(card.id.replace(/^ac-/, ''))) closedCards = true;
       });
     }
     if (closedCards) render();
@@ -10555,7 +10601,7 @@ window.PageAssignments = (function () {
   }
 
   function addModuleInline() {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var modules = getModules(cid);
     var idx = modules.length;
     var color = MODULE_COLORS[idx % MODULE_COLORS.length];
@@ -10568,7 +10614,7 @@ window.PageAssignments = (function () {
     };
     modules.push(newModule);
     saveModules(cid, modules);
-    collapsedModules[newModule.id] = false;
+    pageState.collapsedModules[newModule.id] = false;
     render();
     setTimeout(function () {
       var input = document.querySelector('.mod-folder[data-module-id="' + newModule.id + '"] .mod-folder-name-input');
@@ -10581,8 +10627,8 @@ window.PageAssignments = (function () {
 
   /* ── Drag & Drop — modules and assessments ──────────────── */
   function onModuleDragStart(event, moduleId) {
-    _dragModuleId = moduleId;
-    _dragAssessId = null;
+    pageState._dragModuleId = moduleId;
+    pageState._dragAssessId = null;
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('application/module-id', moduleId);
     setTimeout(function () {
@@ -10591,7 +10637,7 @@ window.PageAssignments = (function () {
     }, 0);
   }
   function onModuleDragEnd() {
-    _dragModuleId = null;
+    pageState._dragModuleId = null;
     document.querySelectorAll('.mod-folder.dragging').forEach(function (el) {
       el.classList.remove('dragging');
     });
@@ -10605,9 +10651,9 @@ window.PageAssignments = (function () {
     document.querySelectorAll('.mod-drop-zone.drag-over').forEach(function (el) {
       el.classList.remove('drag-over');
     });
-    var moduleId = _dragModuleId || event.dataTransfer.getData('application/module-id');
+    var moduleId = pageState._dragModuleId || event.dataTransfer.getData('application/module-id');
     if (!moduleId) return;
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var modules = getModules(cid);
     var fromIndex = modules.findIndex(function (u) {
       return u.id === moduleId;
@@ -10622,13 +10668,13 @@ window.PageAssignments = (function () {
       u.sortOrder = i;
     });
     saveModules(cid, modules);
-    _dragModuleId = null;
+    pageState._dragModuleId = null;
     render();
   }
   function onAssessDragStart(event, assessId) {
     event.stopPropagation();
-    _dragAssessId = assessId;
-    _dragModuleId = null;
+    pageState._dragAssessId = assessId;
+    pageState._dragModuleId = null;
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', assessId);
     setTimeout(function () {
@@ -10637,7 +10683,7 @@ window.PageAssignments = (function () {
     }, 0);
   }
   function onAssessDragEnd() {
-    _dragAssessId = null;
+    pageState._dragAssessId = null;
     _clearDropMarker();
     _clearMergeState();
     document.querySelectorAll('.assess-card.dragging').forEach(function (el) {
@@ -10648,11 +10694,11 @@ window.PageAssignments = (function () {
     });
   }
   function onFolderDrop(event, targetModuleId) {
-    if (_dragModuleId) return;
+    if (pageState._dragModuleId) return;
     event.preventDefault();
-    var assessId = event.dataTransfer.getData('text/plain') || _dragAssessId;
+    var assessId = event.dataTransfer.getData('text/plain') || pageState._dragAssessId;
     if (!assessId) return;
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var assessments = getAssessments(cid);
     var a = assessments.find(function (x) {
       return x.id === assessId;
@@ -10661,23 +10707,23 @@ window.PageAssignments = (function () {
     if (targetModuleId === '__none__') delete a.moduleId;
     else a.moduleId = targetModuleId;
     saveAssessments(cid, assessments);
-    _dragAssessId = null;
+    pageState._dragAssessId = null;
     render();
   }
   function _clearMergeState() {
-    if (_mergeHoverTimer) {
-      clearTimeout(_mergeHoverTimer);
-      _mergeHoverTimer = null;
+    if (pageState._mergeHoverTimer) {
+      clearTimeout(pageState._mergeHoverTimer);
+      pageState._mergeHoverTimer = null;
     }
-    if (_mergeTargetId) {
-      var el = document.getElementById('ac-' + _mergeTargetId);
+    if (pageState._mergeTargetId) {
+      var el = document.getElementById('ac-' + pageState._mergeTargetId);
       if (el) el.classList.remove('merge-target');
     }
-    _mergeTargetId = null;
-    _mergeAnimating = false;
+    pageState._mergeTargetId = null;
+    pageState._mergeAnimating = false;
   }
   function mergeToNewModule(draggedId, targetId) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var modules = getModules(cid);
     var idx = modules.length;
     var color = MODULE_COLORS[idx % MODULE_COLORS.length];
@@ -10698,7 +10744,7 @@ window.PageAssignments = (function () {
       if (a) a.moduleId = newModule.id;
     });
     saveAssessments(cid, assessments);
-    collapsedModules[newModule.id] = false;
+    pageState.collapsedModules[newModule.id] = false;
     render();
     setTimeout(function () {
       var input = document.querySelector('.mod-folder[data-module-id="' + newModule.id + '"] .mod-folder-name-input');
@@ -10715,7 +10761,7 @@ window.PageAssignments = (function () {
      unfiled card, the two stack into a new module instead. */
   // Stacking makes a new module, so it only joins two cards that are not in one.
   function _canStack(dragId, targetId) {
-    var assessments = getAssessments(activeCourse);
+    var assessments = getAssessments(pageState.activeCourse);
     var a = assessments.find(function (x) {
       return x.id === dragId;
     });
@@ -10738,7 +10784,7 @@ window.PageAssignments = (function () {
   // Moves the dragged assessment before or after the target and numbers the
   // whole list 1..n. Dropped beside a card in another module, it joins that module.
   function reorderAssessment(dragId, targetId, after) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var assessments = getAssessments(cid);
     var ordered = sortAssessmentsForList(assessments);
     var dragged = ordered.find(function (x) {
@@ -10768,20 +10814,20 @@ window.PageAssignments = (function () {
   // A level click ran scrollIntoView straight after its writes (49 ms of
   // layout); the row is now scrolled to, when out of sight, after the frame's.
   function kbFocusCell(el) {
-    if (_kbFocusEl) _kbFocusEl.classList.remove('kb-focus');
-    _kbFocusEl = el;
+    if (pageState._kbFocusEl) pageState._kbFocusEl.classList.remove('kb-focus');
+    pageState._kbFocusEl = el;
     if (el) {
       el.classList.add('kb-focus');
       _scrollIntoViewIfNeeded(el, { block: 'nearest' }, true);
     }
   }
   function navigateKb(direction) {
-    if (!_kbFocusEl) return;
-    if (_kbFocusEl.classList.contains('rsg-criterion-row')) {
-      var grid = _kbFocusEl.closest('.rsg-grid');
+    if (!pageState._kbFocusEl) return;
+    if (pageState._kbFocusEl.classList.contains('rsg-criterion-row')) {
+      var grid = pageState._kbFocusEl.closest('.rsg-grid');
       if (!grid) return;
       var allCritRows = Array.from(grid.querySelectorAll('.rsg-criterion-row'));
-      var curIdx = allCritRows.indexOf(_kbFocusEl);
+      var curIdx = allCritRows.indexOf(pageState._kbFocusEl);
       if (curIdx < 0) return;
       var newIdx = curIdx;
       if (direction === 'up' || direction === 'left') newIdx = Math.max(0, curIdx - 1);
@@ -10804,7 +10850,7 @@ window.PageAssignments = (function () {
     var critRow = e.target.closest('.rsg-criterion-row');
     if (critRow) {
       kbFocusCell(critRow);
-    } else if (_kbFocusEl && !e.target.closest('.col-fill-menu') && !e.target.closest('.row-fill-btn')) {
+    } else if (pageState._kbFocusEl && !e.target.closest('.col-fill-menu') && !e.target.closest('.row-fill-btn')) {
       kbFocusCell(null);
     }
 
@@ -10843,13 +10889,13 @@ window.PageAssignments = (function () {
       newQuiz: function () {
         showNewForm();
         QuizBuilder.startNew({
-          open: () => _showingNewForm && !_editingAssessId,
-          choose: () => _formWork && _setFormWork('students_send', 'quiz'),
+          open: () => pageState._showingNewForm && !pageState._editingAssessId,
+          choose: () => pageState._formWork && _setFormWork('students_send', 'quiz'),
           done: _markFormStart,
         });
       },
       addFromClass: function () {
-        if (window.AddFromClass) AddFromClass.open(activeCourse, render);
+        if (window.AddFromClass) AddFromClass.open(pageState.activeCourse, render);
       },
       copyTargetToggle: function () {
         if (window.AssessmentCopy) AssessmentCopy.toggleTarget(el);
@@ -10858,7 +10904,7 @@ window.PageAssignments = (function () {
         if (window.AssessmentCopy) AssessmentCopy.setDatesMode(el);
       },
       switchToClass: function () {
-        if (el.dataset.cid && el.dataset.cid !== activeCourse) switchCourse(el.dataset.cid);
+        if (el.dataset.cid && el.dataset.cid !== pageState.activeCourse) switchCourse(el.dataset.cid);
       },
       openCopyIn: function () {
         openCopyIn(el.dataset.cid, el.dataset.aid);
@@ -10873,7 +10919,7 @@ window.PageAssignments = (function () {
       // Handouts and Links (board 3a).
       afResAddFile: function () {
         var f = document.querySelector('#af-res .af-res-file');
-        if (f && _formRes && !_formRes.busy) f.click();
+        if (f && pageState._formRes && !pageState._formRes.busy) f.click();
       },
       afResAddLink: function () {
         _formResOpenLink();
@@ -10888,7 +10934,7 @@ window.PageAssignments = (function () {
         _formResRemove(el.dataset.key);
       },
       afAddCategories: function () {
-        var cid = activeCourse;
+        var cid = pageState.activeCourse;
         cancelAssessForm(function () {
           Router.navigate('/dashboard?course=' + encodeURIComponent(cid) + '&manage=grading');
         });
@@ -10932,8 +10978,8 @@ window.PageAssignments = (function () {
         _startPickNone();
       },
       useLastRubric: function () {
-        _startOpen = null;
-        _blank = null;
+        pageState._startOpen = null;
+        pageState._blank = null;
         _useRubricInForm(el.dataset.rid);
         _renderRubricView();
       },
@@ -11026,7 +11072,7 @@ window.PageAssignments = (function () {
         rubricFromClass();
       },
       copyRubricUI: function () {
-        if (window.RubricLibrary) RubricLibrary.openCopyDialog(activeCourse, el.dataset.rid, render);
+        if (window.RubricLibrary) RubricLibrary.openCopyDialog(pageState.activeCourse, el.dataset.rid, render);
       },
       setCollaboration: function () {
         setCollaboration(el.dataset.collab);
@@ -11050,7 +11096,7 @@ window.PageAssignments = (function () {
       },
       toggleUngraded: function () {
         var key = AssignToolbar.focusKey(el);
-        showUngraded = !showUngraded;
+        pageState.showUngraded = !pageState.showUngraded;
         render();
         AssignToolbar.refocus(key);
       },
@@ -11059,12 +11105,12 @@ window.PageAssignments = (function () {
       setToGradeShow: function () {
         var show = el.dataset.show;
         if (show === 'toreturn') {
-          var letGo = _toReturnOnly;
+          var letGo = pageState._toReturnOnly;
           AssignShow.choose('all');
-          _toReturnOnly = !letGo;
+          pageState._toReturnOnly = !letGo;
           show = letGo ? 'all' : show;
         } else {
-          _toReturnOnly = false;
+          pageState._toReturnOnly = false;
           show = AssignShow.choose(show);
         }
         render();
@@ -11092,12 +11138,12 @@ window.PageAssignments = (function () {
       },
       openWorkWall: function () {
         var aid = el.dataset.aid;
-        if (!window.WorkWall || !activeCourse) return;
+        if (!window.WorkWall || !pageState.activeCourse) return;
         // Grade in This Order grades in the dialog over the wall, and the
         // page under both is not drawn: it is drawn, whole, as the wall closes.
-        WorkWall.open(activeCourse, aid, {
+        WorkWall.open(pageState.activeCourse, aid, {
           onClose: function () {
-            if (!_pageBehind) return;
+            if (!pageState._pageBehind) return;
             render();
             var more = document.querySelector('#ac-' + aid + ' .assess-more-btn');
             if (more) more.focus({ preventScroll: true });
@@ -11106,12 +11152,12 @@ window.PageAssignments = (function () {
       },
       openAddWorkClass: function () {
         var aid = el.dataset.aid;
-        if (!window.AddWorkClass || !activeCourse) return;
+        if (!window.AddWorkClass || !pageState.activeCourse) return;
         // The page behind is drawn again as it closes, so new work shows.
-        var cid = activeCourse;
+        var cid = pageState.activeCourse;
         AddWorkClass.open(cid, aid, {
           onClose: function () {
-            if (activeCourse !== cid || !document.getElementById('ac-' + aid)) return;
+            if (pageState.activeCourse !== cid || !document.getElementById('ac-' + aid)) return;
             render();
             var more = document.querySelector('#ac-' + aid + ' .assess-more-btn');
             if (more) more.focus({ preventScroll: true });
@@ -11119,12 +11165,12 @@ window.PageAssignments = (function () {
         });
       },
       openQuizResults: function () {
-        var cid = activeCourse;
+        var cid = pageState.activeCourse;
         // The page behind is drawn again as it closes, so confirmed levels show.
         if (window.QuizResults && cid)
           QuizResults.open(cid, el.dataset.aid, {
             onClose: function () {
-              if (activeCourse === cid) render();
+              if (pageState.activeCourse === cid) render();
             },
           });
       },
@@ -11138,8 +11184,8 @@ window.PageAssignments = (function () {
         AssignToolbar.setFilter(!AssignToolbar.filterOpen());
       },
       clearFilterMenu: function () {
-        filterCategories = [];
-        showUngraded = false;
+        pageState.filterCategories = [];
+        pageState.showUngraded = false;
         render();
         AssignToolbar.refocus('.assess-filter-menu [data-action="toggleUngraded"]');
       },
@@ -11166,9 +11212,9 @@ window.PageAssignments = (function () {
       },
       clearAssessFilters: function () {
         e.preventDefault();
-        filterCategories = [];
-        assessSearch = '';
-        showUngraded = false;
+        pageState.filterCategories = [];
+        pageState.assessSearch = '';
+        pageState.showUngraded = false;
         AssignShow.choose('all');
         render();
         AssignShow.afterDraw();
@@ -11253,10 +11299,15 @@ window.PageAssignments = (function () {
       },
       graderMark: function () {
         var aid = _graderAid(el);
-        if (!aid || !focusStudentId) return;
-        var now = getCompletionMark(activeCourse, focusStudentId, aid);
-        Grader.setMark(activeCourse, focusStudentId, aid, now === el.dataset.mark ? null : el.dataset.mark);
-        refreshSidebarGrades(focusStudentId);
+        if (!aid || !pageState.focusStudentId) return;
+        var now = getCompletionMark(pageState.activeCourse, pageState.focusStudentId, aid);
+        Grader.setMark(
+          pageState.activeCourse,
+          pageState.focusStudentId,
+          aid,
+          now === el.dataset.mark ? null : el.dataset.mark,
+        );
+        refreshSidebarGrades(pageState.focusStudentId);
         render();
       },
       graderTick: function () {
@@ -11272,12 +11323,16 @@ window.PageAssignments = (function () {
         _toggleGroupMenu(el);
       },
       groupGradeSeparately: function () {
-        Grader.gradeSeparately(activeCourse, el.dataset.aid, el.dataset.sid);
+        Grader.gradeSeparately(pageState.activeCourse, el.dataset.aid, el.dataset.sid);
         refreshSidebarGrades();
         render();
       },
       groupBackToGroup: function () {
-        _confirmBackToGroupGrade(activeCourse, _assessmentById(activeCourse, el.dataset.aid), el.dataset.sid);
+        _confirmBackToGroupGrade(
+          pageState.activeCourse,
+          _assessmentById(pageState.activeCourse, el.dataset.aid),
+          el.dataset.sid,
+        );
       },
       openCommentPopover: function () {
         openCommentPopover(el.dataset.cid, el.dataset.sid, el.dataset.aid);
@@ -11308,7 +11363,8 @@ window.PageAssignments = (function () {
       },
       printRubrics: function () {
         // Grading one student: their rubric. Every student showing: everyone's.
-        if (window.RubricPrint) RubricPrint.open(activeCourse, el.dataset.aid, { studentId: focusStudentId });
+        if (window.RubricPrint)
+          RubricPrint.open(pageState.activeCourse, el.dataset.aid, { studentId: pageState.focusStudentId });
       },
       toggleSectionTags: function () {
         toggleSectionTags(el.dataset.secid);
@@ -11500,7 +11556,7 @@ window.PageAssignments = (function () {
 
   function _handleBlur(e) {
     var el = e.target;
-    if (el === _chipTipSource) _hideChipTip();
+    if (el === pageState._chipTipSource) _hideChipTip();
     if (el.dataset.actionBlur === 'moduleName') {
       // An empty name is not saved, so the box shows the saved one again.
       var saved = updateModuleName(el.dataset.moduleid, el.value);
@@ -11518,12 +11574,17 @@ window.PageAssignments = (function () {
     if (el.dataset.actionBlur === 'graderCritNote') {
       var noteAid = _graderAid(el);
       var text = el.value.trim();
-      if (!noteAid || !focusStudentId) return;
+      if (!noteAid || !pageState.focusStudentId) return;
       if (
         text !==
-        getRubricCriterionComment(activeCourse, focusStudentId, noteAid, _graderCriterion(noteAid, el.dataset.critid))
+        getRubricCriterionComment(
+          pageState.activeCourse,
+          pageState.focusStudentId,
+          noteAid,
+          _graderCriterion(noteAid, el.dataset.critid),
+        )
       )
-        Grader.setCriterionComment(activeCourse, focusStudentId, noteAid, el.dataset.critid, text);
+        Grader.setCriterionComment(pageState.activeCourse, pageState.focusStudentId, noteAid, el.dataset.critid, text);
       el.classList.toggle('has-text', !!text);
       return;
     }
@@ -11546,36 +11607,44 @@ window.PageAssignments = (function () {
       var spText = el.value.trim();
       var beyond = el.dataset.actionBlur === 'rsgBeyond';
       var spSaved = beyond
-        ? getRubricCriterionBeyond(activeCourse, el.dataset.sid, el.dataset.aid, spCrit)
-        : getRubricCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, spCrit);
+        ? getRubricCriterionBeyond(pageState.activeCourse, el.dataset.sid, el.dataset.aid, spCrit)
+        : getRubricCriterionComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid, spCrit);
       if (spText === spSaved) return;
-      if (beyond) Grader.setWentBeyond(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
-      else Grader.setCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      if (beyond)
+        Grader.setWentBeyond(pageState.activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      else
+        Grader.setCriterionComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
       return;
     }
     if (el.dataset.actionBlur === 'graderCritBeyond') {
       var beyondAid = _graderAid(el);
       var beyondText = el.value.trim();
-      if (!beyondAid || !focusStudentId) return;
+      if (!beyondAid || !pageState.focusStudentId) return;
       if (
         beyondText !==
         getRubricCriterionBeyond(
-          activeCourse,
-          focusStudentId,
+          pageState.activeCourse,
+          pageState.focusStudentId,
           beyondAid,
           _graderCriterion(beyondAid, el.dataset.critid),
         )
       )
-        Grader.setWentBeyond(activeCourse, focusStudentId, beyondAid, el.dataset.critid, beyondText);
+        Grader.setWentBeyond(
+          pageState.activeCourse,
+          pageState.focusStudentId,
+          beyondAid,
+          el.dataset.critid,
+          beyondText,
+        );
       el.classList.toggle('has-text', !!beyondText);
       return;
     }
     if (el.dataset.actionBlur === 'graderTagNote') {
       var tagAid = _graderAid(el);
       var tagText = el.value.trim();
-      if (!tagAid || !focusStudentId) return;
-      if (tagText !== getTagComment(activeCourse, focusStudentId, tagAid, el.dataset.tag))
-        Grader.setCompetencyComment(activeCourse, focusStudentId, tagAid, el.dataset.tag, tagText);
+      if (!tagAid || !pageState.focusStudentId) return;
+      if (tagText !== getTagComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag))
+        Grader.setCompetencyComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag, tagText);
       el.classList.toggle('has-text', !!tagText);
       return;
     }
@@ -11590,7 +11659,7 @@ window.PageAssignments = (function () {
 
   function _handleKeydown(e) {
     if (
-      _fillUndoOpen &&
+      pageState._fillUndoOpen &&
       (e.metaKey || e.ctrlKey) &&
       !e.shiftKey &&
       (e.key === 'z' || e.key === 'Z') &&
@@ -11609,14 +11678,14 @@ window.PageAssignments = (function () {
     if (CardMenu.keydown(e)) return;
     if (_attachLinkKeydown(e)) return;
     // One student's grader open on the page (the dialog runs its own).
-    if (!_grader && _graderCardKey(e)) return;
+    if (!pageState._grader && _graderCardKey(e)) return;
     if (e.key === 'Escape' && document.querySelector('.rsg-group-members .grader-member-menu:not([hidden])')) {
       e.preventDefault();
       _closeGroupMenus();
       return;
     }
-    if (_chipTipSource && e.key === 'Escape') {
-      var focusedChip = e.target === _chipTipSource;
+    if (pageState._chipTipSource && e.key === 'Escape') {
+      var focusedChip = e.target === pageState._chipTipSource;
       _hideChipTip();
       if (focusedChip) return;
     }
@@ -11665,7 +11734,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (
-      focusStudentId &&
+      pageState.focusStudentId &&
       (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
       !e.metaKey &&
       !e.ctrlKey &&
@@ -11678,13 +11747,13 @@ window.PageAssignments = (function () {
       stepFocusStudent(e.key === 'ArrowRight' ? 1 : -1);
       return;
     }
-    if (!_kbFocusEl) return;
+    if (!pageState._kbFocusEl) return;
     var key = e.key;
     // A Six-Point row takes 1 to 6, the scores themselves.
-    var sixRow = _kbFocusEl.classList.contains('is-six');
+    var sixRow = pageState._kbFocusEl.classList.contains('is-six');
     if (sixRow && ['1', '2', '3', '4', '5', '6'].includes(key)) {
       e.preventDefault();
-      var six = _kbFocusEl.querySelector('.sp6-btn[data-six="' + key + '"]');
+      var six = pageState._kbFocusEl.querySelector('.sp6-btn[data-six="' + key + '"]');
       if (six) six.click();
       navigateKb('down');
       return;
@@ -11696,8 +11765,8 @@ window.PageAssignments = (function () {
     if (['1', '2', '3', '4'].includes(key)) {
       e.preventDefault();
       var val = parseInt(key, 10);
-      if (_kbFocusEl.classList.contains('rsg-criterion-row')) {
-        var lvl = _kbFocusEl.querySelector('.l' + val);
+      if (pageState._kbFocusEl.classList.contains('rsg-criterion-row')) {
+        var lvl = pageState._kbFocusEl.querySelector('.l' + val);
         if (lvl) lvl.click();
       }
       navigateKb('down');
@@ -11708,11 +11777,11 @@ window.PageAssignments = (function () {
       !e.metaKey &&
       !e.ctrlKey &&
       !e.altKey &&
-      _kbFocusEl.classList.contains('rsg-criterion-row') &&
+      pageState._kbFocusEl.classList.contains('rsg-criterion-row') &&
       !document.getElementById('rubric-modal') &&
       !document.querySelector('.confirm-overlay')
     ) {
-      var checksBtn = _kbFocusEl.querySelector('.rsg-checks-btn');
+      var checksBtn = pageState._kbFocusEl.querySelector('.rsg-checks-btn');
       if (checksBtn) {
         e.preventDefault();
         checksBtn.click();
@@ -11724,28 +11793,28 @@ window.PageAssignments = (function () {
       !e.metaKey &&
       !e.ctrlKey &&
       !e.altKey &&
-      _kbFocusEl.classList.contains('rsg-criterion-row') &&
+      pageState._kbFocusEl.classList.contains('rsg-criterion-row') &&
       !document.getElementById('rubric-modal') &&
       !document.querySelector('.confirm-overlay')
     ) {
-      var commentBtn = _kbFocusEl.querySelector('.rsg-crit-comment');
+      var commentBtn = pageState._kbFocusEl.querySelector('.rsg-crit-comment');
       if (commentBtn) {
         e.preventDefault();
         commentBtn.click();
       }
       return;
     }
-    if (['+', '=', '-', '_'].includes(key) && _kbFocusEl.classList.contains('rsg-criterion-row')) {
+    if (['+', '=', '-', '_'].includes(key) && pageState._kbFocusEl.classList.contains('rsg-criterion-row')) {
       e.preventDefault();
-      setScoreMod(_kbFocusEl, key === '+' || key === '=' ? 1 : -1);
+      setScoreMod(pageState._kbFocusEl, key === '+' || key === '=' ? 1 : -1);
       // Its keyup lands on what has the browser's focus, perhaps another row.
-      _afterGradingEvent({ type: 'keydown', target: _kbFocusEl });
+      _afterGradingEvent({ type: 'keydown', target: pageState._kbFocusEl });
       return;
     }
     if (key === '0' || key === 'Backspace' || key === 'Delete') {
       e.preventDefault();
-      if (_kbFocusEl.classList.contains('rsg-criterion-row')) {
-        var active = _kbFocusEl.querySelector('.rsg-level.active');
+      if (pageState._kbFocusEl.classList.contains('rsg-criterion-row')) {
+        var active = pageState._kbFocusEl.querySelector('.rsg-level.active');
         // Delete clears a mixed competency too, not sets it to the lowest.
         if (active) active.classList.remove('mixed');
         if (active) active.click();
@@ -11785,21 +11854,21 @@ window.PageAssignments = (function () {
   function _handleDragEnd(e) {
     // A student dropped nowhere, or back where they were, comes back into view.
     AC.collabDragEnd();
-    if (_dragAssessId) {
+    if (pageState._dragAssessId) {
       onAssessDragEnd();
       return;
     }
-    if (_dragModuleId) {
+    if (pageState._dragModuleId) {
       onModuleDragEnd();
       return;
     }
-    _dragSid = null;
-    _dragFromGroup = null;
+    pageState._dragSid = null;
+    pageState._dragFromGroup = null;
   }
   function _handleDragOver(e) {
     // Module drop zone
     var dropZone = e.target.closest('[data-mod-drop-zone]');
-    if (dropZone && _dragModuleId) {
+    if (dropZone && pageState._dragModuleId) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       dropZone.classList.add('drag-over');
@@ -11807,7 +11876,7 @@ window.PageAssignments = (function () {
     }
     // Over a card: reorder (check BEFORE folder drop — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
-    if (cardDrop && _dragAssessId && !_dragModuleId) {
+    if (cardDrop && pageState._dragAssessId && !pageState._dragModuleId) {
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
@@ -11815,34 +11884,34 @@ window.PageAssignments = (function () {
         el.classList.remove('drag-over');
       });
       var targetId = cardDrop.dataset.assessCardDrop;
-      if (targetId === _dragAssessId) {
+      if (targetId === pageState._dragAssessId) {
         _clearDropMarker();
         _clearMergeState();
         return;
       }
       var rect = cardDrop.getBoundingClientRect();
       var y = e.clientY - rect.top;
-      if (y > rect.height / 3 && y < (rect.height * 2) / 3 && _canStack(_dragAssessId, targetId)) {
+      if (y > rect.height / 3 && y < (rect.height * 2) / 3 && _canStack(pageState._dragAssessId, targetId)) {
         // Middle third: hold to stack the two into a new module.
         _clearDropMarker();
-        if (_mergeTargetId === targetId) return;
+        if (pageState._mergeTargetId === targetId) return;
         _clearMergeState();
-        _mergeTargetId = targetId;
-        _mergeHoverTimer = setTimeout(function () {
-          _mergeAnimating = true;
+        pageState._mergeTargetId = targetId;
+        pageState._mergeHoverTimer = setTimeout(function () {
+          pageState._mergeAnimating = true;
           var el = document.getElementById('ac-' + targetId);
           if (el) el.classList.add('merge-target');
         }, 300);
         return;
       }
       // Top or bottom: reorder.
-      if (_mergeTargetId) _clearMergeState();
+      if (pageState._mergeTargetId) _clearMergeState();
       _setDropMarker(cardDrop, y > rect.height / 2);
       return;
     }
     // Folder drop
     var folderDrop = e.target.closest('[data-folder-drop]');
-    if (folderDrop && !_dragModuleId && _dragAssessId) {
+    if (folderDrop && !pageState._dragModuleId && pageState._dragAssessId) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       if (!folderDrop.classList.contains('drag-over')) folderDrop.classList.add('drag-over');
@@ -11867,7 +11936,7 @@ window.PageAssignments = (function () {
     if (cardDrop) {
       if (cardDrop.contains(e.relatedTarget)) return;
       cardDrop.classList.remove('drop-before', 'drop-after');
-      if (_mergeTargetId === cardDrop.dataset.assessCardDrop) _clearMergeState();
+      if (pageState._mergeTargetId === cardDrop.dataset.assessCardDrop) _clearMergeState();
       return;
     }
     var folderDrop = e.target.closest('[data-folder-drop]');
@@ -11884,22 +11953,22 @@ window.PageAssignments = (function () {
   function _handleDrop(e) {
     // Module drop zone
     var dropZone = e.target.closest('[data-mod-drop-zone]');
-    if (dropZone && _dragModuleId) {
+    if (dropZone && pageState._dragModuleId) {
       onModuleDropZoneDrop(e, parseInt(dropZone.dataset.dropIndex, 10));
       return;
     }
     // Card drop: reorder (check before folder — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
-    if (cardDrop && _dragAssessId && !_dragModuleId) {
+    if (cardDrop && pageState._dragAssessId && !pageState._dragModuleId) {
       e.preventDefault();
       e.stopPropagation();
-      var dragId = _dragAssessId;
-      var stackOn = _mergeAnimating && _mergeTargetId === cardDrop.dataset.assessCardDrop;
+      var dragId = pageState._dragAssessId;
+      var stackOn = pageState._mergeAnimating && pageState._mergeTargetId === cardDrop.dataset.assessCardDrop;
       var after = cardDrop.classList.contains('drop-after');
       var placed = after || cardDrop.classList.contains('drop-before');
       _clearDropMarker();
       _clearMergeState();
-      _dragAssessId = null;
+      pageState._dragAssessId = null;
       if (stackOn && dragId !== cardDrop.dataset.assessCardDrop) {
         mergeToNewModule(dragId, cardDrop.dataset.assessCardDrop);
         return;
@@ -11910,7 +11979,7 @@ window.PageAssignments = (function () {
     }
     // Folder drop
     var folderDrop = e.target.closest('[data-folder-drop]');
-    if (folderDrop && _dragAssessId) {
+    if (folderDrop && pageState._dragAssessId) {
       folderDrop.classList.remove('drag-over');
       onFolderDrop(e, folderDrop.dataset.folderDrop);
       return;
@@ -11926,19 +11995,21 @@ window.PageAssignments = (function () {
   /* ── Mouseenter/mouseleave for rubric tooltips ──────────── */
   function _handleMouseOver(e) {
     var chip = e.target.closest('[data-chip-tip]');
-    if (chip && chip !== _chipTipSource) _showChipTip(chip);
+    if (chip && chip !== pageState._chipTipSource) _showChipTip(chip);
     var nameLabel = e.target.closest('.rsg-criterion-label');
-    if (nameLabel && nameLabel !== _chipTipSource && Date.now() - _lastTouch > 800) _queueNameTip(nameLabel);
+    if (nameLabel && nameLabel !== pageState._chipTipSource && Date.now() - pageState._lastTouch > 800)
+      _queueNameTip(nameLabel);
   }
   function _handleMouseOut(e) {
     var chip = e.target.closest('[data-chip-tip]');
-    if (chip && chip === _chipTipSource && !(e.relatedTarget && chip.contains(e.relatedTarget))) _hideChipTip();
+    if (chip && chip === pageState._chipTipSource && !(e.relatedTarget && chip.contains(e.relatedTarget)))
+      _hideChipTip();
     var nameLabel = e.target.closest('.rsg-criterion-label');
     if (nameLabel && !(e.relatedTarget && nameLabel.contains(e.relatedTarget))) {
-      clearTimeout(_nameTipTimer);
+      clearTimeout(pageState._nameTipTimer);
       // A tap's emulated mouseout (a mouse pointer left elsewhere) is not
       // the finger leaving: the tip a tap showed stays until the next tap.
-      if (nameLabel === _chipTipSource && Date.now() - _lastTouch > 800) _hideChipTip();
+      if (nameLabel === pageState._chipTipSource && Date.now() - pageState._lastTouch > 800) _hideChipTip();
     }
   }
 
@@ -11963,12 +12034,12 @@ window.PageAssignments = (function () {
   }
 
   // The last touch, so a tap's emulated mouse events are not read as a hover.
-  var _lastTouch = 0;
+  pageState._lastTouch = 0;
   function _handlePointerDown(e) {
     var nameLabel = e.target.closest && e.target.closest('.rsg-criterion-label');
-    if (_chipTipSource && _chipTipSource.classList.contains('rsg-criterion-label')) _hideChipTip();
+    if (pageState._chipTipSource && pageState._chipTipSource.classList.contains('rsg-criterion-label')) _hideChipTip();
     else if (nameLabel && e.pointerType === 'touch' && _hasNameTip(nameLabel)) _showChipTip(nameLabel);
-    if (e.pointerType === 'touch') _lastTouch = Date.now();
+    if (e.pointerType === 'touch') pageState._lastTouch = Date.now();
   }
 
   /* ── Grader dialog ───────────────────────────────────────
@@ -11977,48 +12048,48 @@ window.PageAssignments = (function () {
      open, render() draws the dialog instead of the page, and this page's
      listeners run alongside the gradebook's (which stand aside, see
      PageAssignments.graderOpen). */
-  var _grader = null;
+  pageState._grader = null;
   // True from a dialog over this page closing until the page is next drawn.
-  var _pageBehind = false;
+  pageState._pageBehind = false;
 
   function openGrader(cid, aid, sid, opts) {
-    if (_grader) closeGrader();
+    if (pageState._grader) closeGrader();
     opts = opts || {};
     // What came in since the class was read (S6-W1); the dialog is drawn again when it changes.
     if (typeof refreshStudentWork === 'function') refreshStudentWork(cid, { force: true });
-    activeCourse = cid;
+    pageState.activeCourse = cid;
     _loadDibelsOnce(cid);
     // Over this page (Grade Submissions, the Work Wall): the page's cards and
     // student, put back when the dialog closes.
     var page = opts.overPage
       ? {
-          open: openAssessIds,
-          focus: focusStudentId,
-          expanded: _allExpanded,
-          collapsed: _collapsedIds,
-          rubricViews: rubricViewStates,
+          open: pageState.openAssessIds,
+          focus: pageState.focusStudentId,
+          expanded: pageState._allExpanded,
+          collapsed: pageState._collapsedIds,
+          rubricViews: pageState.rubricViewStates,
         }
       : null;
-    openAssessIds = new Set([aid]);
-    focusStudentId = sid;
-    _allExpanded = false;
-    _collapsedIds = new Set();
-    rubricViewStates = {};
-    _commentPopoverState = null;
+    pageState.openAssessIds = new Set([aid]);
+    pageState.focusStudentId = sid;
+    pageState._allExpanded = false;
+    pageState._collapsedIds = new Set();
+    pageState.rubricViewStates = {};
+    pageState._commentPopoverState = null;
     CritComment.drop();
-    _kbFocusEl = null;
-    _statusDebounce = {};
+    pageState._kbFocusEl = null;
+    pageState._statusDebounce = {};
     AC.configure(cid);
     // Over this page itself (Grade Submissions, S6-F4): its own listeners
     // are the dialog's too, and come back when the dialog closes.
-    var pageListeners = _listeners.slice();
+    var pageListeners = pageState._listeners.slice();
     var overlay = document.createElement('div');
     overlay.id = 'grader-overlay';
     overlay.className = 'grader-overlay';
     overlay.innerHTML =
       '<div class="grader-dialog" role="dialog" aria-modal="true" aria-labelledby="grader-title" tabindex="-1"></div>';
     document.body.appendChild(overlay);
-    _grader = {
+    pageState._grader = {
       overlay: overlay,
       aid: aid,
       studentIds:
@@ -12048,8 +12119,8 @@ window.PageAssignments = (function () {
       reflectBusy: null,
       reflectMsg: null,
     };
-    if (_grader.queue)
-      _grader.qi = _grader.queue.findIndex(function (q) {
+    if (pageState._grader.queue)
+      pageState._grader.qi = pageState._grader.queue.findIndex(function (q) {
         return q.aid === aid;
       });
     overlay.addEventListener('mousedown', function (e) {
@@ -12085,12 +12156,12 @@ window.PageAssignments = (function () {
     // A click anywhere but the open ⋯ menu closes it.
     overlay.addEventListener('mousedown', function (e) {
       if (
-        !_grader ||
-        !_grader.menuSid ||
+        !pageState._grader ||
+        !pageState._grader.menuSid ||
         e.target.closest('.grader-member-menu, .grader-member-more, .grader-change-one-btn')
       )
         return;
-      _grader.menuSid = null;
+      pageState._grader.menuSid = null;
       _refreshGraderChrome();
     });
     // The Note for the Report: the preview follows each key, the note saves
@@ -12098,8 +12169,8 @@ window.PageAssignments = (function () {
     overlay.addEventListener('input', function (e) {
       if (e.target.classList.contains('grader-report-note-input')) _reportNotePreview(e.target);
       // An answer being written is kept while the dialog redraws (S10-F3).
-      if (e.target.classList.contains('grader-reflect-input') && _grader)
-        _grader.reflectDrafts[e.target.dataset.id] = e.target.value;
+      if (e.target.classList.contains('grader-reflect-input') && pageState._grader)
+        pageState._grader.reflectDrafts[e.target.dataset.id] = e.target.value;
     });
     overlay.addEventListener('change', function (e) {
       if (e.target.classList.contains('grader-report-note-input')) _saveReportNote(e.target);
@@ -12139,11 +12210,11 @@ window.PageAssignments = (function () {
      rubric window, a confirm) is using the key. In a points box it first
      puts back the saved points (_graderCardKey); a second Escape closes. */
   function _graderKeydown(e) {
-    if (!_grader || e.defaultPrevented) return;
+    if (!pageState._grader || e.defaultPrevented) return;
     // ⌘/Ctrl+Enter: Return & Next, from anywhere in the dialog, a comment box too.
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      var rn = _grader.overlay.querySelector('[data-grader="return-next"]:not(:disabled)');
-      if (rn && !_grader.caughtUp && !CritComment.isOpen() && !_commentPopoverState) {
+      var rn = pageState._grader.overlay.querySelector('[data-grader="return-next"]:not(:disabled)');
+      if (rn && !pageState._grader.caughtUp && !CritComment.isOpen() && !pageState._commentPopoverState) {
         e.preventDefault();
         _graderReturnNext();
         return;
@@ -12155,12 +12226,12 @@ window.PageAssignments = (function () {
     var typing =
       t && (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && t.type !== 'checkbox'));
     if (typing) return;
-    if (CritComment.isOpen() || _commentPopoverState) return;
+    if (CritComment.isOpen() || pageState._commentPopoverState) return;
     if (document.getElementById('rubric-modal') || document.querySelector('.confirm-overlay')) return;
     if (window.RubricBank && RubricBank.isOpen()) return;
     e.preventDefault();
-    if (_grader.menuSid) {
-      _grader.menuSid = null;
+    if (pageState._grader.menuSid) {
+      pageState._grader.menuSid = null;
       _refreshGraderChrome();
       return;
     }
@@ -12192,14 +12263,17 @@ window.PageAssignments = (function () {
     if (
       (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
       cls.contains('grdp-input') &&
-      _grader &&
+      pageState._grader &&
       !e.metaKey &&
       !e.ctrlKey &&
       !e.altKey &&
       !e.shiftKey
     ) {
       var arrowAid = _graderAid(t);
-      var held = arrowAid && focusStudentId ? getPointsScore(activeCourse, focusStudentId, arrowAid) : null;
+      var held =
+        arrowAid && pageState.focusStudentId
+          ? getPointsScore(pageState.activeCourse, pageState.focusStudentId, arrowAid)
+          : null;
       if (t.value.trim() !== (held != null ? formatPoints(held) : '')) return false;
       e.preventDefault();
       stepFocusStudent(e.key === 'ArrowRight' ? 1 : -1);
@@ -12208,10 +12282,13 @@ window.PageAssignments = (function () {
     if (e.key === 'Escape' && cls.contains('grdp-input')) {
       e.preventDefault();
       var escAid = _graderAid(t);
-      var saved = escAid && focusStudentId ? getPointsScore(activeCourse, focusStudentId, escAid) : null;
+      var saved =
+        escAid && pageState.focusStudentId
+          ? getPointsScore(pageState.activeCourse, pageState.focusStudentId, escAid)
+          : null;
       var savedText = saved != null ? formatPoints(saved) : '';
       // Nothing typed: nothing to put back, so the dialog closes at once.
-      if (_grader && t.value.trim() === savedText) {
+      if (pageState._grader && t.value.trim() === savedText) {
         closeGrader();
         return true;
       }
@@ -12259,13 +12336,13 @@ window.PageAssignments = (function () {
   }
 
   function _renderGrader() {
-    var cid = activeCourse;
-    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    var cid = pageState.activeCourse;
+    var dialog = pageState._grader.overlay.querySelector('.grader-dialog');
     var a = getAssessments(cid).find(function (x) {
-      return x.id === _grader.aid;
+      return x.id === pageState._grader.aid;
     });
     var st = getStudents(cid).find(function (x) {
-      return x.id === focusStudentId;
+      return x.id === pageState.focusStudentId;
     });
     if (!a || !st) {
       closeGrader();
@@ -12277,19 +12354,19 @@ window.PageAssignments = (function () {
     // The student's work beside the scoring (S6-F1), while the piece takes
     // work; the dialog is otherwise as it always was.
     var work = GraderWork.workShown(cid, a);
-    if (!dialog.firstChild || _grader.workShell !== work) {
+    if (!dialog.firstChild || pageState._grader.workShell !== work) {
       if (dialog.firstChild) _graderForgetDrawn();
       // html-safe: fixed markup and icon constants; text is set with textContent below
       dialog.innerHTML = work ? _graderWorkShellHtml() : _graderShellHtml();
-      _grader.workShell = work;
+      pageState._grader.workShell = work;
     }
     dialog.classList.toggle('has-work', work);
-    dialog.classList.toggle('is-focus', work && _grader.work.focus);
+    dialog.classList.toggle('is-focus', work && pageState._grader.work.focus);
     // Group work shows the group: its grade is drawn from (and saved for)
     // the member it copies from, so that member is the focus.
     var view = _graderGroupView(cid, a, st.id);
     if (view && view.source !== st.id) {
-      focusStudentId = view.source;
+      pageState.focusStudentId = view.source;
       st = getStudents(cid).find(function (x) {
         return x.id === view.source;
       });
@@ -12297,7 +12374,7 @@ window.PageAssignments = (function () {
     _graderWorkStudentChanged();
     _drawGraderToolbar(dialog, cid, a);
     _drawGraderHead(_graderPart(dialog, 'head'), cid, a, st, view);
-    _grader.source = view ? view.source : null;
+    pageState._grader.source = view ? view.source : null;
     _drawGraderPanel(_graderPart(dialog, 'panel'), cid, a, st);
     if (work) _drawGraderWork(dialog, cid, a, st, view);
     _refreshGraderReflection(dialog, cid, a, st);
@@ -12427,14 +12504,16 @@ window.PageAssignments = (function () {
   /* The head for `st` (the member a group's grade is drawn from, when
      `view` is a group): the name, and ← → off at either end. */
   function _drawGraderHead(head, cid, a, st, view) {
-    var i = _grader.studentIds.indexOf(st.id);
+    var i = pageState._grader.studentIds.indexOf(st.id);
     var steps = _graderSteps(cid, a);
     var u = steps ? _graderUnitIndex(steps, st.id) : -1;
     var prev = head.querySelector('[data-grader="prev"]');
     var next = head.querySelector('[data-grader="next"]');
     head.querySelector('.grader-student').textContent = view ? view.label : displayNameWithLast(st);
     prev.disabled = steps ? !(u > 0) : !(i > 0);
-    next.disabled = steps ? !(u >= 0 && u < steps.length - 1) : !(i >= 0 && i < _grader.studentIds.length - 1);
+    next.disabled = steps
+      ? !(u >= 0 && u < steps.length - 1)
+      : !(i >= 0 && i < pageState._grader.studentIds.length - 1);
     prev.setAttribute('aria-label', view ? 'Previous' : 'Previous student');
     next.setAttribute('aria-label', view ? 'Next' : 'Next student');
   }
@@ -12465,19 +12544,19 @@ window.PageAssignments = (function () {
     // A DIBELS benchmark is given on the day or not at all: no Late.
     var statusHtml = _graderStatusButtons(a.id, sid, status, isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE']);
     var statusBox = head.querySelector('.grader-status');
-    if (_grader.statusHtml !== statusHtml) {
+    if (pageState._grader.statusHtml !== statusHtml) {
       // html-safe: statusHtml is built by _graderStatusButtons
       if (!_patchStatusButtons(statusBox, statusHtml)) statusBox.innerHTML = statusHtml;
-      _grader.statusHtml = statusHtml;
+      pageState._grader.statusHtml = statusHtml;
     }
     statusBox.hidden = !!view;
     // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
     var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
     var markBox = head.querySelector('.grader-print-mark');
-    if (markBox && _grader.markHtml !== markHtml) {
+    if (markBox && pageState._grader.markHtml !== markHtml) {
       // html-safe: _printMarkHtml is RubricPrint.markHtml, which escapes its text
       markBox.innerHTML = markHtml;
-      _grader.markHtml = markHtml;
+      pageState._grader.markHtml = markHtml;
     }
   }
 
@@ -12529,7 +12608,9 @@ window.PageAssignments = (function () {
   var _STATUS_LOCKED_TITLE =
     'This student has a score or feedback on this work. Clear it first to mark Missing or Excused.';
   function _statusLockAttrs(aid, sid, key) {
-    return canSetAssignmentStatus(activeCourse, sid, aid, key) ? '' : ' disabled title="' + _STATUS_LOCKED_TITLE + '"';
+    return canSetAssignmentStatus(pageState.activeCourse, sid, aid, key)
+      ? ''
+      : ' disabled title="' + _STATUS_LOCKED_TITLE + '"';
   }
   // Brings the status buttons up to date after a score or comment changes,
   // without redrawing anything: every one on the page, or those of the
@@ -12538,7 +12619,12 @@ window.PageAssignments = (function () {
     var sel = '[data-action="toggleStudentStatus"]';
     if (scope) sel += '[data-aid="' + scope.aid + '"]' + (scope.sid ? '[data-sid="' + scope.sid + '"]' : '');
     document.querySelectorAll(sel).forEach(function (btn) {
-      var locked = !canSetAssignmentStatus(activeCourse, btn.dataset.sid, btn.dataset.aid, btn.dataset.status);
+      var locked = !canSetAssignmentStatus(
+        pageState.activeCourse,
+        btn.dataset.sid,
+        btn.dataset.aid,
+        btn.dataset.status,
+      );
       if (btn.disabled === locked) return;
       btn.disabled = locked;
       if (locked) btn.title = _STATUS_LOCKED_TITLE;
@@ -12561,7 +12647,7 @@ window.PageAssignments = (function () {
     return _gradingScope(card.id.slice(3), sid);
   }
   function _gradingScope(aid, sid) {
-    var a = sid && _assessmentById(activeCourse, aid);
+    var a = sid && _assessmentById(pageState.activeCourse, aid);
     return a && (!a.collaboration || a.collaboration === 'individual') ? { aid: aid, sid: sid } : { aid: aid };
   }
   // Typing in a box saves on Enter or on leaving it, so a key that is not
@@ -12693,7 +12779,7 @@ window.PageAssignments = (function () {
   // screen, in the rows' order; otherwise every unit.
   function _graderSteps(cid, a) {
     var units = _graderUnits(cid, a);
-    var rows = _grader && _grader.rowOrder;
+    var rows = pageState._grader && pageState._grader.rowOrder;
     if (!units || !rows) return units;
     var at = function (unit) {
       return _unitIds(unit).reduce(function (best, id) {
@@ -12735,12 +12821,12 @@ window.PageAssignments = (function () {
 
   // A piece the queue can carry into: it is in the class and has someone in its list.
   function _graderQueueTarget(dir) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var roster = getStudents(cid).map(function (s) {
       return s.id;
     });
-    for (var i = _grader.qi + dir; i >= 0 && i < _grader.queue.length; i += dir) {
-      var q = _grader.queue[i];
+    for (var i = pageState._grader.qi + dir; i >= 0 && i < pageState._grader.queue.length; i += dir) {
+      var q = pageState._grader.queue[i];
       if (!_assessmentById(cid, q.aid)) continue;
       var anyone = q.studentIds.some(function (id) {
         return roster.indexOf(id) >= 0;
@@ -12753,22 +12839,22 @@ window.PageAssignments = (function () {
   /* True when a step in `dir` has nowhere to go in this piece: the last (or
      first) student, group or one Show lists. */
   function _graderEdge(dir) {
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
     if (!a) return false;
     if (_graderShowOn() && _graderShowWanted(cid, a)) return !_nextShownStop(cid, a, dir);
     var steps = _graderSteps(cid, a);
     if (steps) {
-      var u = _graderUnitIndex(steps, focusStudentId);
+      var u = _graderUnitIndex(steps, pageState.focusStudentId);
       return u >= 0 && (dir > 0 ? u >= steps.length - 1 : u <= 0);
     }
-    var i = _grader.studentIds.indexOf(focusStudentId);
-    return i >= 0 && (dir > 0 ? i >= _grader.studentIds.length - 1 : i <= 0);
+    var i = pageState._grader.studentIds.indexOf(pageState.focusStudentId);
+    return i >= 0 && (dir > 0 ? i >= pageState._grader.studentIds.length - 1 : i <= 0);
   }
 
   // ← → at an edge of a piece in a queue. True when it was used.
   function _graderQueueStep(dir) {
-    if (!_grader.queue || !_graderEdge(dir)) return false;
+    if (!pageState._grader.queue || !_graderEdge(dir)) return false;
     var to = _graderQueueTarget(dir);
     if (to >= 0) _graderSwitchPiece(to, dir > 0 ? 'first' : 'last');
     else if (dir > 0) _graderShowCaughtUp();
@@ -12781,11 +12867,11 @@ window.PageAssignments = (function () {
      listeners and onClose stay. `which` is the student it lands on: the
      first one Show lists, or the last. */
   function _graderSwitchPiece(qi, which) {
-    var cid = activeCourse;
-    var q = _grader.queue[qi];
+    var cid = pageState.activeCourse;
+    var q = pageState._grader.queue[qi];
     // A field being typed in saves on blur, so finish it first.
     var active = document.activeElement;
-    if (active && _grader.overlay.contains(active) && active.blur) active.blur();
+    if (active && pageState._grader.overlay.contains(active) && active.blur) active.blur();
     if (window.MarkUp && MarkUp.isOpen()) MarkUp.close();
     var roster = getStudents(cid).map(function (s) {
       return s.id;
@@ -12794,42 +12880,42 @@ window.PageAssignments = (function () {
       return roster.indexOf(id) >= 0;
     });
     _graderForgetDrawn();
-    _grader.aid = q.aid;
-    _grader.qi = qi;
-    _grader.studentIds = ids;
-    if (_grader.rowOrder) _grader.rowOrder = ids.slice();
-    _grader.menuSid = null;
-    _grader.show = _grader.queueShow;
-    _grader.work = { page: 0, fit: _workFitSaved(), turns: {}, focus: false, pics: {} };
-    _grader.reflectDrafts = {};
-    _grader.reflectBusy = null;
-    _grader.reflectMsg = null;
-    _grader.revisionMsg = null;
-    _grader.source = null;
+    pageState._grader.aid = q.aid;
+    pageState._grader.qi = qi;
+    pageState._grader.studentIds = ids;
+    if (pageState._grader.rowOrder) pageState._grader.rowOrder = ids.slice();
+    pageState._grader.menuSid = null;
+    pageState._grader.show = pageState._grader.queueShow;
+    pageState._grader.work = { page: 0, fit: _workFitSaved(), turns: {}, focus: false, pics: {} };
+    pageState._grader.reflectDrafts = {};
+    pageState._grader.reflectBusy = null;
+    pageState._grader.reflectMsg = null;
+    pageState._grader.revisionMsg = null;
+    pageState._grader.source = null;
     // Drawn from the start, as a piece opened new is.
-    _grader.workShell = undefined;
-    openAssessIds = new Set([q.aid]);
-    _commentPopoverState = null;
+    pageState._grader.workShell = undefined;
+    pageState.openAssessIds = new Set([q.aid]);
+    pageState._commentPopoverState = null;
     CritComment.drop();
-    _kbFocusEl = null;
-    _statusDebounce = {};
+    pageState._kbFocusEl = null;
+    pageState._statusDebounce = {};
     var a = _assessmentById(cid, q.aid);
     var stops = _graderStops(cid, a);
     var listed =
       _graderShowOn() && _graderShowWanted(cid, a)
         ? stops.filter(function (s) {
-            return _stopShown(cid, q.aid, s, _grader.show);
+            return _stopShown(cid, q.aid, s, pageState._grader.show);
           })
         : [];
     var pool = listed.length ? listed : stops;
     var stop = which === 'last' ? pool[pool.length - 1] : pool[0];
-    focusStudentId = stop.focus;
+    pageState.focusStudentId = stop.focus;
     _graderToTop();
     render();
-    if (!_grader) return;
-    var again = _grader.overlay.querySelector('[data-grader="next"]:not(:disabled)');
+    if (!pageState._grader) return;
+    var again = pageState._grader.overlay.querySelector('[data-grader="next"]:not(:disabled)');
     if (again) again.focus({ preventScroll: true });
-    else _grader.overlay.querySelector('.grader-dialog').focus({ preventScroll: true });
+    else pageState._grader.overlay.querySelector('.grader-dialog').focus({ preventScroll: true });
     if (which === 'first') _focusGraderPoints(q.aid);
   }
 
@@ -12838,14 +12924,14 @@ window.PageAssignments = (function () {
      is on when a piece comes before. Called after the dialog's chrome is
      drawn, so it has the last word on both buttons. */
   function _graderApplyQueue(dialog, cid, a, view) {
-    if (!_grader.queue) return;
-    if (_grader.caughtUp && !dialog.querySelector('.grader-caught-up')) _grader.caughtUp = false;
+    if (!pageState._grader.queue) return;
+    if (pageState._grader.caughtUp && !dialog.querySelector('.grader-caught-up')) pageState._grader.caughtUp = false;
     var next = dialog.querySelector('[data-grader="next"]');
     var prev = dialog.querySelector('[data-grader="prev"]');
     if (!next || !prev) return;
     if (_graderEdge(1)) {
       var to = _graderQueueTarget(1);
-      var following = to >= 0 ? _assessmentById(cid, _grader.queue[to].aid) : null;
+      var following = to >= 0 ? _assessmentById(cid, pageState._grader.queue[to].aid) : null;
       var title = following ? following.title || 'Assessment' : '';
       var label = following ? 'Next: ' + title + ' →' : 'Finish';
       next.disabled = false;
@@ -12871,7 +12957,7 @@ window.PageAssignments = (function () {
     }
     var back = _graderEdge(-1) ? _graderQueueTarget(-1) : -1;
     if (back >= 0) {
-      var before = _assessmentById(cid, _grader.queue[back].aid);
+      var before = _assessmentById(cid, pageState._grader.queue[back].aid);
       prev.disabled = false;
       prev.title = 'Previous: ' + (before.title || 'Assessment');
       prev.dataset.queueBack = '1';
@@ -12889,7 +12975,7 @@ window.PageAssignments = (function () {
     });
     var seen = {};
     var out = [];
-    _grader.queue.forEach(function (q) {
+    pageState._grader.queue.forEach(function (q) {
       var a = _assessmentById(cid, q.aid);
       if (!a || seen[q.aid]) return;
       seen[q.aid] = true;
@@ -12935,11 +13021,11 @@ window.PageAssignments = (function () {
   }
 
   function _graderShowCaughtUp() {
-    var cid = activeCourse;
-    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    var cid = pageState.activeCourse;
+    var dialog = pageState._grader.overlay.querySelector('.grader-dialog');
     if (!dialog) return;
     var active = document.activeElement;
-    if (active && _grader.overlay.contains(active) && active.blur) active.blur();
+    if (active && pageState._grader.overlay.contains(active) && active.blur) active.blur();
     _graderHideCaughtUp();
     var panel = document.createElement('section');
     panel.className = 'grader-caught-up';
@@ -12950,22 +13036,22 @@ window.PageAssignments = (function () {
       el.setAttribute('inert', '');
     });
     dialog.appendChild(panel);
-    _grader.caughtUp = true;
+    pageState._grader.caughtUp = true;
     var first = panel.querySelector('button');
     if (first) first.focus({ preventScroll: true });
   }
 
   function _graderHideCaughtUp() {
-    if (!_grader) return;
-    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    if (!pageState._grader) return;
+    var dialog = pageState._grader.overlay.querySelector('.grader-dialog');
     if (!dialog) return;
     var panel = dialog.querySelector('.grader-caught-up');
     if (panel) panel.remove();
     Array.prototype.forEach.call(dialog.children, function (el) {
       el.removeAttribute('inert');
     });
-    var wasUp = _grader.caughtUp;
-    _grader.caughtUp = false;
+    var wasUp = pageState._grader.caughtUp;
+    pageState._grader.caughtUp = false;
     if (wasUp) {
       var back = dialog.querySelector('[data-grader="next"]') || dialog;
       back.focus({ preventScroll: true });
@@ -12974,13 +13060,13 @@ window.PageAssignments = (function () {
 
   // Return N Graded on the panel: asks first, naming everyone, then returns each piece's drafts and closes.
   function _graderCaughtReturn(button) {
-    if (!_grader) return;
-    var cid = activeCourse;
-    var overlay = _grader.overlay;
+    if (!pageState._grader) return;
+    var cid = pageState.activeCourse;
+    var overlay = pageState._grader.overlay;
     var items = _graderQueueWaiting(cid);
     if (!items.length) return closeGrader();
     _askReturnPieces(cid, items, button, function () {
-      if (!_grader || _grader.overlay !== overlay) return;
+      if (!pageState._grader || pageState._grader.overlay !== overlay) return;
       items.forEach(function (i) {
         _returnDrafts(cid, i.aid, i.sids);
       });
@@ -13035,14 +13121,14 @@ window.PageAssignments = (function () {
 
   // ← → on group work. False on other work, which steps student by student.
   function _graderStepGroup(dir) {
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
     var units = _graderSteps(cid, a);
     if (!units) return false;
-    var next = units[_graderUnitIndex(units, focusStudentId) + dir];
-    if (_graderUnitIndex(units, focusStudentId) < 0 || !next) return true;
-    _grader.menuSid = null;
-    focusStudentId = next.source || next.sid;
+    var next = units[_graderUnitIndex(units, pageState.focusStudentId) + dir];
+    if (_graderUnitIndex(units, pageState.focusStudentId) < 0 || !next) return true;
+    pageState._grader.menuSid = null;
+    pageState.focusStudentId = next.source || next.sid;
     render();
     return true;
   }
@@ -13050,41 +13136,43 @@ window.PageAssignments = (function () {
   // The members card's buttons: the ⋯ menu, Grade Separately, Back to
   // Group Grade and a separated member's name, which opens their view.
   function _graderGroupAction(what, sid) {
-    var cid = activeCourse;
-    var aid = _grader.aid;
+    var cid = pageState.activeCourse;
+    var aid = pageState._grader.aid;
     var a = _assessmentById(cid, aid);
     if (!a || !sid) return;
     if (what === 'member-menu') {
-      _grader.menuSid = _grader.menuSid === sid ? null : sid;
+      pageState._grader.menuSid = pageState._grader.menuSid === sid ? null : sid;
       _refreshGraderChrome();
-      var item = _grader.menuSid && _grader.overlay.querySelector('.grader-member-menu:not([hidden]) button');
+      var item =
+        pageState._grader.menuSid &&
+        pageState._grader.overlay.querySelector('.grader-member-menu:not([hidden]) button');
       if (item) item.focus();
     } else if (what === 'separate') {
-      _grader.menuSid = null;
+      pageState._grader.menuSid = null;
       Grader.gradeSeparately(cid, aid, sid);
       // The group stays open; it draws from another member now if it drew
       // from this one.
-      if (focusStudentId === sid) {
+      if (pageState.focusStudentId === sid) {
         var stillLinked = (getCollabGroupOf(a, sid) || { members: [] }).members.find(function (m) {
           return !isGradedSeparately(a, m);
         });
         var view = stillLinked && _graderGroupView(cid, a, stillLinked);
-        if (view) focusStudentId = view.source;
+        if (view) pageState.focusStudentId = view.source;
       }
       refreshSidebarGrades();
       render();
     } else if (what === 'rejoin') {
       _confirmBackToGroupGrade(cid, a, sid);
     } else if (what === 'open-member') {
-      _grader.menuSid = null;
-      focusStudentId = sid;
+      pageState._grader.menuSid = null;
+      pageState.focusStudentId = sid;
       render();
     } else if (what === 'change-one') {
       // Change One Student (S12-F2): they keep the group's grade as their
       // own from here, and their grader opens to change it.
-      _grader.menuSid = null;
+      pageState._grader.menuSid = null;
       if (!isGradedSeparately(a, sid)) Grader.gradeSeparately(cid, aid, sid);
-      focusStudentId = sid;
+      pageState.focusStudentId = sid;
       refreshSidebarGrades();
       render();
     }
@@ -13265,14 +13353,14 @@ window.PageAssignments = (function () {
         '<div class="grader-members-grid">' +
         view.members
           .map(function (m) {
-            return _graderMemberHtml(cid, a, byId[m], _grader.menuSid, view.source);
+            return _graderMemberHtml(cid, a, byId[m], pageState._grader.menuSid, view.source);
           })
           .join('') +
         '</div>';
       var changeable = view.linked.filter(function (m) {
         return byId[m];
       });
-      var openChange = _grader.menuSid === 'change-one';
+      var openChange = pageState._grader.menuSid === 'change-one';
       html +=
         '<div class="grader-change-one">' +
         '<button type="button" class="grader-change-one-btn" data-grader="member-menu" data-sid="change-one" aria-haspopup="menu" aria-expanded="' +
@@ -13296,10 +13384,10 @@ window.PageAssignments = (function () {
           .join('') +
         '</div></div>';
     }
-    if (_grader.membersHtml !== html) {
+    if (pageState._grader.membersHtml !== html) {
       // html-safe: built by _graderMemberHtml, names escaped there
       card.innerHTML = html;
-      _grader.membersHtml = html;
+      pageState._grader.membersHtml = html;
     }
     card.hidden = !view;
     _placeGroupMembers(dialog, card, !!view);
@@ -13311,10 +13399,10 @@ window.PageAssignments = (function () {
         sid +
         '">Back to Group Grade</button>'
       : '';
-    if (_grader.lineHtml !== lineHtml) {
+    if (pageState._grader.lineHtml !== lineHtml) {
       // html-safe: the label goes through esc(); sid is our id
       line.innerHTML = lineHtml;
-      _grader.lineHtml = lineHtml;
+      pageState._grader.lineHtml = lineHtml;
     }
     line.hidden = !group;
   }
@@ -13351,18 +13439,18 @@ window.PageAssignments = (function () {
     return true;
   }
   function _refreshGraderChrome() {
-    if (!_grader) return;
-    var cid = activeCourse;
-    var sid = focusStudentId;
+    if (!pageState._grader) return;
+    var cid = pageState.activeCourse;
+    var sid = pageState.focusStudentId;
     var a = getAssessments(cid).find(function (x) {
-      return x.id === _grader.aid;
+      return x.id === pageState._grader.aid;
     });
-    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    var dialog = pageState._grader.overlay.querySelector('.grader-dialog');
     if (!a || !sid || !dialog) return;
     var view = _graderGroupView(cid, a, sid);
     // The member the group's grade comes from changed (Missing, Excused or
     // Grade Separately): draw the group again from the new one.
-    if ((view ? view.source : null) !== (_grader.source || null)) return render();
+    if ((view ? view.source : null) !== (pageState._grader.source || null)) return render();
     _refreshGraderPanel(_graderPart(dialog, 'panel'), cid, a, sid, view);
     _refreshGraderHead(_graderPart(dialog, 'head'), cid, a, sid, view);
     var foot = _graderPart(dialog, 'foot');
@@ -13377,7 +13465,7 @@ window.PageAssignments = (function () {
     var own = view ? null : _workStudent(cid, sid);
     if (own) _refreshGraderRevision(dialog, cid, a, own);
     _refreshGraderWas(dialog, cid, a, own ? sid : null);
-    if (_grader.workShell) {
+    if (pageState._grader.workShell) {
       _refreshGraderWorkLine(dialog, cid, a, sid);
       _graderShortLevels(dialog);
     }
@@ -13414,7 +13502,7 @@ window.PageAssignments = (function () {
      GraderWork.workCounts', as the gradebook's and the dashboard's are. */
   // html-safe: ids are ours; fixed words
   function _gradeSubmissionsHtml(cid, a, shownIds, tograde) {
-    if (focusStudentId || !GraderWork.workOn(cid, a)) return '';
+    if (pageState.focusStudentId || !GraderWork.workOn(cid, a)) return '';
     if (!(tograde != null ? tograde : GraderWork.workCounts(cid, a.id, shownIds).tograde)) return '';
     return (
       '<button type="button" class="assess-grade-work-btn" data-action="gradeSubmissions" data-aid="' +
@@ -13460,9 +13548,9 @@ window.PageAssignments = (function () {
      Unmarked To buttons above their grid. */
   // html-safe: ids are ours; level names are fixed
   function _setEveryoneMenuHtml(cid, a) {
-    if (focusStudentId || isDibelsScored(a) || isCompletionScored(a) || a.scoreMode === 'points') return '';
+    if (pageState.focusStudentId || isDibelsScored(a) || isCompletionScored(a) || a.scoreMode === 'points') return '';
     var rubric = a.rubricId && getRubricById(cid, a.rubricId);
-    var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+    var showRubric = pageState.rubricViewStates[a.id] !== undefined ? pageState.rubricViewStates[a.id] : true;
     var action = rubric && showRubric ? 'confirmFillRubricAll' : 'confirmFillAll';
     var items = levelOrderFor(cid)
       .map(function (l) {
@@ -13547,12 +13635,12 @@ window.PageAssignments = (function () {
           )) + _cardPrintItem(cid, a);
     // Work Wall (S14, shared/work-wall.js): every student's work side by
     // side, only while the piece takes work.
-    var workShown = !a.isDraft && !focusStudentId && GraderWork.workShown(cid, a);
+    var workShown = !a.isDraft && !pageState.focusStudentId && GraderWork.workShown(cid, a);
     if (workShown && window.WorkWall)
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
     // Add Work for the Class (teacher/add-work-class.js): in every class, on
     // every piece it is offered on, never while one student is focused.
-    if (!a.isDraft && !focusStudentId && window.AddWorkClass && AddWorkClass.offered(cid, a))
+    if (!a.isDraft && !pageState.focusStudentId && window.AddWorkClass && AddWorkClass.offered(cid, a))
       html += _cardMenuItem(
         'data-action="openAddWorkClass" ' + aid,
         LINE_ICONS.plus,
@@ -13561,7 +13649,7 @@ window.PageAssignments = (function () {
       );
     var rubric = !a.isDraft && a.rubricId && getRubricById(cid, a.rubricId);
     if (rubric) {
-      var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+      var showRubric = pageState.rubricViewStates[a.id] !== undefined ? pageState.rubricViewStates[a.id] : true;
       html +=
         '<span class="assess-menu-sep" role="separator"></span>' +
         _cardMenuItem(
@@ -13769,7 +13857,7 @@ window.PageAssignments = (function () {
   function _attachWorkFiles(input) {
     var files = Array.prototype.slice.call(input.files || []);
     input.value = '';
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var aid = input.getAttribute('data-aid');
     var sid = input.getAttribute('data-sid');
     var key = aid + '|' + sid;
@@ -13787,7 +13875,7 @@ window.PageAssignments = (function () {
       .then(function (res) {
         delete _attachBusy[key];
         if (res.result !== 'sent') _attachSay(res.said || AddWorkFiles.answer(res));
-        if (activeCourse !== cid) return;
+        if (pageState.activeCourse !== cid) return;
         render();
         if (!document.activeElement || document.activeElement === document.body) _focusWorkIcon(aid, sid);
       });
@@ -13821,7 +13909,7 @@ window.PageAssignments = (function () {
     _closeAttachLink(false);
     CardMenu.close();
     // html-safe: built by _attachLinkHtml, which escapes the name and the ids
-    wrap.insertAdjacentHTML('beforeend', _attachLinkHtml(activeCourse, el.dataset.aid, el.dataset.sid));
+    wrap.insertAdjacentHTML('beforeend', _attachLinkHtml(pageState.activeCourse, el.dataset.aid, el.dataset.sid));
     var btn = wrap.querySelector('.rsg-attach-btn');
     if (btn) btn.setAttribute('aria-expanded', 'true');
     var url = wrap.querySelector('.rsg-attach-url');
@@ -13840,7 +13928,7 @@ window.PageAssignments = (function () {
   }
   function _attachLinkAdd(form) {
     if (!form || form.dataset.busy) return;
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var aid = form.dataset.aid;
     var sid = form.dataset.sid;
     var urlEl = form.querySelector('.rsg-attach-url');
@@ -13875,7 +13963,7 @@ window.PageAssignments = (function () {
         );
         return;
       }
-      if (activeCourse !== cid) return;
+      if (pageState.activeCourse !== cid) return;
       render();
       _focusWorkIcon(aid, sid);
     });
@@ -13897,8 +13985,8 @@ window.PageAssignments = (function () {
   /* The grader dialog over this page, on `sid` or the first student whose
      work waits, with Show on To Grade when work waits. */
   function _openGraderOnWork(aid, sid) {
-    var cid = activeCourse;
-    if (_grader || !aid || !_assessmentById(cid, aid)) return;
+    var cid = pageState.activeCourse;
+    if (pageState._grader || !aid || !_assessmentById(cid, aid)) return;
     var ids = sortStudents(getStudents(cid), 'lastName').map(function (s) {
       return s.id;
     });
@@ -14010,34 +14098,38 @@ window.PageAssignments = (function () {
       box.className = 'grader-return';
       dialog.querySelector('.grader-foot').appendChild(box);
       dialog.classList.add('has-return');
-      _grader.returnHtml = null;
+      pageState._grader.returnHtml = null;
     }
-    if (_grader.returnHtml === html) return;
-    _grader.returnHtml = html;
+    if (pageState._grader.returnHtml === html) return;
+    pageState._grader.returnHtml = html;
     // html-safe: built by _graderReturnHtml
     box.innerHTML = html;
   }
 
   function _graderReturn() {
-    if (!_grader || !focusStudentId) return;
-    var cid = activeCourse;
+    if (!pageState._grader || !pageState.focusStudentId) return;
+    var cid = pageState.activeCourse;
     var a = getAssessments(cid).find(function (x) {
-      return x.id === _grader.aid;
+      return x.id === pageState._grader.aid;
     });
     if (!a) return;
-    Grader.returnGrades(cid, a.id, _graderReturnIds(focusStudentId, _graderGroupView(cid, a, focusStudentId)));
+    Grader.returnGrades(
+      cid,
+      a.id,
+      _graderReturnIds(pageState.focusStudentId, _graderGroupView(cid, a, pageState.focusStudentId)),
+    );
     _refreshGraderChrome();
     // The button is gone: the dialog keeps the keys.
-    var dialog = _grader.overlay.querySelector('.grader-dialog');
-    if (dialog && !_grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
+    var dialog = pageState._grader.overlay.querySelector('.grader-dialog');
+    if (dialog && !pageState._grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
   }
 
   // Return & Next: the grade on screen goes back, then the next student opens.
   function _graderReturnNext() {
-    if (!_grader || !focusStudentId) return;
+    if (!pageState._grader || !pageState.focusStudentId) return;
     // A comment being typed is saved first (its change event).
     var t = document.activeElement;
-    if (t && _grader.overlay.contains(t) && typeof t.blur === 'function') t.blur();
+    if (t && pageState._grader.overlay.contains(t) && typeof t.blur === 'function') t.blur();
     _graderReturn();
     stepFocusStudent(1);
   }
@@ -14083,7 +14175,7 @@ window.PageAssignments = (function () {
 
   // The students on screen: the one open, or the whole class.
   function _returnShownIds(cid) {
-    if (focusStudentId) return [focusStudentId];
+    if (pageState.focusStudentId) return [pageState.focusStudentId];
     return sortStudents(getStudents(cid), 'lastName').map(function (s) {
       return s.id;
     });
@@ -14095,7 +14187,7 @@ window.PageAssignments = (function () {
   // html-safe: numbers and fixed words
   function _returnChipsHtml(cid, a, shownIds, drafts) {
     var n = drafts != null ? drafts : GraderWork.draftsIn(cid, a.id, shownIds).length;
-    var given = focusStudentId
+    var given = pageState.focusStudentId
       ? 0
       : shownIds.filter(function (sid) {
           return GradeState.stateOf(cid, sid, a.id) === GradeState.RETURNED;
@@ -14111,7 +14203,7 @@ window.PageAssignments = (function () {
      their grader has Return. */
   // html-safe: the id is ours; the names and the title go through esc
   function _returnDraftsButtonHtml(cid, a, shownIds) {
-    if (focusStudentId) return '';
+    if (pageState.focusStudentId) return '';
     var waiting = GraderWork.draftsReturned(cid, a.id, shownIds);
     if (!waiting.length) return '';
     var label = GradeState.returnNGraded(waiting.length);
@@ -14220,14 +14312,14 @@ window.PageAssignments = (function () {
      render() calls _seedReturns once it has drawn the page (or cards,
      under `root`), to remember what it drew and write nothing: the
      strings are the ones the draw built (_drawnReturns), not built again. */
-  var _drawnReturns = null;
+  pageState._drawnReturns = null;
   function _drawnReturn(key, html) {
-    if (_drawnReturns) _drawnReturns[key] = html;
+    if (pageState._drawnReturns) pageState._drawnReturns[key] = html;
     return html;
   }
   function _seedReturns(root) {
-    if (_grader || !_holdsGrades(activeCourse) || !document.getElementById('main')) return;
-    var kept = _drawnReturns || {};
+    if (pageState._grader || !_holdsGrades(pageState.activeCourse) || !document.getElementById('main')) return;
+    var kept = pageState._drawnReturns || {};
     root.querySelectorAll('[data-returns-aid]').forEach(function (el) {
       el._drafts = kept['d' + el.dataset.returnsAid];
     });
@@ -14245,8 +14337,8 @@ window.PageAssignments = (function () {
     });
   }
   function _refreshReturns(scope) {
-    if (_grader) return;
-    var cid = activeCourse;
+    if (pageState._grader) return;
+    var cid = pageState.activeCourse;
     var root = document.getElementById('main');
     if (!_holdsGrades(cid) || !root) return;
     var only = scope ? '="' + scope.aid + '"' : '';
@@ -14289,14 +14381,14 @@ window.PageAssignments = (function () {
       var html = _inlineReturnInner(cid, a, el.dataset.returnRowSid);
       if (set(el, html)) el.hidden = !html;
     });
-    if (total === _toReturnTotal) return;
-    _toReturnTotal = total;
+    if (total === pageState._toReturnTotal) return;
+    pageState._toReturnTotal = total;
     // The last draft is returned: the filter turns off and the list is whole again.
-    if (!total && _toReturnOnly) return render();
-    AssignShow.syncReturn(activeCourse, _returnState(activeCourse));
+    if (!total && pageState._toReturnOnly) return render();
+    AssignShow.syncReturn(pageState.activeCourse, _returnState(pageState.activeCourse));
   }
   function _returnsAfterEvent(scope) {
-    if (_grader || !_holdsGrades(activeCourse)) return;
+    if (pageState._grader || !_holdsGrades(pageState.activeCourse)) return;
     setTimeout(function () {
       _refreshReturns(scope);
     }, 0);
@@ -14319,7 +14411,7 @@ window.PageAssignments = (function () {
   /* After a return on the page. With the filter on, a card with nothing
      left to return leaves the list, so the list is drawn again. */
   function _afterPageReturn() {
-    if (_toReturnOnly) render();
+    if (pageState._toReturnOnly) render();
     else _refreshReturns();
   }
 
@@ -14344,12 +14436,12 @@ window.PageAssignments = (function () {
   /* A card's Return N Graded. The button goes with the drafts, so the
      card's next button takes the focus. */
   function _askReturnDrafts(aid, button) {
-    var cid = activeCourse;
-    if (!_holdsGrades(cid) || focusStudentId) return;
+    var cid = pageState.activeCourse;
+    if (!_holdsGrades(cid) || pageState.focusStudentId) return;
     var waiting = GraderWork.draftsReturned(cid, aid, _returnShownIds(cid));
     if (!waiting.length) return _refreshReturns();
     _askReturn(cid, waiting, button, function () {
-      if (activeCourse !== cid || _grader) return;
+      if (pageState.activeCourse !== cid || pageState._grader) return;
       _returnDrafts(cid, aid, _returnShownIds(cid));
       _afterPageReturn();
       var card = document.getElementById('ac-' + aid);
@@ -14363,12 +14455,12 @@ window.PageAssignments = (function () {
      on screen, so it is one click. On pair or group work a partner's draft
      goes with it: then it asks first and names everyone. */
   function _returnOne(aid, sid, button) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     if (!_holdsGrades(cid)) return;
     var waiting = GraderWork.draftsReturned(cid, aid, [sid]);
     if (!waiting.length) return _refreshReturns();
     var done = function () {
-      if (activeCourse !== cid || _grader) return;
+      if (pageState.activeCourse !== cid || pageState._grader) return;
       _returnDrafts(cid, aid, [sid]);
       _afterPageReturn();
       // The button is gone: the student's grader keeps the keys.
@@ -14416,7 +14508,7 @@ window.PageAssignments = (function () {
       return steps.map(function (u) {
         return { focus: u.source || u.sid, ids: _unitIds(u) };
       });
-    return _grader.studentIds.map(function (sid) {
+    return pageState._grader.studentIds.map(function (sid) {
       return { focus: sid, ids: [sid] };
     });
   }
@@ -14437,25 +14529,30 @@ window.PageAssignments = (function () {
   // The next stop Show lists from the one on screen, or null.
   function _nextShownStop(cid, a, dir) {
     var stops = _graderStops(cid, a);
-    var at = _stopIndex(stops, focusStudentId);
+    var at = _stopIndex(stops, pageState.focusStudentId);
     for (var i = at < 0 && dir < 0 ? stops.length - 1 : at + dir; i >= 0 && i < stops.length; i += dir)
-      if (_stopShown(cid, a.id, stops[i], _grader.show)) return stops[i];
+      if (_stopShown(cid, a.id, stops[i], pageState._grader.show)) return stops[i];
     return null;
   }
   function _graderShowOn() {
-    return !!_grader && !!_grader.show && _grader.show !== 'all' && !!_SHOW_LABELS[_grader.show];
+    return (
+      !!pageState._grader &&
+      !!pageState._grader.show &&
+      pageState._grader.show !== 'all' &&
+      !!_SHOW_LABELS[pageState._grader.show]
+    );
   }
 
   // ← → while Show is on To Return or Returned. False when it is on All.
   function _graderStepShown(dir) {
     if (!_graderShowOn()) return false;
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
     if (!a || !_graderShowWanted(cid, a)) return false;
     var next = _nextShownStop(cid, a, dir);
     if (!next) return true;
-    _grader.menuSid = null;
-    focusStudentId = next.focus;
+    pageState._grader.menuSid = null;
+    pageState.focusStudentId = next.focus;
     render();
     return true;
   }
@@ -14465,13 +14562,13 @@ window.PageAssignments = (function () {
      (Grader.workCounts). Students, except a group to grade, which counts
      once. */
   function _graderShowCounts(cid, a) {
-    return GraderWork.workCounts(cid, a.id, _grader.studentIds);
+    return GraderWork.workCounts(cid, a.id, pageState._grader.studentIds);
   }
 
   // html-safe: fixed labels and numbers; the names in the title go through esc
   function _graderShowHtml(cid, a, counts) {
-    var show = _grader.show || 'all';
-    var waiting = GraderWork.draftsReturned(cid, a.id, _grader.studentIds);
+    var show = pageState._grader.show || 'all';
+    var waiting = GraderWork.draftsReturned(cid, a.id, pageState._grader.studentIds);
     var label = GradeState.returnNGraded(waiting.length);
     return (
       '<div class="seg seg-sm grader-show-seg" role="group" aria-label="Show">' +
@@ -14508,16 +14605,16 @@ window.PageAssignments = (function () {
      drew the whole dialog again: what Show listed has run out. */
   function _refreshGraderShow(dialog, cid, a) {
     var box = dialog.querySelector('.grader-show');
-    var on = _graderShowWanted(cid, a) && _grader.studentIds.length > 1;
+    var on = _graderShowWanted(cid, a) && pageState._grader.studentIds.length > 1;
     if (!on) {
       if (box) box.remove();
-      _grader.show = 'all';
-      _grader.showHtml = null;
+      pageState._grader.show = 'all';
+      pageState._grader.showHtml = null;
       return false;
     }
     var counts = _graderShowCounts(cid, a);
-    if (_graderShowOn() && !counts[_grader.show]) {
-      _grader.show = 'all';
+    if (_graderShowOn() && !counts[pageState._grader.show]) {
+      pageState._grader.show = 'all';
       render();
       return true;
     }
@@ -14527,11 +14624,11 @@ window.PageAssignments = (function () {
       var slot = dialog.querySelector('.grader-show-slot');
       if (slot) slot.appendChild(box);
       else dialog.querySelector('.grader-toolbar').insertAdjacentElement('afterend', box);
-      _grader.showHtml = null;
+      pageState._grader.showHtml = null;
     }
     var html = _graderShowHtml(cid, a, counts);
-    if (_grader.showHtml !== html) {
-      _grader.showHtml = html;
+    if (pageState._grader.showHtml !== html) {
+      pageState._grader.showHtml = html;
       // html-safe: built by _graderShowHtml
       box.innerHTML = html;
     }
@@ -14546,27 +14643,29 @@ window.PageAssignments = (function () {
   /* A press on To Return, Returned or All. When the student on screen is
      not one it lists, the first one it lists opens. */
   function _graderSetShow(show) {
-    if (!_grader || !_SHOW_LABELS[show]) return;
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
+    if (!pageState._grader || !_SHOW_LABELS[show]) return;
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
     if (!a || !_graderShowWanted(cid, a)) return;
-    _grader.show = show;
+    pageState._grader.show = show;
     if (_graderShowOn()) {
       var stops = _graderStops(cid, a);
-      var at = _stopIndex(stops, focusStudentId);
+      var at = _stopIndex(stops, pageState.focusStudentId);
       if (at < 0 || !_stopShown(cid, a.id, stops[at], show)) {
         var first = stops.find(function (stop) {
           return _stopShown(cid, a.id, stop, show);
         });
         if (first) {
-          _grader.menuSid = null;
-          focusStudentId = first.focus;
+          pageState._grader.menuSid = null;
+          pageState.focusStudentId = first.focus;
           _graderToTop();
         }
       }
     }
     render();
-    var pressed = _grader && _grader.overlay.querySelector('.grader-show [data-show="' + _grader.show + '"]');
+    var pressed =
+      pageState._grader &&
+      pageState._grader.overlay.querySelector('.grader-show [data-show="' + pageState._grader.show + '"]');
     if (pressed) pressed.focus({ preventScroll: true });
   }
 
@@ -14575,23 +14674,23 @@ window.PageAssignments = (function () {
      are the grade on screen, which the dialog's own Return returns in one
      click. */
   function _graderReturnAll(button) {
-    if (!_grader) return;
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
+    if (!pageState._grader) return;
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
     if (!a || !_holdsGrades(cid)) return;
-    var ids = _grader.studentIds;
+    var ids = pageState._grader.studentIds;
     var waiting = GraderWork.draftsReturned(cid, a.id, ids);
     if (!waiting.length) return _refreshGraderChrome();
-    var overlay = _grader.overlay;
+    var overlay = pageState._grader.overlay;
     var done = function () {
-      if (!_grader || _grader.overlay !== overlay || activeCourse !== cid) return;
+      if (!pageState._grader || pageState._grader.overlay !== overlay || pageState.activeCourse !== cid) return;
       _returnDrafts(cid, a.id, ids);
       _refreshGraderChrome();
       // The button is gone: the dialog keeps the keys.
-      var dialog = _grader && _grader.overlay.querySelector('.grader-dialog');
-      if (dialog && !_grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
+      var dialog = pageState._grader && pageState._grader.overlay.querySelector('.grader-dialog');
+      if (dialog && !pageState._grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
     };
-    var onScreen = _graderReturnIds(focusStudentId, _graderGroupView(cid, a, focusStudentId));
+    var onScreen = _graderReturnIds(pageState.focusStudentId, _graderGroupView(cid, a, pageState.focusStudentId));
     var justThese = waiting.every(function (sid) {
       return onScreen.indexOf(sid) >= 0;
     });
@@ -14662,9 +14761,9 @@ window.PageAssignments = (function () {
       'reflectHtml',
       'revisionHtml',
     ].forEach(function (k) {
-      _grader[k] = null;
+      pageState._grader[k] = null;
     });
-    _graderReleasePage(_grader);
+    _graderReleasePage(pageState._grader);
   }
 
   // A photo's address holds its bytes until it is let go (openStudentWorkPage).
@@ -14789,7 +14888,7 @@ window.PageAssignments = (function () {
   function _workLineHtml(cid, a, sid) {
     var sub = _workSubOf(cid, sid, a.id);
     var html = '<span class="grader-work-what">' + esc(_workLineText(cid, a, sid, sub)) + '</span>';
-    GraderWork.samePhotoAs(cid, a.id, sid, _grader.studentIds).forEach(function (other) {
+    GraderWork.samePhotoAs(cid, a.id, sid, pageState._grader.studentIds).forEach(function (other) {
       var st = _workStudent(cid, other);
       if (!st) return;
       html +=
@@ -14801,7 +14900,7 @@ window.PageAssignments = (function () {
         esc('Same photo as ' + _workShortName(st)) +
         '</button>';
     });
-    var waiting = GraderWork.workCounts(cid, a.id, _grader.studentIds).ids.tograde;
+    var waiting = GraderWork.workCounts(cid, a.id, pageState._grader.studentIds).ids.tograde;
     // Group work (S12-F2): one button a group, "Groups to grade".
     var units = waiting.length ? _graderUnits(cid, a) : null;
     if (units) {
@@ -14892,8 +14991,8 @@ window.PageAssignments = (function () {
     var line = dialog.querySelector('.grader-work-line');
     if (!line) return;
     var html = _workLineHtml(cid, a, sid);
-    if (_grader.workLineHtml === html) return;
-    _grader.workLineHtml = html;
+    if (pageState._grader.workLineHtml === html) return;
+    pageState._grader.workLineHtml = html;
     // html-safe: built by _workLineHtml
     line.innerHTML = html;
   }
@@ -14902,7 +15001,7 @@ window.PageAssignments = (function () {
      First is chosen (S11-F3), the first version. */
   function _workPaneSubOf(cid, sid, aid) {
     var sub = _workSubOf(cid, sid, aid);
-    var w = _grader && _grader.work;
+    var w = pageState._grader && pageState._grader.work;
     if (!w || w.version !== 'first' || !sub || sub.group) return sub;
     var a = _assessmentById(cid, aid);
     var r = _graderRevisionOf(cid, a, sid);
@@ -14919,7 +15018,7 @@ window.PageAssignments = (function () {
     if (!_revisionIn(r) || !sub || r.revision_submission_id !== sub.id) return '';
     var firstSub = _revisionFirstSub(cid, a, sid, r);
     if (!firstSub || firstSub.id === sub.id) return '';
-    var first = _grader.work.version === 'first';
+    var first = pageState._grader.work.version === 'first';
     var newDay = r.revision_sent_at ? formatShortDate(r.revision_sent_at) : '';
     var firstDay = _revisionFirstDay(cid, a, sid, r);
     return (
@@ -14956,7 +15055,7 @@ window.PageAssignments = (function () {
   // html-safe: fixed labels; the versions' dates go through esc
   // `sub` and `versions` are worked out once a draw, in _drawGraderWork.
   function _workToolsHtml(sub, versions) {
-    var w = _grader.work;
+    var w = pageState._grader.work;
     var files = (sub && sub.files) || [];
     if (!files.length) return '';
     var fit = _workFit(w, files.length);
@@ -15005,7 +15104,7 @@ window.PageAssignments = (function () {
   /* The pane for `st`: their pages, or Add Work when nothing is in. */
   // html-safe: names and the note go through esc; ids are ours; labels are fixed words
   function _workPaneHtml(cid, a, st, view, sub, versions) {
-    var w = _grader.work;
+    var w = pageState._grader.work;
     // The first version is for looking at: Mark Up and Unsubmit are the new one's.
     var onFirst = !!versions && w.version === 'first';
     var first = view ? view.label : displayNameFirst(st);
@@ -15133,7 +15232,7 @@ window.PageAssignments = (function () {
   /* Nothing in: Add Work, and Grade From Paper's Set Logan To. */
   // html-safe: the name goes through esc; labels are fixed words; levels are numbers
   function _addWorkHtml(cid, a, st, first) {
-    var w = _grader.work;
+    var w = pageState._grader.work;
     var levels = !isPointsScored(a) && !isCompletionScored(a) && _setEveryonePlan(cid, a.id).perStudent > 0;
     var open = w.setTo === st.id;
     return (
@@ -15181,14 +15280,14 @@ window.PageAssignments = (function () {
     var versions = view ? '' : _workVersionsHtml(cid, a, st.id);
     var tools = dialog.querySelector('.grader-work-view');
     var toolsHtml = _workToolsHtml(sub, versions);
-    if (tools && _grader.workToolsHtml !== toolsHtml) {
-      _grader.workToolsHtml = toolsHtml;
+    if (tools && pageState._grader.workToolsHtml !== toolsHtml) {
+      pageState._grader.workToolsHtml = toolsHtml;
       // html-safe: built by _workToolsHtml
       tools.innerHTML = toolsHtml;
     }
     var html = _workPaneHtml(cid, a, st, view, sub, versions);
-    if (_grader.workHtml !== html) {
-      _grader.workHtml = html;
+    if (pageState._grader.workHtml !== html) {
+      pageState._grader.workHtml = html;
       var was = pane.querySelector('.grader-work-pages');
       var top = was ? was.scrollTop : 0;
       // html-safe: built by _workPaneHtml
@@ -15198,10 +15297,10 @@ window.PageAssignments = (function () {
     }
     var files = (sub && sub.files) || [];
     var surfaces = pane.querySelectorAll('.grader-work-surface');
-    if (!surfaces.length || !files.length) return _graderReleasePage(_grader);
-    var w = _grader.work;
+    if (!surfaces.length || !files.length) return _graderReleasePage(pageState._grader);
+    var w = pageState._grader.work;
     if (!w.pics) w.pics = {};
-    var g = _grader;
+    var g = pageState._grader;
     var keep = {};
     Array.prototype.forEach.call(surfaces, function (surface) {
       var file = files.find(function (f) {
@@ -15221,7 +15320,7 @@ window.PageAssignments = (function () {
       pic = w.pics[key] = { url: null, release: null };
       openStudentWorkPage(cid, file, 'page').then(function (res) {
         // The dialog moved on (another student, version or piece, or closed).
-        if (_grader !== g || g.work.pics[key] !== pic) {
+        if (pageState._grader !== g || g.work.pics[key] !== pic) {
           if (res) res.release();
           return;
         }
@@ -15251,9 +15350,9 @@ window.PageAssignments = (function () {
     if (!surface || !img || !window.MarkupDraw) return;
     if (!img._markupLoad) {
       img._markupLoad = true;
-      var g = _grader;
+      var g = pageState._grader;
       img.addEventListener('load', function () {
-        if (_grader === g && img.isConnected) _drawGraderMarks(surface, cid, file);
+        if (pageState._grader === g && img.isConnected) _drawGraderMarks(surface, cid, file);
       });
     }
     var row = typeof getPageMarkup === 'function' ? getPageMarkup(cid, file.id) : null;
@@ -15274,14 +15373,15 @@ window.PageAssignments = (function () {
      fits with the picture, and a child placed over it with position:
      absolute and inset: 0 lies exactly on the page. */
   function workSurface() {
-    if (!_grader || !_grader.workShell) return null;
+    if (!pageState._grader || !pageState._grader.workShell) return null;
     // The page last acted on (Rotate or Mark Up on its bar), else the first.
     var el =
-      _grader.overlay.querySelector('.grader-work-surface[data-page="' + (_grader.work.page + 1) + '"]') ||
-      _grader.overlay.querySelector('.grader-work-surface');
+      pageState._grader.overlay.querySelector(
+        '.grader-work-surface[data-page="' + (pageState._grader.work.page + 1) + '"]',
+      ) || pageState._grader.overlay.querySelector('.grader-work-surface');
     if (!el) return null;
-    var a = _assessmentById(activeCourse, _grader.aid);
-    var sub = a && _workPaneSubOf(activeCourse, focusStudentId, a.id);
+    var a = _assessmentById(pageState.activeCourse, pageState._grader.aid);
+    var sub = a && _workPaneSubOf(pageState.activeCourse, pageState.focusStudentId, a.id);
     var file =
       sub &&
       (sub.files || []).find(function (f) {
@@ -15291,12 +15391,12 @@ window.PageAssignments = (function () {
     return {
       el: el,
       img: el.querySelector('.grader-work-img'),
-      cid: activeCourse,
+      cid: pageState.activeCourse,
       aid: a.id,
-      sid: focusStudentId,
+      sid: pageState.focusStudentId,
       fileId: file.id,
       page: parseInt(el.dataset.page, 10),
-      turn: _grader.work.turns[file.id] || 0,
+      turn: pageState._grader.work.turns[file.id] || 0,
     };
   }
 
@@ -15321,12 +15421,12 @@ window.PageAssignments = (function () {
   }
 
   function _graderWorkAction(what, btn) {
-    if (!_grader) return;
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
-    var sid = focusStudentId;
+    if (!pageState._grader) return;
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
+    var sid = pageState.focusStudentId;
     if (!a || !sid) return;
-    var w = _grader.work;
+    var w = pageState._grader.work;
     var again = null;
     // The page a page's own button acts on (its bar's data-at).
     var at = parseInt(btn.dataset.at, 10);
@@ -15356,9 +15456,9 @@ window.PageAssignments = (function () {
       if (w.focus) w.fit = 'width';
       again = '[data-grader="work-focus"]';
     } else if (what === 'work-open') {
-      if (!btn.dataset.sid || _grader.studentIds.indexOf(btn.dataset.sid) < 0) return;
-      _grader.menuSid = null;
-      focusStudentId = btn.dataset.sid;
+      if (!btn.dataset.sid || pageState._grader.studentIds.indexOf(btn.dataset.sid) < 0) return;
+      pageState._grader.menuSid = null;
+      pageState.focusStudentId = btn.dataset.sid;
       _graderToTop();
     } else if (what === 'work-setto-menu') {
       w.setTo = w.setTo === sid ? null : sid;
@@ -15372,7 +15472,7 @@ window.PageAssignments = (function () {
       return _graderOpenMarkUp(cid, a, sid);
     } else return;
     render();
-    var to = again && _grader && _grader.overlay.querySelector(again);
+    var to = again && pageState._grader && pageState._grader.overlay.querySelector(again);
     if (to && !to.disabled) to.focus({ preventScroll: true });
   }
 
@@ -15381,18 +15481,18 @@ window.PageAssignments = (function () {
   function _graderWorkEnlarge(tile) {
     var surface = tile.querySelector('.grader-work-surface');
     var at = surface ? parseInt(surface.dataset.page, 10) - 1 : 0;
-    _grader.work.fit = 'width';
-    _grader.work.page = Math.max(0, at);
+    pageState._grader.work.fit = 'width';
+    pageState._grader.work.page = Math.max(0, at);
     render();
-    var pages = _grader && _grader.overlay.querySelector('.grader-work-pages');
-    var sheet = pages && pages.querySelectorAll('.grader-work-sheet')[_grader.work.page];
+    var pages = pageState._grader && pageState._grader.overlay.querySelector('.grader-work-pages');
+    var sheet = pages && pages.querySelectorAll('.grader-work-sheet')[pageState._grader.work.page];
     if (sheet) pages.scrollTop = sheet.offsetTop - pages.offsetTop;
   }
 
   /* Mark Up (S9-F1), on the page the pane shows. Done comes back here with
      the marks drawn over the page and the Return row up to date. */
   function _graderOpenMarkUp(cid, a, sid) {
-    var g = _grader;
+    var g = pageState._grader;
     var w = g.work;
     MarkUp.open({
       cid: cid,
@@ -15401,7 +15501,13 @@ window.PageAssignments = (function () {
       page: w.page,
       turn: Object.assign({}, w.turns),
       onClose: function () {
-        if (_grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid) return;
+        if (
+          pageState._grader !== g ||
+          pageState.activeCourse !== cid ||
+          g.aid !== a.id ||
+          pageState.focusStudentId !== sid
+        )
+          return;
         render();
         var b = g.overlay.querySelector('[data-grader="work-markup"][data-at="' + w.page + '"]');
         if (b) b.focus({ preventScroll: true });
@@ -15411,14 +15517,14 @@ window.PageAssignments = (function () {
 
   /* A new student opens on their first page. */
   function _graderWorkStudentChanged() {
-    var w = _grader && _grader.work;
-    if (!w || w.sid === focusStudentId) return;
-    w.sid = focusStudentId;
+    var w = pageState._grader && pageState._grader.work;
+    if (!w || w.sid === pageState.focusStudentId) return;
+    w.sid = pageState.focusStudentId;
     w.page = 0;
     w.msg = '';
     w.setTo = null;
     w.version = null;
-    _grader.revisionMsg = null;
+    pageState._grader.revisionMsg = null;
   }
 
   /* Grade From Paper: Set Logan To (GraderWork.setToFromPaper, which the
@@ -15429,9 +15535,9 @@ window.PageAssignments = (function () {
     refreshSidebarGrades(sid);
     var after = structuredClone(getScores(cid));
     var st = _workStudent(cid, sid);
-    var g = _grader;
+    var g = pageState._grader;
     done.paper.then(function () {
-      if (_grader === g && activeCourse === cid && g.aid === a.id) render();
+      if (pageState._grader === g && pageState.activeCourse === cid && g.aid === a.id) render();
     });
     if (!done.set) return;
     _showFillUndo((st ? displayNameFirst(st) : 'Student') + ' set to ' + label, function () {
@@ -15445,16 +15551,18 @@ window.PageAssignments = (function () {
      order by AddWorkFiles (shared/add-work-files.js), then recorded as the
      teacher's work (addStudentWorkPages). */
   function _graderAddWorkFiles(input) {
-    if (!_grader || _grader.work.busy) return;
+    if (!pageState._grader || pageState._grader.work.busy) return;
     var files = Array.prototype.slice.call(input.files || []);
     input.value = '';
     if (!files.length || !window.PhotoShrink) return;
-    var cid = activeCourse;
-    var aid = _grader.aid;
-    var sid = focusStudentId;
-    var g = _grader;
+    var cid = pageState.activeCourse;
+    var aid = pageState._grader.aid;
+    var sid = pageState.focusStudentId;
+    var g = pageState._grader;
     var same = function () {
-      return _grader === g && activeCourse === cid && g.aid === aid && focusStudentId === sid;
+      return (
+        pageState._grader === g && pageState.activeCourse === cid && g.aid === aid && pageState.focusStudentId === sid
+      );
     };
     g.work.busy = true;
     g.work.msg = '';
@@ -15471,7 +15579,7 @@ window.PageAssignments = (function () {
       })
       .then(function (res) {
         g.work.busy = false;
-        if (_grader !== g) return;
+        if (pageState._grader !== g) return;
         // A line about this student's files is said only on their screen.
         if (same()) {
           g.work.msg = res.result === 'sent' ? '' : said || AddWorkFiles.answer(res);
@@ -15488,7 +15596,7 @@ window.PageAssignments = (function () {
     var st = _workStudent(cid, sid);
     var sub = getStudentSubmission(cid, sid, a.id);
     if (!st || !sub) return;
-    var g = _grader;
+    var g = pageState._grader;
     var ask = GraderWork.unsubmitAsk(a, st, sub);
     if (button && button.focus) button.focus({ preventScroll: true });
     showConfirm(
@@ -15497,10 +15605,10 @@ window.PageAssignments = (function () {
       'Unsubmit',
       ask.danger ? 'danger' : 'primary',
       function () {
-        if (_grader !== g || activeCourse !== cid || focusStudentId !== sid) return;
+        if (pageState._grader !== g || pageState.activeCourse !== cid || pageState.focusStudentId !== sid) return;
         GraderWork.deleteWork(cid, sid, a.id).then(function () {
-          if (_grader !== g || activeCourse !== cid) return;
-          if (focusStudentId === sid) g.work.page = 0;
+          if (pageState._grader !== g || pageState.activeCourse !== cid) return;
+          if (pageState.focusStudentId === sid) g.work.page = 0;
           render();
         });
       },
@@ -15575,7 +15683,7 @@ window.PageAssignments = (function () {
   // Return for Revision, or the state of the request and Take Back, after the row's Return.
   // html-safe: fixed labels; the name and the dates go through esc
   function _graderRevisionReturnHtml(cid, a, sid, area, buttons) {
-    var g = _grader;
+    var g = pageState._grader;
     var busy = !!(g && g.revisionBusy);
     if (area.revise) {
       if (!buttons) return '';
@@ -15611,11 +15719,11 @@ window.PageAssignments = (function () {
   }
 
   function _graderRevisionAction(what, btn) {
-    if (!_grader) return;
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
-    var sid = focusStudentId;
-    if (!a || !sid || _grader.revisionBusy) return;
+    if (!pageState._grader) return;
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
+    var sid = pageState.focusStudentId;
+    if (!a || !sid || pageState._grader.revisionBusy) return;
     if (what === 'revision-open') return _graderOpenRevisionSheet(cid, a, sid);
     if (what === 'revision-takeback') return _graderTakeBack(cid, a, sid, btn.dataset.id);
   }
@@ -15630,13 +15738,19 @@ window.PageAssignments = (function () {
   function _graderTakeBack(cid, a, sid, requestId) {
     var r = _graderRevisionOf(cid, a, sid);
     if (!r || r.id !== requestId) return;
-    var g = _grader;
+    var g = pageState._grader;
     g.revisionBusy = true;
     g.revisionMsg = null;
     _refreshGraderChrome();
     Grader.cancelRevision(cid, sid, a.id, r.id, _revisionKey('rc')).then(function (res) {
       g.revisionBusy = false;
-      if (_grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid) return;
+      if (
+        pageState._grader !== g ||
+        pageState.activeCourse !== cid ||
+        g.aid !== a.id ||
+        pageState.focusStudentId !== sid
+      )
+        return;
       var ok = res && (res.result === 'cancelled' || res.result === 'not_open');
       g.revisionMsg = ok ? null : 'This couldn’t be taken back. Try again.';
       render();
@@ -15682,7 +15796,7 @@ window.PageAssignments = (function () {
   }
 
   function _graderOpenRevisionSheet(cid, a, sid) {
-    var g = _grader;
+    var g = pageState._grader;
     var st = _workStudent(cid, sid);
     if (!st || g.overlay.querySelector('.grader-sheet-back')) return;
     var back = document.createElement('div');
@@ -15698,7 +15812,7 @@ window.PageAssignments = (function () {
     };
     var close = function () {
       back.remove();
-      if (_grader !== g) return;
+      if (pageState._grader !== g) return;
       var to = g.overlay.querySelector('[data-grader="revision-open"]') || g.overlay.querySelector('.grader-dialog');
       if (to) to.focus({ preventScroll: true });
     };
@@ -15729,7 +15843,13 @@ window.PageAssignments = (function () {
       sheet.querySelector('[data-rv="send"]').textContent = 'Returning…';
       Grader.returnForRevision(cid, sid, a.id, request, _revisionKey('rv')).then(function (res) {
         // The sheet or the dialog went, or moved on: nothing more happens here.
-        if (!back.isConnected || _grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid)
+        if (
+          !back.isConnected ||
+          pageState._grader !== g ||
+          pageState.activeCourse !== cid ||
+          g.aid !== a.id ||
+          pageState.focusStudentId !== sid
+        )
           return;
         var result = res && res.result;
         if (result === 'made' || result === 'already_open') {
@@ -15895,7 +16015,7 @@ window.PageAssignments = (function () {
     var box = dialog.querySelector('.grader-revision-host');
     if (!html) {
       if (box) box.remove();
-      _grader.revisionHtml = null;
+      pageState._grader.revisionHtml = null;
       return;
     }
     if (!box) {
@@ -15904,10 +16024,10 @@ window.PageAssignments = (function () {
       box = document.createElement('div');
       box.className = 'grader-revision-host';
       anchor.insertAdjacentElement('beforebegin', box);
-      _grader.revisionHtml = null;
+      pageState._grader.revisionHtml = null;
     }
-    if (_grader.revisionHtml === html) return;
-    _grader.revisionHtml = html;
+    if (pageState._grader.revisionHtml === html) return;
+    pageState._grader.revisionHtml = html;
     // html-safe: built by _graderRevisionCardHtml
     box.innerHTML = html;
   }
@@ -16043,7 +16163,7 @@ window.PageAssignments = (function () {
       html += '<p class="grader-reflect-now">' + esc(first + ' says it makes sense now.') + '</p>';
     if (r.follow_up) html += said(first + ' is still not sure and asks:', r.follow_up);
     if (r.follow_up_answer) html += said('You answered ' + on(r.follow_up_answered_at) + ':', r.follow_up_answer);
-    var busy = _grader.reflectBusy === r.id;
+    var busy = pageState._grader.reflectBusy === r.id;
     if (r.waiting) {
       html +=
         '<label class="grader-reflect-label" for="grader-reflect-answer">' +
@@ -16077,7 +16197,8 @@ window.PageAssignments = (function () {
         (saved ? 'Saved as Observation' : 'Save as Observation') +
         '</button></div>';
     }
-    var msg = _grader.reflectMsg && _grader.reflectMsg.id === r.id ? _grader.reflectMsg.text : '';
+    var msg =
+      pageState._grader.reflectMsg && pageState._grader.reflectMsg.id === r.id ? pageState._grader.reflectMsg.text : '';
     html += '<p class="grader-reflect-msg" role="status">' + esc(msg) + '</p>';
     return html + '</section>';
   }
@@ -16090,7 +16211,7 @@ window.PageAssignments = (function () {
     var box = dialog.querySelector('.grader-reflect-host');
     if (!html) {
       if (box) box.remove();
-      _grader.reflectHtml = null;
+      pageState._grader.reflectHtml = null;
       return;
     }
     if (!box) {
@@ -16099,26 +16220,26 @@ window.PageAssignments = (function () {
       box = document.createElement('div');
       box.className = 'grader-reflect-host';
       anchor.insertAdjacentElement('beforebegin', box);
-      _grader.reflectHtml = null;
+      pageState._grader.reflectHtml = null;
     }
-    if (_grader.reflectHtml === html) return;
-    _grader.reflectHtml = html;
+    if (pageState._grader.reflectHtml === html) return;
+    pageState._grader.reflectHtml = html;
     var had = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
     var typing = !!had && had.classList.contains('grader-reflect-input');
     // html-safe: built by _graderReflectionHtml
     box.innerHTML = html;
     var input = box.querySelector('.grader-reflect-input');
     if (input) {
-      input.value = _grader.reflectDrafts[input.dataset.id] || '';
+      input.value = pageState._grader.reflectDrafts[input.dataset.id] || '';
       if (typing) input.focus({ preventScroll: true });
     }
   }
 
   function _graderReflectAction(what, btn) {
-    if (!_grader) return;
-    var cid = activeCourse;
-    var a = _assessmentById(cid, _grader.aid);
-    var sid = focusStudentId;
+    if (!pageState._grader) return;
+    var cid = pageState.activeCourse;
+    var a = _assessmentById(cid, pageState._grader.aid);
+    var sid = pageState.focusStudentId;
     if (!a || !sid) return;
     var r = _graderReflection(cid, a, sid);
     if (!r || r.id !== btn.dataset.id) return;
@@ -16138,7 +16259,7 @@ window.PageAssignments = (function () {
      answer is drawn only while the dialog still shows this piece and
      student; the box keeps what was typed when it was not sent. */
   function _graderSendAnswer(cid, a, sid, r) {
-    var g = _grader;
+    var g = pageState._grader;
     if (g.reflectBusy) return;
     var input = g.overlay.querySelector('.grader-reflect-input');
     var text = input ? input.value : g.reflectDrafts[r.id] || '';
@@ -16160,7 +16281,13 @@ window.PageAssignments = (function () {
     answerReflection(cid, r.id, text.slice(0, 2000), key).then(function (res) {
       g.reflectBusy = null;
       if (res && res.result === 'answered') delete g.reflectDrafts[r.id];
-      if (_grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid) return;
+      if (
+        pageState._grader !== g ||
+        pageState.activeCourse !== cid ||
+        g.aid !== a.id ||
+        pageState.focusStudentId !== sid
+      )
+        return;
       g.reflectMsg = res && res.result === 'answered' ? null : { id: r.id, text: _reflectAnswerLine(res || {}) };
       render();
     });
@@ -16177,10 +16304,10 @@ window.PageAssignments = (function () {
       assessmentId: a.id,
       assessmentTitle: a.title || '',
     });
-    _grader.reflectMsg =
+    pageState._grader.reflectMsg =
       ok === false ? { id: r.id, text: 'The observation couldn’t be kept on this computer. Try again.' } : null;
     render();
-    var b = _grader && _grader.overlay.querySelector('[data-grader="reflect-observe"]');
+    var b = pageState._grader && pageState._grader.overlay.querySelector('[data-grader="reflect-observe"]');
     if (b) b.focus({ preventScroll: true });
   }
 
@@ -16224,7 +16351,7 @@ window.PageAssignments = (function () {
   var _REPORT_NOTE_HINT =
     'Your note isn\u2019t used yet: start it with what the student did, like \u201Cused \u2026\u201D or \u201Cexplained \u2026\u201D.';
   function _reportNotePreview(input) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var preview = input.parentNode.querySelector('.grader-report-note-preview');
     var st = getStudents(cid).find(function (x) {
       return x.id === input.dataset.sid;
@@ -16265,7 +16392,7 @@ window.PageAssignments = (function () {
   }
 
   function _saveReportNote(input) {
-    var cid = activeCourse;
+    var cid = pageState.activeCourse;
     var sid = input.dataset.sid;
     var aid = input.dataset.aid;
     if (!cid || !sid || !aid || input.disabled) return;
@@ -16296,10 +16423,10 @@ window.PageAssignments = (function () {
   function _graderAid(el) {
     var card = el && el.closest ? el.closest('.assess-card') : null;
     if (card && card.id.indexOf('ac-') === 0) return card.id.slice(3);
-    return _grader ? _grader.aid : null;
+    return pageState._grader ? pageState._grader.aid : null;
   }
   function _graderRoot(aid) {
-    return _grader ? _grader.overlay : document.getElementById('ac-' + aid);
+    return pageState._grader ? pageState._grader.overlay : document.getElementById('ac-' + aid);
   }
   function _graderCriterion(aid, critId) {
     return aid ? getRubricCriterion(aid, critId) : null;
@@ -16307,58 +16434,58 @@ window.PageAssignments = (function () {
   /* Picking the chosen level again clears it; another level replaces it
      and drops any + or −. */
   function _graderSetLevel(aid, critId, level) {
-    if (!aid || !focusStudentId) return;
+    if (!aid || !pageState.focusStudentId) return;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
     // On a Six-Point rubric `level` is the score, 1 to 6.
-    if (_sixRubricOf(activeCourse, aid)) {
-      if (!RubricScale.isKey(_sixRubricOf(activeCourse, aid), level)) return;
-      var nowSix = _sixScoreNow(activeCourse, focusStudentId, aid, crit);
+    if (_sixRubricOf(pageState.activeCourse, aid)) {
+      if (!RubricScale.isKey(_sixRubricOf(pageState.activeCourse, aid), level)) return;
+      var nowSix = _sixScoreNow(pageState.activeCourse, pageState.focusStudentId, aid, crit);
       var nextSix = nowSix === level ? 0 : level;
-      if (nextSix && isScoreLocked(activeCourse, focusStudentId, aid)) return;
-      var beforeSix = nextSix ? null : structuredClone(getScores(activeCourse));
-      _writeSixScore(activeCourse, focusStudentId, aid, crit, nextSix);
-      refreshSidebarGrades(focusStudentId);
+      if (nextSix && isScoreLocked(pageState.activeCourse, pageState.focusStudentId, aid)) return;
+      var beforeSix = nextSix ? null : structuredClone(getScores(pageState.activeCourse));
+      _writeSixScore(pageState.activeCourse, pageState.focusStudentId, aid, crit, nextSix);
+      refreshSidebarGrades(pageState.focusStudentId);
       render();
       _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
-      if (beforeSix) _offerClearUndo(activeCourse, beforeSix);
+      if (beforeSix) _offerClearUndo(pageState.activeCourse, beforeSix);
       return;
     }
-    var state = _criterionState(activeCourse, focusStudentId, aid, crit);
+    var state = _criterionState(pageState.activeCourse, pageState.focusStudentId, aid, crit);
     var next = state.level === level && !state.mixed ? 0 : level;
-    var before = next ? null : structuredClone(getScores(activeCourse));
+    var before = next ? null : structuredClone(getScores(pageState.activeCourse));
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      Grader.setLevel(activeCourse, focusStudentId, aid, tid, next, 0);
+      Grader.setLevel(pageState.activeCourse, pageState.focusStudentId, aid, tid, next, 0);
     });
-    refreshSidebarGrades(focusStudentId);
+    refreshSidebarGrades(pageState.focusStudentId);
     render();
     _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
-    if (before) _offerClearUndo(activeCourse, before);
+    if (before) _offerClearUndo(pageState.activeCourse, before);
   }
   function _graderSetMod(aid, critId, mod) {
-    if (!aid || !focusStudentId) return;
-    if (_sixRubricOf(activeCourse, aid)) return;
+    if (!aid || !pageState.focusStudentId) return;
+    if (_sixRubricOf(pageState.activeCourse, aid)) return;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
-    var state = _criterionState(activeCourse, focusStudentId, aid, crit);
+    var state = _criterionState(pageState.activeCourse, pageState.focusStudentId, aid, crit);
     if (!state.level) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      Grader.setPlusMinus(activeCourse, focusStudentId, aid, tid, state.level, next);
+      Grader.setPlusMinus(pageState.activeCourse, pageState.focusStudentId, aid, tid, state.level, next);
     });
-    refreshSidebarGrades(focusStudentId);
+    refreshSidebarGrades(pageState.focusStudentId);
     render();
     _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
   }
   /* A rubric row's Checklist or Comment chip opens or closes what folds
      under it; the checklist keeps the Assignments page's Show | Hide rule. */
   function _graderToggleRow(aid, critId, what) {
-    if (!aid || !focusStudentId) return;
-    var key = _checklistKey(aid, focusStudentId, critId);
+    if (!aid || !pageState.focusStudentId) return;
+    var key = _checklistKey(aid, pageState.focusStudentId, critId);
     var opened;
     if (what === 'checks') {
-      var open = _isChecklistOpen(aid, focusStudentId, critId);
+      var open = _isChecklistOpen(aid, pageState.focusStudentId, critId);
       var set = _checklistMode() === 'show' ? _closedChecklists : _openChecklists;
       if (open === (set === _closedChecklists)) set.add(key);
       else set.delete(key);
@@ -16381,58 +16508,58 @@ window.PageAssignments = (function () {
   /* A tick saves the box and, like the Assignments checklist, moves the
      level to the one the boxes suggest unless the teacher picked another. */
   function _graderTick(aid, critId, checkId, on) {
-    if (!aid || !focusStudentId) return;
-    var cid = activeCourse;
+    if (!aid || !pageState.focusStudentId) return;
+    var cid = pageState.activeCourse;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
     // Missing and Excused work takes no score (isScoreLocked): redraw the box as saved.
-    if (on && isScoreLocked(cid, focusStudentId, aid)) {
+    if (on && isScoreLocked(cid, pageState.focusStudentId, aid)) {
       render();
       return;
     }
-    var before = getRubricCheckIds(cid, focusStudentId, aid);
-    var after = Grader.setTick(cid, focusStudentId, aid, checkId, on);
+    var before = getRubricCheckIds(cid, pageState.focusStudentId, aid);
+    var after = Grader.setTick(cid, pageState.focusStudentId, aid, checkId, on);
     if (_sixRubricOf(cid, aid)) {
-      var nowSix = _sixScoreNow(cid, focusStudentId, aid, crit);
+      var nowSix = _sixScoreNow(cid, pageState.focusStudentId, aid, crit);
       var nextSix = RubricChecks.levelAfterTick(crit, nowSix, before, after);
-      if (nextSix !== nowSix) _writeSixScore(cid, focusStudentId, aid, crit, nextSix);
+      if (nextSix !== nowSix) _writeSixScore(cid, pageState.focusStudentId, aid, crit, nextSix);
     } else {
-      var current = _criterionLevelNow(cid, aid, focusStudentId, crit);
+      var current = _criterionLevelNow(cid, aid, pageState.focusStudentId, crit);
       var next = RubricChecks.levelAfterTick(crit, current, before, after);
       if (next !== current)
         rubricCriterionScoreKeys(crit).forEach(function (tid) {
-          Grader.setLevel(cid, focusStudentId, aid, tid, next);
+          Grader.setLevel(cid, pageState.focusStudentId, aid, tid, next);
         });
     }
-    refreshSidebarGrades(focusStudentId);
+    refreshSidebarGrades(pageState.focusStudentId);
     render();
     var root = _graderRoot(aid);
     var box = root && root.querySelector('.grdt-check input[data-checkid="' + checkId + '"]');
     if (box) box.focus({ preventScroll: true });
   }
   function _graderSetTagLevel(aid, tagId, level) {
-    if (!aid || !focusStudentId) return;
-    var state = _tagState(activeCourse, focusStudentId, aid, tagId);
+    if (!aid || !pageState.focusStudentId) return;
+    var state = _tagState(pageState.activeCourse, pageState.focusStudentId, aid, tagId);
     var next = state.level === level && !state.mixed ? 0 : level;
-    var before = next ? null : structuredClone(getScores(activeCourse));
-    _tagScoreKeys(activeCourse, aid, tagId).forEach(function (key) {
-      Grader.setLevel(activeCourse, focusStudentId, aid, key, next, 0);
+    var before = next ? null : structuredClone(getScores(pageState.activeCourse));
+    _tagScoreKeys(pageState.activeCourse, aid, tagId).forEach(function (key) {
+      Grader.setLevel(pageState.activeCourse, pageState.focusStudentId, aid, key, next, 0);
     });
-    refreshSidebarGrades(focusStudentId);
+    refreshSidebarGrades(pageState.focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
-    if (before) _offerClearUndo(activeCourse, before);
+    if (before) _offerClearUndo(pageState.activeCourse, before);
   }
   function _graderSetTagMod(aid, tagId, mod) {
-    if (!aid || !focusStudentId) return;
-    var state = _tagState(activeCourse, focusStudentId, aid, tagId);
+    if (!aid || !pageState.focusStudentId) return;
+    var state = _tagState(pageState.activeCourse, pageState.focusStudentId, aid, tagId);
     if (!state.level || state.mixed) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
-    _tagScoreKeys(activeCourse, aid, tagId).forEach(function (key) {
-      Grader.setPlusMinus(activeCourse, focusStudentId, aid, key, state.level, next);
+    _tagScoreKeys(pageState.activeCourse, aid, tagId).forEach(function (key) {
+      Grader.setPlusMinus(pageState.activeCourse, pageState.focusStudentId, aid, key, state.level, next);
     });
-    refreshSidebarGrades(focusStudentId);
+    refreshSidebarGrades(pageState.focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
   }
@@ -16441,10 +16568,10 @@ window.PageAssignments = (function () {
   // unchanged box saves nothing.
   function _graderCommitPoints(inp, next) {
     var aid = _graderAid(inp);
-    if (!aid || !focusStudentId) return;
-    var cid = activeCourse;
+    if (!aid || !pageState.focusStudentId) return;
+    var cid = pageState.activeCourse;
     var max = parseFloat(inp.dataset.max) || 100;
-    var prev = getPointsScore(cid, focusStudentId, aid);
+    var prev = getPointsScore(cid, pageState.focusStudentId, aid);
     var over = _pointsOverLimit(inp.value, max);
     var raw = parsePointsInput(inp.value, max, prev);
     if (raw === prev) {
@@ -16455,10 +16582,10 @@ window.PageAssignments = (function () {
     // do. A second write under the assessment's own id left an entry later
     // edits elsewhere never updated, so the cell and course % kept the old
     // points.
-    var sid = focusStudentId;
-    Grader.setPoints(cid, focusStudentId, aid, raw);
+    var sid = pageState.focusStudentId;
+    Grader.setPoints(cid, pageState.focusStudentId, aid, raw);
     refreshSidebarGrades(sid);
-    var nextId = next && _grader && _grader.overlay.contains(next) ? next.id : '';
+    var nextId = next && pageState._grader && pageState._grader.overlay.contains(next) ? next.id : '';
     render();
     if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
     // The redraw replaced the control Tab (or a click) was moving to, such
@@ -16469,7 +16596,8 @@ window.PageAssignments = (function () {
         var active = document.activeElement;
         if (active && active !== document.body && active.isConnected) return;
         var again = document.getElementById(nextId);
-        if (again && _grader && _grader.overlay.contains(again)) again.focus({ preventScroll: true });
+        if (again && pageState._grader && pageState._grader.overlay.contains(again))
+          again.focus({ preventScroll: true });
       };
       refocus();
       setTimeout(refocus, 0);
@@ -16491,47 +16619,47 @@ window.PageAssignments = (function () {
   }
 
   function closeGrader() {
-    if (!_grader) return;
+    if (!pageState._grader) return;
     // A field being typed in saves on blur, so finish it before closing.
     var active = document.activeElement;
-    if (active && _grader.overlay.contains(active) && active.blur) active.blur();
-    var g = _grader;
+    if (active && pageState._grader.overlay.contains(active) && active.blur) active.blur();
+    var g = pageState._grader;
     _graderReleasePage(g);
-    _grader = null;
+    pageState._grader = null;
     // Mark Up opened from this dialog goes with it.
     if (window.MarkUp && MarkUp.isOpen()) MarkUp.close();
     _hideChipTip();
-    _listeners.forEach(function (l) {
+    pageState._listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
-    _listeners = [];
+    pageState._listeners = [];
     if (g.pageListeners) {
       g.pageListeners.forEach(function (l) {
         _addDocListener(l.type, l.handler, l.options);
       });
     }
-    Object.keys(_statusDebounce).forEach(function (k) {
-      delete _statusDebounce[k];
+    Object.keys(pageState._statusDebounce).forEach(function (k) {
+      delete pageState._statusDebounce[k];
     });
     ['rubric-modal', 'comment-popover-overlay'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.remove();
     });
-    if (_commentCapture) _commentCapture.destroy();
-    _commentCapture = null;
+    if (pageState._commentCapture) pageState._commentCapture.destroy();
+    pageState._commentCapture = null;
     CritComment.drop();
-    _kbFocusEl = null;
+    pageState._kbFocusEl = null;
     // The student it ended on, so the gradebook selects their cell.
-    var lastSid = focusStudentId;
-    focusStudentId = null;
+    var lastSid = pageState.focusStudentId;
+    pageState.focusStudentId = null;
     // The page under the dialog is as it was, and has not seen what was graded.
     if (g.page) {
-      openAssessIds = g.page.open;
-      focusStudentId = g.page.focus;
-      _allExpanded = g.page.expanded;
-      _collapsedIds = g.page.collapsed;
-      rubricViewStates = g.page.rubricViews;
-      _pageBehind = true;
+      pageState.openAssessIds = g.page.open;
+      pageState.focusStudentId = g.page.focus;
+      pageState._allExpanded = g.page.expanded;
+      pageState._collapsedIds = g.page.collapsed;
+      pageState.rubricViewStates = g.page.rubricViews;
+      pageState._pageBehind = true;
     }
     g.overlay.remove();
     if (g.onClose) g.onClose(lastSid);
@@ -16540,8 +16668,8 @@ window.PageAssignments = (function () {
   /* ── init / destroy ─────────────────────────────────────── */
   function init(params) {
     // Reset all state
-    activeCourse = (params && params.course) || getActiveCourse();
-    setActiveCourse(activeCourse);
+    pageState.activeCourse = (params && params.course) || getActiveCourse();
+    setActiveCourse(pageState.activeCourse);
     // What Class Results' buttons do here: Grade This Assessment opens the
     // card's grading list (or goes to it when open); a change redraws.
     if (window.ClassResults)
@@ -16563,41 +16691,41 @@ window.PageAssignments = (function () {
           },
         };
       });
-    openAssessIds = new Set();
-    focusStudentParam = (params && params.student) || null;
-    focusStudentId = focusStudentParam || null;
-    _allExpanded = !(params && params.open && focusStudentParam);
-    _collapsedIds = new Set();
-    filterCategories = [];
-    assessSearch = '';
-    showUngraded = false;
-    _toReturnOnly = false;
+    pageState.openAssessIds = new Set();
+    pageState.focusStudentParam = (params && params.student) || null;
+    pageState.focusStudentId = pageState.focusStudentParam || null;
+    pageState._allExpanded = !(params && params.open && pageState.focusStudentParam);
+    pageState._collapsedIds = new Set();
+    pageState.filterCategories = [];
+    pageState.assessSearch = '';
+    pageState.showUngraded = false;
+    pageState._toReturnOnly = false;
     // The dashboard's To Grade cell opens the page with To Grade on.
     AssignShow.reset(params && params.show);
     AssignList.reset();
     AssignToolbar.reset();
-    rubricViewStates = {};
-    _showingNewForm = false;
-    _editingAssessId = null;
-    collapsedModules = _loadClosedModules(activeCourse);
-    _dragAssessId = null;
-    _dragModuleId = null;
-    _mergeTargetId = null;
-    _mergeHoverTimer = null;
-    _mergeAnimating = false;
-    AC.configure(activeCourse);
+    pageState.rubricViewStates = {};
+    pageState._showingNewForm = false;
+    pageState._editingAssessId = null;
+    pageState.collapsedModules = _loadClosedModules(pageState.activeCourse);
+    pageState._dragAssessId = null;
+    pageState._dragModuleId = null;
+    pageState._mergeTargetId = null;
+    pageState._mergeHoverTimer = null;
+    pageState._mergeAnimating = false;
+    AC.configure(pageState.activeCourse);
     _resetCollabState();
-    _editingRubric = null;
-    _rubricDirty = false;
-    _rubricAutoTags = [];
-    _commentPopoverState = null;
+    pageState._editingRubric = null;
+    pageState._rubricDirty = false;
+    pageState._rubricAutoTags = [];
+    pageState._commentPopoverState = null;
     CritComment.drop();
-    _kbFocusEl = null;
-    _statusDebounce = {};
-    _searchTimer = null;
+    pageState._kbFocusEl = null;
+    pageState._statusDebounce = {};
+    pageState._searchTimer = null;
 
     if (params && params.open) {
-      openAssessIds = new Set([params.open]);
+      pageState.openAssessIds = new Set([params.open]);
     }
 
     // Show sidebar
@@ -16608,10 +16736,10 @@ window.PageAssignments = (function () {
     window.toggleFocusStudent = toggleFocusStudent;
     // The roster's grades are the year so far, as on the Gradebook,
     // whether the page was reached in the app or loaded fresh.
-    if (typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
+    if (typeof setActiveTerm === 'function') setActiveTerm(pageState.activeCourse, null);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
-      activeCourse,
-      focusStudentId,
+      pageState.activeCourse,
+      pageState.focusStudentId,
       'toggleFocusStudent',
     );
     initSidebarToggle();
@@ -16660,7 +16788,7 @@ window.PageAssignments = (function () {
     _addDocListener('keydown', _startKeydown, true);
     _addDocListener('input', _startSearch);
     _addDocListener('input', _blankInput);
-    if (window.RubricCommentLines) RubricCommentLines.init({ render: _blankRender, get: () => _blank });
+    if (window.RubricCommentLines) RubricCommentLines.init({ render: _blankRender, get: () => pageState._blank });
     _addDocListener('pointerdown', _blankOutside, true);
     _addDocListener('mouseover', _afTipOver);
     _addDocListener('mouseout', _afTipOut);
@@ -16680,9 +16808,9 @@ window.PageAssignments = (function () {
     // "Also in …" chips read the other classes, which load after the first
     // render; draw them once those classes are here.
     if (window.RubricLibrary) {
-      var warmedFor = activeCourse;
-      RubricLibrary.warmCopies(activeCourse).then(function (loaded) {
-        if (loaded && activeCourse === warmedFor && document.getElementById('tb-rubrics-panel')) render();
+      var warmedFor = pageState.activeCourse;
+      RubricLibrary.warmCopies(pageState.activeCourse).then(function (loaded) {
+        if (loaded && pageState.activeCourse === warmedFor && document.getElementById('tb-rubrics-panel')) render();
       });
     }
 
@@ -16713,18 +16841,18 @@ window.PageAssignments = (function () {
   // A new assessment or student got its server id (shared/data.js).
   function _handleRekey(e) {
     var d = e.detail || {};
-    if (openAssessIds.has(d.from)) {
-      openAssessIds.delete(d.from);
-      openAssessIds.add(d.to);
+    if (pageState.openAssessIds.has(d.from)) {
+      pageState.openAssessIds.delete(d.from);
+      pageState.openAssessIds.add(d.to);
     }
-    if (_editingAssessId === d.from) _editingAssessId = d.to;
-    if (focusStudentId === d.from) focusStudentId = d.to;
+    if (pageState._editingAssessId === d.from) pageState._editingAssessId = d.to;
+    if (pageState.focusStudentId === d.from) pageState.focusStudentId = d.to;
     // A new module's folder keeps its local id in the markup until the next
     // render; swap it now, or a rename before then finds no module to save.
     if (d.kind === 'module') {
-      if (d.from in collapsedModules) {
-        collapsedModules[d.to] = collapsedModules[d.from];
-        delete collapsedModules[d.from];
+      if (d.from in pageState.collapsedModules) {
+        pageState.collapsedModules[d.to] = pageState.collapsedModules[d.from];
+        delete pageState.collapsedModules[d.from];
         _saveClosedModules();
       }
       var from = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(d.from) : d.from;
@@ -16738,20 +16866,20 @@ window.PageAssignments = (function () {
 
   function destroy() {
     _hideChipTip();
-    _pageBehind = false;
+    pageState._pageBehind = false;
     closeColorPop();
     if (window.ClassResults) ClassResults.setPage(null);
     // Remove all tracked listeners
-    _listeners.forEach(function (l) {
+    pageState._listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
-    _listeners = [];
+    pageState._listeners = [];
 
     // Clear timers
-    if (_searchTimer) clearTimeout(_searchTimer);
-    if (_mergeHoverTimer) clearTimeout(_mergeHoverTimer);
-    Object.keys(_statusDebounce).forEach(function (k) {
-      delete _statusDebounce[k];
+    if (pageState._searchTimer) clearTimeout(pageState._searchTimer);
+    if (pageState._mergeHoverTimer) clearTimeout(pageState._mergeHoverTimer);
+    Object.keys(pageState._statusDebounce).forEach(function (k) {
+      delete pageState._statusDebounce[k];
     });
 
     document.body.classList.remove('af-comp-open');
@@ -16761,8 +16889,8 @@ window.PageAssignments = (function () {
     if (modal) modal.remove();
 
     // Clean up comment popover (appended to body)
-    if (_commentCapture) _commentCapture.destroy();
-    _commentCapture = null;
+    if (pageState._commentCapture) pageState._commentCapture.destroy();
+    pageState._commentCapture = null;
     var overlay = document.getElementById('comment-popover-overlay');
     if (overlay) overlay.remove();
     CritComment.drop();
@@ -16776,7 +16904,7 @@ window.PageAssignments = (function () {
   // The criterion comment (teacher/crit-comment.js) borrows the class on screen,
   // four of this page's helpers and the level picked.
   CritComment.configure({
-    course: () => activeCourse,
+    course: () => pageState.activeCourse,
     groupRow: _groupRowFor,
     criterion: getRubricCriterion,
     scrollIntoView: _scrollIntoViewIfNeeded,
@@ -16793,7 +16921,7 @@ window.PageAssignments = (function () {
     closeGrader: closeGrader,
     askReturn: askReturn,
     graderOpen: function () {
-      return !!_grader;
+      return !!pageState._grader;
     },
     workSurface: workSurface,
     switchCourse: switchCourse,

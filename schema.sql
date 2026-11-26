@@ -445,6 +445,7 @@ create table grade_return_repair_log (                              -- what a ni
 -- grade_return_remap (move_rubric_scores).
 -- docs/schema.generated.sql does not list this schema.
 
+
 -- Row security on score, tag_score, rubric_score, rubric_check_score and
 -- dibels_score (2026110901_score_rows_same_class): the caller owns the
 -- enrollment and the assessment is in the enrollment's class
@@ -699,6 +700,18 @@ create table report_config (
 -- device; 2026111704_photos_stay_with_class). The nightly photo job deletes the
 -- photos of a class not opened for 365 days; a class with no row counts from
 -- course.created_at. Row security on, no grants: only the two functions reach it.
+-- The accounts allowed to read the site-wide counts on fullvision.ca/health
+-- (2026112603_owner_health, moved here by 2026112604_owner_list_in_public).
+-- RLS on, no policy, no grant to anon, authenticated or service_role.
+-- public.fv_owner_health() returns jsonb, SECURITY DEFINER, authenticated
+-- only: counts across every class (teachers, classes, students, classes
+-- opened in 7 days, ten weeks of work assessed) for an account listed here;
+-- error 42501 for anyone else. No name, id or grade.
+create table fv_owner (
+  teacher_id uuid        not null primary key references teacher(id) on delete cascade,
+  added_at   timestamptz not null default now()
+);
+
 create table course_opened (
   course_id       uuid        not null primary key references course(id) on delete cascade,
   last_opened_at  timestamptz not null default now()

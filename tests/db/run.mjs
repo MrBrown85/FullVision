@@ -121,6 +121,49 @@ function testSameTeacherLinks() {
   return tries;
 }
 
+/* ---------- the owner's counts ---------- */
+
+/* fv_owner_health answers only to an account in public.fv_owner (teacher B
+   in the seed). It takes no id, so the function tests above cannot tell
+   counts that should have been refused: here teacher A must get error 42501
+   and B must get the counts. Skipped where the migration is not applied. */
+function testOwnerHealth() {
+  const there = json(`select to_jsonb(to_regprocedure('public.fv_owner_health()') is not null)::text`);
+  if (!there) return null;
+  const call = uid =>
+    json(`do $$ begin perform set_config('fv_test.out', '', false); end $$;
+      begin;
+      set local role authenticated;
+      set local request.jwt.claims = '{"sub":"${uid}"}';
+      do $$ declare r jsonb; begin
+        r := public.fv_owner_health();
+        perform set_config('fv_test.out', jsonb_build_object('keys', (select jsonb_agg(k order by k) from jsonb_object_keys(r) k))::text, false);
+      exception when others then
+        perform set_config('fv_test.out', jsonb_build_object('error', sqlstate)::text, false);
+      end $$;
+      commit;
+      select current_setting('fv_test.out')`);
+  const a = call(A);
+  const b = call(B);
+  if (a.error !== '42501')
+    fail('owner', `teacher A, not an owner, got ${JSON.stringify(a)} from fv_owner_health; it must be refused (42501)`);
+  const want = [
+    'at',
+    'classes',
+    'classes_opened_7d',
+    'students',
+    'teachers',
+    'teachers_opened_7d',
+    'teachers_with_classes',
+    'teachers_with_students',
+    'weekly',
+  ];
+  if (JSON.stringify(b.keys) !== JSON.stringify(want))
+    fail('owner', `teacher B, the owner, got ${JSON.stringify(b)} from fv_owner_health; it must answer the counts`);
+  say(`Owner: fv_owner_health refused teacher A (${a.error || 'no error'}) and answered the owner, teacher B.`);
+  return { a, b };
+}
+
 /* ---------- nothing new in the app's schemas ---------- */
 
 /* Neither a visitor nor a teacher may create an object in the app's
@@ -629,6 +672,7 @@ function main() {
     const seeded = json(
       `select rls_test.seed_shared(); select jsonb_build_object('a', rls_test.seed('${A}', 'alpha@example.test', '${MARK.a}'), 'b', rls_test.seed('${B}', 'bravo@example.test', '${MARK.b}'))::text`,
     );
+    psql(url, `select rls_test.seed_after_teachers('${B}')`);
     say(`Seeded teachers A and B through the app's own functions on the rebuilt database.`);
     const tables = catalogTables();
     makePrints(tables);
@@ -642,11 +686,12 @@ function main() {
     const f = testFunctions(fns, seeded, uuids);
     const s = testStudentDoor(fns, seeded);
     const l = testSameTeacherLinks();
+    const o = testOwnerHealth();
     const c = testNoCreate();
     if (process.env.RLS_REPORT)
       writeFileSync(
         process.env.RLS_REPORT,
-        JSON.stringify({ tables: t, functions: f, student: s, links: l, schemas: c, failures }, null, 2),
+        JSON.stringify({ tables: t, functions: f, student: s, links: l, owner: o, schemas: c, failures }, null, 2),
       );
     ok = failures.length === 0;
   } finally {

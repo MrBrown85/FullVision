@@ -199,6 +199,13 @@
   to = "/help/index.html"
   status = 200
 
+# The owner's page: who uses FullVision, and whether main is safe to release
+# (health.html, shared/health.js, migrations/2026112603_owner_health.sql).
+[[redirects]]
+  from = "/health"
+  to = "/health.html"
+  status = 200
+
 [[redirects]]
   from = "/help/:slug"
   to = "/help/:slug.html"
