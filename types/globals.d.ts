@@ -556,3 +556,7 @@ interface Window {
   QuizData?: any;
 }
 declare var rerenderKeeping: any;
+declare var ExpandMotion: any;
+interface Window {
+  ExpandMotion?: any;
+}
