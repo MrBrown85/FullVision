@@ -47,6 +47,7 @@
     "teacher/dash-inbox-rollcall.js",
     "teacher/dash-inbox-targets.js",
     "teacher/cm-grading-bars.js",
+    "teacher/cm-guardians.js",
     "teacher/cm-roster-import.js",
     "teacher/cm-students.js",
     "teacher/report-one-zoom.js",
