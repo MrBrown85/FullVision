@@ -351,6 +351,7 @@ load('teacher/cm-grading.js');
 load('teacher/cm-wizard.js');
 load('teacher/cm-edit-actions.js');
 load('teacher/cm-class-actions.js');
+load('teacher/cm-curriculum.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-competencies.js');

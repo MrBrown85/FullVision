@@ -509,3 +509,4 @@ declare var _avatarColor: any;
 declare var CmQuestionnaires: any;
 declare var CmGradingBars: any;
 declare var FVBackupRestore: any;
+declare var openColorPop: any;
