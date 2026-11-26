@@ -1588,7 +1588,7 @@ function segAttr(on, role) {
 function segSelect(btn) {
   var seg = btn && btn.closest('.seg');
   if (!seg) return;
-  var before = _panelMotionOK() ? seg.querySelector('.seg-btn.active') : null;
+  var before = seg.querySelector('.seg-btn.active');
   var fromBox = before && before !== btn ? before.getBoundingClientRect() : null;
   seg.querySelectorAll('.seg-btn').forEach(function (b) {
     var on = b === btn;
@@ -1601,42 +1601,8 @@ function segSelect(btn) {
       b.setAttribute(name, on ? 'true' : 'false');
     }
   });
-  if (fromBox) _segGlide(seg, fromBox, btn.getBoundingClientRect());
-}
-
-/* The chosen pill slides from its old place to its new one (160 ms, or ms: the top tabs', router.js), by
-   transform alone. A page drawing at once holds its start back, so the timer that ends it counts from there. */
-function _segGlide(seg, from, to, ms) {
-  if (!seg.animate || !from.width || !to.width) return;
-  if (seg._fvGlide) seg._fvGlide.remove();
-  const box = seg.getBoundingClientRect();
-  const glide = document.createElement('span');
-  glide.className = 'seg-glide';
-  glide.setAttribute('aria-hidden', 'true');
-  glide.style.cssText =
-    'top:' + (to.top - box.top - seg.clientTop) + 'px;height:' + to.height + 'px;left:0;width:' + to.width + 'px;';
-  seg._fvGlide = glide;
-  seg.classList.add('seg-gliding');
-  seg.appendChild(glide);
-  const fromX = from.left - box.left - seg.clientLeft + seg.scrollLeft;
-  const toX = to.left - box.left - seg.clientLeft + seg.scrollLeft;
-  const done = () => {
-    glide.remove();
-    if (seg._fvGlide === glide) {
-      seg._fvGlide = null;
-      seg.classList.remove('seg-gliding');
-    }
-  };
-  const anim = glide.animate(
-    [
-      { transform: 'translateX(' + fromX + 'px) scaleX(' + from.width / to.width + ')' },
-      { transform: 'translateX(' + toX + 'px) scaleX(1)' },
-    ],
-    { duration: ms || 160, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)', fill: 'forwards' },
-  );
-  anim.onfinish = done;
-  anim.oncancel = done;
-  anim.ready.then(() => setTimeout(done, (ms || 160) + 240), done);
+  // The pill glides over (shared/seg-glide.js).
+  if (fromBox && window.SegGlide) SegGlide.run(seg, fromBox, btn.getBoundingClientRect());
 }
 
 /* ── Breadcrumb ────────────────────────────────────────────────

@@ -3751,27 +3751,6 @@ body.offline-active #app-dock {
       background var(--duration-micro),
       transform var(--motion-fast) var(--motion-ease);
   }
-  /* A segmented control's chosen pill glides to its new place (ui.js,
-     segSelect; the top tabs from router.js). The real pill hides for the
-     glide, then is back. */
-  .seg.seg-gliding {
-    position: relative;
-  }
-  .seg.seg-gliding > .seg-btn {
-    position: relative;
-    z-index: 1;
-    background: transparent;
-    box-shadow: none;
-  }
-  .seg-glide {
-    position: absolute;
-    z-index: 0;
-    background: var(--seg-thumb);
-    border-radius: 6px;
-    box-shadow: var(--shadow-sm);
-    pointer-events: none;
-    transform-origin: 0 50%;
-  }
   /* Class picker: gone while the list slides, then fades in. */
   .page-layout.sidebar-sliding .assess-course-select,
   .page-layout.sidebar-sliding .dash-course-select {
@@ -3781,6 +3760,23 @@ body.offline-active #app-dock {
   .page-layout.sidebar-settled .dash-course-select {
     animation: fv-fade-in var(--motion-base) var(--motion-ease);
   }
+}
+
+/* ── A slider's lit pill glides (shared/seg-glide.js) ─────────
+   Every slider, here and on the phone: while the copy of the pill slides,
+   the real pills are hidden, then back. The copy takes the lit button's own
+   colour, corners and shadow. */
+.seg-gliding > :not(.seg-glide) {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.seg-glide {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  transform-origin: 0 50%;
 }
 
 /* ── Utility classes (CSP: replace inline style attrs) ──────── */
