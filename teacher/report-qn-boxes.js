@@ -271,7 +271,83 @@ window.ReportQnBoxes = (function () {
     });
   }
 
+  /* The Teacher Comment card's note for an approved comment that no longer
+     matches (staleFor), from the card's own pieces. */
+  var /** @type {Record<string, string>} */ CLASS_SENTENCE_NAMES = {
+      closing: 'the closing sentence',
+      support: 'the support line',
+      late_work: 'the late-work line',
+    };
+  var CB = function () {
+    return /** @type {any} */ (window).CommentBank;
+  };
+  var CR = function () {
+    return /** @type {any} */ (window).CommentRealiser;
+  };
+  function _cap(/** @type {string} */ t) {
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+  }
+  function _sentenceCount(/** @type {number} */ n) {
+    return n === 1 ? 'one sentence no longer matches' : CB().numberWords(n) + ' sentences no longer match';
+  }
+  /* What changed, as the card's note says it: the pieces marked since the
+     approval (the States mockup's "“…” was marked …, so one sentence no
+     longer matches the gradebook."), and any class sentence edited since.
+     The day a mark was entered is not kept, so the note says "after" the
+     approval's day. */
+  function staleNote(/** @type {any} */ stale, /** @type {string} */ day) {
+    var /** @type {string[]} */ out = [];
+    var marks = stale.changes.filter(function (/** @type {any} */ c) {
+      return c.kind === 'marks';
+    }).length;
+    if (marks && stale.moved === false) {
+      // The facts are as they were at approval: the sentence was already
+      // out of date then.
+      out.push(_cap(_sentenceCount(marks)) + ' the gradebook.');
+    } else if (marks) {
+      var p = stale.pieces || [];
+      var q = p.map(function (/** @type {string} */ t) {
+        return CR().quoteTitle(t) || '“' + t + '”';
+      });
+      var who =
+        p.length === 1
+          ? q[0] + ' was marked'
+          : p.length === 2
+            ? q[0] + ' and ' + q[1] + ' were marked'
+            : p.length > 2
+              ? _cap(CB().numberWords(p.length)) + ' assignments were marked'
+              : // No piece was marked since: the grades worked out from the
+                // same marks changed.
+                'Grades changed';
+      out.push(who + ' after ' + day + ', so ' + _sentenceCount(marks) + ' the gradebook.');
+    }
+    var cls = stale.changes.filter(function (/** @type {any} */ c) {
+      return c.kind === 'class';
+    });
+    if (cls.length) {
+      var names = CB().list(
+        cls.map(function (/** @type {any} */ c) {
+          return CLASS_SENTENCE_NAMES[c.key] || 'a class sentence';
+        }),
+      );
+      out.push(_cap(names) + ' changed after ' + day + ', so ' + _sentenceCount(cls.length) + ' your class settings.');
+    }
+    var pron = stale.changes.filter(function (/** @type {any} */ c) {
+      return c.kind === 'pronouns';
+    }).length;
+    var named = stale.changes.filter(function (/** @type {any} */ c) {
+      return c.kind === 'name';
+    }).length;
+    if (pron || named) {
+      var whose = pron && stale.renamed ? 'The name and pronouns' : pron ? 'The pronouns' : 'The name';
+      out.push(whose + ' changed after ' + day + ', so ' + _sentenceCount(pron + named) + (pron ? ' them.' : ' it.'));
+    }
+    out.push('Approved text is never changed for you.');
+    return out.join(' ');
+  }
+
   return {
+    staleNote: staleNote,
     look: look,
     box: box,
     wrap: wrap,
