@@ -119,7 +119,6 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     upsertTermRating(CID, PRI.id, TERM, { narrative: d.text });
     open(); // rows recovered and kept in memory
     markTask4(); // the teacher marks Task 4 in the gradebook, comes back
-    RQ.tqSetCheck('missing', true);
     RQ.tqApproveNext();
     expect(rating().approvedAt).toBeFalsy();
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
@@ -130,9 +129,9 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
       expect.arrayContaining([expect.objectContaining({ before: NH_BEFORE, after: NH_AFTER })]),
     );
     RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    // The reason is the button's title; the Ready count keeps its words (below).
-    expect(btn.title).toContain('Approve and Next is off until you pick Use the New Sentence or Keep as Written.');
+    // The button stays on; pressing it goes to the sentence's row.
+    expect(btn.disabled).toBe(false);
+    expect(btn.title).not.toContain('off until');
     const html = open();
     expect(html).toContain(`<span class="qn-stale-label">Written</span><span class="qn-stale-was">${NH_BEFORE}</span>`);
     expect(html).toContain(`<span class="qn-stale-label">Now true</span><span class="qn-stale-now">${NH_AFTER}</span>`);
@@ -151,7 +150,6 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     expect(rating().narrative).toContain(NH_AFTER);
     expect(rating().narrative).not.toContain(NH_BEFORE);
     expect(RQ.claimChanges(st)).toEqual([]);
-    RQ.tqSetCheck('missing', true);
     RQ.tqApproveNext();
     expect(rating().approvedAt).toBeTruthy();
     expect(rating().narrative).toContain(NH_AFTER);
@@ -168,7 +166,6 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     while (RQ.claimChanges(st).length) RQ.tqClaim('keep', String(RQ.claimChanges(st)[0].row));
     expect(RQ.claimChanges(st)).toEqual([]);
     expect(rating().narrative).toBe(d.text);
-    RQ.tqSetCheck('missing', true);
     RQ.tqApproveNext();
     expect(rating().approvedAt).toBeTruthy();
     expect(rating().narrative).toContain(NH_BEFORE);
@@ -187,7 +184,6 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     open();
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
     expect(RQ.claimChanges(st).map(c => c.before)).toContain(NH_BEFORE);
-    RQ.tqSetCheck('missing', true);
     RQ.tqApproveNext();
     expect(rating().approvedAt).toBeFalsy();
   });
@@ -230,7 +226,8 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
     expect(RQ.approveBlockers(st)).toContain('claims');
     RQ.syncApprove();
-    expect(btn.title).toContain('Approve and Next is off until you pick Keep as Approved or Use the New Sentence.');
+    expect(btn.disabled).toBe(false);
+    expect(btn.title).not.toContain('off until');
     expect(ready.textContent).toBe('1 of 2 Ready');
   });
 });

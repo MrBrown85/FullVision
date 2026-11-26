@@ -3007,7 +3007,7 @@ window.CommentBank = (function () {
   }
   /* Whether a saved deadline can stand: a real date from today to the last
      school day. One that has passed, or falls after the school year, is
-     treated as not picked: no Deadline sentence, Approve and Next off. */
+     treated as not picked: no Deadline sentence; Approve and Next goes to the deadline. */
   function deadlineOk(cid, iso, today) {
     var d = String(iso || '').slice(0, 10);
     if (!deadlineText(d)) return false;

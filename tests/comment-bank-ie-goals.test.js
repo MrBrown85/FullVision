@@ -532,7 +532,7 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
     expect(html).not.toContain('qn-required');
   });
 
-  it('chosen IE: the header says IE, the Required rows show, Approve and Next waits for the date', () => {
+  it('chosen IE: the header says IE, the Required rows show, Approve and Next goes to the date', () => {
     seed({ missing: [3] });
     rate({ reportingBasis: 'ie' });
     const html = open();
@@ -543,22 +543,18 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
       expect(html).toContain('<span class="qn-req-label">' + l + '</span>'),
     );
     expect((html.match(/>Required</g) || []).length).toBe(5);
-    expect(html).toContain('I checked this');
+    expect(html).not.toContain('I checked this');
     expect(html).toContain('Pick a Date');
-    expect(html).toContain('Approve and Next stays off until you pick a date.');
+    expect(html).toContain('Pick the date by which the IE must become a grade.');
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
-    expect(RQ.approveBlockers(st)).toEqual(['deadline', 'missing']);
+    expect(RQ.approveBlockers(st)).toEqual(['deadline']);
     RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe(
-      'Saves this comment to the report card and opens the next student. Pick the deadline and tick “I checked this” first.',
-    );
+    // The button is never off; pressing it goes to the deadline.
+    expect(btn.disabled).toBe(false);
+    expect(btn.title).toBe('Saves this comment to the report card and opens the next student. ⌘ Return');
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18' });
     open();
-    expect(RQ.approveBlockers(st)).toEqual(['missing']);
-    RQ.tqSetCheck('missing', true);
     expect(RQ.approveBlockers(st)).toEqual([]);
-    expect(btn.disabled).toBe(false);
   });
 
   it('goals: the header says No Letter Grade and the Statement row is Required', () => {

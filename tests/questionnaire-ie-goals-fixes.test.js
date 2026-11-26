@@ -209,22 +209,19 @@ describe('2. The Language Goals row once the comment has sentences', () => {
 describe('3. An IE comment written without Generate', () => {
   const TYPED = 'Noor needs more marked work for a grade this term. Please talk with me about a plan.';
 
-  it('shows the Required rows with "I checked this", and Approve and Next follows the tick', () => {
+  it('shows the Required rows with no tick, and Approve and Next is on', () => {
     seed();
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18', narrative: TYPED });
     const html = open();
     ['Grade', 'Problem', 'Plan', 'Deadline', 'Meeting'].forEach(label =>
       expect(html, label).toContain(`<span class="qn-req-label">${label}</span></div>`),
     );
-    expect(html).toContain('data-tq-check="ie"');
+    expect(html).not.toContain('data-tq-check');
     // The teacher's own sentences are still there.
     expect(html).toContain('Please talk with me about a plan.');
     RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toContain('Tick “I checked this” first.');
-    RQ.tqSetCheck('ie', true);
-    expect(RQ.approveBlockers(student())).toEqual([]);
     expect(btn.disabled).toBe(false);
+    expect(RQ.approveBlockers(student())).toEqual([]);
   });
 
   it('a generated IE comment keeps a single Problem row', () => {
@@ -232,7 +229,6 @@ describe('3. An IE comment written without Generate', () => {
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18', narrative: draftNow(1).text });
     const html = open();
     expect(html.split('<span class="qn-req-label">Problem</span>').length - 1).toBe(1);
-    expect(html.split('data-tq-check="ie"').length - 1).toBe(1);
   });
 });
 
@@ -335,14 +331,12 @@ describe('5. A saved deadline that cannot stand', () => {
       const printed = ReportBlocks.renderBlockTeacherNarrative(CID, student(), { termId: TERM });
       expect(printed).not.toContain(day);
       expect(printed).toContain('Please contact me');
-      // The Deadline row asks for a date; Approve and Next says why it is off.
+      // The Deadline row asks for a date; Approve and Next goes to it.
       const html = RQ.renderTermQuestionnaire(CID);
       expect(html).toContain('Pick a Date</button>');
       expect(html).toContain('Pick a deadline from today to June 30.');
-      RQ.tqSetCheck('ie', true);
       expect(RQ.approveBlockers(student())).toContain('deadlineRange');
-      expect(btn.disabled).toBe(true);
-      expect(btn.title).toContain('Pick a deadline from today to June 30.');
+      expect(btn.disabled).toBe(false);
     });
   });
 
@@ -368,7 +362,6 @@ describe('5. A saved deadline that cannot stand', () => {
     expect(saved().ieDeadline).toBe('2026-12-18');
     expect(saved().narrative).toContain(STALE_SENTENCE('December 18'));
     expect(saved().narrative).not.toContain('October 15');
-    RQ.tqSetCheck('ie', true);
     expect(RQ.approveBlockers(student())).not.toContain('deadlineRange');
     expect(RQ.approveBlockers(student())).not.toContain('deadline');
   });
@@ -482,7 +475,6 @@ describe('11. The calendar', () => {
     expect(CommentBank.deadlineOk(CID, '2026-11-01')).toBe(true);
     expect(CommentBank.deadlineOk(CID, '2026-10-31')).toBe(false);
     rate({ ieDeadline: '2027-06-30' });
-    RQ.tqSetCheck('ie', true);
     expect(RQ.approveBlockers(student())).not.toContain('deadlineRange');
   });
 

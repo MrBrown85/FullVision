@@ -4662,11 +4662,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-req-ctrl input {
   margin: 0;
 }
-/* Ticked: green, and the row's highlight goes (the States mockup). */
-.qn-req-ctrl.on {
-  color: var(--score-3-text);
-  border-color: var(--score-3-bg);
-}
 .qn-req-ctrl:focus-visible,
 .qn-req-ctrl:focus-within {
   outline: 2px solid var(--active);
@@ -5536,11 +5531,25 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text-2);
 }
 
-/* Approve and Next while an IE still needs its deadline or a tick. */
-#tq-approve-next:disabled {
-  opacity: 0.4;
-  cursor: default;
-  filter: none;
+/* Approve and Next with something still waiting (an IE's deadline, a
+   sentence that no longer matches): pressing it goes to the box, which
+   draws this ring once. No motion under Reduce Motion. */
+.qn-attn {
+  outline: 2px solid var(--active);
+  outline-offset: 3px;
+  border-radius: 8px;
+  animation: qn-attn-ring 180ms ease-out;
+}
+@keyframes qn-attn-ring {
+  from {
+    outline-color: transparent;
+    outline-offset: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qn-attn {
+    animation: none;
+  }
 }
 
 /* Suggested for Your Bank (plan PR 10): the teacher's own sentences after a

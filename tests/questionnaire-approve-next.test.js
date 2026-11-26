@@ -156,14 +156,13 @@ describe('Approve and Next', () => {
     expect(onLast).toBe(0);
   });
 
-  it('does nothing while a check keeps Approve and Next off', () => {
+  it('approves a student with work not handed in: nothing waits on a tick', () => {
     _cache.statuses[CID] = { 'stu-hopper:a0': 'NS' };
     clearProfCache();
     RQ.tqStudentIndex = indexOf('stu-hopper');
-    expect(RQ.approveBlockers(current())).toContain('missing');
+    expect(RQ.approveBlockers(current())).toEqual([]);
     RQ.tqApproveNext();
-    expect(approved('stu-hopper')).toBe(false);
-    expect(current().id).toBe('stu-hopper');
+    expect(approved('stu-hopper')).toBe(true);
   });
 
   describe('with the sidebar sorted by First Name (live run: Approve and Next jumped around the list)', () => {
