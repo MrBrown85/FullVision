@@ -106,6 +106,8 @@ declare var CommentBank: {
   gradeOf(facts: unknown): { kind: string; letter?: string; standing?: string; next?: string; word?: string } | null;
   angle(facts: unknown, picks: unknown): { id: string };
   stepOf(sentence: unknown): string | null;
+  // The rest of teacher/comment-bank.js's members, which the Assignments pieces call.
+  [member: string]: any;
 };
 // Browse Sentences' cases (teacher/report-qn-browse-cases.js) and the
 // Observations card, the student's Voice and the class's report parts
@@ -586,3 +588,8 @@ interface Window {
   MarkUp?: any;
 }
 declare var CardMenu: any;
+declare var CommentLint: any;
+declare var ReportScores: any;
+interface Window {
+  CommentLint?: any;
+}

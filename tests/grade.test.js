@@ -201,7 +201,8 @@ describe('grade-format-guard', () => {
     'teacher/assign-levels.js': 2, // the six-point rubric's level names (moved from page-assignments.js, which keeps 14 of its 16)
     'teacher/assign-rubric-grading.js': 3, // the rubric rows' level names (moved from page-assignments.js, which keeps 11 of its 14)
     'teacher/assign-grader-queue.js': 2, // the Work to grade rows' level names (moved from page-assignments.js, which keeps 9 of its 11)
-    'teacher/page-assignments.js': 9, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
+    'teacher/assign-grader-notes.js': 1, // the Note for the Report's level name (moved from page-assignments.js, which keeps 8 of its 9)
+    'teacher/page-assignments.js': 8, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
     'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,
