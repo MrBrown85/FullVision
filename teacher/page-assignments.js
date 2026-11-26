@@ -6,6 +6,57 @@ window.PageAssignments = (function () {
      assigned again as the teacher works. One object, so a part of this
      file that moves to its own file can be handed it once. */
   var pageState = {};
+  /* In assign-inputs.js (moved 2026-11-26). */
+  var _handleBlur = AssignInputs._handleBlur;
+  var _handleChange = AssignInputs._handleChange;
+  var _handleFocus = AssignInputs._handleFocus;
+  var _handleInput = AssignInputs._handleInput;
+  /* In assign-drag-events.js (moved 2026-11-26). */
+  var _handleDragEnd = AssignDragEvents._handleDragEnd;
+  var _handleDragLeave = AssignDragEvents._handleDragLeave;
+  var _handleDragOver = AssignDragEvents._handleDragOver;
+  var _handleDragStart = AssignDragEvents._handleDragStart;
+  var _handleDrop = AssignDragEvents._handleDrop;
+  var _handleMouseOut = AssignDragEvents._handleMouseOut;
+  var _handleMouseOver = AssignDragEvents._handleMouseOver;
+  var _handlePointerDown = AssignDragEvents._handlePointerDown;
+  var _selectDefaultName = AssignDragEvents._selectDefaultName;
+  /* In assign-card-open.js (moved 2026-11-26). */
+  var _expandSegOn = AssignCardOpen._expandSegOn;
+  var collapseAllAssess = AssignCardOpen.collapseAllAssess;
+  var expandAllAssess = AssignCardOpen.expandAllAssess;
+  var kbFocusCell = AssignCardOpen.kbFocusCell;
+  var navigateKb = AssignCardOpen.navigateKb;
+  var setRubricView = AssignCardOpen.setRubricView;
+  var toggleAssess = AssignCardOpen.toggleAssess;
+  /* In assign-cards.js (moved 2026-11-26). */
+  var _CHEVRON_ICON = AssignCards._CHEVRON_ICON;
+  var _MODULE_CHEVRON = AssignCards._MODULE_CHEVRON;
+  var _MODULE_TRASH = AssignCards._MODULE_TRASH;
+  var _RUBRIC_ICON = AssignCards._RUBRIC_ICON;
+  var _WARNING_ICON = AssignCards._WARNING_ICON;
+  var _getAssessmentCategoryId = AssignCards._getAssessmentCategoryId;
+  var _getCategoryName = AssignCards._getCategoryName;
+  var _getSortedCategories = AssignCards._getSortedCategories;
+  var _returnState = AssignCards._returnState;
+  var _singlePointHtml = AssignCards._singlePointHtml;
+  var _toolbarState = AssignCards._toolbarState;
+  var renderAssessToolbar = AssignCards.renderAssessToolbar;
+  var setAssessSearch = AssignCards.setAssessSearch;
+  var sortAssessmentsForList = AssignCards.sortAssessmentsForList;
+  var toggleCategoryFilter = AssignCards.toggleCategoryFilter;
+  /* In assign-card-list.js (moved 2026-11-26). */
+  var _criterionState = AssignCardList._criterionState;
+  var _graderHtml = AssignCardList._graderHtml;
+  var _graderNotesOpen = AssignCardList._graderNotesOpen;
+  var _scoreTagObjs = AssignCardList._scoreTagObjs;
+  /* In assign-focus.js (moved 2026-11-26). */
+  var _focusGraderPoints = AssignFocus._focusGraderPoints;
+  var _graderToTop = AssignFocus._graderToTop;
+  var _scrollIntoViewIfNeeded = AssignFocus._scrollIntoViewIfNeeded;
+  var clearFocusStudent = AssignFocus.clearFocusStudent;
+  var stepFocusStudent = AssignFocus.stepFocusStudent;
+  var toggleFocusStudent = AssignFocus.toggleFocusStudent;
   /* In assign-modules.js (moved 2026-11-26). */
   var _canStack = AssignModules._canStack;
   var _clearDropMarker = AssignModules._clearDropMarker;
@@ -407,6 +458,109 @@ window.PageAssignments = (function () {
     sortAssessmentsForList: sortAssessmentsForList,
     render: render,
   });
+  AssignFocus.configure({
+    pageState: pageState,
+    _graderAid: _graderAid,
+    _graderHideCaughtUp: _graderHideCaughtUp,
+    _graderQueueStep: _graderQueueStep,
+    _graderRoot: _graderRoot,
+    _graderStepGroup: _graderStepGroup,
+    _graderStepShown: _graderStepShown,
+    kbFocusCell: kbFocusCell,
+    render: render,
+  });
+  AssignCardList.configure({
+    pageState: pageState,
+    _checklistAdvice: _checklistAdvice,
+    _checklistKey: _checklistKey,
+    _completeCardHtml: _completeCardHtml,
+    _dibelsCardHtml: _dibelsCardHtml,
+    _dibelsGridHtml: _dibelsGridHtml,
+    _graderOverallCommentHtml: _graderOverallCommentHtml,
+    _graderPickHtml: _graderPickHtml,
+    _isAdvancedRubric: _isAdvancedRubric,
+    _isChecklistOpen: _isChecklistOpen,
+    _levelCardsHtml: _levelCardsHtml,
+    _pointsCardHtml: _pointsCardHtml,
+    _singlePointHtml: _singlePointHtml,
+    _sixButtonsHtml: _sixButtonsHtml,
+    _sixChecklistAdvice: _sixChecklistAdvice,
+    _sixChecklistColsHtml: _sixChecklistColsHtml,
+    renderCompletionGrid: renderCompletionGrid,
+    renderPointsGrid: renderPointsGrid,
+    renderRubricGradingView: renderRubricGradingView,
+    renderTagGrid: renderTagGrid,
+  });
+  AssignCards.configure({
+    pageState: pageState,
+    _expandSegOn: _expandSegOn,
+    _graderPickHtml: _graderPickHtml,
+    _holdsGrades: _holdsGrades,
+    _criterionState: _criterionState,
+    _quizOn: _quizOn,
+    render: render,
+  });
+  AssignCardOpen.configure({
+    pageState: pageState,
+    _cardBodyHtml: _cardBodyHtml,
+    _cardOpen: _cardOpen,
+    _refreshCardCounts: _refreshCardCounts,
+    _afterCardsDrawn: _afterCardsDrawn,
+    _hideAfTip: _hideAfTip,
+    _hideChipTip: _hideChipTip,
+    _scrollIntoViewIfNeeded: _scrollIntoViewIfNeeded,
+    _toolbarState: _toolbarState,
+    render: render,
+  });
+  AssignDragEvents.configure({
+    pageState: pageState,
+    collabDragStart: collabDragStart,
+    collabDrop: collabDrop,
+    _canStack: _canStack,
+    _clearDropMarker: _clearDropMarker,
+    _clearMergeState: _clearMergeState,
+    _hasNameTip: _hasNameTip,
+    _hideChipTip: _hideChipTip,
+    _queueNameTip: _queueNameTip,
+    _setDropMarker: _setDropMarker,
+    _showChipTip: _showChipTip,
+    mergeToNewModule: mergeToNewModule,
+    onAssessDragEnd: onAssessDragEnd,
+    onAssessDragStart: onAssessDragStart,
+    onFolderDrop: onFolderDrop,
+    onModuleDragEnd: onModuleDragEnd,
+    onModuleDragStart: onModuleDragStart,
+    onModuleDropZoneDrop: onModuleDropZoneDrop,
+    reorderAssessment: reorderAssessment,
+  });
+  AssignInputs.configure({
+    pageState: pageState,
+    _attachWorkFiles: _attachWorkFiles,
+    _commitDibelsField: _commitDibelsField,
+    _graderAid: _graderAid,
+    _graderCommitPoints: _graderCommitPoints,
+    _graderCriterion: _graderCriterion,
+    _queueOverallComment: _queueOverallComment,
+    _saveOverallComment: _saveOverallComment,
+    collabToggleStudent: collabToggleStudent,
+    commitPointsScore: commitPointsScore,
+    getRubricCriterion: getRubricCriterion,
+    livePointsUpdate: livePointsUpdate,
+    switchCourse: switchCourse,
+    _copyFromChanged: _copyFromChanged,
+    _formResFiles: _formResFiles,
+    _hideChipTip: _hideChipTip,
+    _setFormWorkUntil: _setFormWorkUntil,
+    _setModuleDraggable: _setModuleDraggable,
+    _showChipTip: _showChipTip,
+    _syncCodes: _syncCodes,
+    _tickGroup: _tickGroup,
+    autoSetDueDate: autoSetDueDate,
+    onRubricSelect: onRubricSelect,
+    onTagChange: onTagChange,
+    setAssessSearch: setAssessSearch,
+    updateModuleName: updateModuleName,
+  });
 
   /* ── Listener tracking for cleanup ──────────────────────── */
   pageState._listeners = [];
@@ -458,6 +612,7 @@ window.PageAssignments = (function () {
   pageState._searchTimer = null;
   // Collaboration delegation (now in assign-collab.js)
   var AC = AssignCollab;
+  AssignDragEvents.configure({ AC: AC });
   AssignPast.configure({ AC: AC });
   AssignFormWork.configure({ AC: AC });
   pageState.newCollaboration = undefined; // alias for reads in save logic
@@ -630,672 +785,6 @@ window.PageAssignments = (function () {
       if (card && typeof card.scrollIntoView === 'function')
         card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  }
-
-  /* ── Focus Student ─────────────────────────────────────── */
-  /* Picking a student while some assessments are open (grading the whole
-     class) keeps just those open, for that student; with none open, every
-     assessment opens. Leaving keeps the class on those same assessments. */
-  function toggleFocusStudent(sid) {
-    if (pageState.focusStudentId === sid) {
-      _leaveFocus();
-    } else if (!pageState.focusStudentId) {
-      pageState.focusStudentId = sid;
-      pageState._collapsedIds.clear();
-      pageState._allExpanded = pageState.openAssessIds.size === 0;
-    } else {
-      pageState.focusStudentId = sid;
-    }
-    _syncSidebarSelection();
-    render();
-    // One points card open: its box is ready to type in.
-    var boxes = pageState.focusStudentId ? document.querySelectorAll('.assess-card.open .grdp-input') : [];
-    if (boxes.length === 1) _focusGraderPoints(_graderAid(boxes[0]));
-  }
-
-  function clearFocusStudent() {
-    _leaveFocus();
-    _syncSidebarSelection();
-    render();
-  }
-
-  function _leaveFocus() {
-    pageState.focusStudentId = null;
-    if (pageState._allExpanded) pageState.openAssessIds.clear();
-    pageState._allExpanded = true;
-    pageState._collapsedIds.clear();
-  }
-
-  /* Mark the focused student in the roster without redrawing it, so the
-     names and the roster's scroll stay put. */
-  function _syncSidebarSelection() {
-    if (pageState._grader) return;
-    var rows = document.querySelectorAll('#gb-roster-list .student-row');
-    if (!rows.length) {
-      document.getElementById('sidebar-mount').innerHTML = renderSidebar(
-        pageState.activeCourse,
-        pageState.focusStudentId,
-        'toggleFocusStudent',
-      );
-      return;
-    }
-    var picked = null;
-    rows.forEach(function (r) {
-      var on = r.dataset.sid === pageState.focusStudentId;
-      r.classList.toggle('selected', on);
-      if (on) picked = r;
-    });
-    _scrollIntoViewIfNeeded(picked, { block: 'nearest' });
-  }
-
-  /* Scrolls `el` into view only when part of it is out of sight: out of
-     the window, or of a box around it that scrolls. scrollIntoView lays the
-     page out and walks every scrolling box around it, for an element
-     already in view too. With `soon`, after this frame's own layout (a
-     click's writes first): the page is laid out once, not twice. */
-  function _scrollIntoViewIfNeeded(el, opts, soon) {
-    if (soon) {
-      return requestAnimationFrame(function () {
-        _scrollIntoViewIfNeeded(el, opts);
-      });
-    }
-    if (!el || !el.scrollIntoView || !el.isConnected) return;
-    var w = window.innerWidth;
-    var h = window.innerHeight;
-    var r = el.getBoundingClientRect && w && h ? el.getBoundingClientRect() : null;
-    var out = !r || r.top < 0 || r.left < 0 || r.bottom > h || r.right > w;
-    for (var p = el.parentElement; !out && p && p !== document.body; p = p.parentElement) {
-      var cs = getComputedStyle(p);
-      if (!/auto|scroll|hidden|clip/.test(cs.overflowX + ' ' + cs.overflowY)) continue;
-      var b = p.getBoundingClientRect();
-      out = r.top < b.top || r.left < b.left || r.bottom > b.bottom || r.right > b.right;
-    }
-    if (out) el.scrollIntoView(opts);
-  }
-
-  /* Left and Right arrows while grading one student: the previous or next
-     student in the roster (as filtered by its search), on the same open
-     assessments. A focused rubric row moves to the new student's first row. */
-  function stepFocusStudent(dir) {
-    if (!pageState.focusStudentId) return;
-    // The All Caught Up panel (I3): Previous takes it away; nothing else steps.
-    if (pageState._grader && pageState._grader.caughtUp) {
-      if (dir < 0) _graderHideCaughtUp();
-      return;
-    }
-    var memo = _graderFocusMemo();
-    // With a queue (I3), a step past either end of this piece carries into the next or previous piece.
-    if (pageState._grader && _graderQueueStep(dir)) return;
-    // Show is on To Return or Returned: the next student it lists (S1-F2).
-    if (pageState._grader && _graderStepShown(dir)) {
-      _graderToTop();
-      _restoreGraderFocus(memo);
-      return;
-    }
-    if (pageState._grader && _graderStepGroup(dir)) {
-      _graderToTop();
-      _restoreGraderFocus(memo);
-      return;
-    }
-    var ids = pageState._grader
-      ? pageState._grader.studentIds
-      : Array.prototype.filter
-          .call(document.querySelectorAll('#gb-roster-list .student-row'), function (r) {
-            return r.style.display !== 'none';
-          })
-          .map(function (r) {
-            return r.dataset.sid;
-          });
-    if (!ids.length) {
-      ids = sortStudents(getStudents(pageState.activeCourse), 'lastName').map(function (s) {
-        return s.id;
-      });
-    }
-    var i = ids.indexOf(pageState.focusStudentId);
-    var next = ids[i + dir];
-    if (i < 0 || !next) return;
-    var hadKbFocus = !!pageState._kbFocusEl;
-    pageState.focusStudentId = next;
-    _syncSidebarSelection();
-    render();
-    var card = document.querySelector('.assess-card.open');
-    if (pageState._grader) _graderToTop();
-    else _scrollIntoViewIfNeeded(card, { block: 'nearest' }, true);
-    if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
-    else _restoreGraderFocus(memo);
-  }
-
-  /* The grader opens the next student at the top, under their name: kept
-     scrolled down, the name was off screen and a teacher could score the
-     wrong student (Nov 3 sweep). The same card keeps the focus. */
-  function _graderToTop() {
-    var sc = pageState._grader && pageState._grader.overlay.querySelector('.grader-scroll');
-    if (sc) {
-      sc.scrollTop = 0;
-      // The next student comes in with a short fade. A script-driven fade
-      // leaves no class or attribute behind in the page's markup.
-      if (sc.animate && window.matchMedia && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        sc.animate([{ opacity: 0.45 }, { opacity: 1 }], { duration: 150, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)' });
-      }
-    }
-  }
-
-  /* The grading control that has focus (a criterion or competency card, a
-     points box), so the next student's view can focus the same one. */
-  function _graderFocusMemo() {
-    var el = document.activeElement;
-    var cls = el && el.classList;
-    if (!cls) return null;
-    var aid = _graderAid(el);
-    if (!aid) return null;
-    if (cls.contains('grdt-crit')) return { aid: aid, sel: '.grdt-crit[data-critid="' + el.dataset.critid + '"]' };
-    if (cls.contains('grdl-card')) return { aid: aid, sel: '.grdl-card[data-tag="' + el.dataset.tag + '"]' };
-    if (cls.contains('grdp-input')) return { aid: aid, points: true };
-    return null;
-  }
-  // Focus the same control for the new student. In the dialog, points work
-  // focuses the box even when the step came from a button.
-  function _restoreGraderFocus(memo) {
-    if (memo && memo.points) return _focusGraderPoints(memo.aid);
-    if (memo) {
-      var root = _graderRoot(memo.aid);
-      var el = root && root.querySelector(memo.sel);
-      if (el) el.focus({ preventScroll: true });
-      return;
-    }
-    if (pageState._grader) _focusGraderPoints(pageState._grader.aid);
-  }
-  // The student's points box for `aid`, focused with its text selected.
-  function _focusGraderPoints(aid) {
-    var root = aid && _graderRoot(aid);
-    var box = root && root.querySelector('.grdp-input');
-    if (!box || box.disabled) return;
-    box.focus({ preventScroll: true });
-    box.select();
-  }
-
-  /* ── Assessment Filters ────────────────────────────────── */
-  function toggleCategoryFilter(catId) {
-    var idx = pageState.filterCategories.indexOf(catId);
-    if (idx >= 0) pageState.filterCategories.splice(idx, 1);
-    else pageState.filterCategories.push(catId);
-    render();
-  }
-
-  /* The Assignments list order. A teacher's drag sets display_order 1..n;
-     anything never placed (0, e.g. a new assessment) sits on top, newest first. */
-  function sortAssessmentsForList(arr) {
-    return arr.slice().sort(function (a, b) {
-      var oa = Number(a.display_order || 0);
-      var ob = Number(b.display_order || 0);
-      if (oa !== ob) return oa - ob;
-      return (b.date || '').localeCompare(a.date || '');
-    });
-  }
-
-  function _getSortedCategories(cid) {
-    return (getCategories(cid) || []).slice().sort(function (a, b) {
-      var orderA = Number(a.displayOrder || 0);
-      var orderB = Number(b.displayOrder || 0);
-      if (orderA !== orderB) return orderA - orderB;
-      return String(a.name || '').localeCompare(String(b.name || ''));
-    });
-  }
-
-  function _getAssessmentCategoryId(assessment) {
-    return (assessment && (assessment.categoryId || assessment.category_id)) || '';
-  }
-
-  function _getCategoryName(cid, categoryId) {
-    if (!categoryId) return 'No Category';
-    var category = getCategoryById(cid, categoryId);
-    return category && category.name ? category.name : 'Unknown Category';
-  }
-
-  function setAssessSearch(val) {
-    pageState.assessSearch = (val || '').trim();
-    clearTimeout(pageState._searchTimer);
-    pageState._searchTimer = setTimeout(function () {
-      render();
-      var inp = document.querySelector('.assess-search-input');
-      if (inp) {
-        inp.focus();
-        inp.setSelectionRange(inp.value.length, inp.value.length);
-      }
-    }, 200);
-  }
-
-  /* ── Assessment card icons ─────────────────────────────── */
-  var _RUBRIC_ICON =
-    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/></svg>';
-  var _WARNING_ICON =
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17v.5"/></svg>';
-  // Points right when closed; the open card turns it down.
-  var _CHEVRON_ICON =
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
-
-  var _MODULE_CHEVRON =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
-  var _MODULE_TRASH =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
-
-  /* ── Toolbar ────────────────────────────────────────────── */
-  // What the toolbar (assign-toolbar.js) draws, from the page's own state.
-  function _toolbarState(cid) {
-    var all = getAssessments(cid);
-    var open = _expandSegOn();
-    var targets = window.AssessmentCopy ? AssessmentCopy.copyTargets(cid) : null;
-    return {
-      cid: cid,
-      courses: getPickerCourses(cid),
-      search: pageState.assessSearch,
-      cats: _getSortedCategories(cid).map(function (cat, i) {
-        var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
-        return { id: cat.id, name: cat.name, color: t.fg, on: pageState.filterCategories.indexOf(cat.id) >= 0 };
-      }),
-      ungraded: pageState.showUngraded,
-      toReturn: _returnState(cid),
-      bulk: AssignList.on(),
-      focusStudent: !!pageState.focusStudentId,
-      cards: all.length,
-      allOpen: open[0],
-      noneOpen: open[1],
-      quiz: _quizOn(cid),
-      copy: !!targets && !!(targets.sameCourse.length || targets.other.length),
-    };
-  }
-  function _returnState(cid) {
-    return { holds: _holdsGrades(cid), total: pageState._toReturnTotal, pressed: pageState._toReturnOnly };
-  }
-  function renderAssessToolbar(cid) {
-    var toolbarHtml = AssignToolbar.html(
-      _toolbarState(cid),
-      window.AssessmentCopy ? AssessmentCopy.renderSiblingToggle(cid) : '',
-    );
-
-    // Focus banner when grading a single student
-    if (pageState.focusStudentId) {
-      var focusSt = getStudents(cid).find(function (s) {
-        return s.id === pageState.focusStudentId;
-      });
-      if (focusSt) {
-        toolbarHtml +=
-          '<div class="focus-banner">' +
-          '<span class="focus-banner-label">Grading: <strong>' +
-          esc(focusSt.firstName) +
-          ' ' +
-          esc(focusSt.lastName) +
-          '</strong></span>' +
-          '</div>';
-      }
-    }
-
-    return { toolbarHtml: toolbarHtml };
-  }
-
-  /* ── Assessment List ────────────────────────────────────── */
-  // Competencies, rubric criteria with none, or one overall score. Rubric
-  // work lists the competencies its criteria feed, scored through them
-  // (_tagState, _setTagScore), then any criterion that feeds none. A
-  // whole-rubric competency has no row: its level is worked out from the
-  // criteria, so setting it would overwrite them.
-  function _scoreTagObjs(cid, a) {
-    var keys = rubricCompetencyRowKeys(cid, a);
-    var tagObjs = keys
-      .map(function (key) {
-        return scoreKeyInfo(cid, a, key);
-      })
-      .filter(Boolean);
-    return tagObjs.length ? tagObjs : [{ id: UNLINKED_TAG_ID, label: 'Overall', text: 'Not linked to a competency' }];
-  }
-
-  /* The grading controls for one assessment, for the students given: the
-     Complete/Incomplete grid, the points grid, the rubric or the
-     competency grid, as the assessment is scored. */
-  // html-safe: every grading builder it calls escapes names, labels and comments; levels and points are numbers
-  function _graderHtml(cid, a, tagObjs, students, scores, oneStudent) {
-    var one = oneStudent && students.length === 1 ? students[0] : null;
-    if (isDibelsScored(a)) return one ? _dibelsCardHtml(cid, a, one) : _dibelsGridHtml(cid, a, students);
-    if (isCompletionScored(a))
-      return one
-        ? _completeCardHtml(cid, a, one) + _graderOverallCommentHtml(cid, a, one)
-        : renderCompletionGrid(cid, a, students);
-    if (a.scoreMode === 'points')
-      return one
-        ? _pointsCardHtml(cid, a, one) + _graderOverallCommentHtml(cid, a, one)
-        : renderPointsGrid(cid, a, students, scores);
-    if (a.rubricId && getRubricById(cid, a.rubricId)) {
-      var showRubric = pageState.rubricViewStates[a.id] !== undefined ? pageState.rubricViewStates[a.id] : true;
-      var rubric = getRubricById(cid, a.rubricId);
-      if (showRubric && oneStudent && students.length === 1)
-        return (
-          (rubricStyle(rubric) === 'single_point'
-            ? _singlePointHtml(cid, a, rubric, students[0])
-            : _rubricTilesHtml(cid, a, rubric, students[0], _isAdvancedRubric(rubric))) +
-          _graderOverallCommentHtml(cid, a, students[0])
-        );
-      if (showRubric) return renderRubricGradingView(cid, a, students, scores);
-    }
-    if (one) return _levelCardsHtml(cid, a, tagObjs, one) + _graderOverallCommentHtml(cid, a, one);
-    return renderTagGrid(cid, a, tagObjs, students, scores);
-  }
-
-  /* ── A rubric for one student: the board's compact rows ──
-     Each criterion is a card (Main, MainRevised, TGroupGrade, as the
-     Assignments page's rows): its name, a Checklist chip with the ticks
-     and a Comment chip, Suggested at the right, and the four levels as one
-     bar in the course's level order, the chosen level holding its − | +.
-     Descriptors stay off the scoring grid (DECISIONS): a level's wording
-     is its hover. The checklist folds under its chip, a column of boxes
-     under each level; the criterion's comment (rubric_score.comment,
-     printed on the graded rubric) shows under the levels, a box while the
-     Comment chip is open. Clicking a level, − | + or pressing 1–4 / + / −
-     on a focused card goes through _handleClick / _graderKeydown. */
-  function _criterionState(cid, sid, aid, crit) {
-    var entries = getScores(cid)[sid] || [];
-    // A criterion is saved under one key (rubricCriterionScoreKeys), so it is never mixed.
-    var tid = rubricCriterionScoreKeys(crit)[0];
-    var e =
-      tid &&
-      entries.find(function (x) {
-        return x.assessmentId === aid && x.tagId === tid;
-      });
-    var level = e ? Number(e.score) || 0 : 0;
-    return { level: level, mod: level ? e.mod || 0 : 0, mixed: false };
-  }
-  // A criterion's comment box is open while the teacher writes in it.
-  var _graderNotesOpen = new Set();
-  var _CHECK_ICON =
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>';
-  var _COMMENT_ICON =
-    '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>';
-  // html-safe: names, words, check labels and comments through esc; ids are ours; levels are numbers
-  function _rubricTilesHtml(cid, a, rubric, st, advanced) {
-    var order = levelOrderFor(cid);
-    // A Six-Point rubric's six scores take the four levels' place (no ± of their own).
-    var six = !!window.RubricScale && RubricScale.has(rubric) ? rubric : null;
-    var ticked = advanced ? getRubricCheckIds(cid, st.id, a.id) : [];
-    var html = '';
-    (rubric.criteria || []).forEach(function (crit) {
-      if (!crit) return;
-      var state = _criterionState(cid, st.id, a.id, crit);
-      var cur = six && state.level ? RubricScale.fromStored(six, state.level, state.mod) : state.level;
-      var hasChecks = advanced && RubricChecks.hasChecks(crit);
-      var advice = hasChecks
-        ? six
-          ? _sixChecklistAdvice(six, crit, ticked, cur)
-          : _checklistAdvice(crit, ticked, state.level)
-        : null;
-      var open = hasChecks && _isChecklistOpen(a.id, st.id, crit.id);
-      var note = getRubricCriterionComment(cid, st.id, a.id, crit);
-      var noteKey = _checklistKey(a.id, st.id, crit.id);
-      var writing = _graderNotesOpen.has(noteKey);
-      var name = esc(crit.name || 'Criterion');
-      var seg = six
-        ? _sixButtonsHtml(cid, six, crit, cur, 'grdl-level', function () {
-            return 'data-action="graderSix" data-critid="' + crit.id + '"';
-          })
-        : order
-            .map(function (lv) {
-              var on = state.level === lv;
-              var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
-              var btn =
-                '<button type="button" class="grdl-level' +
-                (on ? ' is-on l' + lv + (state.mixed ? ' mixed' : '') : '') +
-                '" data-action="graderLevel" data-critid="' +
-                crit.id +
-                '" data-level="' +
-                lv +
-                '" aria-pressed="' +
-                on +
-                '"' +
-                (words ? ' title="' + esc(PROF_LABELS[lv] + ': ' + words) + '"' : '') +
-                '>' +
-                PROF_LABELS[lv] +
-                '</button>';
-              return on
-                ? _graderPickHtml(
-                    btn,
-                    lv,
-                    state.mixed ? 0 : state.level,
-                    state.mod,
-                    'data-action="graderMod" data-critid="' + crit.id + '"',
-                    state.mixed,
-                  )
-                : btn;
-            })
-            .join('');
-      var count = hasChecks ? RubricChecks.tickedCount(crit, ticked) : null;
-      var chips =
-        (hasChecks
-          ? '<button type="button" class="rsg-checks-btn grdr-chip' +
-            (open ? ' is-open' : '') +
-            (count.ticked ? ' has-ticks' : '') +
-            '" data-action="graderChecks" data-critid="' +
-            crit.id +
-            '" aria-expanded="' +
-            open +
-            '" aria-label="Checklist for ' +
-            name +
-            ', ' +
-            count.ticked +
-            ' ticked">' +
-            _CHECK_ICON +
-            (count.ticked ? count.ticked : 'Checklist') +
-            '</button>'
-          : '') +
-        '<button type="button" class="rsg-crit-comment grdr-chip' +
-        (note ? ' has-comment' : '') +
-        (writing ? ' is-open' : '') +
-        '" data-action="graderNote" data-critid="' +
-        crit.id +
-        '" aria-expanded="' +
-        writing +
-        '" aria-label="Comment on ' +
-        name +
-        '">' +
-        _COMMENT_ICON +
-        'Comment</button>';
-      var checklist = '';
-      if (open && six) {
-        checklist =
-          '<div class="rsg-checklist grdr-checklist">' +
-          _sixChecklistColsHtml(cid, six, crit, ticked, cur, 'data-action="graderTick"') +
-          '</div>';
-      } else if (open) {
-        checklist = '<div class="rsg-checklist grdr-checklist">';
-        order.forEach(function (lv) {
-          checklist +=
-            '<div class="rsg-checklist-col l' +
-            lv +
-            (state.level === lv ? ' is-chosen' : '') +
-            '" data-level="' +
-            lv +
-            '" data-level-name="' +
-            PROF_LABELS[lv] +
-            '">';
-          RubricChecks.checksAt(crit, lv).forEach(function (check) {
-            checklist +=
-              '<label class="rsg-check grdt-check"><input type="checkbox" data-action="graderTick" data-critid="' +
-              crit.id +
-              '" data-checkid="' +
-              check.id +
-              '"' +
-              (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
-              '><span>' +
-              esc(check.label) +
-              '</span></label>';
-          });
-          checklist += '</div>';
-        });
-        checklist += '</div>';
-      }
-      var id = 'grdt-note-' + a.id + '-' + crit.id;
-      var comment = writing
-        ? '<textarea id="' +
-          id +
-          '" class="grdt-note' +
-          (note ? ' has-text' : '') +
-          '" rows="1" aria-label="Comment on ' +
-          name +
-          '" placeholder="Add a comment on ' +
-          name +
-          '" data-action-blur="graderCritNote" data-critid="' +
-          crit.id +
-          '">' +
-          esc(note) +
-          '</textarea>'
-        : note
-          ? '<button type="button" class="grdr-note" data-action="graderNote" data-critid="' +
-            crit.id +
-            '">' +
-            _COMMENT_ICON +
-            '<span>' +
-            esc(note) +
-            '</span></button>'
-          : '';
-      // On pair or group work, the line for this student alone (written on
-      // the Assignments page, under the group's comment).
-      var own = getRubricCriterionOwn(cid, st.id, a.id, crit);
-      if (own)
-        comment +=
-          '<div class="rsg-crit-own-note"><b>' + esc(displayNameFirst(st) + ' Only:') + '</b> ' + esc(own) + '</div>';
-      html +=
-        '<section class="grdt-crit grdr-crit' +
-        (six ? ' is-six' : '') +
-        (open ? ' is-open' : '') +
-        '" tabindex="0" data-critid="' +
-        crit.id +
-        '" aria-label="' +
-        name +
-        '">' +
-        '<div class="grdr-head"><h3 class="grdt-crit-name">' +
-        name +
-        '</h3>' +
-        chips +
-        (advice && advice.suggested
-          ? // A level picked by hand stays; the hover says so (nothing moves).
-            '<span class="grdr-suggested l' +
-            (six ? advice.tone : advice.suggested) +
-            '"' +
-            (advice.hint ? ' title="' + esc(advice.hint) + '"' : '') +
-            '>' +
-            esc(advice.head) +
-            '</span>'
-          : '') +
-        '</div>' +
-        '<div class="grdl-controls grdr-levels"><div class="grdl-seg' +
-        (six ? ' sp6-levels' : '') +
-        '" role="group" aria-label="' +
-        (six ? 'Score' : 'Level') +
-        '">' +
-        seg +
-        '</div></div>' +
-        checklist +
-        comment +
-        '</section>';
-    });
-    return '<div class="grdt-tiles grdr-rows">' + html + '</div>';
-  }
-
-  /* ── Single-point rubric: one student ──────────────────────
-     Each criterion is a card in three columns: Work On (the criterion's
-     comment), the Proficient standard with the level control and − | +
-     under it, and Went Beyond. Both notes are optional and save when they
-     lose focus; 1–4 and + / − work on a focused card. */
-  function _rubricCodesHtml(cid, crit) {
-    return (crit.tagIds || [])
-      .map(function (tid) {
-        var t = getTagById(cid, tid);
-        if (!t) return '';
-        // The printed rubric's rule: the tag's code, else an id that isn't a database id.
-        var code = t.code || (t.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t.id) ? t.id : '') || t.label || '';
-        return '<span class="grdt-code" title="' + esc(t.label || '') + '">' + esc(code) + '</span>';
-      })
-      .join('');
-  }
-  // Ids carry the assessment: one student's view can show several cards
-  // on the same rubric.
-  function _singlePointNoteHtml(kind, aid, crit, text) {
-    var work = kind === 'work';
-    var id = (work ? 'grsp-work-' : 'grsp-beyond-') + aid + '-' + crit.id;
-    return (
-      '<div class="grsp-note ' +
-      (work ? 'is-work' : 'is-beyond') +
-      '"><label class="grsp-note-label" for="' +
-      id +
-      '"><span class="grsp-dot" aria-hidden="true"></span>' +
-      (work ? 'Work On' : 'Went Beyond') +
-      '</label><textarea id="' +
-      id +
-      '" class="grdt-note' +
-      (text ? ' has-text' : '') +
-      '" rows="1" data-action-blur="' +
-      (work ? 'graderCritNote' : 'graderCritBeyond') +
-      '" data-critid="' +
-      crit.id +
-      '">' +
-      esc(text) +
-      '</textarea></div>'
-    );
-  }
-  function _singlePointHtml(cid, a, rubric, st) {
-    var order = levelOrderFor(cid);
-    var html =
-      '<div class="grsp-legend">' +
-      '<span class="is-work"><span class="grsp-dot" aria-hidden="true"></span>Work On</span>' +
-      '<span class="is-standard"><span class="grsp-dot" aria-hidden="true"></span>Proficient Standard</span>' +
-      '<span class="is-beyond"><span class="grsp-dot" aria-hidden="true"></span>Went Beyond</span>' +
-      '</div>';
-    (rubric.criteria || []).forEach(function (crit) {
-      if (!crit) return;
-      var state = _criterionState(cid, st.id, a.id, crit);
-      var seg = order
-        .map(function (lv) {
-          var on = state.level === lv;
-          var btn =
-            '<button type="button" class="grdl-level' +
-            (on ? ' is-on l' + lv : '') +
-            '" data-action="graderLevel" data-critid="' +
-            crit.id +
-            '" data-level="' +
-            lv +
-            '" aria-pressed="' +
-            on +
-            '">' +
-            PROF_LABELS[lv] +
-            '</button>';
-          return on
-            ? _graderPickHtml(btn, lv, state.level, state.mod, 'data-action="graderMod" data-critid="' + crit.id + '"')
-            : btn;
-        })
-        .join('');
-      var codes = _rubricCodesHtml(cid, crit);
-      html +=
-        '<section class="grdt-crit grsp-crit" tabindex="0" data-critid="' +
-        crit.id +
-        '" aria-label="' +
-        esc(crit.name || '') +
-        '">' +
-        _singlePointNoteHtml('work', a.id, crit, getRubricCriterionComment(cid, st.id, a.id, crit)) +
-        '<div class="grsp-standard">' +
-        '<h3 class="grdt-crit-name">' +
-        esc(crit.name || '') +
-        '</h3>' +
-        (codes ? '<div class="grdt-codes">' + codes + '</div>' : '') +
-        '<p class="grsp-words">' +
-        esc((crit.levels && (crit.levels[3] || crit.levels['3'])) || '') +
-        '</p>' +
-        '<div class="grsp-controls"><div class="grdl-seg" role="group" aria-label="Level">' +
-        seg +
-        '</div>' +
-        '</div>' +
-        (state.level ? '' : '<span class="grdt-not-scored">' + _NOT_SCORED_ICON + 'Not Scored</span>') +
-        '</div>' +
-        _singlePointNoteHtml('beyond', a.id, crit, getRubricCriterionBeyond(cid, st.id, a.id, crit)) +
-        '</section>';
-    });
-    return '<div class="grdt-tiles grsp-tiles">' + html + '</div>';
   }
 
   /* ── DIBELS 8 benchmark ─────────────────────────────────────
@@ -2634,160 +2123,6 @@ window.PageAssignments = (function () {
         if (keep && pageState._showingNewForm && !pageState._editingAssessId) return;
         render();
       });
-  }
-
-  /* ── Expand/Collapse ────────────────────────────────────── */
-  // Whether Expand and Collapse show pressed.
-  function _expandSegOn() {
-    return pageState.focusStudentId
-      ? [
-          pageState._allExpanded && pageState._collapsedIds.size === 0,
-          !pageState._allExpanded && pageState.openAssessIds.size === 0,
-        ]
-      : [
-          pageState.openAssessIds.size > 0 &&
-            pageState.openAssessIds.size >= getAssessments(pageState.activeCourse).length,
-          pageState.openAssessIds.size === 0,
-        ];
-  }
-
-  /* Opening or closing cards draws or empties those cards' bodies and sets
-     Expand and Collapse; the rest of the page stays as drawn (a whole
-     redraw took 260 ms of script). False when the page must be drawn
-     again instead: a card not on the page, or a folder the teacher closed
-     that must now open or close. */
-  function _redrawCards(aids) {
-    var cid = pageState.activeCourse;
-    var main = document.getElementById('main');
-    if (pageState._grader || !main || !COURSES[cid]) return false;
-    // A filter on grades (Ungraded, To Return) can drop a card graded since the draw.
-    if (pageState.showUngraded || pageState._toReturnOnly) return false;
-    var opensFolders = pageState.filterCategories.length > 0 || !!pageState.assessSearch;
-    var all = getAssessments(cid);
-    var byId = {};
-    all.forEach(function (a) {
-      byId[a.id] = a;
-    });
-    var cards = [];
-    for (var i = 0; i < aids.length; i++) {
-      var card = document.getElementById('ac-' + aids[i]);
-      var a = card && main.contains(card) && byId[aids[i]];
-      if (!a) return false;
-      cards.push({ card: card, a: a });
-    }
-    // A folder the teacher closed is drawn open only while a card in it is
-    // held open (renderAssessmentList): every folder is checked, since Expand
-    // lets go of cards that stay open.
-    var folders = opensFolders ? [] : main.querySelectorAll('.mod-folder');
-    for (var f = 0; f < folders.length; f++) {
-      if (!pageState.collapsedModules[folders[f].dataset.moduleId]) continue;
-      var holds = Array.prototype.some.call(folders[f].querySelectorAll('.assess-card'), function (el) {
-        return pageState.openAssessIds.has(el.id.slice(3));
-      });
-      if (holds !== folders[f].classList.contains('open')) return false;
-    }
-    _hideChipTip();
-    _hideAfTip();
-    if (typeof refreshStudentWork === 'function') refreshStudentWork(cid);
-    var students = sortStudents(getStudents(cid), 'lastName');
-    var scores = getScores(cid);
-    _refreshCardCounts(
-      cid,
-      byId,
-      students,
-      pageState.focusStudentId
-        ? [pageState.focusStudentId]
-        : students.map(function (st) {
-            return st.id;
-          }),
-    );
-    var focusSt = pageState.focusStudentId
-      ? students.find(function (st) {
-          return st.id === pageState.focusStudentId;
-        })
-      : null;
-    // One card opened or closed moves (teacher/expand-motion.js); Expand
-    // and Collapse, which change many, do not.
-    var motion = cards.length === 1 ? window.ExpandMotion : null;
-    cards.forEach(function (c) {
-      var open = _cardOpen(c.a.id);
-      var body = c.card.querySelector('.assess-body');
-      var wasOpen = c.card.classList.contains('open');
-      if (motion) motion.settle(c.card, body, 'is-closing');
-      c.card.className = 'assess-card' + (open ? ' open active' : '');
-      if (motion && wasOpen && !open && body.firstChild) {
-        // It folds away first; its content goes when it has, unless it opened again.
-        motion.close(c.card, body, 'is-closing', function () {
-          if (c.card.classList.contains('open')) return;
-          body.innerHTML = '';
-          _afterCardsDrawn(body);
-        });
-        return;
-      }
-      pageState._drawnReturns = {};
-      // html-safe: _cardBodyHtml escapes the description; the grading builders are reviewed
-      body.innerHTML = open ? _cardBodyHtml(cid, c.a, focusSt, students, scores) : '';
-      _afterCardsDrawn(body);
-      if (motion && open && !wasOpen) motion.open(body);
-    });
-    AssignToolbar.syncMore(_toolbarState(cid));
-    return true;
-  }
-
-  function toggleAssess(aid) {
-    if (pageState.focusStudentId) {
-      if (pageState._allExpanded) {
-        if (pageState._collapsedIds.has(aid)) pageState._collapsedIds.delete(aid);
-        else pageState._collapsedIds.add(aid);
-      } else {
-        if (pageState.openAssessIds.has(aid)) pageState.openAssessIds.delete(aid);
-        else pageState.openAssessIds.add(aid);
-      }
-    } else {
-      if (pageState.openAssessIds.has(aid)) pageState.openAssessIds.delete(aid);
-      else pageState.openAssessIds.add(aid);
-    }
-    if (!_redrawCards([aid])) render();
-  }
-  // Expand and Collapse draw or empty only the cards that change.
-  function _setAllOpen(change) {
-    var was = _cardsOnPage().filter(_cardOpen);
-    change();
-    var now = _cardsOnPage();
-    var changed = now.filter(function (aid) {
-      var wasOpen = was.indexOf(aid) >= 0;
-      return _cardOpen(aid) !== wasOpen;
-    });
-    if (!_redrawCards(changed)) render();
-  }
-  function _cardsOnPage() {
-    return Array.prototype.map.call(document.querySelectorAll('#main .assess-card'), function (el) {
-      return el.id.slice(3);
-    });
-  }
-  function expandAllAssess() {
-    _setAllOpen(function () {
-      pageState._allExpanded = true;
-      pageState._collapsedIds.clear();
-      pageState.openAssessIds.clear();
-      if (!pageState.focusStudentId)
-        getAssessments(pageState.activeCourse).forEach(function (a) {
-          pageState.openAssessIds.add(a.id);
-        });
-    });
-  }
-  function collapseAllAssess() {
-    _setAllOpen(function () {
-      pageState._allExpanded = false;
-      pageState._collapsedIds.clear();
-      pageState.openAssessIds.clear();
-    });
-  }
-
-  /* ── Rubric view toggle ─────────────────────────────────── */
-  function setRubricView(aid, isRubric) {
-    pageState.rubricViewStates[aid] = isRubric;
-    render();
   }
 
   /* ── Scoring Functions ──────────────────────────────────── */
@@ -5187,33 +4522,6 @@ window.PageAssignments = (function () {
     });
   }
 
-  /* ── Export / Import ────────────────────────────────────── */
-  /* ── Keyboard Navigation ────────────────────────────────── */
-  // A level click ran scrollIntoView straight after its writes (49 ms of
-  // layout); the row is now scrolled to, when out of sight, after the frame's.
-  function kbFocusCell(el) {
-    if (pageState._kbFocusEl) pageState._kbFocusEl.classList.remove('kb-focus');
-    pageState._kbFocusEl = el;
-    if (el) {
-      el.classList.add('kb-focus');
-      _scrollIntoViewIfNeeded(el, { block: 'nearest' }, true);
-    }
-  }
-  function navigateKb(direction) {
-    if (!pageState._kbFocusEl) return;
-    if (pageState._kbFocusEl.classList.contains('rsg-criterion-row')) {
-      var grid = pageState._kbFocusEl.closest('.rsg-grid');
-      if (!grid) return;
-      var allCritRows = Array.from(grid.querySelectorAll('.rsg-criterion-row'));
-      var curIdx = allCritRows.indexOf(pageState._kbFocusEl);
-      if (curIdx < 0) return;
-      var newIdx = curIdx;
-      if (direction === 'up' || direction === 'left') newIdx = Math.max(0, curIdx - 1);
-      else if (direction === 'down' || direction === 'right') newIdx = Math.min(allCritRows.length - 1, curIdx + 1);
-      if (allCritRows[newIdx]) kbFocusCell(allCritRows[newIdx]);
-    }
-  }
-
   /* ── Delegated click handler ────────────────────────────── */
   function _handleClick(e) {
     CritComment.clickOutside(e);
@@ -5848,193 +5156,6 @@ window.PageAssignments = (function () {
     }
   }
 
-  /* ── Input/change/blur handler ──────────────────────────── */
-  function _handleInput(e) {
-    var el = e.target;
-    // The box grows with the name where field-sizing isn't supported.
-    if (el.dataset.actionBlur === 'moduleName') {
-      el.size = Math.max(4, el.value.length);
-      return;
-    }
-    if (el.dataset.actionInput === 'assessSearch') {
-      setAssessSearch(el.value);
-      return;
-    }
-    // T-UI-09 · live weight mutation (mark dirty, no re-render — weight shows up
-    // in the input itself, so the input's own value stays in sync).
-    if (el.dataset.actionInput === 'rsgOverallComment') {
-      _queueOverallComment(el);
-      return;
-    }
-    if (el.dataset.actionInput === 'critCommentInput' || el.dataset.actionInput === 'critOwnInput') {
-      CritComment.input(el);
-      return;
-    }
-    // Points input live update
-    if (el.classList.contains('gb-pts-input')) {
-      livePointsUpdate(el);
-      return;
-    }
-  }
-
-  function _handleChange(e) {
-    var el = e.target;
-    if (el.dataset.action === 'assessSwitchCourse') {
-      switchCourse(el.value);
-      return;
-    }
-    if (el.dataset.actionChange === 'onRubricSelect') {
-      onRubricSelect(el.value);
-      return;
-    }
-    if (el.dataset.actionChange === 'afResFiles') {
-      _formResFiles(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'attachWorkFile') {
-      _attachWorkFiles(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'setFormWorkUntil') {
-      _setFormWorkUntil(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'autoSetDueDate') {
-      autoSetDueDate();
-      return;
-    }
-    if (el.dataset.actionChange === 'copyFrom') {
-      _copyFromChanged(el.value);
-      return;
-    }
-    if (el.dataset.actionChange === 'tickGroup') {
-      _tickGroup(el);
-      return;
-    }
-    if (el.dataset.actionChange === 'tagCheckbox') {
-      onTagChange(el, el.dataset.section);
-      _syncCodes();
-      return;
-    }
-    if (el.dataset.actionChange === 'collabToggleStudent') {
-      collabToggleStudent(el.dataset.sid, el.checked);
-      return;
-    }
-    if (el.dataset.actionChange === 'copyTargetsChanged') {
-      if (window.AssessmentCopy) AssessmentCopy.onTargetsChanged();
-      return;
-    }
-  }
-
-  function _handleFocus(e) {
-    var el = e.target;
-    if (e.type === 'focus' && el && el.dataset && el.dataset.chipTip) _showChipTip(el);
-    if (el && el.dataset && el.dataset.actionBlur === 'moduleName') _setModuleDraggable(el, false);
-  }
-
-  function _handleBlur(e) {
-    var el = e.target;
-    if (el === pageState._chipTipSource) _hideChipTip();
-    if (el.dataset.actionBlur === 'moduleName') {
-      // An empty name is not saved, so the box shows the saved one again.
-      var saved = updateModuleName(el.dataset.moduleid, el.value);
-      el.value = saved;
-      el.title = saved;
-      el.size = Math.max(4, saved.length);
-      el.scrollLeft = 0;
-      _setModuleDraggable(el, true);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderPoints') {
-      _graderCommitPoints(el, e.relatedTarget);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderCritNote') {
-      var noteAid = _graderAid(el);
-      var text = el.value.trim();
-      if (!noteAid || !pageState.focusStudentId) return;
-      if (
-        text !==
-        getRubricCriterionComment(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          noteAid,
-          _graderCriterion(noteAid, el.dataset.critid),
-        )
-      )
-        Grader.setCriterionComment(pageState.activeCourse, pageState.focusStudentId, noteAid, el.dataset.critid, text);
-      el.classList.toggle('has-text', !!text);
-      return;
-    }
-    if (el.dataset.actionBlur === 'dibelsField') {
-      if (el.isConnected) _commitDibelsField(el);
-      return;
-    }
-    if (el.dataset.actionBlur === 'rsgOverallComment') {
-      CritComment.flowBlur(el);
-      _saveOverallComment(el);
-      return;
-    }
-    if (el.dataset.actionBlur === 'critCommentBlur') {
-      CritComment.save();
-      return;
-    }
-    if (el.dataset.actionBlur === 'rsgWorkOn' || el.dataset.actionBlur === 'rsgBeyond') {
-      var spCrit = getRubricCriterion(el.dataset.aid, el.dataset.critid);
-      if (!spCrit || !el.isConnected) return;
-      var spText = el.value.trim();
-      var beyond = el.dataset.actionBlur === 'rsgBeyond';
-      var spSaved = beyond
-        ? getRubricCriterionBeyond(pageState.activeCourse, el.dataset.sid, el.dataset.aid, spCrit)
-        : getRubricCriterionComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid, spCrit);
-      if (spText === spSaved) return;
-      if (beyond)
-        Grader.setWentBeyond(pageState.activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
-      else
-        Grader.setCriterionComment(pageState.activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderCritBeyond') {
-      var beyondAid = _graderAid(el);
-      var beyondText = el.value.trim();
-      if (!beyondAid || !pageState.focusStudentId) return;
-      if (
-        beyondText !==
-        getRubricCriterionBeyond(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          beyondAid,
-          _graderCriterion(beyondAid, el.dataset.critid),
-        )
-      )
-        Grader.setWentBeyond(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          beyondAid,
-          el.dataset.critid,
-          beyondText,
-        );
-      el.classList.toggle('has-text', !!beyondText);
-      return;
-    }
-    if (el.dataset.actionBlur === 'graderTagNote') {
-      var tagAid = _graderAid(el);
-      var tagText = el.value.trim();
-      if (!tagAid || !pageState.focusStudentId) return;
-      if (tagText !== getTagComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag))
-        Grader.setCompetencyComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag, tagText);
-      el.classList.toggle('has-text', !!tagText);
-      return;
-    }
-    // Points input commit on blur. A re-render that removes the input also
-    // blurs it; that is not the teacher leaving the field.
-    if (el.classList.contains('gb-pts-input')) {
-      if (!el.isConnected) return;
-      commitPointsScore(el);
-      return;
-    }
-  }
-
   function _handleKeydown(e) {
     if (
       pageState._fillUndoOpen &&
@@ -6210,215 +5331,8 @@ window.PageAssignments = (function () {
     }
   }
 
-  /* ── Drag event handlers (delegated) ────────────────────── */
-  function _handleDragStart(e) {
-    // Collab drag must be checked FIRST — members are nested inside assess cards
-    var collabDrag = e.target.closest('[data-collab-drag-sid]');
-    if (collabDrag) {
-      collabDragStart(e, collabDrag.dataset.collabDragSid, parseInt(collabDrag.dataset.collabDragGroup, 10));
-      return;
-    }
-    var assessDrag = e.target.closest('[data-assess-drag]');
-    if (assessDrag) {
-      onAssessDragStart(e, assessDrag.dataset.assessDrag);
-      return;
-    }
-    var moduleDrag = e.target.closest('[data-module-drag]');
-    if (moduleDrag) {
-      onModuleDragStart(e, moduleDrag.dataset.moduleDrag);
-      return;
-    }
-  }
-  function _handleDragEnd(e) {
-    // A student dropped nowhere, or back where they were, comes back into view.
-    AC.collabDragEnd();
-    if (pageState._dragAssessId) {
-      onAssessDragEnd();
-      return;
-    }
-    if (pageState._dragModuleId) {
-      onModuleDragEnd();
-      return;
-    }
-    pageState._dragSid = null;
-    pageState._dragFromGroup = null;
-  }
-  function _handleDragOver(e) {
-    // Module drop zone
-    var dropZone = e.target.closest('[data-mod-drop-zone]');
-    if (dropZone && pageState._dragModuleId) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      dropZone.classList.add('drag-over');
-      return;
-    }
-    // Over a card: reorder (check BEFORE folder drop — cards are inside folders)
-    var cardDrop = e.target.closest('[data-assess-card-drop]');
-    if (cardDrop && pageState._dragAssessId && !pageState._dragModuleId) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
-      document.querySelectorAll('.mod-folder.drag-over').forEach(function (el) {
-        el.classList.remove('drag-over');
-      });
-      var targetId = cardDrop.dataset.assessCardDrop;
-      if (targetId === pageState._dragAssessId) {
-        _clearDropMarker();
-        _clearMergeState();
-        return;
-      }
-      var rect = cardDrop.getBoundingClientRect();
-      var y = e.clientY - rect.top;
-      if (y > rect.height / 3 && y < (rect.height * 2) / 3 && _canStack(pageState._dragAssessId, targetId)) {
-        // Middle third: hold to stack the two into a new module.
-        _clearDropMarker();
-        if (pageState._mergeTargetId === targetId) return;
-        _clearMergeState();
-        pageState._mergeTargetId = targetId;
-        pageState._mergeHoverTimer = setTimeout(function () {
-          pageState._mergeAnimating = true;
-          var el = document.getElementById('ac-' + targetId);
-          if (el) el.classList.add('merge-target');
-        }, 300);
-        return;
-      }
-      // Top or bottom: reorder.
-      if (pageState._mergeTargetId) _clearMergeState();
-      _setDropMarker(cardDrop, y > rect.height / 2);
-      return;
-    }
-    // Folder drop
-    var folderDrop = e.target.closest('[data-folder-drop]');
-    if (folderDrop && !pageState._dragModuleId && pageState._dragAssessId) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      if (!folderDrop.classList.contains('drag-over')) folderDrop.classList.add('drag-over');
-      return;
-    }
-    // Collab group drop
-    var collabDrop = e.target.closest('[data-collab-drop]');
-    if (collabDrop) {
-      e.preventDefault();
-      collabDrop.classList.add('drag-over');
-      return;
-    }
-  }
-  function _handleDragLeave(e) {
-    var dropZone = e.target.closest('[data-mod-drop-zone]');
-    if (dropZone) {
-      dropZone.classList.remove('drag-over');
-      return;
-    }
-    // Card leave (check before folder — cards are inside folders)
-    var cardDrop = e.target.closest('[data-assess-card-drop]');
-    if (cardDrop) {
-      if (cardDrop.contains(e.relatedTarget)) return;
-      cardDrop.classList.remove('drop-before', 'drop-after');
-      if (pageState._mergeTargetId === cardDrop.dataset.assessCardDrop) _clearMergeState();
-      return;
-    }
-    var folderDrop = e.target.closest('[data-folder-drop]');
-    if (folderDrop && !folderDrop.contains(e.relatedTarget)) {
-      folderDrop.classList.remove('drag-over');
-      return;
-    }
-    var collabDrop = e.target.closest('[data-collab-drop]');
-    if (collabDrop) {
-      collabDrop.classList.remove('drag-over');
-      return;
-    }
-  }
-  function _handleDrop(e) {
-    // Module drop zone
-    var dropZone = e.target.closest('[data-mod-drop-zone]');
-    if (dropZone && pageState._dragModuleId) {
-      onModuleDropZoneDrop(e, parseInt(dropZone.dataset.dropIndex, 10));
-      return;
-    }
-    // Card drop: reorder (check before folder — cards are inside folders)
-    var cardDrop = e.target.closest('[data-assess-card-drop]');
-    if (cardDrop && pageState._dragAssessId && !pageState._dragModuleId) {
-      e.preventDefault();
-      e.stopPropagation();
-      var dragId = pageState._dragAssessId;
-      var stackOn = pageState._mergeAnimating && pageState._mergeTargetId === cardDrop.dataset.assessCardDrop;
-      var after = cardDrop.classList.contains('drop-after');
-      var placed = after || cardDrop.classList.contains('drop-before');
-      _clearDropMarker();
-      _clearMergeState();
-      pageState._dragAssessId = null;
-      if (stackOn && dragId !== cardDrop.dataset.assessCardDrop) {
-        mergeToNewModule(dragId, cardDrop.dataset.assessCardDrop);
-        return;
-      }
-      if (placed && dragId !== cardDrop.dataset.assessCardDrop)
-        reorderAssessment(dragId, cardDrop.dataset.assessCardDrop, after);
-      return;
-    }
-    // Folder drop
-    var folderDrop = e.target.closest('[data-folder-drop]');
-    if (folderDrop && pageState._dragAssessId) {
-      folderDrop.classList.remove('drag-over');
-      onFolderDrop(e, folderDrop.dataset.folderDrop);
-      return;
-    }
-    // Collab drop
-    var collabDropEl = e.target.closest('[data-collab-drop]');
-    if (collabDropEl) {
-      collabDrop(e, parseInt(collabDropEl.dataset.collabDrop, 10));
-      return;
-    }
-  }
-
-  /* ── Mouseenter/mouseleave for rubric tooltips ──────────── */
-  function _handleMouseOver(e) {
-    var chip = e.target.closest('[data-chip-tip]');
-    if (chip && chip !== pageState._chipTipSource) _showChipTip(chip);
-    var nameLabel = e.target.closest('.rsg-criterion-label');
-    if (nameLabel && nameLabel !== pageState._chipTipSource && Date.now() - pageState._lastTouch > 800)
-      _queueNameTip(nameLabel);
-  }
-  function _handleMouseOut(e) {
-    var chip = e.target.closest('[data-chip-tip]');
-    if (chip && chip === pageState._chipTipSource && !(e.relatedTarget && chip.contains(e.relatedTarget)))
-      _hideChipTip();
-    var nameLabel = e.target.closest('.rsg-criterion-label');
-    if (nameLabel && !(e.relatedTarget && nameLabel.contains(e.relatedTarget))) {
-      clearTimeout(pageState._nameTipTimer);
-      // A tap's emulated mouseout (a mouse pointer left elsewhere) is not
-      // the finger leaving: the tip a tap showed stays until the next tap.
-      if (nameLabel === pageState._chipTipSource && Date.now() - pageState._lastTouch > 800) _hideChipTip();
-    }
-  }
-
-  /* "New Rubric" and "Criterion 2" are real names, so a rubric or criterion
-     saved untouched still has one. Typing used to go in front of them ("Lab
-     Report RubricNew Rubric"); the default name is now selected when its box
-     gets the focus, so typing replaces it (Nov 3 sweep). */
-  var DEFAULT_NAME_RE = /^(New Rubric|Criterion \d+)$/;
-  function _selectDefaultName(e) {
-    var t = e.target;
-    if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') || !DEFAULT_NAME_RE.test(t.value)) return;
-    if (!t.closest('#rubric-modal, #new-assess-form')) return;
-    t.select();
-    // A click that gave the focus would put the caret back on mouseup.
-    var keep = function (ev) {
-      if (ev.target === t) ev.preventDefault();
-    };
-    t.addEventListener('mouseup', keep, { once: true });
-    setTimeout(function () {
-      t.removeEventListener('mouseup', keep);
-    }, 500);
-  }
-
   // The last touch, so a tap's emulated mouse events are not read as a hover.
   pageState._lastTouch = 0;
-  function _handlePointerDown(e) {
-    var nameLabel = e.target.closest && e.target.closest('.rsg-criterion-label');
-    if (pageState._chipTipSource && pageState._chipTipSource.classList.contains('rsg-criterion-label')) _hideChipTip();
-    else if (nameLabel && e.pointerType === 'touch' && _hasNameTip(nameLabel)) _showChipTip(nameLabel);
-    if (e.pointerType === 'touch') pageState._lastTouch = Date.now();
-  }
 
   /* ── Grader dialog ───────────────────────────────────────
      The gradebook's cell editor: this page's grading controls for one
@@ -6979,6 +5893,7 @@ window.PageAssignments = (function () {
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>';
   var _NOT_SCORED_ICON =
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>';
+  AssignCards.configure({ _NOT_SCORED_ICON: _NOT_SCORED_ICON });
   var _GRADER_STATUS_LABELS = { NS: 'Missing', EXC: 'Excused', LATE: 'Late' };
   // Missing and Excused are greyed out on work with a score or feedback
   // (canSetAssignmentStatus, shared/data.js).

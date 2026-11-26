@@ -560,3 +560,4 @@ declare var ExpandMotion: any;
 interface Window {
   ExpandMotion?: any;
 }
+declare var AssignToolbar: any;
