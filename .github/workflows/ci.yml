@@ -238,7 +238,12 @@ jobs:
   # (playwright.config.js) and run in e2e-flaky.
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Six shards, each held to 30 minutes (Nov 26, 2026). With four, a shard
+    # averaged 13.5 minutes against a 20-minute limit: over the last 40 runs
+    # 15 of 156 shard jobs took more than 17 minutes and 3 were cut off with
+    # tests still to run, which held up a release. The repository is public,
+    # so a shard costs no money, and setting one up takes under half a minute.
+    timeout-minutes: 30
     # On main a run that has started always finishes (2026-11-24, Colin:
     # merges a few minutes apart kept cancelling each other's runs, and a
     # run takes 7 to 15 minutes, so on a busy day none finished). A merge
@@ -256,7 +261,7 @@ jobs:
       # every failing spec.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
 
     steps:
       - name: Check out repository
