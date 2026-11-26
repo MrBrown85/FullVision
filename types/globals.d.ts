@@ -555,3 +555,4 @@ declare var refreshSidebarGrades: any;
 interface Window {
   QuizData?: any;
 }
+declare var rerenderKeeping: any;
