@@ -346,6 +346,7 @@ const PRECACHE_URLS = [
   '/teacher/assign-rubric-criteria.js',
   '/teacher/assign-rubric-editor.js',
   '/teacher/assign-modules.js',
+  '/teacher/assign-focus.js',
   '/teacher/page-assignments.js',
   '/teacher/rubric-words.js',
   '/teacher/bulletin-share.js',
