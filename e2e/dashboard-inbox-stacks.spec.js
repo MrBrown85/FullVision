@@ -162,6 +162,59 @@ test('a page opens the grader on that student; Start Grading on the first stack'
   await expect(page.locator('#grader-overlay')).toContainText('3.6 Assessing the Treaty of Versailles');
 });
 
+test("a Not In name opens Roll Call's menu: Handed In on Paper, Add a Scan or Photo", async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await open(page, { more: true });
+  await page.locator('.dash-inbox-stack[data-aid="xa2"]').click();
+  const spread = page.locator('.dash-inbox-spread');
+  const chips = spread.locator('.dash-inbox-notin-chip');
+  const before = await chips.count();
+  const menu = spread.locator('.dash-inbox-rc-pop.is-menu');
+
+  // The menu opens under the name, inside the tile; Escape closes the menu, not the stack.
+  const first = chips.first();
+  const name = await first.getAttribute('title');
+  await first.click();
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('.dash-inbox-rc-item')).toHaveText(['Handed In on Paper', 'Add a Scan or Photo']);
+  await expect(menu.locator('.dash-inbox-rc-item').first()).toBeFocused();
+  await expect(first).toHaveAttribute('aria-expanded', 'true');
+  const [m, c, t] = await Promise.all([menu, first, page.locator('#dash-inbox')].map(l => l.boundingBox()));
+  expect(m.y).toBeGreaterThanOrEqual(c.y + c.height - 1);
+  expect(m.y + m.height).toBeLessThanOrEqual(t.y + t.height);
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(spread).toBeVisible();
+  await expect(first).toBeFocused();
+
+  // The same name again closes it; another name moves it.
+  await first.click();
+  await first.click();
+  await expect(menu).toHaveCount(0);
+  await first.click();
+  await chips.nth(1).click();
+  await expect(menu).toHaveCount(1);
+  await expect(chips.nth(1)).toHaveAttribute('aria-expanded', 'true');
+  await expect(first).not.toHaveAttribute('aria-expanded', 'true');
+
+  // Add a Scan or Photo: the grader on that student.
+  const other = await chips.nth(1).getAttribute('title');
+  await menu.getByText('Add a Scan or Photo').click();
+  await expect(page.locator('#grader-overlay')).toBeVisible();
+  await expect(page.locator('#grader-overlay')).toContainText(other);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#grader-overlay')).toHaveCount(0);
+
+  // Handed In on Paper: the name leaves Not In and the paper joins the stack.
+  await spread.locator('.dash-inbox-notin-chip[title="' + name + '"]').click();
+  await menu.getByText('Handed In on Paper').click();
+  await expect(spread.locator('.dash-inbox-notin-chip[title="' + name + '"]')).toHaveCount(0);
+  await expect(chips).toHaveCount(before - 1);
+  await expect(spread.locator('.dash-inbox-page-name', { hasText: name.split(' ')[0] })).not.toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('a graded pile asks before it returns, and the tile draws again after', async ({ page }) => {
   await open(page);
   // askReturn is another slice's: here the call that reaches it is what is checked.
