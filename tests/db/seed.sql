@@ -238,14 +238,16 @@ as $$
 $$;
 
 -- Rows of a shared table that name a teacher, added once both teachers exist.
--- fv_private.owner: teacher B may read the site-wide counts
+-- public.fv_owner: teacher B may read the site-wide counts
 -- (fv_owner_health), so teacher A's call must be refused. Skipped on a
 -- database the owner-health migration has not reached yet.
 create function rls_test.seed_after_teachers(p_owner uuid) returns void
 language plpgsql
 as $$
 begin
-    if to_regclass('fv_private.owner') is not null then
+    if to_regclass('public.fv_owner') is not null then
+        execute 'insert into public.fv_owner (teacher_id) values ($1)' using p_owner;
+    elsif to_regclass('fv_private.owner') is not null then
         execute 'insert into fv_private.owner (teacher_id) values ($1)' using p_owner;
     end if;
 end;

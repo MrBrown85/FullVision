@@ -186,6 +186,7 @@ public.fv_course_letter_pipeline(p_enrollment_id uuid, p_course_id uuid) cd99a80
 public.fv_idem_check(p_key uuid, p_endpoint text) 1c7b546434bee4b774557e0e6b16024f 727
 public.fv_idem_store(p_key uuid, p_endpoint text, p_result jsonb) 6d0b48c458d273a332db39e1a4b68626 499
 public.fv_overall_proficiency(p_enrollment_id uuid, p_course_id uuid) 647ac33291535943c51d9fcd834131a4 211
+public.fv_owner_health() 33ce9fcf90117e35fff8897268854d7a 3104
 public.fv_owns_assessment(aid uuid) 9f4c680c35f9f3ac32e8290824707673 389
 public.fv_owns_course(cid uuid) e3afeca06043a6e907e6f4ae777c85da 345
 public.fv_owns_enrollment(eid uuid) 728526648388367393162be706f7f9ea 389

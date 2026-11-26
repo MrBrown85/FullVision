@@ -10,8 +10,8 @@
  *   App health: main's browser tests, and a link to Sentry for errors (the
  *     page holds no Sentry key).
  *   Who uses it: counts across every class from fv_owner_health(), which
- *     answers only to the accounts in fv_private.owner
- *     (migrations/2026112603_owner_health.sql).
+ *     answers only to the accounts in public.fv_owner
+ *     (migrations/2026112603_owner_health.sql, 2026112604_owner_list_in_public.sql).
  * Text from GitHub goes into the page only as textContent. */
 (function () {
   'use strict';

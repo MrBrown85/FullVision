@@ -123,7 +123,7 @@ function testSameTeacherLinks() {
 
 /* ---------- the owner's counts ---------- */
 
-/* fv_owner_health answers only to an account in fv_private.owner (teacher B
+/* fv_owner_health answers only to an account in public.fv_owner (teacher B
    in the seed). It takes no id, so the function tests above cannot tell
    counts that should have been refused: here teacher A must get error 42501
    and B must get the counts. Skipped where the migration is not applied. */

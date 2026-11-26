@@ -1972,6 +1972,7 @@ function public.fv_course_letter_pipeline(p_enrollment_id uuid, p_course_id uuid
 function public.fv_idem_check(p_key uuid, p_endpoint text) returns jsonb security definer
 function public.fv_idem_store(p_key uuid, p_endpoint text, p_result jsonb) returns void security definer
 function public.fv_overall_proficiency(p_enrollment_id uuid, p_course_id uuid) returns numeric
+function public.fv_owner_health() returns jsonb security definer
 function public.fv_owns_assessment(aid uuid) returns boolean security definer
 function public.fv_owns_course(cid uuid) returns boolean security definer
 function public.fv_owns_enrollment(eid uuid) returns boolean security definer
