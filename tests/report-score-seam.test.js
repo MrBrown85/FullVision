@@ -33,6 +33,7 @@ import { parse } from 'acorn';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { FROZEN_AT, loadDemoClass } from './helpers/golden-grades.js';
 import { freshGenerate, surfaceOf, surfaces } from './helpers/report-surfaces.js';
+import { assignAll } from './helpers/assign-sources.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = file => readFileSync(resolve(ROOT, file), 'utf-8');
@@ -484,7 +485,7 @@ describe('report files read scores only through ReportScores', () => {
     const named = Object.keys(DOORS).map(file => DOORS[file].surface);
     // 'grader' is named by the grader, not a report file: the Note for the Report's preview (S2-F2).
     expect(ReportScores.surfaces().slice().sort()).toEqual(Array.from(new Set(named.concat(['grader']))).sort());
-    expect(read('teacher/page-assignments.js')).toContain("ReportScores.withReportScores('grader', function () {");
+    expect(assignAll()).toContain("ReportScores.withReportScores('grader', function () {");
   });
 });
 

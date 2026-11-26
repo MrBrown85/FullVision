@@ -110,6 +110,11 @@ declare var CommentBank: {
   gradeOf(facts: unknown): { kind: string; letter?: string; standing?: string; next?: string; word?: string } | null;
   angle(facts: unknown, picks: unknown): { id: string };
   stepOf(sentence: unknown): string | null;
+  // Called by the grader's Note for the Report (teacher/assign-grader-notes.js).
+  bestPieceSentence(...args: any[]): any;
+  bestPieceSkillOf(...args: any[]): any;
+  studentRef(...args: any[]): any;
+  facts(...args: any[]): any;
 };
 // Browse Sentences' cases (teacher/report-qn-browse-cases.js) and the
 // Observations card, the student's Voice and the class's report parts
@@ -205,6 +210,9 @@ declare var GradeState: {
   copyOf(grade: unknown): unknown;
   sameCopy(a: unknown, b: unknown): boolean;
   partInUse(copy: unknown, scoring: unknown): unknown;
+  returnNGraded(...args: any[]): any;
+  draftsSentence(...args: any[]): any;
+  returnQuestion(...args: any[]): any;
 };
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
@@ -391,6 +399,17 @@ declare var GraderWork: {
   draftsIn(cid: string, aid: string, shownIds: unknown): any[];
   workOnInClass(cid: string): boolean;
   workCounts(cid: string, aid: string, shownIds: unknown): any;
+  draftsReturned(...args: any[]): any;
+  // Called by the Assignments pieces (teacher/assign-*.js).
+  deleteWork(...args: any[]): any;
+  returnArea(...args: any[]): any;
+  revisionsOnInClass(...args: any[]): any;
+  samePhotoAs(...args: any[]): any;
+  setToFromPaper(...args: any[]): any;
+  unsubmitAsk(...args: any[]): any;
+  workInIds(...args: any[]): any;
+  workOn(...args: any[]): any;
+  workStateOf(...args: any[]): any;
 };
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };
@@ -584,4 +603,14 @@ declare var ObsCapture: any;
 declare var ObsFollowUps: any;
 interface Window {
   ObsFollowUps?: any;
+}
+declare var MarkUp: any;
+interface Window {
+  MarkUp?: any;
+}
+declare var CardMenu: any;
+declare var CommentLint: any;
+declare var ReportScores: any;
+interface Window {
+  CommentLint?: any;
 }
