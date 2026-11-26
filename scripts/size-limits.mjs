@@ -16,7 +16,9 @@
 //   node scripts/size-limits.mjs --update  lower and drop baseline entries to
 //                                          match the code, and follow functions
 //                                          that moved to another file; never
-//                                          raises an entry or adds one
+//                                          raises an entry. It adds a file only
+//                                          when listed files shrank by nearly as
+//                                          much: the file holds code that moved
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +27,10 @@ import { DIRS, EXEMPT } from './typecheck-ratchet.mjs';
 
 export const FILE_LIMIT = 400;
 export const FUNCTION_LIMIT = 50;
+/* New files that hold moved code may be this much longer, in all, than what
+   left the listed files: scripts/split/cut.mjs writes wiring, and each new file
+   has a header. Class Settings' split (PR 1844) came to 1.17. */
+export const MOVED_ALLOWANCE = 1.25;
 export const FILE_BASELINE = 'tests/file-size-baseline.json';
 export const FUNCTION_BASELINE = 'tests/function-size-baseline.json';
 
@@ -179,7 +185,10 @@ export function fileProblems(now, fileBase) {
   for (const [rel, lines] of Object.entries(now.files)) {
     const listed = rel in fileBase;
     if (!listed && lines > FILE_LIMIT)
-      out.push(`${rel} has ${fmt(lines)} lines; a file may have ${FILE_LIMIT}. Move a part into its own file.`);
+      out.push(
+        `${rel} has ${fmt(lines)} lines; a file may have ${FILE_LIMIT}. Move a part into its own file. ` +
+          `If it holds code cut from a listed file, run node scripts/size-limits.mjs --update.`,
+      );
     else if (listed && lines > fileBase[rel])
       out.push(
         `${rel} has ${fmt(lines)} lines; it may not grow past ${fmt(fileBase[rel])}. Move a part into its own file.`,
@@ -228,6 +237,24 @@ export function updated(now, fileBase, fnBase) {
     const lines = now.files[rel];
     if (lines > FILE_LIMIT) files[rel] = Math.min(limit, lines);
   }
+  /* A new file over the limit is listed only when it holds code that moved:
+     the listed files shrank, in this same change, by nearly as much as the
+     new files hold. (The wiring a cut writes and the lines Prettier re-wraps
+     make the new files a little longer than what left.) New code has no
+     shrinkage to pay for it, so it is never listed this way. */
+  const shrank = Object.entries(fileBase).reduce(
+    (sum, [rel, limit]) => sum + Math.max(0, limit - (now.files[rel] || 0)),
+    0,
+  );
+  const arrivals = Object.entries(now.files).filter(([rel, lines]) => !(rel in fileBase) && lines > FILE_LIMIT);
+  const arrived = arrivals.reduce((sum, [, lines]) => sum + lines, 0);
+  const moved = [];
+  if (arrivals.length && arrived <= shrank * MOVED_ALLOWANCE) {
+    for (const [rel, lines] of arrivals) {
+      files[rel] = lines;
+      moved.push(rel);
+    }
+  }
   const functions = {};
   const orphans = new Map();
   for (const [key, limit] of Object.entries(fnBase)) {
@@ -245,7 +272,7 @@ export function updated(now, fileBase, fnBase) {
     followed.push(`${c.key} -> ${f.file}`);
   }
   const sortObj = o => Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : 1)));
-  return { files: sortObj(files), functions: sortObj(functions), followed };
+  return { files: sortObj(files), functions: sortObj(functions), followed, moved };
 }
 
 if (import.meta.url === 'file://' + process.argv[1]) {
@@ -257,6 +284,7 @@ if (import.meta.url === 'file://' + process.argv[1]) {
     fs.writeFileSync(path.join(ROOT, FILE_BASELINE), JSON.stringify(u.files, null, 2) + '\n');
     fs.writeFileSync(path.join(ROOT, FUNCTION_BASELINE), JSON.stringify(u.functions, null, 2) + '\n');
     u.followed.forEach(m => console.log('followed: ' + m));
+    u.moved.forEach(m => console.log('listed, holds moved code: ' + m));
   }
   const left = problems(now, readBaseline(FILE_BASELINE), readBaseline(FUNCTION_BASELINE));
   const overFiles = Object.values(now.files).filter(n => n > FILE_LIMIT).length;
