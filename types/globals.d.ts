@@ -526,7 +526,9 @@ declare var CritComment: any;
 declare var AssessmentCopy: any;
 declare var AssessmentTypeField: any;
 declare var AssignDraft: any;
+declare var HandoutFiles: any;
 interface Window {
   BANK_CORE_COMPETENCIES?: any;
   AssessmentCopy?: any;
+  HandoutFiles?: any;
 }
