@@ -287,6 +287,8 @@
     var going = !S.demo && !replace ? running[S.page.student.id + ':' + id] : null;
     if (going) return show(going);
     if (replace ? !(p.send.sent && p.send.sent.canChange) : !p.send.open) return;
+    var draft = window.SendNote.kept(S.page.student.id, id, !!replace);
+    if (draft) return show(draft);
     // Send My Revision (S11-F2): a piece returned for revision, or replacing the revision sent.
     var revision = !!p.revision && (replace ? p.kind === 'sent' : p.kind === 'revise');
     if (!replace && p.revision && !revision) return;
@@ -342,6 +344,7 @@
     var id = send ? send.id : '';
     // A real send the student leaves after it stopped for good is not kept for next time.
     if (send && send.real && send.step === 'expired') forget(send);
+    if (send) window.SendNote.keep(send);
     S.send = null;
     S.screen = 'assignments';
     // Work just sent has moved to My Learning: the keyboard goes to the segments; otherwise to the card.
@@ -1659,14 +1662,15 @@
     return p.send && p.send.takes === 'photos_files' ? 'image/*,application/pdf' : 'image/*';
   }
 
-  function head(title, sub) {
+  function head(title, sub, under) {
     return (
       '<header class="sp-send-head"><button type="button" class="sp-head-icon" data-act="send-back" aria-label="Back">' +
       BACK +
       '</button><h1 class="sp-send-title" id="sp-send-title" tabindex="-1">' +
       esc(title) +
       '</h1></header>' +
-      (sub ? '<p class="sp-send-piece sp-send-piece-head">' + esc(sub) + '</p>' : '')
+      (sub ? '<p class="sp-send-piece sp-send-piece-head">' + esc(sub) + '</p>' : '') +
+      (under || '')
     );
   }
 
@@ -1770,39 +1774,6 @@
      it" is the student's, Nov 8, decision 11): Yes, Partly or Not This
      Time, or none. */
   var FOLLOWED = { yes: 'Yes', partly: 'Partly', no: 'Not This Time' };
-  var PLAN_ARROW =
-    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-  function planAskHtml(send, p) {
-    if (!p.plan || !p.plan.text) return '';
-    return (
-      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">' +
-      PLAN_ARROW +
-      'Your Plan From Last Time</h2><p class="sp-plan-words">' +
-      esc(p.plan.text) +
-      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-choices" role="radiogroup" aria-label="Did you follow your plan?">' +
-      Object.keys(FOLLOWED)
-        .map(function (k) {
-          var on = send.followed === k;
-          return (
-            // Yes green when chosen, as the board; Partly and Not This Time blue.
-            '<button type="button" class="sp-choice' +
-            (k === 'yes' ? ' sp-choice-green' : '') +
-            '" role="radio" aria-checked="' +
-            on +
-            '" tabindex="' +
-            (on || (!send.followed && k === 'yes') ? '0' : '-1') +
-            '" data-act="send-followed" data-value="' +
-            k +
-            '">' +
-            esc(FOLLOWED[k]) +
-            '</button>'
-          );
-        })
-        .join('') +
-      '</div></section>'
-    );
-  }
-
   // Check and Send, and Sending Late (the boards): the pages, Add Page or File, the note, Send at the bottom.
   function checkHtml(send, p) {
     var n = send.pages.length;
@@ -1817,7 +1788,7 @@
         ? 'Due ' + fmtDay(p.dueDate, { weekday: 'short', month: 'short', day: 'numeric' })
         : '';
     return (
-      head('Check and Send', p.title) +
+      head('Check and Send', p.title, window.SendNote.about(p, !!send.about)) +
       (late
         ? // Sending Late: one amber panel with a clock.
           '<div class="sp-send-late-panel">' +
@@ -1843,7 +1814,7 @@
                 : 'Take a photo of each page.',
             ) +
             '</p></div>') +
-      planAskHtml(send, p) +
+      window.SendNote.planAsk(send, p, FOLLOWED) +
       window.SendNote.html(send.note, NOTE_MAX) +
       '<div class="sp-send-foot"><button type="button" class="sp-btn sp-btn-primary sp-btn-big sp-send-go" data-act="send-go"' +
       (!n || send.busy ? ' disabled' : '') +
@@ -2016,7 +1987,7 @@
   /* ── Presses ─────────────────────────────────────────────────── */
 
   function onClick(act, el) {
-    if (!S) return;
+    if (!S || window.SendNote.press(act, el, S)) return;
     var attr = function (n) {
       return (el && el.getAttribute && el.getAttribute(n)) || '';
     };
@@ -2130,6 +2101,7 @@
       // kept for them (ruling 138, "Yes, wipe them").
       if (state !== S) {
         running = {};
+        window.SendNote.clear();
         thumbs = {};
         thumbsAsked = {};
         letGo();

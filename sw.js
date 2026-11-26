@@ -125,6 +125,7 @@ const PRECACHE_URLS = [
   '/shared/rubric-scale.js',
   '/shared/core-self.js',
   '/shared/student-view.js',
+  '/s/rubric-whole.js',
   '/s/page-view.js',
   '/s/page-carousel.js',
   '/s/bulletins-view.js',

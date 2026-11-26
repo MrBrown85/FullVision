@@ -118,6 +118,7 @@
     "s/quiz.js",
     "s/seen-watch.js",
     "s/send-note.js",
+    "s/rubric-whole.js",
     "shared/website-ask.js",
     "s/settings.js",
     "teacher/cm-reflect-answers.js",

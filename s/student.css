@@ -1422,6 +1422,20 @@ label.sp-btn:focus-within {
 .sp-send-count:empty {
   display: none;
 }
+/* See the Assignment, open over the photos: the card's instructions and links, then the rubric's cards. It
+   borrows .sp-view for the rubric's own styles (s/page-view.css), without its page-filling height. */
+.sp-send-about-btn {
+  width: 100%;
+}
+.sp-send-about.sp-view {
+  min-height: 0;
+  gap: 12px;
+}
+.sp-send-about-rubric {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 /* Sent, Not Sent Yet, One Page Didn't Send: centred on the screen. */
 .sp-send-center {
   flex: 1;
