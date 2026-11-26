@@ -6009,6 +6009,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   --qn-box-bg: var(--surface);
   --qn-missing-bg: #fff4dc;
   --qn-tint-bg: rgba(0, 102, 204, 0.1);
+  /* The link blue on that tint over a grey card is 4.44:1, under the 4.5 small text needs; one step darker passes. */
+  --qn-tint-ink: #0058b0;
   --qn-tint-bg-amber: rgba(255, 255, 255, 0.8);
   --qn-btn-bg: rgba(0, 0, 0, 0.04);
   --qn-ev-badge-bg: #fbefd6;
@@ -6021,6 +6023,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn {
     --qn-missing-bg: rgba(255, 214, 10, 0.12);
     --qn-tint-bg: rgba(10, 132, 255, 0.18);
+    --qn-tint-ink: var(--link);
     --qn-tint-bg-amber: rgba(255, 255, 255, 0.12);
     --qn-btn-bg: rgba(255, 255, 255, 0.08);
     --qn-ev-badge-bg: rgba(255, 214, 10, 0.16);
@@ -6281,8 +6284,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   min-height: 28px;
   border: 0;
   border-radius: 7px;
-  background: #0066cc;
-  color: #fff;
+  background: var(--qn-tint-bg);
+  color: var(--qn-tint-ink);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -6290,7 +6293,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   cursor: pointer;
 }
 .qn-add-sentence:hover {
-  background: #0059b3;
+  background: rgba(0, 102, 204, 0.16);
 }
 .qn-add-sentence:focus-visible,
 .qn-gap-add:focus-visible {
