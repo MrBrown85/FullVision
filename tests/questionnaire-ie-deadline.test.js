@@ -228,7 +228,7 @@ describe('the Deadline row and the calendar (teacher/report-questionnaire.js)', 
     return d;
   }
 
-  it('keeps the Deadline row, Required, with Pick a Date in place of a sentence; Approve and Next stays off', () => {
+  it('keeps the Deadline row, Required, with Pick a Date in place of a sentence; Approve and Next goes to it', () => {
     const d = withComment();
     const html = open();
     expect(saved().narrative).toBe(d.text);
@@ -240,7 +240,7 @@ describe('the Deadline row and the calendar (teacher/report-questionnaire.js)', 
       'class="qn-box-name">Deadline</span><span class="qn-req-chip" title="An IE comment needs every part marked Required.">Required</span>',
     );
     expect(row).toContain('Pick a Date');
-    expect(row).toContain('Approve and Next stays off until you pick a date.');
+    expect(row).toContain('Pick the date by which the IE must become a grade.');
     expect(row).not.toContain('qn-req-text');
     expect(html).not.toContain('[date]');
     expect(RQ.approveBlockers(RQ.getTqStudents()[RQ.tqStudentIndex])).toContain('deadline');

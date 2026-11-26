@@ -298,7 +298,6 @@ describe('the review screen', () => {
     const { d } = drafted();
     upsertTermRating(CID, PRI.id, TERM, { narrative: d.text });
     open();
-    RQ.tqSetCheck('missing', true);
     RQ.tqStudentIndex = RQ.getTqStudents().findIndex(s => s.id === PRI.id);
     RQ.tqApproveNext();
     const r = rating();
@@ -422,7 +421,6 @@ describe('the review screen', () => {
     // Another change used: the approval clears; approving again keeps the Keep.
     if (left) RQ.tqStale('use', 0);
     open();
-    RQ.tqSetCheck('missing', true);
     RQ.tqStudentIndex = RQ.getTqStudents().findIndex(x => x.id === PRI.id);
     RQ.tqApproveNext();
     expect(rating().approvedAt).toBeTruthy();
@@ -439,7 +437,6 @@ describe('the review screen', () => {
     expect(RQ.staleFor(CID, PRI)).toBeNull();
     upsertTermRating(CID, PRI.id, TERM, { approvedAt: null });
     open();
-    RQ.tqSetCheck('missing', true);
     RQ.tqStudentIndex = RQ.getTqStudents().findIndex(x => x.id === PRI.id);
     RQ.tqApproveNext();
     expect(rating().draftMeta.class_sentences).toEqual({ closing: CLOSING });

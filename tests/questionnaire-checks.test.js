@@ -2,10 +2,9 @@
  * Checks and approval on the review screen (teacher/report-questionnaire.js,
  * fullvision-generate-plan PR 11c; the "Review-screen states" mockup).
  *
- * - The missing-work, IE and low-grade rows carry "I checked this"; Approve
- *   and Next stays off until each is ticked, the IE deadline is picked, and
- *   the comment is within the character limit with no sentence over 20
- *   words. The count turns orange and says why.
+ * - Approve and Next is never off (Nov 25 2026: no ticks). A comment past
+ *   the character limit or with a sentence over 20 words leaves it on; the
+ *   count turns orange and says why.
  * - Before Generate: "No comment yet", with the habits rated.
  * - Class warnings: a near-identical comment shows in the Teacher Comment
  *   card with Show Both.
@@ -94,44 +93,6 @@ function open(sid) {
 }
 const current = () => RQ.getTqStudents()[RQ.tqStudentIndex];
 
-describe('lowGrade and checksFor', () => {
-  const f = over =>
-    Object.assign(
-      { grade: { mode: 'letter', letter: 'B' }, standing: '', notHandedIn: { count: 0, titles: [], groups: [] } },
-      over,
-    );
-  it('a low grade is C- or F in a Letter class and Emerging in a Proficiency class', () => {
-    expect(RQ.lowGrade(f({ grade: { mode: 'letter', letter: 'C-' } }))).toBe(true);
-    expect(RQ.lowGrade(f({ grade: { mode: 'both', letter: 'F' } }))).toBe(true);
-    expect(RQ.lowGrade(f({ grade: { mode: 'letter', letter: 'C' } }))).toBe(false);
-    expect(RQ.lowGrade(f({ grade: { mode: 'proficiency' }, standing: 'Emerging' }))).toBe(true);
-    expect(RQ.lowGrade(f({ grade: { mode: 'proficiency' }, standing: 'Emerging+' }))).toBe(true);
-    expect(RQ.lowGrade(f({ grade: { mode: 'proficiency' }, standing: 'Developing' }))).toBe(false);
-  });
-  it('checks the missing-work row, and the grade row of a low grade once the comment has one', () => {
-    expect(RQ.checksFor(f(), [])).toEqual([]);
-    expect(RQ.checksFor(f({ notHandedIn: { count: 2, titles: ['A', 'B'], groups: [] } }), [])).toEqual(['missing']);
-    const low = f({ grade: { mode: 'letter', letter: 'C-' } });
-    expect(RQ.checksFor(low, [])).toEqual([]);
-    expect(RQ.checksFor(low, [{ step: 'grade' }])).toEqual(['low']);
-    expect(RQ.checksFor(Object.assign(low, { notHandedIn: { count: 1 } }), [{ step: 'grade' }])).toEqual([
-      'missing',
-      'low',
-    ]);
-  });
-  it('an IE comment checks its Problem row: the missing work, else IE itself; a goals comment checks nothing', () => {
-    const ie = f({
-      grade: { mode: 'letter', letter: 'IE', basis: 'ie', marked: { mine: 2, all: 8 } },
-      notHandedIn: { count: 6, titles: [], groups: [] },
-    });
-    expect(RQ.checksFor(ie, [{ step: 'grade' }])).toEqual(['missing']);
-    const marks = f({ grade: { mode: 'letter', letter: 'IE', basis: 'ie', marked: { mine: 2, all: 8 } } });
-    expect(RQ.checksFor(marks, [{ step: 'grade' }])).toEqual(['ie']);
-    const goals = f({ grade: { mode: 'letter', letter: 'C-', basis: 'language_goals' } });
-    expect(RQ.checksFor(goals, [{ step: 'grade' }])).toEqual([]);
-  });
-});
-
 describe('longSentences', () => {
   it('finds a sentence over 20 words, a quoted title counting as one', () => {
     const long = 'He ' + 'always '.repeat(20) + 'tries.';
@@ -143,36 +104,20 @@ describe('longSentences', () => {
 });
 
 describe('the Not Handed In row and Approve and Next', () => {
-  it('highlights the row with "I checked this" until ticked; Approve waits', () => {
+  it('shows the row with its count and no tick; Approve and Next stays on', () => {
     seed({ missing: ['a3', 'a7'] });
-    let html = open();
-    expect(html).toContain('id="tq-row-missing"');
-    expect(html).toContain('class="qn-req-row flag qn-line-row has-menu" id="tq-row-missing"');
-    expect(html).toContain('data-tq-check="missing"');
-    expect(html).toContain(
-      'title="Tick once you have checked these are really missing. Approve and Next stays off until you do."',
-    );
-    expect(html).toContain('2 of 10 · check that both are really missing before you approve</span>');
-    expect(RQ.approveBlockers(current())).toEqual(['missing']);
-    RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe(
-      'Saves this comment to the report card and opens the next student. Tick “I checked this” on the highlighted sentence first.',
-    );
-    RQ.tqSetCheck('missing', true);
+    const html = open();
+    expect(html).toContain('class="qn-req-row qn-line-row has-menu" id="tq-row-missing"');
+    expect(html).not.toContain('data-tq-check');
+    expect(html).not.toContain('I checked this');
+    expect(html).toContain('2 of 10</span>');
     expect(RQ.approveBlockers(current())).toEqual([]);
+    RQ.syncApprove();
     expect(btn.disabled).toBe(false);
     expect(btn.title).toBe('Saves this comment to the report card and opens the next student. ⌘ Return');
-    html = open();
-    expect(html).toContain('class="qn-req-row qn-line-row has-menu" id="tq-row-missing"');
-    expect(html).toContain('class="qn-req-ctrl on"');
-    expect(html).toContain('2 of 10 · checked</span>');
-    // Untick: highlighted again.
-    RQ.tqSetCheck('missing', false);
-    expect(RQ.approveBlockers(current())).toEqual(['missing']);
   });
 
-  it('no check for a student with nothing missing', () => {
+  it('nothing to tick for a student with nothing missing', () => {
     seed();
     const html = open();
     expect(html).not.toContain('I checked this');

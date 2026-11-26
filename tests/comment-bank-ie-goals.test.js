@@ -519,6 +519,21 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
     return RQ.renderTermQuestionnaire(CID);
   }
 
+  it('says "Only N of M are marked" only while IE is on offer, not when IE was only chosen before', () => {
+    const line = 'assignments are marked. You can report IE (Insufficient Evidence)';
+    // Offered (3 of 8 marked) and chosen: the line stays.
+    seed();
+    rate({ reportingBasis: 'ie' });
+    expect(open()).toContain(line);
+    // Chosen, but every assignment is marked: the switch stays, the claim goes.
+    seed({ noor: [3, 3, 3, 3, 3, 3, 3, 3] });
+    rate({ reportingBasis: 'ie' });
+    const html = open();
+    expect(html).toContain('data-basis="ie"');
+    expect(html).not.toContain(line);
+    expect(html).not.toContain('Only 8 of 8');
+  });
+
   it('shows Letter Grade | IE with the mockup’s line when IE is on offer', () => {
     seed();
     const html = open();
@@ -532,7 +547,7 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
     expect(html).not.toContain('qn-required');
   });
 
-  it('chosen IE: the header says IE, the Required rows show, Approve and Next waits for the date', () => {
+  it('chosen IE: the header says IE, the Required rows show, Approve and Next goes to the date', () => {
     seed({ missing: [3] });
     rate({ reportingBasis: 'ie' });
     const html = open();
@@ -543,22 +558,18 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
       expect(html).toContain('<span class="qn-req-label">' + l + '</span>'),
     );
     expect((html.match(/>Required</g) || []).length).toBe(5);
-    expect(html).toContain('I checked this');
+    expect(html).not.toContain('I checked this');
     expect(html).toContain('Pick a Date');
-    expect(html).toContain('Approve and Next stays off until you pick a date.');
+    expect(html).toContain('Pick the date by which the IE must become a grade.');
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
-    expect(RQ.approveBlockers(st)).toEqual(['deadline', 'missing']);
+    expect(RQ.approveBlockers(st)).toEqual(['deadline']);
     RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe(
-      'Saves this comment to the report card and opens the next student. Pick the deadline and tick “I checked this” first.',
-    );
+    // The button is never off; pressing it goes to the deadline.
+    expect(btn.disabled).toBe(false);
+    expect(btn.title).toBe('Saves this comment to the report card and opens the next student. ⌘ Return');
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18' });
     open();
-    expect(RQ.approveBlockers(st)).toEqual(['missing']);
-    RQ.tqSetCheck('missing', true);
     expect(RQ.approveBlockers(st)).toEqual([]);
-    expect(btn.disabled).toBe(false);
   });
 
   it('goals: the header says No Letter Grade and the Statement row is Required', () => {

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { FONTS, useFont } from './wide-font.js';
 
 /* The Term Questionnaire's review screen (fullvision-generate-plan PR 11a,
    the "Review screen" mockup), in Demo Mode on Science 8's Report 2. */
@@ -546,7 +547,7 @@ test.describe('checks and approval', () => {
     await expect(page.locator('#tq-approve-next')).toBeEnabled();
   });
 
-  test('the missing-work row waits for I checked this; a sentence over 20 words or past the limit leaves Approve on', async ({
+  test('the missing-work row has no tick; a sentence over 20 words or past the limit leaves Approve on', async ({
     page,
   }) => {
     await open(page);
@@ -567,25 +568,20 @@ test.describe('checks and approval', () => {
     await page.locator('#tq-narrative').waitFor();
     await page.locator('#tq-generate').click();
     const row = page.locator('#tq-row-missing');
-    await expect(row).toHaveClass(/flag/);
+    await expect(row.locator('[data-tq-check]')).toHaveCount(0);
     await expect(row.locator('.qn-req-text')).toContainText(title);
     // The missing-work sentence is ringed inside the comment (the LayoutE mockup).
     await expect(page.locator('#tq-marks .qn-mark.missing')).toContainText(title);
     await expect(row.locator('.qn-req-source').last()).toHaveText(
       // Of the year's work to Report 2's end (Colin, 2026-11-03), not Term 2's alone.
-      '1 of 37 · check that it is really missing before you approve',
+      '1 of 37',
     );
     const approve = page.locator('#tq-approve-next');
-    await expect(approve).toBeDisabled();
+    await expect(approve).toBeEnabled();
     await expect(approve).toHaveAttribute(
       'title',
-      'Saves this comment to the report card and opens the next student. Tick “I checked this” on the highlighted sentence first.',
+      'Saves this comment to the report card and opens the next student. ⌘ Return',
     );
-    await row.locator('[data-tq-check="missing"]').check();
-    await expect(row).not.toHaveClass(/flag/);
-    await expect(row.locator('.qn-req-ctrl')).toHaveClass(/on/);
-    await expect(row.locator('.qn-req-source').last()).toHaveText('1 of 37 · checked');
-    await expect(approve).toBeEnabled();
     // A sentence over 20 words: the count turns orange and says so;
     // Approve and Next stays on.
     await toEnd(page);
@@ -1714,6 +1710,109 @@ test('the IE deadline calendar keeps the focus: ‹ and › with clicks and keys
   await page.keyboard.press('Escape');
   await expect(page.locator('#tq-cal')).toHaveCount(0);
   await expect(page.locator('#tq-deadline-btn')).toBeFocused();
+});
+
+/* Approve and Next is always on (Colin, 2026-11-25: "don't grey it out").
+   An IE with no deadline picked: pressing it does not approve; it lands on
+   the Deadline box, focuses Pick a Date and rings the box. Pick a date and
+   the second press approves. */
+for (const font of FONTS) {
+  test(
+    'Approve and Next on an IE with no deadline goes to the deadline box; after a date is picked it approves (' +
+      font +
+      ' font)',
+    async ({ page }) => {
+      await page.goto('/login.html?demo=1');
+      await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+      await page.waitForFunction(() => getAssessments('sci8').length > 0);
+      await page.evaluate(() => {
+        COURSES.sci8.gradingSystem = 'letter';
+        COURSES.sci8.gradeLevel = '10';
+        clearProfCache();
+      });
+      await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
+      await page.locator('#tq-narrative').waitFor();
+      await page.locator('#report-period').selectOption('Report 2');
+      await page.locator('#tq-narrative').waitFor();
+      await page.evaluate(() => {
+        upsertTermRating('sci8', 'st1', 'term-2', {
+          reportingBasis: 'ie',
+          ieDeadline: null,
+          narrative: '',
+          approvedAt: null,
+        });
+        clearProfCache();
+      });
+      await page.locator('#report-period').selectOption('Report 1');
+      await page.locator('#report-period').selectOption('Report 2');
+      await expect(page.locator('.qn-grade-big')).toHaveText('IE');
+      await useFont(page, font);
+      await expect(page.locator('[data-tq-check]')).toHaveCount(0);
+
+      const approve = page.locator('#tq-approve-next');
+      await expect(approve).toBeEnabled();
+      const who = await page.locator('.qn-name').textContent();
+      await approve.click();
+      // Not approved; the Deadline box is focused and ringed once.
+      await expect(page.locator('#tq-deadline-btn')).toBeFocused();
+      await expect(page.locator('.qn-attn')).toHaveCount(1);
+      await expect(page.locator('.qn-name')).toHaveText(who);
+      expect(await page.evaluate(() => !!getStudentTermRating('sci8', 'st1', 'term-2').approvedAt)).toBe(false);
+      await expect(approve).toBeEnabled();
+      // The ring goes by itself.
+      await expect(page.locator('.qn-attn')).toHaveCount(0, { timeout: 4000 });
+
+      // Pick a date; the next press approves and opens the next student.
+      await page.locator('#tq-deadline-btn').click();
+      await page.locator('#tq-cal .qn-cal-day:not([disabled])').last().click();
+      await approve.click();
+      await expect(page.locator('.qn-name')).not.toHaveText(who);
+      expect(await page.evaluate(() => !!getStudentTermRating('sci8', 'st1', 'term-2').approvedAt)).toBe(true);
+    },
+  );
+}
+
+/* An IE student with no comment: a Required part with no sentence shows one
+   button in its place, never the grey source line. */
+test('an IE with no comment shows + Problem Sentence and + Plan Sentence, and no Your gradebook text', async ({
+  page,
+}) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => {
+    COURSES.sci8.gradingSystem = 'letter';
+    COURSES.sci8.gradeLevel = '10';
+    clearProfCache();
+  });
+  await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
+  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#report-period').selectOption('Report 2');
+  await page.locator('#tq-narrative').waitFor();
+  await page.evaluate(() => {
+    upsertTermRating('sci8', 'st1', 'term-2', {
+      reportingBasis: 'ie',
+      ieDeadline: null,
+      narrative: '',
+      approvedAt: null,
+    });
+    clearProfCache();
+  });
+  await page.locator('#report-period').selectOption('Report 1');
+  await page.locator('#report-period').selectOption('Report 2');
+  await expect(page.locator('.qn-grade-big')).toHaveText('IE');
+  const card = page.locator('#tq-sentences');
+  await expect(card.getByRole('button', { name: '+ Problem Sentence' })).toBeVisible();
+  await expect(card.getByRole('button', { name: '+ Plan Sentence' })).toBeVisible();
+  await expect(card).not.toContainText('Your gradebook');
+  await expect(card.locator('.qn-req-source')).toHaveCount(0);
+  // The button opens a line for that part; what is written is the part's sentence.
+  await card.getByRole('button', { name: '+ Problem Sentence' }).click();
+  await page.locator('#tq-own-input').fill('Cece has handed in too little marked work for a grade.');
+  await page.locator('#tq-own-save').click();
+  await expect(card.getByRole('button', { name: '+ Problem Sentence' })).toHaveCount(0);
+  await expect(card.locator('.qn-req-text', { hasText: 'too little marked work' })).toBeVisible();
+  await expect(card.getByRole('button', { name: '+ Plan Sentence' })).toBeVisible();
 });
 
 /* The arrow keys (Nov 3 sweep, step 4 group 2 #53 and group 3 #68): on a Work
