@@ -106,8 +106,11 @@ declare var CommentBank: {
   gradeOf(facts: unknown): { kind: string; letter?: string; standing?: string; next?: string; word?: string } | null;
   angle(facts: unknown, picks: unknown): { id: string };
   stepOf(sentence: unknown): string | null;
-  // The rest of teacher/comment-bank.js's members, which the Assignments pieces call.
-  [member: string]: any;
+  // Called by the grader's Note for the Report (teacher/assign-grader-notes.js).
+  bestPieceSentence(...args: any[]): any;
+  bestPieceSkillOf(...args: any[]): any;
+  studentRef(...args: any[]): any;
+  facts(...args: any[]): any;
 };
 // Browse Sentences' cases (teacher/report-qn-browse-cases.js) and the
 // Observations card, the student's Voice and the class's report parts
@@ -392,8 +395,16 @@ declare var GraderWork: {
   workOnInClass(cid: string): boolean;
   workCounts(cid: string, aid: string, shownIds: unknown): any;
   draftsReturned(...args: any[]): any;
-  // The rest of shared/grader-work.js's members, which the Assignments pieces call.
-  [member: string]: any;
+  // Called by the Assignments pieces (teacher/assign-*.js).
+  deleteWork(...args: any[]): any;
+  returnArea(...args: any[]): any;
+  revisionsOnInClass(...args: any[]): any;
+  samePhotoAs(...args: any[]): any;
+  setToFromPaper(...args: any[]): any;
+  unsubmitAsk(...args: any[]): any;
+  workInIds(...args: any[]): any;
+  workOn(...args: any[]): any;
+  workStateOf(...args: any[]): any;
 };
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };

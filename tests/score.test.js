@@ -5,25 +5,8 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-
-// The Assignments page is cut into teacher/page-assignments.js and teacher/assign-*.js:
-// a function is looked for in each, and read from its start to the named one that follows it.
-const assignPieces = () =>
-  ['teacher/page-assignments.js']
-    .concat(
-      readdirSync('teacher')
-        .filter(n => /^assign-.*\.js$/.test(n))
-        .map(n => 'teacher/' + n),
-    )
-    .map(f => readFileSync(f, 'utf-8'));
-const assignBetween = (from, to) => {
-  for (const s of assignPieces()) {
-    const i = s.indexOf(from);
-    if (i >= 0) return s.slice(i, s.indexOf(to, i));
-  }
-  return '';
-};
+import { readFileSync } from 'node:fs';
+import { assignAll, assignBetween } from './helpers/assign-sources.js';
 
 describe('score-comments', () => {
   /**
@@ -247,7 +230,7 @@ describe('score-save-parity', () => {
 
     // Both through Grader.setPoints since S1-T3, as the points entry above.
     it('the grader dialog and Set Unmarked to max save points once, through setPointsScore', () => {
-      const src = assignPieces().join('\n');
+      const src = assignAll();
       const grader = assignBetween('function _graderCommitPoints(', 'function _focusGraderCard(');
       expect(grader).toContain('Grader.setPoints(cid, pageState.focusStudentId, aid, raw)');
       expect(grader).not.toMatch(/\bsetScore\(/);
