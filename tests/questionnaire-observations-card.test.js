@@ -64,7 +64,7 @@ describe('the Observations card', () => {
   });
 
   it('says how many came in since the Term 1 report', () => {
-    expect(card(cece())).toContain('<span class="qn-sub">So far this year · 3 since the Term 1 report</span>');
+    expect(card(cece())).toContain('<span class="qn-ev-text">So far this year · 3 since the Term 1 report</span>');
   });
 
   it('counts each type and all of them, in order', () => {
@@ -114,7 +114,7 @@ describe('the Observations card', () => {
       expect(c).toContain(
         '<div class="qno-empty">No observations for Cece yet. Observations you record for her this year show here.</div>',
       );
-      expect(c).toContain('<span class="qn-sub">So far this year</span>');
+      expect(c).toContain('<span class="qn-ev-text">So far this year</span>');
       expect(c).not.toContain('qno-strip');
       expect(c).not.toContain('View All');
     } finally {

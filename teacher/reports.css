@@ -2668,16 +2668,12 @@ body.qn-roster #gb-sidebar .student-row-note {
    every width; the words take what is left. */
 .qn-habits {
   --hs-w: 236px;
-  padding: 12px 14px 4px;
+  padding: 10px 14px 4px;
   display: flex;
   flex-direction: column;
 }
 .qn-habits .qn-card-top {
   padding-bottom: 4px;
-}
-.qn-habits .qn-card-title {
-  font-size: 15px;
-  font-weight: 500;
 }
 .qn-habit-head,
 .qn-habit-row {
@@ -2724,13 +2720,13 @@ body.qn-roster #gb-sidebar .student-row-note {
   white-space: nowrap;
 }
 .qn-habit-name {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.3;
 }
 .qn-habit-desc {
   grid-column: 1 / -1;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.35;
   color: var(--text-2);
 }
@@ -2812,37 +2808,34 @@ body.qn-roster #gb-sidebar .student-row-note {
   display: block;
 }
 /* At a Glance */
-.qn-glance .qn-card-top {
-  padding: 12px 14px 10px;
+.qn-glance {
+  padding: 10px 14px;
 }
 .qn-band {
-  padding: 6px 14px 4px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-2);
-  background: var(--bg);
+  padding: 10px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
 }
+/* A row: its part's tile, then the label in the part's colour over the
+   name and what it rests on (slice 7). */
 .qn-fact {
   display: flex;
   gap: 10px;
-  padding: 9px 14px;
+  padding: 7px 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
   align-items: flex-start;
-  border-top: 1px solid var(--qn-hairline);
   font-size: var(--text-sm);
 }
-.qn-band + .qn-fact,
-.qn-best {
-  border-top: 0;
-}
-.qn-best {
-  background: var(--qn-best-bg);
+.qn-fact > .qn-box-tile,
+.qn-glance-toggle > .qn-box-tile {
+  margin-top: 1px;
 }
 .qn-fact-label {
-  width: 92px;
-  flex: none;
-  color: var(--text-2);
+  color: var(--qn-part, var(--text-2));
   font-size: 12.5px;
-  padding-top: 1px;
+  font-weight: 600;
 }
 .qn-fact-body {
   flex: 1;
@@ -2911,7 +2904,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 /* At a Glance sets up the comment (Questionnaire glance plan, step 2):
    three skill rows, three work rows and a foot that opens every skill. */
 .qno-glance .qn-fact {
-  align-items: center;
+  align-items: flex-start;
 }
 /* A row that opens in place (Colin, Nov 4): the competency's name and its
    own wording, the figure on the right, a chevron; opened, the pieces
@@ -2925,7 +2918,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   align-items: flex-start;
   gap: 10px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 0;
   border: 0;
   background: none;
   font: inherit;
@@ -2933,19 +2926,16 @@ body.qn-roster #gb-sidebar .student-row-note {
   text-align: left;
   cursor: pointer;
 }
-.qn-glance-toggle:hover {
-  background: var(--bg);
+.qn-glance-toggle.static {
+  cursor: default;
 }
 .qn-glance-toggle:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: -2px;
 }
-.qn-glance-toggle .qn-fact-label {
-  padding-top: 2px;
-}
 .qn-glance-name {
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text);
   overflow-wrap: anywhere;
 }
@@ -3001,7 +2991,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-glance-list {
   list-style: none;
   margin: 0;
-  padding: 0 14px 10px 116px;
+  padding: 0 0 6px 32px;
 }
 .qn-glance-list[hidden] {
   display: none;
@@ -3043,9 +3033,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   gap: 10px;
   padding: 4px 14px 12px;
 }
-.qno-glance-foot {
-  padding: 10px 14px 12px;
-  border-top: 1px solid var(--qn-hairline);
+.qno-glance-foot,
+.qn-obs .qno-foot {
+  padding: 10px 0 2px;
 }
 .qno-view-all {
   background: none;
@@ -3060,14 +3050,14 @@ body.qn-roster #gb-sidebar .student-row-note {
    four types and All with their counts, the newest three observations as
    the Observations page's card (read only, text cut to two lines), and a
    foot. Always the same size, however many there are. */
-.qn-obs .qn-card-top {
-  padding: 12px 14px 10px;
+.qn-obs {
+  padding: 10px 14px;
 }
 .qno-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
-  padding: 0 14px 12px;
+  padding: 8px 0;
 }
 .qno-seg {
   display: flex;
@@ -3115,7 +3105,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   white-space: nowrap;
 }
 .qno-recent {
-  padding: 0 14px;
+  padding: 0;
 }
 /* Read only: no delete column. */
 .qn-obs .obs-card,
@@ -3351,16 +3341,23 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 
 /* The student's Voice */
-.qn-voice .qn-card-top {
-  padding: 12px 14px 8px;
+.qn-voice {
+  padding: 10px 14px;
 }
 .qn-voice-row {
   display: flex;
   gap: 10px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--qn-hairline);
+  padding: 8px 0 2px 32px;
   font-size: var(--text-sm);
   align-items: flex-start;
+}
+.qn-voice-main {
+  flex: 1;
+  min-width: 0;
+}
+.qn-voice .qn-fact-label {
+  display: block;
+  color: color-mix(in srgb, #b83a72 78%, var(--text));
 }
 .qn-voice-text {
   flex: 1;
@@ -3836,15 +3833,20 @@ body.qn-roster #gb-sidebar .student-row-note {
 
 /* Attendance: one line */
 .qn-att {
-  padding: 9px 14px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   gap: 16px;
   font-size: var(--text-sm);
 }
+.qn-att-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .qn-att-title {
   font-weight: 600;
-  font-size: var(--text-md);
+  font-size: 14px;
 }
 .qn-att-field {
   display: flex;
@@ -5853,7 +5855,7 @@ body.qn-roster #gb-sidebar .student-row-note {
     flex-wrap: wrap;
     gap: 8px 16px;
   }
-  .qn-att-title,
+  .qn-att-head,
   .qn-att-note {
     flex-basis: 100%;
     text-align: left;
@@ -6156,6 +6158,84 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-box + .qn-box {
   margin-top: 8px;
 }
+
+/* A card and its sentence light each other when pointed at (slice 7): a
+   soft tint and ring in the part's colour. Nothing moves; each part's
+   colour is --qn-part. Under Reduce Motion it is not drawn. */
+[data-lit='grade'],
+.qn-box[data-part='grade'] {
+  --qn-part: #0066cc;
+}
+[data-lit='bestPiece'],
+.qn-box[data-part='bestPiece'] {
+  --qn-part: #a8690a;
+}
+[data-lit='strengths'],
+.qn-box[data-part='strengths'] {
+  --qn-part: #2e7d4f;
+}
+[data-lit='habits'],
+.qn-box[data-part='habits'] {
+  --qn-part: #6b4fbb;
+}
+[data-lit='attendance'],
+.qn-box[data-part='attendance'] {
+  --qn-part: #3f6fb5;
+}
+[data-lit='voice'],
+.qn-box[data-part='voice'] {
+  --qn-part: #b83a72;
+}
+[data-lit='notHandedIn'],
+.qn-box[data-part='notHandedIn'] {
+  --qn-part: #a35f00;
+}
+[data-lit='nextStep'],
+.qn-box[data-part='nextStep'] {
+  --qn-part: #0f7b83;
+}
+.qn-box,
+.qn-card[data-lit],
+.qn-fact[data-lit],
+.qn-grade[data-lit] {
+  transition:
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+.qn-box.qn-lit,
+.qn-card.qn-lit {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 2px color-mix(in srgb, var(--qn-part) 40%, transparent);
+}
+.qn-fact.qn-lit {
+  background: color-mix(in srgb, var(--qn-part) 9%, transparent);
+}
+.qn-grade.qn-lit {
+  background: color-mix(in srgb, var(--qn-part) 9%, transparent);
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qn-part) 9%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qn-box,
+  .qn-card[data-lit],
+  .qn-fact[data-lit],
+  .qn-grade[data-lit] {
+    transition: none;
+  }
+  .qn-box.qn-lit,
+  .qn-card.qn-lit {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .qn-fact.qn-lit,
+  .qn-grade.qn-lit {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  .qn-box[data-part='notHandedIn'].qn-lit {
+    background-color: var(--qn-missing-bg);
+  }
+}
 .qn-box[data-part='notHandedIn'] {
   background: var(--qn-missing-bg);
 }
@@ -6179,6 +6259,10 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-weight: 600;
   color: var(--text);
   min-width: 0;
+}
+.qn-card-top .qn-box-name {
+  flex: none;
+  white-space: nowrap;
 }
 .qn-box-head .qn-req-chip {
   flex: none;

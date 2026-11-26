@@ -52,7 +52,7 @@ function glance(st) {
 /* The card's rows as text: label, body, word. */
 function rows(html) {
   return html
-    .split(/<div class="qn-fact(?: qn-best| qn-glance-row)?">/)
+    .split(/<div class="qn-fact(?: qn-best| qn-glance-row)?"[^>]*>/)
     .slice(1)
     .map(r =>
       r
@@ -68,7 +68,9 @@ function rows(html) {
 
 describe('At a Glance', () => {
   it('names the earlier report in its sub-line', () => {
-    expect(glance(cece())).toContain('<span class="qn-sub">So far this year · change since the Term 1 report</span>');
+    expect(glance(cece())).toContain(
+      '<span class="qn-ev-text">So far this year · change since the Term 1 report</span>',
+    );
   });
 
   it('has the Skills rows, then the Work rows, in order', () => {
@@ -164,7 +166,7 @@ describe('At a Glance', () => {
     period.value = period.options[0].text = 'Report 1';
     try {
       const html = glance(cece());
-      expect(html).toContain('<span class="qn-sub">So far this year</span>');
+      expect(html).toContain('<span class="qn-ev-text">So far this year</span>');
       expect(html).not.toContain('Biggest Change');
       expect(html).not.toContain('from 3.0');
     } finally {
