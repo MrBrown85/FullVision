@@ -200,6 +200,9 @@ declare var GradeState: {
   copyOf(grade: unknown): unknown;
   sameCopy(a: unknown, b: unknown): boolean;
   partInUse(copy: unknown, scoring: unknown): unknown;
+  returnNGraded(...args: any[]): any;
+  draftsSentence(...args: any[]): any;
+  returnQuestion(...args: any[]): any;
 };
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
@@ -386,6 +389,7 @@ declare var GraderWork: {
   draftsIn(cid: string, aid: string, shownIds: unknown): any[];
   workOnInClass(cid: string): boolean;
   workCounts(cid: string, aid: string, shownIds: unknown): any;
+  draftsReturned(...args: any[]): any;
 };
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };
@@ -574,4 +578,8 @@ declare var ObsCapture: any;
 declare var ObsFollowUps: any;
 interface Window {
   ObsFollowUps?: any;
+}
+declare var MarkUp: any;
+interface Window {
+  MarkUp?: any;
 }
