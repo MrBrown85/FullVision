@@ -106,6 +106,7 @@
     "teacher/student-outlook.js",
     "teacher/gradebook-student-menu.js",
     "teacher/assign-list.js",
+    "teacher/assign-form-tips.js",
     "teacher/crit-bank.js",
     "teacher/crit-comment.js",
     "teacher/rubric-comment-lines.js",

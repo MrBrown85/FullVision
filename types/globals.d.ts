@@ -381,7 +381,10 @@ declare var AddWorkTwoClasses: any; // teacher/add-work-two-classes.js (B6)
 declare var PhotoExpiry: any; // shared/photo-expiry.js, for shared/data-courses-terms.js
 declare var PhotoShrink: { prepare(file: unknown, opts?: unknown): Promise<any>; REASONS: Record<string, string> };
 declare var PhotoReaders: { openPdf: unknown };
-declare var GraderWork: { workShown(cid: string, a: unknown): boolean };
+declare var GraderWork: {
+  workShown(cid: string, a: unknown): boolean;
+  draftsIn(cid: string, aid: string, shownIds: unknown): any[];
+};
 // A dialog gives the focus back to what opened it (teacher/focus-back.js).
 declare var FocusBack: { from(el: Element | null): () => void };
 declare function showConfirm(
@@ -514,3 +517,12 @@ declare var CmTerms: any;
 declare var CompetencyWording: any;
 declare var RubricDraft: any;
 declare var RubricPrint: any;
+// The Assignments page's pieces (teacher/assign-*.js, cut from page-assignments.js)
+// and the modules they call, which are not typed.
+declare var FactorField: any;
+declare var AssignShow: any;
+declare var AssignList: any;
+declare var CritComment: any;
+interface Window {
+  BANK_CORE_COMPETENCIES?: any;
+}
