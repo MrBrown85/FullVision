@@ -14,110 +14,12 @@
    so (the tab body when the tab changes, the whole detail when the class
    changes). Elements match by id, else by place and tag. A box the teacher
    is typing in keeps what was typed unless the page has a newer value of its
-   own. */
+   own. The patching itself is keep-dom.js's, shared with the student list and
+   the Assignments toolbar. */
 window.CmKeepDraw = (function () {
   'use strict';
 
   /** @typedef {(old: Element) => boolean} CmFresh */
-
-  /** @param {Node} a @param {Node} b @returns {boolean} */
-  function _same(a, b) {
-    if (a.nodeType !== b.nodeType) return false;
-    if (a.nodeType !== 1) return true;
-    var x = /** @type {Element} */ (a);
-    var y = /** @type {Element} */ (b);
-    return x.tagName === y.tagName && x.id === y.id;
-  }
-
-  /** @param {Element} old @param {Element} next */
-  function _attrs(old, next) {
-    var i;
-    for (i = old.attributes.length - 1; i >= 0; i--) {
-      var n = old.attributes[i].name;
-      if (!next.hasAttribute(n)) old.removeAttribute(n);
-    }
-    for (i = 0; i < next.attributes.length; i++) {
-      var a = next.attributes[i];
-      if (old.getAttribute(a.name) !== a.value) old.setAttribute(a.name, a.value);
-    }
-  }
-
-  /** Whether the teacher's typing in a box stays: it has the focus, and the
-   * page still holds the value the typing began from.
-   * @param {HTMLInputElement | HTMLTextAreaElement} box @param {string} want */
-  function _typing(box, want) {
-    return box === document.activeElement && CmKeepMenu.began(box) === want;
-  }
-
-  /** The typed value and the checked state, which the attributes stop
-   * carrying once the teacher has touched a control.
-   * @param {Element} old @param {Element} next */
-  function _controls(old, next) {
-    if (old.tagName === 'INPUT') {
-      var inp = /** @type {HTMLInputElement} */ (old);
-      var want = next.getAttribute('value') || '';
-      if (inp.type === 'checkbox' || inp.type === 'radio') {
-        var on = next.hasAttribute('checked');
-        if (inp.checked !== on) inp.checked = on;
-      } else if (inp.value !== want && !_typing(inp, want)) {
-        inp.value = want;
-      }
-    } else if (old.tagName === 'TEXTAREA') {
-      var ta = /** @type {HTMLTextAreaElement} */ (old);
-      var text = next.textContent || '';
-      if (ta.value !== text && !_typing(ta, text)) ta.value = text;
-      ta.defaultValue = text;
-    } else if (old.tagName === 'SELECT') {
-      var sel = /** @type {HTMLSelectElement} */ (old);
-      var pick = /** @type {HTMLSelectElement} */ (next).selectedIndex;
-      if (sel.selectedIndex !== pick) sel.selectedIndex = pick;
-    }
-  }
-
-  /** @param {Element} old @param {Element} next @param {CmFresh} fresh */
-  function _element(old, next, fresh) {
-    _attrs(old, next);
-    if (old.tagName !== 'TEXTAREA') _children(old, next, fresh);
-    _controls(old, next);
-  }
-
-  /** @param {Element} old @param {Element} next @param {CmFresh} fresh */
-  function _children(old, next, fresh) {
-    var byId = /** @type {Record<string, Element>} */ ({});
-    Array.prototype.forEach.call(old.children, function (/** @type {Element} */ c) {
-      if (c.id) byId[c.id] = c;
-    });
-    var oc = old.firstChild;
-    var wanted = Array.prototype.slice.call(next.childNodes);
-    wanted.forEach(function (/** @type {ChildNode} */ nc) {
-      var id = nc.nodeType === 1 ? /** @type {Element} */ (nc).id : '';
-      var match = id ? byId[id] || null : oc;
-      var isEl = !!match && match.nodeType === 1;
-      if (match && _same(match, nc) && !(isEl && fresh(/** @type {Element} */ (match)))) {
-        if (match === oc) oc = oc.nextSibling;
-        else old.insertBefore(match, oc);
-        if (isEl) _element(/** @type {Element} */ (match), /** @type {Element} */ (nc), fresh);
-        else if (match.nodeValue !== nc.nodeValue) match.nodeValue = nc.nodeValue;
-        return;
-      }
-      if (match && _same(match, nc)) {
-        // Meant to be replaced whole.
-        if (match === oc) oc = oc.nextSibling;
-        old.removeChild(match);
-      }
-      old.insertBefore(nc, oc);
-    });
-    while (oc) {
-      var gone = oc;
-      oc = oc.nextSibling;
-      old.removeChild(gone);
-    }
-  }
-
-  /** @returns {boolean} */
-  function _never() {
-    return false;
-  }
 
   /**
    * Changes what is inside `target` into `html`, keeping the elements that
@@ -127,12 +29,7 @@ window.CmKeepDraw = (function () {
    * @param {CmFresh} [fresh] true for an old element that is replaced whole
    */
   function draw(target, html, fresh) {
-    var tpl = document.createElement('template');
-    // html-safe: as in paint, the caller's markup is escaped where it is built.
-    tpl.innerHTML = html;
-    var next = document.createElement(target.tagName);
-    next.appendChild(tpl.content);
-    _children(target, next, fresh || _never);
+    window.KeepDom.patch(target, html, { fresh: fresh, began: CmKeepMenu.began });
   }
 
   /* What the last draw of #main showed, so the next one knows that the class
