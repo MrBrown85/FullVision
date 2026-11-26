@@ -43,7 +43,7 @@ for (const mode of ['criteria', 'competencies']) {
   });
 }
 
-test('the student card names the student, fits the window, and counts assessments in words', async ({ page }) => {
+test('the student card names the student, fits the window, and puts no count after a level', async ({ page }) => {
   for (const vp of [
     { width: 1440, height: 900 },
     { width: 1024, height: 768 },

@@ -429,9 +429,12 @@ describe('gradebook-name-tip-missing-term', () => {
     return document.getElementById('gb-tooltip').textContent;
   }
 
-  describe('the name tip missing count', () => {
-    it('counts Missing work from every term, as the year-so-far grade does', () => {
-      expect(nameTip()).toContain('2 assessments missing (count as 0)');
+  describe('the name card’s missing work', () => {
+    it('lists Missing work from every term, as the year-so-far grade does', () => {
+      const tip = nameTip();
+      expect(tip).toContain('t1a');
+      expect(tip).toContain('t1b');
+      expect(tip).toContain('With All 2 Handed In');
     });
 
     it('a report in view on the Reports page does not carry over: no term picker, the year so far', () => {
@@ -441,7 +444,7 @@ describe('gradebook-name-tip-missing-term', () => {
       expect(document.querySelector('.term-select')).toBeNull();
       expect(document.querySelector('[data-action="setTerm"]')).toBeNull();
       expect(document.body.textContent).not.toContain('Undated Not Shown');
-      expect(tip).toContain('2 assessments missing (count as 0)');
+      expect(tip).toContain('With All 2 Handed In');
       expect(localStorage.getItem('gb-term-' + CID)).toBeNull();
     });
 
@@ -452,7 +455,9 @@ describe('gradebook-name-tip-missing-term', () => {
       ];
       _cache.assessments[CID].forEach(a => (a.categoryId = 'cat-tests'));
       _cache.assessments[CID][1].categoryId = 'cat-practice';
-      expect(nameTip()).toContain('1 assessment missing (counts as 0)');
+      const tip = nameTip();
+      expect(tip).toContain('With It Handed In');
+      expect(tip).not.toContain('t1b');
     });
   });
 });

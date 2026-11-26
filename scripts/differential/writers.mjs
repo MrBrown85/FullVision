@@ -100,6 +100,8 @@ export const WRITERS = {
   'Grader.undoCell': ['score', 'Undo for one gradebook cell'],
   'Grader.markBlankCells': ['status', 'Mark Blank Cells Missing or Excused'],
   'Grader.undoMarkBlankCells': ['status', 'its Undo'],
+  'Grader.markStudentCells': ['status', "Mark Missing, Excuse and Clear in the menu on a student's name"],
+  'Grader.undoMarkStudentCells': ['status', 'its Undo'],
   'Grader.deleteAssessmentScores': ['score', "Delete Assessment: the piece's scores"],
   'Grader.deleteAssessmentStatuses': ['status', "Delete Assessment: the piece's statuses"],
   'Grader.undoMissing': ['status', 'Undo for Set Unmarked to Missing'],

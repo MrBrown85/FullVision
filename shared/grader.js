@@ -178,6 +178,19 @@ window.Grader = (function () {
     return _saved(cid, null, aid, 'undo', saveAssignmentStatuses(cid, statuses));
   }
 
+  /* Mark Missing, Excuse and Clear, in the gradebook's menu on a student's
+     name: `statuses` is the class's whole status list with that student's
+     cells changed. */
+  function markStudentCells(cid, sid, statuses) {
+    return _saved(cid, sid, null, 'status', saveAssignmentStatuses(cid, statuses));
+  }
+
+  /* Its undo (the toast, Cmd+Z, or Undo Last Marking): the list with those
+     cells put back. */
+  function undoMarkStudentCells(cid, sid, statuses) {
+    return _saved(cid, sid, null, 'undo', saveAssignmentStatuses(cid, statuses));
+  }
+
   /* Delete Assessment, in the gradebook's column menu: `scores` is the
      class's score list with the work's scores taken out. The gradebook
      deletes the work itself. */
@@ -1152,6 +1165,8 @@ window.Grader = (function () {
     undoCell: undoCell,
     markBlankCells: markBlankCells,
     undoMarkBlankCells: undoMarkBlankCells,
+    markStudentCells: markStudentCells,
+    undoMarkStudentCells: undoMarkStudentCells,
     deleteAssessmentScores: deleteAssessmentScores,
     deleteAssessmentStatuses: deleteAssessmentStatuses,
     // The Assignments page (S1-T3)

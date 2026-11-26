@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoApp } from './helpers.js';
 
-// A student's name shows their course grade, each competency and how many
-// competencies have evidence, on hover or keyboard focus, in either view;
-// Escape closes it.
+// A student's name shows their card (the course grade, the categories and
+// the missing work) on hover or keyboard focus, in either view; Escape
+// closes it.
 test.beforeEach(async ({ page }) => {
   await mockAuth(page);
   await seedCourse(page);
@@ -19,9 +19,8 @@ for (const view of ['scores', 'detailed']) {
     await page.locator('.gb-grid-rowheads a.gb-grid-rowhead-name', { hasText: 'Alice' }).hover();
     const tip = page.locator('#gb-tooltip');
     await expect(tip).toBeVisible();
-    await expect(tip).toContainText('Course Grade');
+    await expect(tip.locator('.gb-tip-name')).toContainText('Alice');
     await expect(tip).toContainText('Proficient (3.0)');
-    await expect(tip).toContainText('Evidence in');
     // The card sits under (or over) the row, never on it.
     const [row, card] = await page.evaluate(() => [
       document.querySelector('.gb-grid-rowhead-name').closest('.gb-grid-rowhead').getBoundingClientRect().toJSON(),
