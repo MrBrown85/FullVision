@@ -710,7 +710,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const list = RQ.browseList('habits', ctx, { fits: false });
     expect(list.groups.filter(g => /^cell:/.test(g.id)).length).toBe(24);
     expect(list.groups.filter(g => !/^cell:/.test(g.id)).every(g => g.rows.length > 0)).toBe(true);
-    expect(list.groups.reduce((n, g) => n + g.rows.length, 0)).toBe(list.rows.length);
+    // A sentence that reads the same under two cases is listed once, under
+    // the first (the sheet shows no sentence twice).
+    const shown = list.groups.flatMap(g => g.rows.map(r => r.text));
+    expect(new Set(shown).size).toBe(shown.length);
+    expect(shown.length).toBe(new Set(list.rows.map(r => r.text)).size);
+    expect(list.rows.length).toBeGreaterThan(shown.length);
     const ownFirst = list.groups.findIndex(g => !g.own);
     expect(list.groups.slice(0, ownFirst).every(g => g.own)).toBe(true);
     expect(list.groups.slice(ownFirst).some(g => g.own)).toBe(false);
@@ -727,7 +732,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     full.rows.forEach((r, i) => (usage[r.id] = full.rows.length - i));
     const again = RQ.browseList('habits', ctx, { fits: false, usage });
     const g0 = again.groups.find(g => g.id === full.id);
-    expect(g0.rows.map(r => usage[r.id])).toEqual(g0.rows.map(r => usage[r.id]).sort((a, b) => a - b));
+    // (A sentence the first list showed under another case may come here now.)
+    const used = r => usage[r.id] || 0;
+    expect(g0.rows.map(used)).toEqual(g0.rows.map(used).sort((a, b) => a - b));
     // A search keeps only the groups with a match, empty cells included.
     const q = RQ.browseList('grade', ctx, { fits: false, q: 'marks close' });
     expect(q.rows.length).toBeGreaterThan(0);
