@@ -1450,7 +1450,7 @@
     _cid = cid;
     if (!(await switchActiveCourse(cid))) return;
     var side = document.getElementById('sidebar-mount');
-    if (side) side.innerHTML = renderSidebar(cid);
+    if (side) SidebarKeep.draw(renderSidebar(cid));
     _menuId = '';
     _seen = {};
     _notes = {};
@@ -1494,7 +1494,7 @@
     var side = document.getElementById('sidebar-mount');
     if (side) {
       side.style.display = '';
-      side.innerHTML = renderSidebar(_cid);
+      SidebarKeep.draw(renderSidebar(_cid));
     }
     var layout = document.getElementById('page-layout');
     if (layout) layout.classList.remove('sidebar-hidden');

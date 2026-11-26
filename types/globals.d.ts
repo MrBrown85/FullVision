@@ -505,6 +505,7 @@ interface Window {
   };
 }
 declare var Router: any;
+declare var SidebarKeep: { draw(html: string): void; release(): void; settle(): void };
 declare var CmRosterFile: any;
 declare var closeColorPop: any;
 declare var CmBlockPicker: any;
