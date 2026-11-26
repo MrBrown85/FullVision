@@ -205,6 +205,7 @@ interface Window {
 // the checked data files use are typed.
 declare var GradeState: {
   RETURNED: string;
+  DRAFT: string;
   holds(klass: unknown): boolean;
   stateOf(cid: string, sid: string, aid: string): string | null;
   copyOf(grade: unknown): unknown;
@@ -213,6 +214,7 @@ declare var GradeState: {
   returnNGraded(...args: any[]): any;
   draftsSentence(...args: any[]): any;
   returnQuestion(...args: any[]): any;
+  returnTogether(...args: any[]): any;
 };
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
@@ -613,4 +615,8 @@ declare var CommentLint: any;
 declare var ReportScores: any;
 interface Window {
   CommentLint?: any;
+}
+declare var MarkupDraw: any;
+interface Window {
+  MarkupDraw?: any;
 }
