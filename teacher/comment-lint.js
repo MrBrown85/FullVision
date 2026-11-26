@@ -448,6 +448,11 @@ window.CommentLint = (function () {
   // started" stays banned.
   var PLAN_PHRASES = [
     /\bnot handed in\b/gi,
+    // Colin's missing-work wording (Nov 26, plan slice 3): "still to hand in",
+    // "still needs to hand in" and "not yet handed in" before a count or a
+    // title. Any other "still" or "hand in" stays banned.
+    /\bstill (needs?|to) (to )?hand in\b/gi,
+    /\bnot yet handed in\b/gi,
     /\bhands? in (X|his|her|their) work on time\b/gi,
     /\bhanding in each task by its due date\b/gi,
     /\bgetting started as soon as class begins\b/gi,
@@ -473,7 +478,7 @@ window.CommentLint = (function () {
       if (re.test(p)) out.push('comparison: ' + re);
     });
     SHAME_RES.forEach(function (x) {
-      if (x.re.test(p)) out.push('shame word: ' + x.name);
+      if (x.re.test(pp)) out.push('shame word: ' + x.name);
     });
     ws.forEach(function (w) {
       if (EVALUATIVE.indexOf(w) >= 0 && !CONTROLLED[w]) out.push('evaluative word: ' + w);

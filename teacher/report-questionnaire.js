@@ -3261,8 +3261,16 @@ window.ReportQuestionnaire = (function () {
     return (
       find(id) ||
       (window.PersonalBank && PersonalBank.currentId ? find(PersonalBank.currentId(id)) : null) ||
-      _setSentence(id)
+      _setSentence(id) ||
+      _retiredSentence(id) ||
+      null
     );
+  }
+  // A retired sentence a saved comment may still hold, found by id, never offered.
+  function _retiredSentence(id) {
+    return (COMMENT_BANK.retired || []).find(function (s) {
+      return s.id === id && Array.isArray(s.claims);
+    });
   }
 
   /* The rows of the comment on screen, per class, student and report: one
