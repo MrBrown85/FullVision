@@ -1,6 +1,6 @@
 # Comment Bank per Rubric: build plan
 
-Status: building (started Nov 25 2026). Owner's calls are final; do not reopen them.
+Status: built and on (Nov 25 2026 Pacific; the database change was applied Nov 26 02:24 UTC). Owner's calls are final; do not reopen them.
 
 A teacher keeps reusable feedback comments with a rubric. Each criterion holds comments per level; the rubric
 holds overall comments. They are written ahead of time in the rubric editor or kept while grading with
@@ -29,12 +29,13 @@ In memory (and in Demo Mode's localStorage, and in a backup file):
 
 - `criterion.comments`: array of `{ level: Number, text: String }`, in the order shown. `level` is the same
   level key the Advanced checkboxes use (`RubricChecks.checksAt(crit, level)`): 1..4, or 1..6 on a rubric
-  with a `scale`. No ids. Missing means `[]`.
+  with a `scale`. The database accepts a level 1 to 6 whatever the rubric's scale, and three table checks
+  per column hold the same rule. No ids. Missing means `[]`.
 - `rubric.overallComments`: array of `String`. Missing means `[]`.
 - A text may hold the slot `[Name]`, filled with the student's first name when used.
 - Limits: text 1..500 characters after trim; at most 40 comments on a criterion and 40 overall.
 
-Database (one migration, `migrations/2026112501_rubric_comment_bank.sql`):
+Database (one migration, `migrations/2026112601_rubric_comment_bank.sql`):
 
 - `criterion.comments jsonb not null default '[]'`, `rubric.overall_comments jsonb not null default '[]'`,
   each with a CHECK that it is a JSON array.
@@ -47,7 +48,7 @@ Database (one migration, `migrations/2026112501_rubric_comment_bank.sql`):
   `add_criterion_comment(p_criterion_id uuid, p_level smallint, p_text text, p_idempotency_key uuid default null) returns jsonb`
   and `add_rubric_overall_comment(p_rubric_id uuid, p_text text, p_idempotency_key uuid default null) returns jsonb`.
   Each appends unless the same level + text (overall: the same text) is already there, and returns the list.
-  Owner-checked, idempotent (`fv_idem_check`), granted to `authenticated` only.
+  Owner-checked, idempotent (`fv_idem_check`), granted to `authenticated` and `service_role`.
 - `student_submit.page` is NOT touched: it lists the criterion fields it sends, so the new columns never
   reach a student. The harness proves it.
 
@@ -112,11 +113,12 @@ Grader (`teacher/crit-comment.js`; styles in `teacher/assignments.css`), under a
 
 1. Database: the migration, its harness scenario, pre/post checks, fingerprints, undo. Shown to Colin;
    applied to the live database only on his OK; merged after it is applied (the drift check needs that).
+   Built: #1805.
 2. Data layer: `shared/rubric-comments.js`, the loader/payload/signature/wrapper/backup changes, the Demo
-   sample class's comments, unit tests, the build switch `commentBank` (off). Merges after 1 is applied.
-3. Rubric editor comments (behind the switch).
-4. Grader: Bank row, Add to Bank, preview, Last Time (behind the switch).
-5. Switch on, this plan and a DECISIONS entry in the repo, CLAUDE.md's Current State line.
+   sample class's comments, unit tests, the build switch `commentBank` (off). Merges after 1 is applied. Built: #1804.
+3. Rubric editor comments (behind the switch). Built: #1807.
+4. Grader: Bank row, Add to Bank, preview, Last Time (behind the switch). Built: #1806.
+5. Switch on, this plan and a DECISIONS entry in the repo, CLAUDE.md's Current State line. Built: this one, "Comment bank: on".
 
 With the switch off nothing a teacher sees changes, and no existing snapshot fixture changes.
 

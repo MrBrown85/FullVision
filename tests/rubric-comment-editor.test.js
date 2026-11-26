@@ -1,7 +1,6 @@
 /**
  * Comments in the rubric editor (docs/plans/comment-bank-plan.md, "Rubric editor";
- * teacher/rubric-comment-lines.js). With the commentBank switch off the editor
- * draws what it always drew; on, a criterion's levels carry comment lines.
+ * teacher/rubric-comment-lines.js). A criterion's levels carry comment lines.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -75,37 +74,7 @@ afterEach(async () => {
   window.isDemoMode = wasDemo;
 });
 
-describe('the switch is off', () => {
-  it('draws the editor as it was, comments or none', async () => {
-    openAssignments(seed, CID, {});
-    await settled();
-    await editRubric();
-    const off = card().outerHTML;
-    expect(off).not.toContain('Comments');
-    expect(off).not.toContain('af-cm');
-    expect(off).not.toContain('Safe from start');
-    // The same card with the new file absent altogether: byte for byte.
-    const had = window.RubricCommentLines;
-    delete window.RubricCommentLines;
-    click(document.querySelector('.af-ge-card [data-action="geStyle"][data-style="standard"]'));
-    await settled();
-    window.RubricCommentLines = had;
-    expect(card().outerHTML).toBe(off);
-  });
-});
-
-/* The switch on: the editor reads it each time it draws. */
-const switchOn = () => {
-  const real = window.BuildFlags.on;
-  window.BuildFlags.on = name => name === 'commentBank' || real(name);
-  return () => (window.BuildFlags.on = real);
-};
-
-describe('the switch is on', () => {
-  let restore;
-  beforeEach(() => (restore = switchOn()));
-  afterEach(() => restore());
-
+describe('the rubric editor with comments', () => {
   it('shuts: + Comments on each criterion, each comment a bubble under its level, + Overall Comments in the foot', async () => {
     openAssignments(seed, CID, {});
     await settled();

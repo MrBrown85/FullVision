@@ -13,13 +13,6 @@ const LONG =
 
 async function demo(page, width = 1280) {
   await page.setViewportSize({ width, height: 1000 });
-  await page.addInitScript(() => {
-    try {
-      localStorage.setItem('fv-build-commentBank', '1');
-    } catch (e) {
-      /* storage blocked */
-    }
-  });
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => typeof getAssessments === 'function' && getAssessments('sci8').length > 0);

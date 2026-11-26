@@ -1664,6 +1664,20 @@ Colin, Nov 25, after the Assignments, Gradebook, Dashboard, Observations, Report
 6. **`.cm-action-btn` elsewhere is untouched**: it is used by many other tabs and panels, and Colin has not yet decided on them.
 7. On an iPad the bar's buttons, ⋯ and search are 44 tall (`teacher/tablet.css`) and the header and the bar wrap rather than squeeze (`e2e/class-settings-bars.spec.js`).
 
+## A comment bank per rubric (2026-11-25)
+
+Colin, Nov 25, after a day of boards (https://claude.ai/artifact/JJh7gVVUuxUn4tNGnaAvSA; the two that count are "Grading Your Rubric: Same As, Bank, Add to Bank" and "Your Rubric in the Grid"), said "build it." A teacher keeps reusable feedback comments with a rubric and gives them while grading. Plan: `docs/plans/comment-bank-plan.md`. His calls:
+
+1. **Same As stays exactly as it is.** The bank is a second row under it, in the same look, not a replacement.
+2. **Only Add to Bank keeps a comment.** Nothing joins the bank by itself.
+3. **A banked comment belongs to one criterion of one rubric, at the level it was given;** overall comments belong to the rubric. It does not follow the competency to other rubrics. He first said to follow the competency, then reversed when his own rubrics showed that comments on the same competency are about different tasks.
+4. **Last Time stays, above the comment box as a line of text.** It follows the competency across assessments because it is about the student, not the bank.
+5. **The rubric writer stays the grid.** A cards re-imagining was drawn and he chose the grid.
+6. **No sliders, no codes, no "where is it kept" choice.** A small use count ("6×") is the only statistic, and it is counted from the comments given, never stored.
+7. **Left out of this build:** the BC library's "Curriculum" line (weak on his rubrics), the phone grader, and any rename (Reporting already has a Comment Bank).
+
+How it is built: the comments ride on their parent rows (`criterion.comments`, a list of level and text; `rubric.overall_comments`, a list of texts), with no ids and no new table. `upsert_rubric` keeps what is stored when a save does not name them, so the app already in a teacher's browser cannot empty a bank. Add to Bank sends one comment (`add_criterion_comment`, `add_rubric_overall_comment`) and never the whole rubric. A text may hold `[Name]`, filled with the student's first name when given. Limits: 500 characters, 40 comments on a criterion and 40 overall, level 1 to 6 whatever the rubric's scale; the tables hold the same rule as the functions. The bank is teacher-only: `student_submit.page` names the criterion fields it sends, so neither column reaches a student. The database change (`migrations/2026112601_rubric_comment_bank.sql`) was reviewed twice and applied Nov 26. The old rubric editor, which no screen could reach, was deleted in the same work.
+
 ## The Gradebook's card and menu on a student's name (2026-11-25)
 
 Colin, Nov 25: the card that opens on a student's name "gives info they're not super-interested in"; teachers "don't care about the competency breakdowns, they'd rather have a view of what's been submitted, not, trends in growth/decline", such as "a list of missing assignments, what they'd be getting if they were submitted (just like the student dashboard)", in no more space than the card took. And a click on a name should "give options like 'set all to missing, set all to excused'", like the cell's right-click menu, icons included. He chose each point on the board (https://claude.ai/artifact/KoQGtgoW2bhvY9tGbiqsb9) and said "Build it".
