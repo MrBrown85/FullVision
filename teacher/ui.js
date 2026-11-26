@@ -1604,9 +1604,9 @@ function segSelect(btn) {
   if (fromBox) _segGlide(seg, fromBox, btn.getBoundingClientRect());
 }
 
-/* The chosen pill slides from its old place to its new one (150 ms). The
-   selection itself has already changed, so a click or key is never held up. */
-function _segGlide(seg, from, to) {
+/* The chosen pill slides from its old place to its new one (160 ms, or ms: the
+   top tabs', router.js), by transform alone so a page still drawing can't stall it. */
+function _segGlide(seg, from, to, ms) {
   if (!seg.animate || !from.width || !to.width) return;
   if (seg._fvGlide) seg._fvGlide.remove();
   const box = seg.getBoundingClientRect();
@@ -1618,8 +1618,8 @@ function _segGlide(seg, from, to) {
   seg._fvGlide = glide;
   seg.classList.add('seg-gliding');
   seg.appendChild(glide);
-  const fromX = from.left - box.left - seg.clientLeft;
-  const toX = to.left - box.left - seg.clientLeft;
+  const fromX = from.left - box.left - seg.clientLeft + seg.scrollLeft;
+  const toX = to.left - box.left - seg.clientLeft + seg.scrollLeft;
   const done = () => {
     glide.remove();
     if (seg._fvGlide === glide) {
@@ -1629,10 +1629,10 @@ function _segGlide(seg, from, to) {
   };
   const anim = glide.animate(
     [
-      { transform: 'translateX(' + fromX + 'px)', width: from.width + 'px' },
-      { transform: 'translateX(' + toX + 'px)', width: to.width + 'px' },
+      { transform: 'translateX(' + fromX + 'px) scaleX(' + from.width / to.width + ')' },
+      { transform: 'translateX(' + toX + 'px) scaleX(1)' },
     ],
-    { duration: 160, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)', fill: 'forwards' },
+    { duration: ms || 160, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)', fill: 'forwards' },
   );
   anim.onfinish = done;
   anim.oncancel = done;
