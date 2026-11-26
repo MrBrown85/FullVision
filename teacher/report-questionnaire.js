@@ -1403,15 +1403,18 @@ window.ReportQuestionnaire = (function () {
   /* A row that opens in place: the label, the body, the figure on the
      right and a chevron; under it the pieces. */
   // html-safe: the body, figure and list are built escaped by the callers; row and label are fixed words
-  function _glanceRowHtml(row, label, body, fig, list) {
+  function _glanceRowHtml(row, label, body, fig, list, chip) {
     var open = !!_glanceOpen[row];
     var kind = _GLANCE_KIND[row];
     return `<div class="qn-fact qn-glance-row" data-lit="${_GLANCE_PART[row] || ''}" style="--qn-part:${ReportQnBoxes.look(kind, '').tint}">
         <button type="button" class="qn-glance-toggle" data-action="tqGlanceToggle" data-row="${row}" aria-expanded="${open}" aria-controls="tq-glance-${row}">
           ${ReportQnBoxes.tile(kind)}
           <span class="qn-fact-body"><span class="qn-fact-label">${label}</span>${body}</span>
-          <span class="qn-glance-fig">${fig}</span>
-          <span class="qn-chev" aria-hidden="true"></span>
+          ${
+            chip
+              ? `<span class="qn-glance-chip">${fig}<span class="qn-chev" aria-hidden="true"></span></span>`
+              : `<span class="qn-glance-fig">${fig}</span><span class="qn-chev" aria-hidden="true"></span>`
+          }
         </button>
         ${list}
       </div>`;
@@ -1424,8 +1427,10 @@ window.ReportQuestionnaire = (function () {
      mark on it. */
   // html-safe: competency names, figures, titles and marks esc()'d; row and label are fixed words
   function _glanceSkillHtml(cid, f, row, label, c, extra) {
-    var body = `<span class="qn-glance-name">${esc(c.name)}</span>`;
-    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level) + ' · ' + _pieces(c))}</span>${extra ? `<span class="qn-glance-extra">${esc(extra)}</span>` : ''}`;
+    // The name, then a detail line (the pieces and the change); the figure
+    // at the right.
+    var body = `<span class="qn-glance-name">${esc(c.name)}</span><span class="qn-glance-detail">${esc(_pieces(c) + (extra ? ' · ' + extra : ''))}</span>`;
+    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level))}</span>`;
     var items = (c.scores || []).map(function (sc) {
       return { id: sc.id, title: sc.title, mark: formatLevel(cid, sc.v) };
     });
@@ -1498,7 +1503,7 @@ window.ReportQuestionnaire = (function () {
       ? _glanceRowHtml(
           'missing',
           'Missing Work',
-          `<span>${esc(mlCount)}</span>`,
+          `<span class="qn-glance-name">${esc(mlCount)}</span>`,
           `<span class="qn-count">${ml.length}</span>`,
           _glanceListHtml(
             'missing',
@@ -1511,6 +1516,7 @@ window.ReportQuestionnaire = (function () {
               };
             }),
           ),
+          true,
         )
       : `<div class="qn-fact qn-glance-row" data-lit="notHandedIn" style="--qn-part:${ReportQnBoxes.look('notHandedIn', '').tint}">
         <div class="qn-glance-toggle static">${ReportQnBoxes.tile('notHandedIn')}

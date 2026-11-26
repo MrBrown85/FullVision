@@ -2825,11 +2825,12 @@ body.qn-roster #gb-sidebar .student-row-note {
   padding: 7px 6px;
   margin: 0 -6px;
   border-radius: 8px;
-  align-items: flex-start;
+  align-items: center;
   font-size: var(--text-sm);
 }
 .qn-fact > .qn-box-tile,
 .qn-glance-toggle > .qn-box-tile {
+  align-self: flex-start;
   margin-top: 1px;
 }
 .qn-fact-label {
@@ -2842,7 +2843,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 .qn-count {
   flex: none;
@@ -2904,18 +2905,17 @@ body.qn-roster #gb-sidebar .student-row-note {
 /* At a Glance sets up the comment (Questionnaire glance plan, step 2):
    three skill rows, three work rows and a foot that opens every skill. */
 .qno-glance .qn-fact {
-  align-items: flex-start;
+  align-items: center;
 }
 /* A row that opens in place (Colin, Nov 4): the competency's name and its
    own wording, the figure on the right, a chevron; opened, the pieces
    behind the figure, each title opening the grader. */
 .qno-glance .qn-glance-row {
   display: block;
-  padding: 0;
 }
 .qn-glance-toggle {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   width: 100%;
   padding: 0;
@@ -2946,19 +2946,47 @@ body.qn-roster #gb-sidebar .student-row-note {
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  padding-top: 2px;
   text-align: right;
 }
+/* The value: black, 14/600; its level step stays in data-level. */
 .qn-glance-fig .qn-level {
   width: auto;
   white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.qn-glance-detail {
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/* Missing Work's count and chevron, one chip. */
+.qn-glance-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 10px;
+  border-radius: 7px;
+  background: var(--qn-chip-amber, rgba(138, 90, 0, 0.12));
+  color: var(--qn-missing-ink);
+}
+.qn-glance-chip .qn-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+}
+.qn-glance-chip .qn-chev {
+  border-color: currentColor;
 }
 .qn-glance-extra {
   font-size: 12px;
   color: var(--text-2);
 }
 .qn-best-mark {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -2979,14 +3007,13 @@ body.qn-roster #gb-sidebar .student-row-note {
   flex: none;
   width: 8px;
   height: 8px;
-  margin: 6px 2px 0 0;
+  margin: 0 2px 0 0;
   border-right: 1.5px solid var(--text-3);
   border-bottom: 1.5px solid var(--text-3);
-  transform: rotate(45deg);
+  transform: translateY(-2px) rotate(45deg);
 }
 .qn-glance-toggle[aria-expanded='true'] .qn-chev {
-  margin-top: 9px;
-  transform: rotate(-135deg);
+  transform: translateY(2px) rotate(-135deg);
 }
 .qn-glance-list {
   list-style: none;
@@ -3106,6 +3133,78 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qno-recent {
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* The card's observations follow the board: a soft fill with no border; the
+   kind chip, then the date, then the text, then the tags; Private small at
+   the top right. */
+.qn-obs .obs-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 8px;
+  align-items: center;
+  position: relative;
+  background: var(--qn-obs-fill, #f5f5f7);
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  margin-bottom: 0;
+}
+.qn-obs .obs-card:hover {
+  box-shadow: none;
+}
+.qn-obs .obs-card-main,
+.qn-obs .obs-card-header {
+  display: contents;
+}
+.qn-obs .obs-type {
+  width: auto;
+  height: 20px;
+  padding: 0 7px;
+  margin: 0;
+  font-size: 12px;
+  border-radius: 5px;
+}
+.qn-obs .obs-card-time {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.qn-obs .obs-card-text {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.qn-obs .obs-card-meta {
+  grid-column: 1 / -1;
+  margin: 0;
+  gap: 4px 10px;
+  font-size: 12.5px;
+}
+.qn-obs
+  .obs-card-meta:not(:has(.obs-card-dim, .obs-card-context, .obs-card-assessment, .obs-card-link, .obs-card-quoted)) {
+  display: none;
+}
+.qn-obs .obs-card-meta .obs-card-dim {
+  color: var(--text);
+  font-weight: 500;
+}
+.qn-obs .obs-private {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.07);
+  border-radius: 5px;
+  padding: 2px 6px;
 }
 /* Read only: no delete column. */
 .qn-obs .obs-card,
@@ -6112,6 +6211,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   --qn-ev-track: rgba(0, 0, 0, 0.1);
   --qn-habit: #6b4fbb;
   --qn-missing-ink: #a35f00;
+  --qn-obs-fill: #f5f5f7;
 }
 @media (prefers-color-scheme: dark) {
   .qn {
@@ -6124,6 +6224,7 @@ body.qn-roster #gb-sidebar .student-row-note {
     --qn-ev-track: rgba(255, 255, 255, 0.16);
     --qn-habit: #a18cf0;
     --qn-missing-ink: #ffd60a;
+    --qn-obs-fill: rgba(255, 255, 255, 0.07);
   }
 }
 /* The card itself is only the page's section: the title, then the boxes. */
