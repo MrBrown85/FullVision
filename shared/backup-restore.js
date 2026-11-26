@@ -421,6 +421,8 @@
       });
       // Its own level columns (2026111901_rubric_levels), only when it has them.
       if (Array.isArray(r.scale) && r.scale.length >= 2) p.rubrics[p.rubrics.length - 1].scale = r.scale;
+      // The Comment Bank (2026112601): the rubric's overall comments, only when it has any.
+      if (arr(r.overallComments).length) p.rubrics[p.rubrics.length - 1].overall_comments = arr(r.overallComments);
       arr(r.tagIds).forEach(function (tid) {
         if (tagIds[tid]) p.rubric_tags.push({ rubric_id: r.id, tag_id: tid });
       });
@@ -447,6 +449,8 @@
           weight: num(c.weight, 1),
           display_order: num(c.displayOrder, i),
         });
+        // The Comment Bank: this criterion's comments per level, only when it has any.
+        if (arr(c.comments).length) p.criteria[p.criteria.length - 1].comments = arr(c.comments);
         arr(c.tagIds).forEach(function (tid) {
           if (tagIds[tid]) p.criterion_tags.push({ criterion_id: c.id, tag_id: tid });
         });

@@ -22,6 +22,7 @@
     "shared/html.js",
     "shared/build-flags.js",
     "shared/rubric-scale.js",
+    "shared/rubric-comments.js",
     "shared/constants.js",
     "shared/calc.js",
     "shared/data-utilities.js",

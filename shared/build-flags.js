@@ -15,10 +15,20 @@
    phoneLook (the phone's new look, docs/plans/phone-look-plan.md) is on
    since Nov 25 and nothing asks for it any more: the phone draws the new
    look and nothing else. The name stays for the same reason as the
-   others. */
+   others.
+
+   commentBank (the Comment Bank per rubric, docs/plans/comment-bank-plan.md)
+   is off until the last slice of that build turns it on. */
 (function () {
   /** @type {Record<string, boolean>} */
-  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true, phoneLook: true };
+  var DEFAULTS = {
+    dashRow: true,
+    bulletins: true,
+    quizzes: true,
+    inboxStacks: true,
+    phoneLook: true,
+    commentBank: false,
+  };
 
   /** @param {string} name */
   function on(name) {

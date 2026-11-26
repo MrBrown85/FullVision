@@ -12,7 +12,7 @@ function _loadSeedScript() {
   if (!_seedScript) {
     _seedScript = new Promise(function (/** @type {() => void} */ resolve) {
       var s = document.createElement('script');
-      s.src = '/shared/seed-data.js?v=46';
+      s.src = '/shared/seed-data.js?v=47';
       s.onload = resolve;
       s.onerror = function () {
         _seedScript = null;
