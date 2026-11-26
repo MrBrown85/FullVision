@@ -17,16 +17,16 @@ test.beforeEach(async ({ page }) => {
   await page.waitForSelector('.gb-scores-cell', { timeout: 10000 });
 });
 
-// A student with blank cells on work due by today: [row index, how many].
+// A student with blank cells (no grade, whatever the dates) in the columns on screen: [row index, how many, id].
 const withBlanks = page =>
   page.evaluate(() => {
     const cid = getActiveCourse();
-    const today = courseToday(cid);
+    const shown = [...document.querySelectorAll('#gb-colheads .gb-grid-colhead[data-aid]')].map(h => h.dataset.aid);
     const rows = [...document.querySelectorAll('#gb-rowheads .gb-grid-rowhead-name')].map(n => n.dataset.sid);
     for (let i = 0; i < rows.length; i++) {
       const n = getAssessments(cid).filter(
         a =>
-          String(a.dueDate || a.date || '').slice(0, 10) <= today &&
+          shown.includes(a.id) &&
           !getAssignmentStatus(cid, rows[i], a.id) &&
           assessmentCellValue(cid, rows[i], a).kind === 'none' &&
           canSetAssignmentStatus(cid, rows[i], a.id, 'NS'),
@@ -44,6 +44,14 @@ const missingOf = (page, sid) =>
   );
 
 test('a click on a name opens its menu, and a list marks the row with Undo', async ({ page }) => {
+  // Every piece due at the end of the term, as in the class where "due by today" marked only one.
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const list = getAssessments(cid);
+    list.forEach(a => (a.dueDate = '2099-01-31'));
+    saveAssessments(cid, list);
+    PageGradebook.render();
+  });
   const [row, blanks, sid] = await withBlanks(page);
   const name = page.locator('#gb-rowheads .gb-grid-rowhead-name').nth(row);
   const before = await missingOf(page, sid);
