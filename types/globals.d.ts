@@ -500,3 +500,4 @@ interface Window {
   };
 }
 declare var Router: any;
+declare var CmRosterFile: any;
