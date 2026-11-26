@@ -236,7 +236,9 @@ describe('the Deadline row and the calendar (teacher/report-questionnaire.js)', 
     expect(order.indexOf('Deadline')).toBe(order.indexOf('Plan') + 1);
     expect(order.indexOf('Deadline')).toBeLessThan(order.indexOf('Meeting'));
     const row = deadlineRow(html);
-    expect(html).toContain('class="qn-box-name">Deadline</span><span class="qn-req-chip">Required</span>');
+    expect(html).toContain(
+      'class="qn-box-name">Deadline</span><span class="qn-req-chip" title="An IE comment needs every part marked Required.">Required</span>',
+    );
     expect(row).toContain('Pick a Date');
     expect(row).toContain('Approve and Next stays off until you pick a date.');
     expect(row).not.toContain('qn-req-text');
