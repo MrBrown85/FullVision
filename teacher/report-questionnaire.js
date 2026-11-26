@@ -981,7 +981,7 @@ window.ReportQuestionnaire = (function () {
         <span class="qn-name">${esc(displayName(student))}</span>
         <span class="qn-head-sub">${student.pronouns ? esc(student.pronouns) + ' · ' : ''}${des.map(d => esc(d) + ' · ').join('')}${link}</span>
       </div>
-      <div class="qn-grade">
+      <div class="qn-grade" data-lit="grade">
         <span class="qn-grade-big">${esc(g.big)}</span>
         <span class="qn-grade-sub">${esc(g.small)}</span>
       </div>
@@ -1037,8 +1037,8 @@ window.ReportQuestionnaire = (function () {
         <span class="qn-habit-desc" id="tq-habit-desc-${h.key}" title="${esc(h.desc || h.hint)}">${esc(h.desc || h.hint)}</span>
       </div>`;
     }).join('');
-    return `<div class="qn-card qn-habits">
-      <div class="qn-card-top"><span class="qn-card-title">Work Habits</span><span class="qn-sub" id="tq-rated">${_ratedCount(stored)} of 6 rated</span></div>
+    return `<div class="qn-card qn-habits" data-lit="habits">
+      ${ReportQnBoxes.head('habits', '', `<span class="qn-ev-text" id="tq-rated">${_ratedCount(stored)} of 6 rated</span>`)}
       <div class="qn-habit-head" aria-hidden="true"><span></span><span class="qn-habit-scale">${CommentBank.SCALE.slice(
         0,
         HS_STOPS,
@@ -1175,6 +1175,7 @@ window.ReportQuestionnaire = (function () {
     var chip = document.getElementById('tq-empty-rated');
     if (chip) chip.textContent = _ratedCount(habits) + ' of 6 habits rated';
     _redrawHabits(st);
+    _syncRequired();
   }
 
   /* After a rating: the comment's habits sentence written again for the new
@@ -1395,17 +1396,26 @@ window.ReportQuestionnaire = (function () {
       .join('')}</ul>`;
   }
 
+  /* Each At a Glance row's part: the tile and colour (ReportQnBoxes.LOOK)
+     and the Sentences box it lights (data-lit; Biggest Change has none). */
+  var _GLANCE_KIND = { strongest: 'strengths', next: 'nextStep', change: 'change', missing: 'notHandedIn' };
+  var _GLANCE_PART = { strongest: 'strengths', next: 'nextStep', change: '', missing: 'notHandedIn' };
+
   /* A row that opens in place: the label, the body, the figure on the
      right and a chevron; under it the pieces. */
   // html-safe: the body, figure and list are built escaped by the callers; row and label are fixed words
-  function _glanceRowHtml(row, label, body, fig, list) {
+  function _glanceRowHtml(row, label, body, fig, list, chip) {
     var open = !!_glanceOpen[row];
-    return `<div class="qn-fact qn-glance-row">
+    var kind = _GLANCE_KIND[row];
+    return `<div class="qn-fact qn-glance-row" data-lit="${_GLANCE_PART[row] || ''}" data-tone="${_GLANCE_KIND[row]}">
         <button type="button" class="qn-glance-toggle" data-action="tqGlanceToggle" data-row="${row}" aria-expanded="${open}" aria-controls="tq-glance-${row}">
-          <span class="qn-fact-label">${label}</span>
-          <span class="qn-fact-body">${body}</span>
-          <span class="qn-glance-fig">${fig}</span>
-          <span class="qn-chev" aria-hidden="true"></span>
+          ${ReportQnBoxes.tile(kind)}
+          <span class="qn-fact-body"><span class="qn-fact-label">${label}</span>${body}</span>
+          ${
+            chip
+              ? `<span class="qn-glance-chip">${fig}<span class="qn-chev" aria-hidden="true"></span></span>`
+              : `<span class="qn-glance-fig">${fig}</span><span class="qn-chev" aria-hidden="true"></span>`
+          }
         </button>
         ${list}
       </div>`;
@@ -1418,8 +1428,10 @@ window.ReportQuestionnaire = (function () {
      mark on it. */
   // html-safe: competency names, figures, titles and marks esc()'d; row and label are fixed words
   function _glanceSkillHtml(cid, f, row, label, c, extra) {
-    var body = `<span class="qn-glance-name">${esc(c.name)}</span>`;
-    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level) + ' · ' + _pieces(c))}</span>${extra ? `<span class="qn-glance-extra">${esc(extra)}</span>` : ''}`;
+    // The name, then a detail line (the pieces and the change); the figure
+    // at the right.
+    var body = `<span class="qn-glance-name">${esc(c.name)}</span><span class="qn-glance-detail">${esc(_pieces(c) + (extra ? ' · ' + extra : ''))}</span>`;
+    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level))}</span>`;
     var items = (c.scores || []).map(function (sc) {
       return { id: sc.id, title: sc.title, mark: formatLevel(cid, sc.v) };
     });
@@ -1492,7 +1504,7 @@ window.ReportQuestionnaire = (function () {
       ? _glanceRowHtml(
           'missing',
           'Missing Work',
-          `<span>${esc(mlCount)}</span>`,
+          `<span class="qn-glance-name">${esc(mlCount)}</span>`,
           `<span class="qn-count">${ml.length}</span>`,
           _glanceListHtml(
             'missing',
@@ -1505,27 +1517,28 @@ window.ReportQuestionnaire = (function () {
               };
             }),
           ),
+          true,
         )
-      : `<div class="qn-fact">
-        <span class="qn-fact-label">Missing Work</span>
-        <div class="qn-fact-body"><span class="qn-muted">None so far this year</span></div>
+      : `<div class="qn-fact qn-glance-row" data-lit="notHandedIn">
+        <div class="qn-glance-toggle static">${ReportQnBoxes.tile('notHandedIn')}
+        <div class="qn-fact-body"><span class="qn-fact-label">Missing Work</span><span class="qn-glance-name">None so far this year</span></div></div>
       </div>`;
     var sub = f.lastReport
       ? 'So far this year · change since the ' + f.lastReport.label + ' report'
       : 'So far this year';
     var n = rows.comps.length;
     return `<div class="qn-card qn-glance qno-glance">
-      <div class="qn-card-top"><span class="qn-card-title">At a Glance</span><span class="qn-sub">${esc(sub)}</span></div>
+      ${ReportQnBoxes.head('glance', '', `<span class="qn-ev-text">${esc(sub)}</span>`)}
       <div class="qn-band">Skills</div>
       ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
       <div class="qn-band">Work</div>
-      <div class="qn-fact qn-best">
-        <span class="qn-fact-label">Best Piece</span>
+      <div class="qn-fact qn-best" data-lit="bestPiece">
+        ${ReportQnBoxes.tile('bestPiece')}
         ${
           best
-            ? `<div class="qn-fact-body"><span class="qn-glance-name">${esc(best.title)}</span><span class="qn-best-links"><button type="button" class="qn-card-link" data-action="tqOpenGrader" data-aid="${esc(best.id)}" title="Opens the grader on this piece.">Open in Grader ›</button>${_reportNoteNudge(best)}</span></div>
+            ? `<div class="qn-fact-body"><span class="qn-fact-label">Best Piece</span><span class="qn-glance-name">${esc(best.title)}</span><span class="qn-best-links"><button type="button" class="qn-card-link" data-action="tqOpenGrader" data-aid="${esc(best.id)}" title="Opens the grader on this piece.">Open in Grader ›</button>${_reportNoteNudge(best)}</span></div>
         <span class="qn-glance-fig"><span class="qn-best-mark">${esc(bestMark)}</span></span>`
-            : '<div class="qn-fact-body"><span class="qn-muted">No marked work yet</span></div>'
+            : '<div class="qn-fact-body"><span class="qn-fact-label">Best Piece</span><span class="qn-glance-name">No marked work yet</span></div>'
         }
       </div>
       ${mlRow}
@@ -1589,8 +1602,8 @@ window.ReportQuestionnaire = (function () {
     var warn = function (k, p) {
       return att[k] != null && att[p] != null && att[k] < att[p] ? ' warn' : '';
     };
-    return `<div class="qn-card qn-att">
-      <span class="qn-att-title">Attendance</span>
+    return `<div class="qn-card qn-att" data-lit="attendance">
+      <span class="qn-att-head">${ReportQnBoxes.tile('attendance')}<span class="qn-box-name qn-att-title">Attendance</span></span>
       <label class="qn-att-field">Classes Absent<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
       <label class="qn-att-field">Times Late<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
       <span class="qn-att-note" id="tq-att-note" aria-live="polite">${_attendanceNoteHtml(att)}</span>
@@ -2061,7 +2074,6 @@ window.ReportQuestionnaire = (function () {
         })
         .filter(Boolean);
     _wording = null;
-    _addAt = null;
     _writeRows(st);
     // Each press replaces the draft: Undo brings the last one back (⌘ Z
     // still works in the box too).
@@ -3737,7 +3749,6 @@ window.ReportQuestionnaire = (function () {
     if (!st || _rowsCurrent(st)) return false;
     delete _rows[_rowKey(st)];
     _wording = null;
-    _addAt = null;
     _own = null;
     rerender();
     return true;
@@ -4220,7 +4231,6 @@ window.ReportQuestionnaire = (function () {
         if (snap.seed != null) _lastSeed[snap.key] = snap.seed;
         else delete _lastSeed[snap.key];
         _wording = null;
-        _addAt = null;
         _writeRows(st, snap.text);
       },
       null,
@@ -4383,22 +4393,8 @@ window.ReportQuestionnaire = (function () {
     _rows[key] = next;
     _ordered[key] = true;
     _wording = null;
-    _addAt = null;
     _writeRows(st);
     _focusRow(next.indexOf(rows[i]));
-  }
-  function _dropRow(i, j, before) {
-    var st = _current();
-    if (!st || _resync(st)) return;
-    var key = _rowKey(st);
-    var rows = _rows[key] || [];
-    var next = dropRow(rows, i, j, before);
-    if (!next) return;
-    _rows[key] = next;
-    _ordered[key] = true;
-    _wording = null;
-    _addAt = null;
-    _writeRows(st);
   }
   function _resetOrder() {
     var st = _current();
@@ -4407,7 +4403,6 @@ window.ReportQuestionnaire = (function () {
     _rows[key] = resetOrder(_rows[key] || [], _original[key] || []);
     _ordered[key] = false;
     _wording = null;
-    _addAt = null;
     _writeRows(st);
     _focusSel('#tq-browse-btn');
   }
@@ -4415,64 +4410,150 @@ window.ReportQuestionnaire = (function () {
     _focusSel('#tq-sentences [data-row="' + i + '"] .qn-srow-handle[tabindex]');
   }
 
-  /* Drag and drop between the rows, wired once on the document: the
-     handle starts it, a blue line shows where the row will land. */
+  /* Dragging by the six-dot handle (pointer events, teacher/report-qn-motion.js),
+     wired once on the document. The order changes live in memory as the
+     lifted sentence passes its neighbours; letting go saves it, Escape
+     puts it back. */
   var _dnd = false;
-  var _drag = null;
+  var _dragFrom = null; // the rows as they were when the drag began
   function _wireDrag() {
     if (_dnd || typeof document === 'undefined' || !document.addEventListener) return;
     _dnd = true;
-    document.addEventListener('dragstart', function (e) {
-      var h = e.target && e.target.closest && e.target.closest('.qn-srow-handle[draggable]');
-      var row = h && h.closest('#tq-sentences [data-row]');
+    ReportQnMotion.configure({
+      card: function () {
+        return document.getElementById('tq-sentences');
+      },
+      neighbors: function (i) {
+        var st = _current();
+        var rows = (st && _rows[_rowKey(st)]) || [];
+        var us = _units(rows);
+        var u = _unitOf(us, rows[i]);
+        return {
+          prev: u > 0 ? rows.indexOf(us[u - 1][0]) : -1,
+          next: u >= 0 && u < us.length - 1 ? rows.indexOf(us[u + 1][0]) : -1,
+        };
+      },
+      step: function (i, dir) {
+        var st = _current();
+        if (!st) return -1;
+        var key = _rowKey(st);
+        var rows = _rows[key] || [];
+        var next = moveRow(rows, i, dir);
+        if (!next) return -1;
+        if (!_dragFrom) _dragFrom = rows.slice();
+        _rows[key] = next;
+        _wording = null;
+        _syncRequired();
+        return next.indexOf(rows[i]);
+      },
+      commit: function () {
+        var st = _current();
+        var from = _dragFrom;
+        _dragFrom = null;
+        if (!st || !from) return;
+        _ordered[_rowKey(st)] = true;
+        _writeRows(st);
+      },
+      cancel: function () {
+        var st = _current();
+        var from = _dragFrom;
+        _dragFrom = null;
+        if (!st || !from) return;
+        _rows[_rowKey(st)] = from;
+        _syncRequired();
+      },
+    });
+    document.addEventListener('pointerdown', function (e) {
+      var t = /** @type {Element | null} */ (e.target);
+      var h = t && t.closest && t.closest('#tq-sentences .qn-srow-handle:not(.qn-srow-spacer)');
+      if (h) ReportQnMotion.begin(e, h);
+    });
+  }
+
+  /* ── Click a sentence to edit it in place (slice 4) ──────────
+     The sentence becomes a field. Return or a click away keeps it, Esc
+     puts it back. A kept change goes into the Teacher Comment box and
+     through the same input path typing there takes, so the rows follow
+     and an edited bank sentence is "edited" as ever. */
+  var _cardWired = false;
+  function _wireCard() {
+    if (_cardWired || typeof document === 'undefined' || !document.addEventListener) return;
+    _cardWired = true;
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      var txt = t && t.closest && t.closest('#tq-sentences .qn-req-text');
+      if (!txt || t.closest('button, a, input, textarea') || txt.tagName === 'BUTTON') return;
+      var row = txt.closest('.qn-req-row');
       if (!row) return;
-      _drag = Number(row.dataset.row);
-      try {
-        e.dataTransfer.setData('text/plain', String(_drag));
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setDragImage(row, 24, 20);
-      } catch (x) {
-        /* a browser without a data transfer */
+      // The support sentence is the class's line: its menu opens.
+      if (row.id === 'tq-row-support') {
+        tqLine('supportMenu');
+        return;
       }
-      row.classList.add('dragging');
+      if (!row.classList.contains('qn-srow') || row.classList.contains('qn-own-row') || row.dataset.row == null) return;
+      _editStart(txt);
     });
-    document.addEventListener('dragover', function (e) {
-      if (_drag == null) return;
-      var row = e.target && e.target.closest && e.target.closest('#tq-sentences [data-row]');
-      if (!row) return;
-      e.preventDefault();
-      var r = row.getBoundingClientRect();
-      _dropLine(row, e.clientY < r.top + r.height / 2);
-    });
-    document.addEventListener('drop', function (e) {
-      if (_drag == null) return;
-      var from = _drag;
-      var row = e.target && e.target.closest && e.target.closest('#tq-sentences [data-row]');
-      e.preventDefault();
-      _endDrag();
-      if (!row) return;
-      var r = row.getBoundingClientRect();
-      _dropRow(from, Number(row.dataset.row), e.clientY < r.top + r.height / 2);
-    });
-    document.addEventListener('dragend', _endDrag);
   }
-  function _dropLine(row, before) {
-    var line = document.getElementById('tq-drop-line');
-    if (!line) {
-      line = document.createElement('div');
-      line.id = 'tq-drop-line';
-      line.className = 'qn-drop-line';
-      line.setAttribute('aria-hidden', 'true');
-    }
-    row.parentNode.insertBefore(line, before ? row : row.nextSibling);
-  }
-  function _endDrag() {
-    _drag = null;
-    var line = document.getElementById('tq-drop-line');
-    if (line) line.remove();
-    document.querySelectorAll('#tq-sentences .dragging').forEach(function (el) {
-      el.classList.remove('dragging');
+  function _editStart(txt) {
+    var st = _current();
+    var box = _box();
+    if (!st || !box || String(box.dataset.sid) !== String(st.id) || _commentTab !== 'this') return;
+    var field = document.createElement('textarea');
+    var orig = txt.textContent;
+    var done = false;
+    field.className = 'qn-edit-field';
+    field.rows = 1;
+    field.value = orig;
+    field.setAttribute('aria-label', 'Edit this sentence');
+    field.setAttribute('spellcheck', 'true');
+    var fit = function () {
+      field.style.height = 'auto';
+      field.style.height = field.scrollHeight + 'px';
+    };
+    var close = function (keep) {
+      if (done) return;
+      done = true;
+      var next = field.value.replace(/\s+/g, ' ').trim();
+      var row = txt.closest('.qn-req-row');
+      field.remove();
+      txt.hidden = false;
+      if (row) row.classList.remove('editing');
+      if (keep && next && next !== orig) _applyEdit(st, orig, next);
+    };
+    field.addEventListener('input', fit);
+    field.addEventListener('blur', function () {
+      close(true);
     });
+    field.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        close(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        close(false);
+      } else e.stopPropagation();
+    });
+    txt.hidden = true;
+    txt.after(field);
+    var row = txt.closest('.qn-req-row');
+    if (row) row.classList.add('editing');
+    fit();
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }
+  /* The sentence changed in the comment box as if typed there. */
+  function _applyEdit(st, orig, next) {
+    var box = _box();
+    if (!box || String(box.dataset.sid) !== String(st.id)) return;
+    var at = box.value.indexOf(orig);
+    if (at < 0) return;
+    box.value = box.value.slice(0, at) + next + box.value.slice(at + orig.length);
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    _fitBox();
+    clearTimeout(_alignTimer);
+    _alignNow();
   }
 
   /* ── Options: other wording (was "Other Wording", Nov 6) ─── */
@@ -4603,7 +4684,7 @@ window.ReportQuestionnaire = (function () {
       .join('');
     var low = part.label.toLowerCase();
     return `<div class="qn-menu qn-wording" role="menu" aria-label="Other ways to say the ${esc(low)} sentence" id="tq-wording-menu">
-      <span class="qn-menu-head">Other ways to say this</span>
+      ${_pickHtml(cid, student, row, i)}<span class="qn-menu-head">Other ways to say this</span>
       ${mine}${others}
       <div class="qn-menu-sep" role="separator"></div>
       <button type="button" role="menuitem" class="qn-menu-add qn-menu-all" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}: every sentence that fits ${esc(first)}.">All ${_plural(_fitCount(part, ctx), esc(low) + ' sentence', esc(low) + ' sentences')}…</button>
@@ -4616,12 +4697,104 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* Pick the Piece (Best Piece) and Pick the Skill (Strength), above Other
+     Ways to Say This. The pick is saved with the term rating: the first
+     assessment the report mentions is the best piece, the first strength
+     tag the skill named as the strength. */
+  var _piecesAll = false;
+  var _habMenu = false; // the six ratings open under the Work Habits bars
+  // html-safe: titles, names, marks and ids esc()'d; indexes are numbers
+  function _pickHtml(cid, student, row, i) {
+    var f = _facts(student);
+    var first = _first(student);
+    var item = function (action, attr, text, right, on, tip) {
+      return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-menu-item${on ? ' on' : ''}" data-action="tqSentences" data-do="${action}" data-row="${i}" ${attr} title="${esc(tip)}"><span class="qn-menu-mark" aria-hidden="true">${on ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span></span><span class="qn-menu-right">${esc(right)}</span></button>`;
+    };
+    if (_isBestRow(row)) {
+      var order = CommentBank.bestOrderOf(f);
+      if (!order.length) return '';
+      var shown = _piecesAll ? order : order.slice(0, 4);
+      var links = `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqOpenGrader" data-aid="${esc(order[0].id)}" title="Opens the grader on this piece.">Open in Grader ›</button><button type="button" role="menuitem" class="qn-menu-add" data-action="tqAddReportNote" data-aid="${esc(order[0].id)}" title="Opens the grader on this piece. Write one line about what the student did, for the comment.">Add a Note for the Report ›</button>`;
+      return `<span class="qn-menu-head">Pick the Piece</span>${shown
+        .map(function (w) {
+          return item(
+            'pickPiece',
+            'data-aid="' + esc(w.id) + '"',
+            w.title || 'Untitled',
+            _pieceMark(cid, f, w),
+            w === order[0],
+            'Makes this ' + first + '’s best piece for this report.',
+          );
+        })
+        .join('')}${
+        !_piecesAll && order.length > 4
+          ? `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="piecesAll" data-row="${i}" title="Lists every piece with a mark.">All ${order.length} Assignments…</button>`
+          : ''
+      }${links}<div class="qn-menu-sep" role="separator"></div>`;
+    }
+    var part = row.step ? partOf(row.step) : null;
+    if (part && part.id === 'strengths') {
+      var keys = (row.prov && row.prov.factKeys) || [];
+      var comps = (f.comps || [])
+        .filter(function (c) {
+          return c.level > 0 && !!CommentBank.skillFor(f, c);
+        })
+        .sort(function (a, b) {
+          return b.level - a.level;
+        })
+        .slice(0, 8);
+      if (!comps.length) return '';
+      return `<span class="qn-menu-head">Pick the Skill</span>${comps
+        .map(function (c) {
+          return item(
+            'pickSkill',
+            'data-comp="' + esc(c.id) + '"',
+            c.name,
+            formatLevel(cid, c.level),
+            keys.indexOf('comp:' + c.id) >= 0,
+            'Names this skill as ' + first + '’s strength in the comment.',
+          );
+        })
+        .join('')}<div class="qn-menu-sep" role="separator"></div>`;
+    }
+    return '';
+  }
+  /* A pick saved, and the row's sentence written again for it: the same
+     bank sentence when it still fits, else the first other one that does. */
+  function _repick(st, i, patch) {
+    tqSaveCurrentIfNeeded();
+    var key = _rowKey(st);
+    var rows = _rows[key] || [];
+    var row = rows[i];
+    if (!row || !row.s) return;
+    upsertTermRating(_activeCourse, st.id, getTermId(), patch);
+    var f = _facts(st, true);
+    var ctx = _bankContext(_activeCourse, st, f);
+    var sentence = row.s;
+    var own =
+      patch.strengths && /^set:/.test(row.id)
+        ? ((ctx && ctx._extra) || []).find(function (x) {
+            return String(x.id).indexOf('set:' + patch.strengths[0] + ':s') === 0;
+          })
+        : null;
+    if (own) sentence = own;
+    else if (!CommentBank.fits(sentence, ctx)) {
+      var alt = alternatives(row, ctx, _usage(_activeCourse, st), {})[0];
+      if (alt) sentence = alt;
+    }
+    rows[i] = rowFromSentence(sentence, ctx, row.step, i === 0);
+    _wording = null;
+    _piecesAll = false;
+    _writeRows(st);
+    // The left column (At a Glance) reads the pick too.
+    rerender();
+  }
+
   function _pickWording(st, i, id) {
     var key = _rowKey(st);
     var rows = _rows[key] || [];
     var s = _bankById(id);
     _wording = null;
-    _addAt = null;
     if (!rows[i] || !s || (rows[i].id === id && !rows[i].edited)) {
       _syncRequired();
       _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
@@ -4807,11 +4980,20 @@ window.ReportQuestionnaire = (function () {
 
   var DOTS_ICON =
     '<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="2.5" r="1.3"></circle><circle cx="7.5" cy="2.5" r="1.3"></circle><circle cx="2.5" cy="7" r="1.3"></circle><circle cx="7.5" cy="7" r="1.3"></circle><circle cx="2.5" cy="11.5" r="1.3"></circle><circle cx="7.5" cy="11.5" r="1.3"></circle></svg>';
-  var HANDLE = `<span role="button" tabindex="0" class="qn-srow-handle" draggable="true" aria-label="Move this sentence" title="Drag to move this sentence. ⌥↑ and ⌥↓ move it too.">${DOTS_ICON}</span>`;
+  var HANDLE = `<span role="button" tabindex="0" class="qn-srow-handle" aria-label="Move this sentence" title="Drag to move this sentence. ⌥↑ and ⌥↓ move it too.">${DOTS_ICON}</span>`;
   var SPACER = '<span class="qn-srow-handle qn-srow-spacer" aria-hidden="true"></span>';
 
+  /* A row's place on the card (data-row) and its key (data-rk: the
+     sentence's id and which of that id it is), which stays the same when
+     the row moves, so the card can glide it from where it was. */
   function _rowAttr(i) {
-    return i != null && i >= 0 ? ' data-row="' + i + '"' : '';
+    if (i == null || i < 0) return '';
+    var st = _current();
+    var rows = (st && _rows[_rowKey(st)]) || [];
+    var r = rows[i];
+    var n = 0;
+    for (var k = 0; r && k < i; k++) if (rows[k].id === r.id) n++;
+    return ' data-row="' + i + '"' + (r ? ' data-rk="' + esc(String(r.id)) + '#' + n + '"' : '');
   }
 
   /* One row of the card. unit: its rows (_units), the first leading; i:
@@ -4861,7 +5043,7 @@ window.ReportQuestionnaire = (function () {
       );
     var open = !!_wording && _wording.index === i;
     var low = row.step === 'grade' && _checksFor(f, rows).indexOf('low') >= 0;
-    var typed = isTyped(row);
+    var typed = isTyped(row) || !!row.derived;
     var edited =
       !typed &&
       unit.some(function (r) {
@@ -5310,7 +5492,6 @@ window.ReportQuestionnaire = (function () {
         })
       : null;
     _wording = null;
-    _addAt = null;
     if (rows[i] && a && rows[i].id !== id) {
       rows[i] = wordsRow(st, a, want.frame);
       _writeRows(st);
@@ -5374,7 +5555,6 @@ window.ReportQuestionnaire = (function () {
       if (c) from = grp.source;
     });
     if (!c) {
-      _addAt = null;
       _syncRequired();
       _focusGap(g);
       return;
@@ -5382,7 +5562,6 @@ window.ReportQuestionnaire = (function () {
     var row = from.row(c, ctx);
     _rows[key] = insertRow(rows, row, g);
     _markAdded(st, row);
-    _addAt = null;
     _wording = null;
     _writeRows(st);
     _focusAny([
@@ -5403,53 +5582,18 @@ window.ReportQuestionnaire = (function () {
     var row = typedRow(t);
     _rows[key] = insertRow(rows, row, g);
     _markAdded(st, row);
-    _addAt = null;
     _wording = null;
     _writeRows(st);
     _focusSel('#tq-sentences [data-row="' + Math.min(g, _rows[key].length - 1) + '"] [data-do="options"]');
     return true;
   }
-
-  /* The + menu at a gap. */
-  var _addAt = null; // the gap (rows before it) whose menu is open
-  function _addMenuHtml(cid, student, f, ctx, rows, g) {
-    var first = _first(student);
-    var groups = _gapChoices(cid, student, f, ctx, rows, g);
-    var items = groups
-      .map(function (grp) {
-        // A group's heading only when more than one source offers a sentence.
-        var head = groups.length > 1 ? `<span class="qn-menu-head qn-add-source">${esc(grp.source.label)}</span>` : '';
-        return (
-          head +
-          grp.choices
-            .map(function (c) {
-              var row = grp.source.row(c, ctx);
-              return `<button type="button" role="menuitem" class="qn-menu-item qn-add-item" data-action="tqSentences" data-do="insert" data-gap="${g}" data-step="${esc(c.step)}" data-sentence="${esc(c.id)}" title="Puts this sentence in the comment here."><span class="qn-add-part">${esc(c.label)}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(row.text)}</span><span class="qn-menu-meta">${esc(rowSource(row, cid, student, f, ctx))}</span></span></button>`;
-            })
-            .join('')
-        );
-      })
-      .join('');
-    var none = items
-      ? ''
-      : `<span class="qn-menu-meta qn-add-none">Every part with a sentence that fits ${esc(first)} is in the comment.</span>`;
-    return `<div class="qn-menu qn-add-menu" role="menu" aria-label="Add a sentence here" id="tq-add-menu">
-      <span class="qn-menu-head">Add Here</span>
-      ${items}${none}
-      <div class="qn-menu-sep" role="separator"></div>
-      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="ownOpen" data-where="gap" data-gap="${g}" title="Opens a line here for a sentence of your own. It goes into the comment at this place.">Write Your Own…</button>
-      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="browseAt" data-gap="${g}" title="Opens the full sentence bank. The sentence you pick goes here.">Browse Sentences…</button>
-    </div>`;
-  }
-  /* The gap after a row: a thin line and a + on hover or focus, nothing
-     in the flow (the rows do not move); the + opens the Add Here menu. */
+  /* The gap after a row: a 2px line and a pill drawn over it after the
+     pointer rests there (or at once on keyboard focus); nothing moves when
+     they show. The pill opens the writing box at this place. */
   function _gapHtml(cid, student, f, ctx, rows, g) {
-    var open = _addAt === g;
-    return `<div class="qn-gap${open ? ' open' : ''}" data-gap="${g}">
+    return `<div class="qn-gap" data-gap="${g}">
       <span class="qn-gap-line" aria-hidden="true"></span>
-      <button type="button" class="qn-gap-add" data-action="tqSentences" data-do="addMenu" data-gap="${g}" aria-label="Add a sentence here" aria-haspopup="menu" aria-expanded="${open}">+</button>
-      <span class="qn-gap-tip" role="tooltip">Add a sentence here</span>
-      ${open ? _addMenuHtml(cid, student, f, ctx, rows, g) : ''}
+      <button type="button" class="qn-gap-add" data-action="tqSentences" data-do="ownOpen" data-where="gap" data-gap="${g}" aria-label="Add a sentence here" aria-haspopup="dialog">+ Add a Sentence Here</button>
     </div>`;
   }
   /* The box for a sentence of the teacher's own at a gap, drawn as the
@@ -5534,9 +5678,10 @@ window.ReportQuestionnaire = (function () {
       return {
         habits: CommentBank.HABITS.map(function (h) {
           var v = Number(habits[h.key]);
-          return { name: h.name, v: v >= 1 && v <= HS_STOPS ? v : 0 };
+          return { key: h.key, name: h.name, v: v >= 1 && v <= HS_STOPS ? v : 0 };
         }),
         scale: CommentBank.SCALE,
+        open: _habMenu,
       };
     }
     if (kind === 'attendance') return { absent: f.absent || 0, late: f.late || 0 };
@@ -5551,10 +5696,116 @@ window.ReportQuestionnaire = (function () {
   function _wrapBoxes(cid, student, f, entries) {
     return ReportQnBoxes.wrap(entries, {
       first: _first(student),
+      requiredTip:
+        CommentBank.reportPath(f) === 'ie'
+          ? 'An IE comment needs every part marked Required.'
+          : 'The grade sentence is replaced by the required statement.',
       facts: function (kind, row) {
         return _boxFacts(kind, cid, student, f, row);
       },
     });
+  }
+
+  /* ── The amber note and + Close to (slice 8) ─────────────────── */
+
+  var _HABIT_STEPS = /^(habits|habitsMore|habitsBuild|strongHabits)$/;
+  var _habKept = {};
+  var _HAB_KEEP_STORE = 'fv-tq-habit-keep';
+  function _habKeepKey(st) {
+    return _activeCourse + '|' + st.id + '|' + getTermId();
+  }
+  function _habitKept(st) {
+    var k = _habKeepKey(st);
+    if (_habKept[k] != null) return !!_habKept[k];
+    var on = false;
+    try {
+      on = !!(JSON.parse(localStorage.getItem(_HAB_KEEP_STORE) || '{}') || {})[k];
+    } catch (e) {
+      /* no storage: the choice lasts for this page only */
+    }
+    _habKept[k] = on;
+    return on;
+  }
+  function _keepHabitNote(st) {
+    var k = _habKeepKey(st);
+    _habKept[k] = true;
+    try {
+      var all = JSON.parse(localStorage.getItem(_HAB_KEEP_STORE) || '{}') || {};
+      all[k] = true;
+      localStorage.setItem(_HAB_KEEP_STORE, JSON.stringify(all));
+    } catch (e) {
+      /* no storage */
+    }
+  }
+  /* The amber note under the habit sentences when one of them says the student
+     usually or consistently hands in work on time and the gradebook has work
+     labelled Missing (the same count the Missing Work box shows). Rate It
+     lowers that one rating a step through the ordinary rating; Keep It hides
+     the note for this student and report. It changes no status. */
+  /* What the note says: the frequency word is the one the habit sentence
+     itself uses before "hand(s) in" (always, usually, consistently ...); a
+     sentence that uses none gets none. */
+  var _FREQ =
+    /\b(always|usually|consistently|regularly|generally|typically|often|mostly|normally|reliably)\s+hands?\s+in\b/i;
+  function habitNoteText(sentence, pron, nh) {
+    var m = _FREQ.exec(String(sentence || ''));
+    return (
+      'This says ' +
+      pron.subj +
+      ' ' +
+      (m ? m[1].toLowerCase() + ' ' : '') +
+      (pron.subj === 'they' ? 'hand' : 'hands') +
+      ' in ' +
+      pron.poss +
+      ' work on time. ' +
+      CommentBank.notHandedInSentence(nh)
+    );
+  }
+  // html-safe: the sentence's words are esc()'d; the rating is a number
+  function _habitNoteHtml(cid, st, f, rows) {
+    var v = _habitsOf(cid, st, f).completes;
+    var nh = f.notHandedIn;
+    if (!(v >= 3 && v <= HS_STOPS) || !nh || !(nh.count > 0) || _habitKept(st)) return '';
+    var said = rows.find(function (r) {
+      return _HABIT_STEPS.test(r.step || '') && ((r.prov && r.prov.factKeys) || []).indexOf('habit:completes') >= 0;
+    });
+    if (!said) return '';
+    var p = ReportBlocks.getPronouns(st);
+    var text = habitNoteText(said.text, p, nh);
+    return `<div class="qn-habit-note" role="status"><span class="qn-habit-note-text">${esc(text)}</span><button type="button" class="qn-habit-note-fix" data-action="tqSentences" data-do="habitNoteRate" data-to="${v - 1}" title="Lowers the Completes Work rating one step. The habit sentence follows.">Rate It ${esc(CommentBank.SCALE[v - 2])}</button><button type="button" class="qn-habit-note-keep" data-action="tqSentences" data-do="habitNoteKeep" title="Leaves the sentence and the rating as they are, and hides this note for ${esc(_first(st))} in this report.">Keep It</button></div>`;
+  }
+  /* "+ Close to a C+" on the Grade box, only where the comment already says
+     a student is close to the next band (CommentBank.closeTo, from
+     calc.js's band): a letter grade within reach, no sentence about it yet.
+     It adds no grade math and prints no figure. */
+  function _closeNext(f, rows) {
+    var c = f.grade && f.grade.mode !== 'proficiency' ? CommentBank.closeTo(f.grade) : null;
+    if (!c || CommentBank.reportPath(f)) return null;
+    var said = rows.some(function (r) {
+      return /\bclose to\b/i.test(r.text || '');
+    });
+    return said ? null : c;
+  }
+  // html-safe: the letter comes from the band table and is esc()'d
+  function _closeBtnHtml(c) {
+    return `<div class="qn-extra-row"><button type="button" class="qn-add-btn" data-action="tqSentences" data-do="closeAdd" title="Adds one sentence under the grade saying the student is close to the next band.">+ Close to ${esc(CommentBank.aOrAn(c.letter))}</button></div>`;
+  }
+  function _addClose(st) {
+    tqSaveCurrentIfNeeded();
+    var key = _rowKey(st);
+    var f = _facts(st);
+    var rows = _rows[key] || [];
+    var c = _closeNext(f, rows);
+    var at = rows.findIndex(function (r) {
+      return r.step === 'grade';
+    });
+    if (!c || at < 0) return;
+    var ctx = _bankContext(_activeCourse, st, f);
+    var text = CommentBank.fill({ text: '{He} [is|are] close to ' + CommentBank.aOrAn(c.letter) + '.' }, ctx);
+    var row = Object.assign(typedRow(text), { step: 'grade', id: 'close:' + c.letter, derived: true, edited: false });
+    _rows[key] = insertRow(rows, row, at + 1);
+    _markAdded(st, row);
+    _writeRows(st);
   }
 
   /* The IE comment's parts in its order (the IEPath mockup): where a
@@ -5644,16 +5895,29 @@ window.ReportQuestionnaire = (function () {
     });
     // After each row of the comment, the gap where a sentence can be put in
     // (the InsertRows mockup): its index is how many rows come before it.
+    var habNote = _habitNoteHtml(cid, student, f, rows);
+    var close = _closeNext(f, rows);
+    var kindAt = function (it) {
+      return it.i >= 0 && it.i === meetAt ? 'ieMeeting' : _boxKind(it.unit[0], path);
+    };
+    var lastHab = -1;
+    var gradeAt = -1;
+    items.forEach(function (it, k) {
+      if (kindAt(it) === 'habits') lastHab = k;
+      if (gradeAt < 0 && kindAt(it) === 'grade') gradeAt = k;
+    });
     return _wrapBoxes(
       cid,
       student,
       f,
-      items.reduce(function (out, it) {
+      items.reduce(function (out, it, k) {
         var row = it.unit[0];
         var html = _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
         var kind = it.i >= 0 && it.i === meetAt ? 'ieMeeting' : _boxKind(row, path);
         var ownGap = '';
         if (it.i >= 0) {
+          if (k === lastHab && habNote) html += habNote;
+          if (k === gradeAt && close) html += _closeBtnHtml(close);
           claims.forEach(function (c) {
             if (it.unit.indexOf(rows[c.row]) >= 0) html += _claimHtml(c);
           });
@@ -5686,25 +5950,19 @@ window.ReportQuestionnaire = (function () {
     var key = _rowKey(student);
     var rows = _rowsFor(student, f);
     var ordered = !!_ordered[key];
-    // The line that said "Reword, edit or drag to reorder" is gone; the two
-    // notes that tell something stay.
-    var hint = path
-      ? path === 'ie'
-        ? 'An IE comment needs every part marked Required.'
-        : 'The grade sentence is replaced by the required statement.'
-      : ordered
-        ? 'Your order is kept when you generate again.'
-        : '';
     var reset = ordered
-      ? '<button type="button" class="qn-card-link qn-reset" data-action="tqSentences" data-do="reset" title="Puts the sentences back in the order Generate Comment gave them.">Reset Order</button>'
+      ? '<button type="button" class="qn-card-link qn-reset" data-action="tqSentences" data-do="reset" title="Puts the sentences back in the order Generate Comment gave them. Your order is kept when you generate again.">Reset Order</button>'
       : '';
     var browse =
       '<button type="button" class="qn-card-link" id="tq-browse-btn" data-action="tqSentences" data-do="browse" aria-haspopup="dialog" title="Opens the full sentence bank so you can pick a sentence yourself.">Browse Sentences…</button>';
+    var add = rows.length
+      ? '<button type="button" class="qn-add-sentence" id="tq-add-sentence" data-action="tqSentences" data-do="addEnd" aria-haspopup="dialog" title="Writes a sentence of your own at the end of the comment."><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 1v8M1 5h8"></path></svg>Add a Sentence</button>'
+      : '';
     var body = rows.length
       ? _rowListHtml(cid, student, f, rows, path)
       : _wrapBoxes(cid, student, f, _requiredRows(cid, student, f).concat(_classRowsHtml(cid, student, f)));
     return `<div class="qn-card qn-sentences${path ? ' qn-required' : ''}" id="tq-sentences">
-      <div class="qn-req-top"><span class="qn-card-title">Sentences</span>${hint ? `<span class="qn-sub">${esc(hint)}</span>` : ''}<span class="qn-req-top-end">${reset}${browse}</span></div>
+      <div class="qn-req-top"><span class="qn-card-title">Sentences</span><span class="qn-req-top-end">${reset}${browse}${add}</span></div>
       ${body}
     </div>`;
   }
@@ -5715,8 +5973,10 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     var card = document.getElementById('tq-sentences');
     if (!st || !card) return;
+    var before = ReportQnMotion.measure(card);
     card.outerHTML = _sentencesHtml(_activeCourse, st, _facts(st));
     _fitMenus();
+    ReportQnMotion.play(document.getElementById('tq-sentences'), before, ReportQnMotion.dragKey());
   }
 
   /* An open menu or calendar on the Sentences card kept inside the window
@@ -6141,7 +6401,6 @@ window.ReportQuestionnaire = (function () {
     tqSaveCurrentIfNeeded();
     _closeBrowse(true);
     _wording = null;
-    _addAt = null;
     // open: the groups opened by hand per part and case; openQ: the same
     // while a search is typed; init: the parts whose own cases were opened.
     _browse = {
@@ -6318,7 +6577,9 @@ window.ReportQuestionnaire = (function () {
       case 'options': {
         var open = !!_wording && _wording.index === i;
         _wording = open ? null : { index: i };
-        _addAt = null;
+        _piecesAll = false;
+        _habMenu = false;
+        _miss = null;
         _supportMenu = false;
         _langMenu = false;
         _limitOpen = false;
@@ -6359,30 +6620,67 @@ window.ReportQuestionnaire = (function () {
         ]);
         return;
       }
-      case 'addMenu': {
-        var g = Number(ds.gap);
-        var was = _addAt === g;
-        _addAt = was ? null : g;
-        _wording = null;
-        _supportMenu = false;
-        _langMenu = false;
-        _limitOpen = false;
-        _syncRequired();
-        if (!was) _focusSel('#tq-add-menu [role="menuitem"]');
-        else _focusGap(g);
-        return;
-      }
       case 'insert': {
         tqSaveCurrentIfNeeded();
+        _own = null;
         _insertAt(st, Number(ds.gap), ds.step, ds.sentence);
         return;
       }
+      case 'addEnd': {
+        // At the end of the movable sentences: before the class's closing.
+        var all = _rows[key] || [];
+        var end = all.length;
+        if (end && all[end - 1].step === 'closer') end--;
+        _ownOpen('gap', 'write', { gap: end });
+        return;
+      }
       case 'browseAt': {
+        _own = null;
         var at = Number(ds.gap);
         var rowsNow = _rows[key] || [];
         _openBrowse(_gapPart(rowsNow, _bankContext(_activeCourse, st, _facts(st)), _insertOpts(_activeCourse, st)), at);
         return;
       }
+      case 'habitsMenu':
+        _habMenu = !_habMenu;
+        _wording = null;
+        _miss = null;
+        _syncRequired();
+        if (_habMenu) _focusSel('#tq-habits-menu [aria-checked="true"], #tq-habits-menu .qn-hm-step');
+        else _focusSel('#tq-sentences [data-do="habitsMenu"]');
+        return;
+      case 'rateHabit':
+        tqRate(ds.habit, Number(ds.value));
+        _syncRequired();
+        _focusSel('#tq-habits-menu [data-habit="' + ds.habit + '"][data-value="' + ds.value + '"]');
+        return;
+      case 'habitNoteRate': {
+        var low = Number(ds.to);
+        if (low >= 1) tqRate('completes', low);
+        _syncRequired();
+        return;
+      }
+      case 'habitNoteKeep':
+        _keepHabitNote(st);
+        _syncRequired();
+        return;
+      case 'closeAdd':
+        _addClose(st);
+        return;
+      case 'pickPiece':
+        _repick(st, i, { mentionAssessments: [ds.aid] });
+        return;
+      case 'pickSkill':
+        _repick(st, i, { strengths: [ds.comp] });
+        return;
+      case 'piecesAll':
+        _piecesAll = true;
+        _syncRequired();
+        _focusSel('#tq-wording-menu .qn-menu-item.on');
+        return;
+      case 'missOpen':
+        _missAction(st, what);
+        return;
       case 'pick':
         tqSaveCurrentIfNeeded();
         (_sourceOf((_rows[key] || [])[i]) || BANK_SOURCE).pick(st, i, ds.sentence);
@@ -6692,14 +6990,28 @@ window.ReportQuestionnaire = (function () {
         .join('')
     );
   }
+  // html-safe: the sentence, names, part labels, ids and titles esc()'d; gap and row indexes are numbers; the choice buttons are drawn above with esc()
   function _ownBoxHtml(st) {
     var o = _own;
     var first = _first(st);
     if (o.where === 'gap') {
       // At a gap: the sentence goes into the comment there, not the bank.
+      // Under it, everything the Add Here menu offered, as buttons.
+      var gf = _facts(st);
+      var gctx = _bankContext(_activeCourse, st, gf);
+      var picks = _gapChoices(_activeCourse, st, gf, gctx, _rows[_rowKey(st)] || [], o.gap)
+        .map(function (grp) {
+          return grp.choices
+            .map(function (c) {
+              var row = grp.source.row(c, gctx);
+              return `<button type="button" class="qn-own-pick" data-source="${esc(grp.source.id)}" data-action="tqSentences" data-do="insert" data-gap="${o.gap}" data-step="${esc(c.step)}" data-sentence="${esc(c.id)}" title="${esc(row.text + ' · ' + rowSource(row, _activeCourse, st, gf, gctx))}">+ ${esc(c.label)}</button>`;
+            })
+            .join('');
+        })
+        .join('');
       return `<div class="qn-own qn-own-gap" id="tq-own" role="group" aria-label="A sentence of your own">
-      <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. It goes into the comment here. Return adds it.">${esc(o.text)}</textarea>
-      <span class="qn-own-hint">One sentence for this student. Its row’s Options menu can add it to your bank.</span>
+      <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. It goes into the comment here. Return adds it. Its row’s Options menu can add it to your bank.">${esc(o.text)}</textarea>
+      <div class="qn-own-picks">${picks}<button type="button" class="qn-own-pick" data-action="tqSentences" data-do="browseAt" data-gap="${o.gap}" title="Opens the full sentence bank. The sentence you pick goes here.">Browse Sentences…</button></div>
       <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqSentences" data-do="ownCancel" title="Closes without adding anything.">Cancel</button><button type="button" class="qn-line-save" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${o.text.trim() ? '' : ' disabled'} title="Puts this sentence in the comment here.">Add Here</button></div>
     </div>`;
     }
@@ -6783,7 +7095,6 @@ window.ReportQuestionnaire = (function () {
     if (!st || (where !== 'gap' && !window.PersonalBank)) return;
     tqSaveCurrentIfNeeded();
     _wording = null;
-    _addAt = null;
     _supportMenu = false;
     _limitOpen = false;
     if (_browse) _browse.menu = false;
@@ -7018,6 +7329,47 @@ window.ReportQuestionnaire = (function () {
     return n + ' of ' + total + ' · check that ' + which + ' really missing before you approve';
   }
 
+  /* ── See the N (Missing Work) ────────────────────────────────
+     A button on the sentence's row opens the list of the work labelled
+     Missing; each piece opens in the grader. It only lists and opens: it
+     changes no status. */
+  var _miss = null; // { sid, ids: [assessment ids listed] }
+  function _missTitle(cid, aid) {
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    return (a && a.title) || 'Untitled';
+  }
+  // html-safe: titles esc()'d; ids are esc()'d attributes
+  function _missMenuHtml(cid) {
+    var items = _miss.ids
+      .map(function (aid) {
+        var title = _missTitle(cid, aid);
+        return `<div class="qn-miss-item"><span class="qn-menu-text">${esc(title)}</span><button type="button" role="menuitem" class="qn-card-link qn-miss-open" data-action="tqOpenGrader" data-aid="${esc(aid)}" title="Opens the grader on this piece.">Open in Grader ›</button></div>`;
+      })
+      .join('');
+    return `<div class="qn-menu qn-miss-menu" role="menu" aria-label="Missing work" id="tq-miss-menu"><span class="qn-menu-head">Missing Work</span>${items}</div>`;
+  }
+  function _missAction(st, what) {
+    if (what !== 'missOpen') return;
+    _wording = null;
+    if (_miss && _miss.sid === st.id) _miss = null;
+    else
+      _miss = {
+        sid: st.id,
+        ids: missingAndLate(_activeCourse, st.id)
+          .filter(function (x) {
+            return x.missing;
+          })
+          .map(function (x) {
+            return x.id;
+          }),
+      };
+    _syncRequired();
+    if (_miss) _focusSel('#tq-miss-menu button');
+    else _focusSel('#tq-row-missing [data-do="missOpen"]');
+  }
+
   function _missingRowHtml(cid, f, handle, i, text) {
     var course = _courseName(cid);
     var late = String((COURSES[cid] && COURSES[cid].lateWorkPolicy) || '').trim();
@@ -7042,14 +7394,21 @@ window.ReportQuestionnaire = (function () {
         : '';
     var n = (f.notHandedIn && f.notHandedIn.count) || 0;
     var total = (f.record && f.record.total) || n;
-    return `<div class="qn-req-row${_isChecked(f.sid, 'missing') ? '' : ' flag'} qn-line-row" id="tq-row-missing"${_rowAttr(i)}>
+    var cur = _current();
+    var listed = _miss && cur && _miss.sid === cur.id;
+    var seeN = listed ? _miss.ids.length : n;
+    var see =
+      n > 0 || listed
+        ? `<button type="button" class="qn-see-missing" data-action="tqSentences" data-do="missOpen" aria-haspopup="menu" aria-expanded="${!!listed}" title="Lists the missing work. Each piece opens in the grader.">See the ${seeN}</button>`
+        : '';
+    return `<div class="qn-req-row${_isChecked(f.sid, 'missing') ? '' : ' flag'} qn-line-row has-menu" id="tq-row-missing"${_rowAttr(i)}>
       ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">Missing Work</span></div>
       <div class="qn-req-body">
         <span class="qn-req-text">${esc(sentence)}${lateBtn}</span>
         ${line}
         ${_checkSourceHtml(f.sid, 'missing', _missingSource(f), n + ' of ' + total + ' · checked')}
       </div>
-      ${_checkHtml(f.sid, 'missing')}
+      ${see}${_checkHtml(f.sid, 'missing')}${listed ? _missMenuHtml(cid) : ''}
     </div>`;
   }
 
@@ -7637,8 +7996,9 @@ window.ReportQuestionnaire = (function () {
       _limitOpen ||
       !!_lineEdit ||
       !!_wording ||
-      _addAt != null ||
       !!_own ||
+      !!_miss ||
+      _habMenu ||
       !!(_browse && _browse.menu)
     );
   }
@@ -7669,8 +8029,12 @@ window.ReportQuestionnaire = (function () {
       _wording = null;
       _syncRequired();
     }
-    if (_addAt != null && !target.closest('#tq-add-menu, [data-do="addMenu"]')) {
-      _addAt = null;
+    if (_habMenu && !target.closest('#tq-habits-menu, [data-do="habitsMenu"]')) {
+      _habMenu = false;
+      _syncRequired();
+    }
+    if (_miss && !target.closest('#tq-miss-menu, [data-do="missOpen"], #undo-toast')) {
+      _miss = null;
       _syncRequired();
     }
     if (_browse && _browse.menu && !target.closest('#tq-fits-menu, #tq-browse-fits')) {
@@ -7691,11 +8055,16 @@ window.ReportQuestionnaire = (function () {
       _syncBrowse('tq-browse-fits');
       return true;
     }
-    if (_addAt != null) {
-      var gap = _addAt;
-      _addAt = null;
+    if (_habMenu) {
+      _habMenu = false;
       _syncRequired();
-      _focusGap(gap);
+      _focusSel('#tq-sentences [data-do="habitsMenu"]');
+      return true;
+    }
+    if (_miss) {
+      _miss = null;
+      _syncRequired();
+      _focusSel('#tq-row-missing [data-do="missOpen"]');
       return true;
     }
     if (_wording) {
@@ -8162,7 +8531,6 @@ window.ReportQuestionnaire = (function () {
     _drawer = null;
     _own = null;
     _wording = null;
-    _addAt = null;
     _cal = null;
     _iePending = null;
     _supportMenu = false;
@@ -8213,7 +8581,9 @@ window.ReportQuestionnaire = (function () {
     _measureObs();
     syncApprove();
     _wireDrag();
+    _wireCard();
     _wireSliders();
+    ReportQnBoxes.wireLight();
     _wireSelAdd();
     // The teacher's own sentences in the bank (plan PR 10), and the
     // suggestions again after Later.
@@ -8433,6 +8803,7 @@ window.ReportQuestionnaire = (function () {
     PARTS: PARTS,
     partOf: partOf,
     rowLabel: rowLabel,
+    habitNoteText: habitNoteText,
     sentencesOf: sentencesOf,
     rowsFromDraft: rowsFromDraft,
     rowFromSentence: rowFromSentence,

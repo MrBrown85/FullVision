@@ -2668,16 +2668,12 @@ body.qn-roster #gb-sidebar .student-row-note {
    every width; the words take what is left. */
 .qn-habits {
   --hs-w: 236px;
-  padding: 12px 14px 4px;
+  padding: 10px 14px 4px;
   display: flex;
   flex-direction: column;
 }
 .qn-habits .qn-card-top {
   padding-bottom: 4px;
-}
-.qn-habits .qn-card-title {
-  font-size: 15px;
-  font-weight: 500;
 }
 .qn-habit-head,
 .qn-habit-row {
@@ -2724,13 +2720,13 @@ body.qn-roster #gb-sidebar .student-row-note {
   white-space: nowrap;
 }
 .qn-habit-name {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.3;
 }
 .qn-habit-desc {
   grid-column: 1 / -1;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.35;
   color: var(--text-2);
 }
@@ -2812,44 +2808,42 @@ body.qn-roster #gb-sidebar .student-row-note {
   display: block;
 }
 /* At a Glance */
-.qn-glance .qn-card-top {
-  padding: 12px 14px 10px;
+.qn-glance {
+  padding: 10px 14px;
 }
 .qn-band {
-  padding: 6px 14px 4px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-2);
-  background: var(--bg);
+  padding: 10px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
 }
+/* A row: its part's tile, then the label in the part's colour over the
+   name and what it rests on (slice 7). */
 .qn-fact {
   display: flex;
   gap: 10px;
-  padding: 9px 14px;
-  align-items: flex-start;
-  border-top: 1px solid var(--qn-hairline);
+  padding: 7px 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
+  align-items: center;
   font-size: var(--text-sm);
 }
-.qn-band + .qn-fact,
-.qn-best {
-  border-top: 0;
-}
-.qn-best {
-  background: var(--qn-best-bg);
+.qn-fact > .qn-box-tile,
+.qn-glance-toggle > .qn-box-tile {
+  align-self: flex-start;
+  margin-top: 1px;
 }
 .qn-fact-label {
-  width: 92px;
-  flex: none;
-  color: var(--text-2);
+  color: var(--qn-ink, var(--text-2));
   font-size: 12.5px;
-  padding-top: 1px;
+  font-weight: 600;
 }
 .qn-fact-body {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 .qn-count {
   flex: none;
@@ -2918,14 +2912,13 @@ body.qn-roster #gb-sidebar .student-row-note {
    behind the figure, each title opening the grader. */
 .qno-glance .qn-glance-row {
   display: block;
-  padding: 0;
 }
 .qn-glance-toggle {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 0;
   border: 0;
   background: none;
   font: inherit;
@@ -2933,19 +2926,16 @@ body.qn-roster #gb-sidebar .student-row-note {
   text-align: left;
   cursor: pointer;
 }
-.qn-glance-toggle:hover {
-  background: var(--bg);
+.qn-glance-toggle.static {
+  cursor: default;
 }
 .qn-glance-toggle:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: -2px;
 }
-.qn-glance-toggle .qn-fact-label {
-  padding-top: 2px;
-}
 .qn-glance-name {
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text);
   overflow-wrap: anywhere;
 }
@@ -2956,19 +2946,47 @@ body.qn-roster #gb-sidebar .student-row-note {
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  padding-top: 2px;
   text-align: right;
 }
+/* The value: black, 14/600; its level step stays in data-level. */
 .qn-glance-fig .qn-level {
   width: auto;
   white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.qn-glance-detail {
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/* Missing Work's count and chevron, one chip. */
+.qn-glance-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 10px;
+  border-radius: 7px;
+  background: var(--qn-chip-amber, rgba(138, 90, 0, 0.12));
+  color: var(--qn-missing-ink);
+}
+.qn-glance-chip .qn-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+}
+.qn-glance-chip .qn-chev {
+  border-color: currentColor;
 }
 .qn-glance-extra {
   font-size: 12px;
   color: var(--text-2);
 }
 .qn-best-mark {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -2989,19 +3007,18 @@ body.qn-roster #gb-sidebar .student-row-note {
   flex: none;
   width: 8px;
   height: 8px;
-  margin: 6px 2px 0 0;
+  margin: 0 2px 0 0;
   border-right: 1.5px solid var(--text-3);
   border-bottom: 1.5px solid var(--text-3);
-  transform: rotate(45deg);
+  transform: translateY(-2px) rotate(45deg);
 }
 .qn-glance-toggle[aria-expanded='true'] .qn-chev {
-  margin-top: 9px;
-  transform: rotate(-135deg);
+  transform: translateY(2px) rotate(-135deg);
 }
 .qn-glance-list {
   list-style: none;
   margin: 0;
-  padding: 0 14px 10px 116px;
+  padding: 0 0 6px 32px;
 }
 .qn-glance-list[hidden] {
   display: none;
@@ -3043,9 +3060,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   gap: 10px;
   padding: 4px 14px 12px;
 }
-.qno-glance-foot {
-  padding: 10px 14px 12px;
-  border-top: 1px solid var(--qn-hairline);
+.qno-glance-foot,
+.qn-obs .qno-foot {
+  padding: 10px 0 2px;
 }
 .qno-view-all {
   background: none;
@@ -3060,14 +3077,14 @@ body.qn-roster #gb-sidebar .student-row-note {
    four types and All with their counts, the newest three observations as
    the Observations page's card (read only, text cut to two lines), and a
    foot. Always the same size, however many there are. */
-.qn-obs .qn-card-top {
-  padding: 12px 14px 10px;
+.qn-obs {
+  padding: 10px 14px;
 }
 .qno-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
-  padding: 0 14px 12px;
+  padding: 8px 0;
 }
 .qno-seg {
   display: flex;
@@ -3115,7 +3132,82 @@ body.qn-roster #gb-sidebar .student-row-note {
   white-space: nowrap;
 }
 .qno-recent {
-  padding: 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* The card's observations follow the board: a soft fill with no border; the
+   kind chip, then the date, then the text, then the tags; Private small at
+   the top right. */
+.qn-obs .obs-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 8px;
+  align-items: center;
+  position: relative;
+  background: var(--qn-obs-fill, #f5f5f7);
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  margin-bottom: 0;
+}
+.qn-obs .obs-card:hover {
+  box-shadow: none;
+}
+.qn-obs .obs-card-main,
+.qn-obs .obs-card-header {
+  display: contents;
+}
+.qn-obs .obs-type {
+  width: auto;
+  height: 20px;
+  padding: 0 7px;
+  margin: 0;
+  font-size: 12px;
+  border-radius: 5px;
+}
+.qn-obs .obs-card-time {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.qn-obs .obs-card-text {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.qn-obs .obs-card-meta {
+  grid-column: 1 / -1;
+  margin: 0;
+  gap: 4px 10px;
+  font-size: 12.5px;
+}
+.qn-obs
+  .obs-card-meta:not(:has(.obs-card-dim, .obs-card-context, .obs-card-assessment, .obs-card-link, .obs-card-quoted)) {
+  display: none;
+}
+.qn-obs .obs-card-context {
+  color: var(--text-2);
+}
+.qn-obs .obs-card-meta .obs-card-dim {
+  color: var(--text);
+  font-weight: 500;
+}
+.qn-obs .obs-private {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.07);
+  border-radius: 5px;
+  padding: 2px 6px;
 }
 /* Read only: no delete column. */
 .qn-obs .obs-card,
@@ -3351,16 +3443,23 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 
 /* The student's Voice */
-.qn-voice .qn-card-top {
-  padding: 12px 14px 8px;
+.qn-voice {
+  padding: 10px 14px;
 }
 .qn-voice-row {
   display: flex;
   gap: 10px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--qn-hairline);
+  padding: 8px 0 2px 32px;
   font-size: var(--text-sm);
   align-items: flex-start;
+}
+.qn-voice-main {
+  flex: 1;
+  min-width: 0;
+}
+.qn-voice .qn-fact-label {
+  display: block;
+  color: var(--qn-ink, var(--text-2));
 }
 .qn-voice-text {
   flex: 1;
@@ -3836,15 +3935,20 @@ body.qn-roster #gb-sidebar .student-row-note {
 
 /* Attendance: one line */
 .qn-att {
-  padding: 9px 14px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   gap: 16px;
   font-size: var(--text-sm);
 }
+.qn-att-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .qn-att-title {
   font-weight: 600;
-  font-size: var(--text-md);
+  font-size: 14px;
 }
 .qn-att-field {
   display: flex;
@@ -4962,109 +5066,6 @@ body.qn-roster #gb-sidebar .student-row-note {
     background-color: transparent;
   }
 }
-/* The gap after a row: nothing in the flow, so the rows never move. A
-   band 12px tall over the hairline takes the hover; the line, the + and
-   the tooltip show on hover, keyboard focus or while the menu is open. */
-.qn-gap {
-  position: relative;
-  height: 0;
-  z-index: 2;
-}
-/* The open menu above the next gap's hover band. */
-.qn-gap.open {
-  z-index: 3;
-}
-.qn-gap::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -6px;
-  height: 12px;
-}
-.qn-gap-line {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  top: -1px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--active);
-  opacity: 0;
-  pointer-events: none;
-}
-.qn-gap-add {
-  position: absolute;
-  left: 7px;
-  top: -9px;
-  width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  border: 0;
-  background: var(--active-fill);
-  color: #fff;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 18px;
-  padding: 0;
-  text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  cursor: pointer;
-}
-.qn-gap-tip {
-  position: absolute;
-  left: 32px;
-  top: -13px;
-  background: #1d1d1f;
-  color: #fff;
-  border-radius: 8px;
-  padding: 5px 10px;
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  opacity: 0;
-  pointer-events: none;
-}
-.qn-gap:hover .qn-gap-line,
-.qn-gap:focus-within .qn-gap-line,
-.qn-gap.open .qn-gap-line,
-.qn-gap:hover .qn-gap-add,
-.qn-gap:focus-within .qn-gap-add,
-.qn-gap.open .qn-gap-add,
-.qn-gap:hover .qn-gap-tip,
-.qn-gap:focus-within .qn-gap-tip {
-  opacity: 1;
-}
-.qn-gap.open .qn-gap-tip {
-  opacity: 0;
-}
-.qn-gap-add:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
-}
-/* The Add Here menu, from the + (the InsertRows mockup). */
-.qn-add-menu {
-  left: 30px;
-  right: auto;
-  top: 10px;
-}
-.qn-add-item {
-  gap: 10px;
-}
-.qn-add-part {
-  width: 72px;
-  flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  padding-top: 2px;
-}
-.qn-add-none {
-  padding: 6px 10px;
-}
 /* The Options menu of a Your Sentence row. */
 .qn-options {
   width: 270px;
@@ -5853,7 +5854,7 @@ body.qn-roster #gb-sidebar .student-row-note {
     flex-wrap: wrap;
     gap: 8px 16px;
   }
-  .qn-att-title,
+  .qn-att-head,
   .qn-att-note {
     flex-basis: 100%;
     text-align: left;
@@ -6103,6 +6104,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   --qn-box-bg: var(--surface);
   --qn-missing-bg: #fff4dc;
   --qn-tint-bg: rgba(0, 102, 204, 0.1);
+  /* The link blue on that tint over a grey card is 4.44:1, under the 4.5 small text needs; one step darker passes. */
+  --qn-tint-ink: #0058b0;
   --qn-tint-bg-amber: rgba(255, 255, 255, 0.8);
   --qn-btn-bg: rgba(0, 0, 0, 0.04);
   --qn-ev-badge-bg: #fbefd6;
@@ -6110,11 +6113,32 @@ body.qn-roster #gb-sidebar .student-row-note {
   --qn-ev-track: rgba(0, 0, 0, 0.1);
   --qn-habit: #6b4fbb;
   --qn-missing-ink: #a35f00;
+  --qn-obs-fill: #f5f5f7;
+  /* Each part's colour (the ring and tint) and its text shade, light and dark. */
+  --qn-c-grade: #0066cc;
+  --qn-ink-grade: #0062c4;
+  --qn-c-bestPiece: #a8690a;
+  --qn-ink-bestPiece: #85530a;
+  --qn-c-strengths: #2e7d4f;
+  --qn-ink-strengths: #25673f;
+  --qn-c-habits: #6b4fbb;
+  --qn-ink-habits: #5e43a8;
+  --qn-c-attendance: #3f6fb5;
+  --qn-ink-attendance: #33609f;
+  --qn-c-voice: #b83a72;
+  --qn-ink-voice: #9a2c5d;
+  --qn-c-notHandedIn: #a35f00;
+  --qn-ink-notHandedIn: #8a5000;
+  --qn-c-nextStep: #0f7b83;
+  --qn-ink-nextStep: #0b666d;
+  --qn-c-change: #5b5b60;
+  --qn-ink-change: #56565b;
 }
 @media (prefers-color-scheme: dark) {
   .qn {
     --qn-missing-bg: rgba(255, 214, 10, 0.12);
     --qn-tint-bg: rgba(10, 132, 255, 0.18);
+    --qn-tint-ink: var(--link);
     --qn-tint-bg-amber: rgba(255, 255, 255, 0.12);
     --qn-btn-bg: rgba(255, 255, 255, 0.08);
     --qn-ev-badge-bg: rgba(255, 214, 10, 0.16);
@@ -6122,6 +6146,25 @@ body.qn-roster #gb-sidebar .student-row-note {
     --qn-ev-track: rgba(255, 255, 255, 0.16);
     --qn-habit: #a18cf0;
     --qn-missing-ink: #ffd60a;
+    --qn-obs-fill: rgba(255, 255, 255, 0.07);
+    --qn-c-grade: #4da3ff;
+    --qn-ink-grade: #4da3ff;
+    --qn-c-bestPiece: #e6b050;
+    --qn-ink-bestPiece: #e6b050;
+    --qn-c-strengths: #5fc486;
+    --qn-ink-strengths: #5fc486;
+    --qn-c-habits: #b3a1f5;
+    --qn-ink-habits: #b3a1f5;
+    --qn-c-attendance: #86b3ea;
+    --qn-ink-attendance: #86b3ea;
+    --qn-c-voice: #f08ab4;
+    --qn-ink-voice: #f08ab4;
+    --qn-c-notHandedIn: #ffd60a;
+    --qn-ink-notHandedIn: #ffd60a;
+    --qn-c-nextStep: #4fc3cb;
+    --qn-ink-nextStep: #4fc3cb;
+    --qn-c-change: #a1a1a6;
+    --qn-ink-change: #a1a1a6;
   }
 }
 /* The card itself is only the page's section: the title, then the boxes. */
@@ -6156,6 +6199,96 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-box + .qn-box {
   margin-top: 8px;
 }
+
+/* A card and its sentence light each other when pointed at (slice 7): a
+   soft tint and ring in the part's colour. Nothing moves; each part's
+   colour is --qn-part. Under Reduce Motion it is not drawn. */
+[data-lit='grade'],
+.qn-box[data-part='grade'] {
+  --qn-part: var(--qn-c-grade);
+  --qn-ink: var(--qn-ink-grade);
+}
+[data-lit='bestPiece'],
+.qn-box[data-part='bestPiece'] {
+  --qn-part: var(--qn-c-bestPiece);
+  --qn-ink: var(--qn-ink-bestPiece);
+}
+[data-lit='strengths'],
+.qn-box[data-part='strengths'] {
+  --qn-part: var(--qn-c-strengths);
+  --qn-ink: var(--qn-ink-strengths);
+}
+[data-lit='habits'],
+.qn-box[data-part='habits'] {
+  --qn-part: var(--qn-c-habits);
+  --qn-ink: var(--qn-ink-habits);
+}
+[data-lit='attendance'],
+.qn-box[data-part='attendance'] {
+  --qn-part: var(--qn-c-attendance);
+  --qn-ink: var(--qn-ink-attendance);
+}
+[data-lit='voice'],
+.qn-box[data-part='voice'] {
+  --qn-part: var(--qn-c-voice);
+  --qn-ink: var(--qn-ink-voice);
+}
+[data-lit='notHandedIn'],
+.qn-box[data-part='notHandedIn'] {
+  --qn-part: var(--qn-c-notHandedIn);
+  --qn-ink: var(--qn-ink-notHandedIn);
+}
+[data-lit='nextStep'],
+.qn-box[data-part='nextStep'] {
+  --qn-part: var(--qn-c-nextStep);
+  --qn-ink: var(--qn-ink-nextStep);
+}
+[data-tone='change'] {
+  --qn-part: var(--qn-c-change);
+  --qn-ink: var(--qn-ink-change);
+}
+.qn-box,
+.qn-card[data-lit],
+.qn-fact[data-lit],
+.qn-grade[data-lit] {
+  transition:
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+.qn-box.qn-lit,
+.qn-card.qn-lit {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 2px color-mix(in srgb, var(--qn-part) 40%, transparent);
+}
+.qn-fact.qn-lit {
+  background: color-mix(in srgb, var(--qn-part) 9%, transparent);
+}
+.qn-grade.qn-lit {
+  background: color-mix(in srgb, var(--qn-part) 9%, transparent);
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qn-part) 9%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qn-box,
+  .qn-card[data-lit],
+  .qn-fact[data-lit],
+  .qn-grade[data-lit] {
+    transition: none;
+  }
+  .qn-box.qn-lit,
+  .qn-card.qn-lit {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .qn-fact.qn-lit,
+  .qn-grade.qn-lit {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  .qn-box[data-part='notHandedIn'].qn-lit {
+    background-color: var(--qn-missing-bg);
+  }
+}
 .qn-box[data-part='notHandedIn'] {
   background: var(--qn-missing-bg);
 }
@@ -6179,6 +6312,10 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-weight: 600;
   color: var(--text);
   min-width: 0;
+}
+.qn-card-top .qn-box-name {
+  flex: none;
+  white-space: nowrap;
 }
 .qn-box-head .qn-req-chip {
   flex: none;
@@ -6354,14 +6491,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-box .qn-drop-line {
   margin: 2px 0;
 }
-/* The gap's + sits inside the box's left padding. */
-.qn-box .qn-gap-add {
-  left: -3px;
-}
-.qn-box .qn-gap-line {
-  left: 0;
-  right: 0;
-}
 @media (max-width: 600px) {
   .qn-sentences .qn-box .qn-req-row {
     flex-wrap: nowrap;
@@ -6373,4 +6502,429 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn-req-top .qn-card-link {
     margin-left: 0;
   }
+}
+
+/* ── Adding and editing in one click (slice 4) ── */
+.qn-add-sentence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--qn-tint-bg);
+  color: var(--qn-tint-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 11px;
+  cursor: pointer;
+}
+.qn-add-sentence:hover {
+  background: rgba(0, 102, 204, 0.16);
+}
+.qn-add-sentence:focus-visible,
+.qn-gap-add:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+/* The gap between two sentences or two boxes takes the room the space
+   between them took, so nothing moves. The line and the pill are drawn
+   over it after the pointer rests (180 ms) or at once on keyboard focus. */
+.qn-box .qn-gap {
+  position: relative;
+  height: 5px;
+  margin: 0 -14px;
+  z-index: 2;
+}
+.qn-box .qn-gap + .qn-req-row {
+  margin-top: 0;
+}
+.qn-box .qn-gap:last-child {
+  height: 11px;
+}
+.qn-box:has(> .qn-gap:last-child) {
+  padding-bottom: 0;
+}
+/* The part of the hover area that lies in the space between two boxes. */
+.qn-box .qn-gap:last-child::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 8px;
+}
+.qn-gap-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1.5px;
+  height: 2px;
+  background: #0066cc;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1ms;
+}
+.qn-box .qn-gap:last-child .qn-gap-line {
+  top: calc(100% + 3px);
+}
+.qn-gap-add {
+  position: absolute;
+  z-index: 1;
+  left: 44px;
+  top: -6px;
+  height: 18px;
+  border: 0;
+  border-radius: 9px;
+  background: #0066cc;
+  color: #fff;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 18px;
+  padding: 0 9px;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--qn-box-bg);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 1ms;
+}
+.qn-box .qn-gap:last-child .qn-gap-add {
+  top: calc(100% - 5px);
+}
+.qn-box[data-part='notHandedIn'] .qn-gap-add {
+  box-shadow: 0 0 0 2px var(--qn-missing-bg);
+}
+.qn-box .qn-gap:hover .qn-gap-line,
+.qn-box .qn-gap:hover .qn-gap-add {
+  opacity: 1;
+  transition-delay: 180ms;
+}
+.qn-box .qn-gap:focus-within .qn-gap-line,
+.qn-box .qn-gap:focus-within .qn-gap-add {
+  opacity: 1;
+  transition-delay: 0s;
+}
+/* While a sentence is dragged, no bar shows. */
+.qn-sentences.dragging .qn-gap-line,
+.qn-sentences.dragging .qn-gap-add {
+  display: none;
+}
+/* A sentence's own edges lie over the pill, so a click there reaches it. */
+.qn-box .qn-srow .qn-req-text {
+  position: relative;
+  z-index: 3;
+  cursor: text;
+}
+.qn-box .qn-edit-field,
+.qn-box .qn-edit-field:focus {
+  box-shadow: 0 0 0 2px #0066cc !important;
+}
+.qn-edit-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--qn-box-bg);
+  border: 0;
+  border-radius: 6px;
+  padding: 0 4px;
+  margin: 0 -4px;
+  box-shadow: 0 0 0 2px #0066cc;
+  outline: 0;
+  position: relative;
+  z-index: 6;
+}
+.qn-box .qn-srow.editing {
+  position: relative;
+  z-index: 6;
+}
+/* The writing box at a gap: the choices as tinted buttons under it. */
+.qn-own-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.qn-own-pick {
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--qn-tint-bg);
+  color: var(--link);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-own-pick:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-box .qn-own-gap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Dragging and motion (slice 5) ── */
+.qn-box .qn-srow-handle {
+  touch-action: none;
+  user-select: none;
+}
+.qn-sentences {
+  position: relative;
+}
+/* The lifted sentence: its own background rings it, a long shadow lifts it,
+   it is a little larger and follows the pointer. */
+.qn-box .qn-srow.lifted {
+  position: relative;
+  z-index: 20;
+  background: var(--lift-bg, var(--qn-box-bg));
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 6px var(--lift-bg, var(--qn-box-bg)),
+    0 14px 34px 6px rgba(0, 0, 0, 0.2);
+  cursor: grabbing;
+}
+.qn-slot {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  background: #dbe8fa;
+  border-radius: 12px;
+  z-index: 1;
+  pointer-events: none;
+}
+.qn-sentences.dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+/* What hangs off a sentence waits until it lands. */
+.qn-sentences.dragging .qn-claim,
+.qn-sentences.dragging .qn-pron-note,
+.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-line-menu,
+.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-edited,
+.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-own-add {
+  visibility: hidden;
+}
+.qn-box .qn-srow,
+.qn-box .qn-req-row.flag {
+  transition: background-color 150ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .qn-sentences *,
+  .qn-sentences *::before,
+  .qn-sentences *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ── The menus (slice 6) ── */
+.qn-menu-right {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.qn-see-missing {
+  flex: none;
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(138, 90, 0, 0.14);
+  color: #6b4200;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-see-missing:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+@media (prefers-color-scheme: dark) {
+  .qn-see-missing {
+    background: rgba(255, 214, 10, 0.16);
+    color: #ffd60a;
+  }
+}
+.qn-miss-menu {
+  width: 520px;
+}
+.qn-miss-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+}
+.qn-miss-item .qn-menu-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.qn-miss-open {
+  flex: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+/* ── Work Habits in the box, the amber note and + Close to (slice 8) ── */
+.qn-box-head {
+  position: relative;
+}
+.qn-ev-habits {
+  position: static;
+  display: inline-flex;
+}
+.qn-ev-bars-btn {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(107, 79, 187, 0.08);
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.qn-ev-bars-btn:hover,
+.qn-ev-bars-btn.on {
+  background: rgba(107, 79, 187, 0.16);
+}
+.qn-ev-bars-btn:focus-visible,
+.qn-hm-step:focus-visible,
+.qn-habit-note button:focus-visible,
+.qn-add-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-habits-menu {
+  top: calc(100% + 2px);
+  right: 0;
+  width: 480px;
+}
+.qn-hm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+}
+.qn-hm-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.qn-hm-steps {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.qn-hm-step {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 0 3px;
+  cursor: pointer;
+}
+.qn-hm-step > span {
+  width: 5px;
+  border-radius: 2px;
+  background: var(--qn-ev-track);
+}
+.qn-hm-step.lit > span {
+  background: var(--qn-habit);
+}
+.qn-hm-step:hover {
+  background: rgba(107, 79, 187, 0.12);
+}
+.qn-hm-word {
+  flex: none;
+  width: 108px;
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.qn-habit-note {
+  margin: 6px 0 0 32px;
+  background: var(--qn-missing-bg);
+  border-radius: 9px;
+  padding: 6px 6px 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.qn-habit-note-text {
+  flex: 1 1 280px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.qn-habit-note button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-habit-note-fix {
+  background: #a35f00;
+  color: #fff;
+}
+.qn-habit-note-keep {
+  background: rgba(138, 90, 0, 0.14);
+  color: #6b4200;
+}
+@media (prefers-color-scheme: dark) {
+  .qn-habit-note-keep {
+    background: rgba(255, 214, 10, 0.16);
+    color: #ffd60a;
+  }
+}
+.qn-extra-row {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0 32px;
+}
+.qn-add-btn {
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--qn-tint-bg);
+  color: var(--link);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-sentences.dragging .qn-habit-note,
+.qn-sentences.dragging .qn-extra-row {
+  visibility: hidden;
 }

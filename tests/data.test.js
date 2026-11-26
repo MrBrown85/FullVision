@@ -712,6 +712,104 @@ describe('data-cache-first', () => {
       expect(localStorage.getItem('gb-students-' + CID)).toBe('[]');
       expect(localStorage.getItem('gb-students-' + OTHER)).toBeNull();
     });
+
+    /* A teacher's classes outgrew the phone's storage (Safari's 5 MB): the classes loaded behind the page filled
+       it, and at every sign-in the sync dot said recent changes may not be saved, though only copies of what the
+       server sent had failed (Nov 25, 2026). */
+    describe('when storage is full', () => {
+      const THIRD = 'd0000000-0000-4000-8000-000000000003';
+      let realSetItem;
+      // Writes to the class's keys fail as a full browser's do; other keys still save.
+      const fullFor = cid => {
+        realSetItem = localStorage.setItem;
+        localStorage.setItem = function (key, value) {
+          if (String(key).endsWith('-' + cid)) {
+            const err = new Error('full');
+            err.name = 'QuotaExceededError';
+            throw err;
+          }
+          return realSetItem.call(this, key, value);
+        };
+      };
+      afterEach(() => {
+        if (realSetItem) localStorage.setItem = realSetItem;
+        realSetItem = null;
+        _copyKeysUnsaved = {};
+        _storageFullKeys.clear();
+      });
+
+      it('a class loaded behind the page that does not fit is not kept, pushes nothing out, and leaves the dot alone', () => {
+        _saveClassMeta(THIRD, { lastOpenedAt: 1 });
+        localStorage.setItem('gb-students-' + THIRD, '[]');
+        _saveClassMeta(OTHER, { lastOpenedAt: 2, savedAt: 2 });
+        fullFor(OTHER);
+        _preloadFull = false;
+
+        _persistLoadedField(OTHER, 'students', [{ id: 'x' }]);
+
+        expect(getSaveProblem()).toBeNull();
+        expect(_preloadFull).toBe(true);
+        // A class the teacher opened keeps its copy; the one that didn't fit keeps none it could open from.
+        expect(localStorage.getItem('gb-students-' + THIRD)).toBe('[]');
+        expect(localStorage.getItem('gb-bundle-meta-' + THIRD)).not.toBeNull();
+        expect(localStorage.getItem('gb-bundle-meta-' + OTHER)).toBeNull();
+        // What was loaded is still on the page.
+        expect(_cache.students[OTHER]).toEqual([{ id: 'x' }]);
+      });
+
+      it("the open class's copy that does not fit leaves the dot alone, and isn't opened from", () => {
+        _saveClassMeta(CID, { lastOpenedAt: Date.now() });
+        fullFor(CID);
+
+        _persistLoadedField(CID, 'students', [{ id: 'y' }]);
+
+        expect(getSaveProblem()).toBeNull();
+        expect(localStorage.getItem('gb-bundle-meta-' + CID)).toBeNull();
+        expect(_cache.students[CID]).toEqual([{ id: 'y' }]);
+      });
+
+      it("a teacher's own change that does not fit still turns the dot red", () => {
+        fullFor(CID);
+        expect(_safeLSSet('gb-scores-' + CID, '{}')).toBe(false);
+        expect(getSaveProblem()).toMatch(/storage is full/);
+        localStorage.setItem = realSetItem;
+        _safeLSSet('gb-scores-' + CID, '{}');
+        expect(getSaveProblem()).toBeNull();
+      });
+
+      it('frees space from a copy never opened before one the teacher opened', () => {
+        _saveClassMeta(THIRD, { lastOpenedAt: 5 });
+        localStorage.setItem('gb-students-' + THIRD, '[]');
+        _saveClassMeta(OTHER, { savedAt: Date.now() });
+        localStorage.setItem('gb-students-' + OTHER, '[]');
+
+        expect(_evictOldestSavedCopy(null)).toBe(true);
+
+        expect(localStorage.getItem('gb-students-' + OTHER)).toBeNull();
+        expect(localStorage.getItem('gb-students-' + THIRD)).toBe('[]');
+      });
+
+      it('loading behind the page stops once a class does not fit', async () => {
+        saveCourses({
+          [CID]: { id: CID, name: 'Science 8' },
+          [OTHER]: { id: OTHER, name: 'Science 9' },
+          [THIRD]: { id: THIRD, name: 'Science 10' },
+        });
+        const realLoad = globalThis.loadClass;
+        const loaded = [];
+        globalThis.loadClass = cid => {
+          loaded.push(cid);
+          _preloadFull = true; // its copy didn't fit
+          return Promise.resolve();
+        };
+        try {
+          await preloadClasses();
+        } finally {
+          globalThis.loadClass = realLoad;
+        }
+        expect(loaded).toHaveLength(1);
+      });
+    });
   });
 });
 

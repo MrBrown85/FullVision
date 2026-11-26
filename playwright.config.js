@@ -11,6 +11,11 @@ export default defineConfig({
   // One retry on CI: a test that fails twice is real breakage and fails the
   // run; one that passes on the retry is reported as flaky.
   retries: process.env.CI ? 1 : 0,
+  // A test that fails at random is set aside, not chased through the queue: "@flaky" in its title keeps it out
+  // of the run that gates a merge, and CI's e2e-flaky job runs those alone, never blocking (Colin, Nov 25,
+  // 2026). FV_FLAKY=1 runs only them here too. Each one set aside has an open issue labelled flaky-test.
+  grep: process.env.FV_FLAKY ? /@flaky/ : undefined,
+  grepInvert: process.env.FV_FLAKY ? undefined : /@flaky/,
   // A GitHub runner has 4 cores; Playwright's default (half the cores) ran
   // only 2 tests at a time there. Locally the default already uses half
   // the Mac's cores.

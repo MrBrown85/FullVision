@@ -200,7 +200,7 @@
       '">+ Observe</button><button type="button" class="m-sc-profile" data-action="m-student-detail" data-sid="' +
       esc(st.id) +
       '">Profile</button></div>' +
-      '<div class="m-sc-scroll">' +
+      '<div class="m-sc-list"><div class="m-sc-scroll">' +
       (boxes ? '<div class="m-sc-boxes">' + boxes + '</div>' : '') +
       (rows
         ? '<div class="m-sc-work">' +
@@ -219,7 +219,7 @@
             : '') +
           '</div>'
         : '') +
-      '</div></div>'
+      '</div></div></div>'
     );
   }
 

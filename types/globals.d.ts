@@ -116,6 +116,7 @@ interface Window {
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
   ReportQnBoxes: any;
+  ReportQnMotion: any;
   CmStdHelp: unknown;
   CmKeepMenu: unknown;
   FocusBack: { from(el: Element | null): () => void };

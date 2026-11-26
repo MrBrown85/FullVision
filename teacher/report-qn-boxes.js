@@ -29,6 +29,14 @@ window.ReportQnBoxes = (function () {
     nextStep: { label: 'Next Step', tint: '#0f7b83', icon: 'M3 8h10M9 4l4 4-4 4' },
     support: { label: 'Support', tint: '#0f7b83', icon: 'M8 3v10M3 8h10' },
     closing: { label: 'Closing', tint: '#5b5b60', icon: 'M4 14V2.5M4 3h8l-2 3 2 3H4' },
+    /* The left cards that are not a sentence part (slice 7). */
+    glance: { label: 'At a Glance', tint: '#5b5b60', icon: 'M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z' },
+    change: { label: 'Biggest Change', tint: '#5b5b60', icon: 'M2.5 11l3.5-3.5 2.5 2.5 5-5M10 5h3.5v3.5' },
+    observations: {
+      label: 'Observations',
+      tint: '#5856d6',
+      icon: 'M1.8 8s2.3-4.3 6.2-4.3S14.2 8 14.2 8s-2.3 4.3-6.2 4.3S1.8 8 1.8 8zM8 6.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 1 0 0-3.6',
+    },
   };
   /* Every other part (Your Sentence, Statement, Problem, Plan, Deadline,
      Meeting, Example, Earlier Comment, Language Goals) keeps its own name
@@ -58,8 +66,10 @@ window.ReportQnBoxes = (function () {
   // html-safe: kind is a fixed key, label and the chip text esc()'d, evidence and rows are html the caller drew with esc()
   function box(opts, rows) {
     var l = look(opts.kind, opts.label);
-    var chip = opts.required ? '<span class="qn-req-chip">Required</span>' : '';
-    return `<div class="qn-box" data-part="${_esc(opts.kind)}" role="group" aria-label="${_esc(l.label)}">
+    var chip = opts.required
+      ? `<span class="qn-req-chip" title="${_esc(opts.requiredTip || 'Required.')}">Required</span>`
+      : '';
+    return `<div class="qn-box" data-bk="${_esc(opts.bk || opts.kind)}" data-part="${_esc(opts.kind)}" role="group" aria-label="${_esc(l.label)}">
       <div class="qn-box-head">${_tile(l)}<span class="qn-box-name">${_esc(l.label)}</span>${chip}<span class="qn-box-evidence">${opts.evidence || ''}</span></div>
       ${rows}
     </div>`;
@@ -91,7 +101,29 @@ window.ReportQnBoxes = (function () {
           : '<span class="qn-ev-bar off" style="height:4px"></span>';
       })
       .join('');
-    return `<span class="qn-ev-bars" role="img" aria-label="${_esc(words)}">${b}</span>`;
+    return `<span class="qn-ev-bars" aria-hidden="true" data-words="${_esc(words)}">${b}</span>`;
+  }
+
+  /* The six bars as one button; pressed, the six ratings open under it, each
+     habit with its four steps, Rarely to Consistently. d: { habits: [{ key,
+     name, v }], scale, open }. */
+  // html-safe: names, words and keys esc()'d; ratings are numbers
+  function habitsButton(barsHtml, d, words) {
+    var menu = '';
+    if (d.open) {
+      menu = `<div class="qn-menu qn-habits-menu" role="menu" aria-label="Work Habits ratings" id="tq-habits-menu"><span class="qn-menu-head">Work Habits</span>${d.habits
+        .map(function (h) {
+          var steps = d.scale
+            .map(function (w, k) {
+              var on = h.v === k + 1;
+              return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-hm-step${h.v > k ? ' lit' : ''}${on ? ' on' : ''}" data-action="tqSentences" data-do="rateHabit" data-habit="${_esc(h.key)}" data-value="${k + 1}" aria-label="${_esc(h.name + ': ' + w)}" title="${_esc(h.name + ': ' + w)}"><span style="height:${BAR_H[k]}px"></span></button>`;
+            })
+            .join('');
+          return `<div class="qn-hm-row"><span class="qn-hm-name">${_esc(h.name)}</span><span class="qn-hm-steps" role="group" aria-label="${_esc(h.name)}">${steps}</span><span class="qn-hm-word">${_esc(h.v ? d.scale[h.v - 1] : 'Not rated')}</span></div>`;
+        })
+        .join('')}</div>`;
+    }
+    return `<span class="qn-ev-habits"><button type="button" class="qn-ev-bars-btn${d.open ? ' on' : ''}" data-action="tqSentences" data-do="habitsMenu" aria-haspopup="menu" aria-expanded="${!!d.open}" aria-label="${_esc('Work Habits ratings. ' + words)}" title="Opens the six ratings.">${barsHtml}</button>${menu}</span>`;
   }
 
   /** A track filled to the share, then "N of M". @param {number} n @param {number} total */
@@ -125,12 +157,10 @@ window.ReportQnBoxes = (function () {
           return h.name + ': ' + (h.v ? d.scale[h.v - 1] : 'Not rated');
         })
         .join(', ');
-      return bars(
-        d.habits.map(function (h) {
-          return h.v;
-        }),
-        words,
-      );
+      var ratings = d.habits.map(function (h) {
+        return h.v;
+      });
+      return habitsButton(bars(ratings, words), d, words);
     }
     if (kind === 'attendance' && d.absent != null) return fact(d.absent + ' Absent · ' + d.late + ' Late');
     if (kind === 'voice') return fact(d.goal ? 'Goal Check-In' : 'About Me');
@@ -145,14 +175,23 @@ window.ReportQnBoxes = (function () {
   // html-safe: the boxes are drawn by box(), which esc()s every text
   function wrap(entries, opts) {
     var out = '';
+    var seen = /** @type {Record<string, number>} */ ({});
     /** @type {any} */
     var cur = null;
     var flush = function () {
       if (!cur) return;
       var kind = cur.kind;
       var label = LABELS[kind] || (kind === 'voice' ? opts.first + '’s Voice' : cur.label || '');
+      seen[kind] = (seen[kind] || 0) + 1;
       out += box(
-        { kind: kind, label: label, required: cur.required, evidence: evidence(kind, opts.facts(kind, cur.row)) },
+        {
+          bk: kind + '#' + seen[kind],
+          kind: kind,
+          label: label,
+          required: cur.required,
+          requiredTip: opts.requiredTip,
+          evidence: evidence(kind, opts.facts(kind, cur.row)),
+        },
         cur.html,
       );
       cur = null;
@@ -169,5 +208,77 @@ window.ReportQnBoxes = (function () {
     return out;
   }
 
-  return { look: look, box: box, wrap: wrap, evidence: evidence, LOOK: LOOK };
+  /* The head line of a left card (slice 7): the same tile, name and type as
+     a box's. right is html the caller drew with esc(). */
+  // html-safe: kind is a fixed key, label esc()'d, right is html the caller drew with esc()
+  function head(kind, label, right) {
+    var l = look(kind, label);
+    return `<div class="qn-card-top qn-box-head">${_tile(l)}<span class="qn-box-name">${_esc(l.label)}</span><span class="qn-box-evidence">${right || ''}</span></div>`;
+  }
+
+  /** The small tile alone, for a row. @param {string} kind */
+  function tile(kind) {
+    return _tile(look(kind, ''));
+  }
+
+  /* A card and its sentence light each other (slice 7): pointing at or
+     focusing a left card or row (data-lit) or a box (data-part)
+     lights every element of the same part on the page. A tint and ring in
+     the part's colour (reports.css, .qn-lit); nothing moves. Wired once. */
+  var _lightWired = false;
+  /* A lit thing is a left card or row (data-lit) or a Sentences box (its
+     data-part); both name the same part. */
+  var LIT = '[data-lit], .qn-box[data-part]';
+  /** @param {Element|null} from */
+  function _partOf(from) {
+    var el = from && from.closest ? from.closest(LIT) : null;
+    if (!el) return '';
+    return el.getAttribute('data-lit') || el.getAttribute('data-part') || '';
+  }
+  /** @param {string} part @param {boolean} on */
+  function _set(part, on) {
+    document.querySelectorAll('.qn-left, .qn-right').forEach(function (side) {
+      side.querySelectorAll('[data-lit="' + part + '"], .qn-box[data-part="' + part + '"]').forEach(function (el) {
+        el.classList.toggle('qn-lit', on);
+      });
+    });
+  }
+  function wireLight() {
+    if (_lightWired || typeof document === 'undefined' || !document.addEventListener) return;
+    _lightWired = true;
+    /** @type {string} */
+    var cur = '';
+    /** @param {string} part */
+    var go = function (part) {
+      if (part === cur) {
+        if (part) _set(part, true); // the card was redrawn under the pointer
+        return;
+      }
+      if (cur) _set(cur, false);
+      cur = part;
+      if (part) _set(part, true);
+    };
+    var on = function (/** @type {Event} */ e) {
+      go(_partOf(/** @type {Element} */ (e.target)));
+    };
+    document.addEventListener('mouseover', on);
+    document.addEventListener('focusin', on);
+    document.addEventListener('mouseout', function (e) {
+      if (!e.relatedTarget) go('');
+    });
+    document.addEventListener('focusout', function (e) {
+      if (!e.relatedTarget) go('');
+    });
+  }
+
+  return {
+    look: look,
+    box: box,
+    wrap: wrap,
+    evidence: evidence,
+    head: head,
+    tile: tile,
+    wireLight: wireLight,
+    LOOK: LOOK,
+  };
 })();
