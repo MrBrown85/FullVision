@@ -2,6 +2,16 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Size limits for new code (2026-11-26)
+
+Colin asked what would impress a senior development team taking FullVision over, and then: "Write the lint for it." No line count impresses on its own; what a team checks first is whether each part has one job and whether its functions are short. The limits below hold new code to that and stop old code growing while it is split.
+
+- **A file may have 400 lines; a function 50,** counted as ESLint's `max-lines` and `max-lines-per-function` count them (every line, comments included). A function invoked where it is written (the closure that wraps a page file) does not count. The numbers are in `scripts/size-limits.mjs`.
+- **Code already longer is listed with its length today** in `tests/file-size-baseline.json` (161 files) and `tests/function-size-baseline.json` (771 functions, named by file and place, such as `teacher/page-assignments.js :: _handleClick`). A listed file or function may not grow. When it shrinks, `node scripts/size-limits.mjs --update` lowers its number, so it cannot grow back; the tests fail until it is lowered. `--update` never raises a number or adds one, and it follows a function cut to another file.
+- **Raising a number is an edit to a baseline file by hand,** seen in the pull request, with the reason in its description. A rename of a page file's changing variables onto one object (`scripts/split/state.mjs`) is the expected case: it makes lines longer before the split shrinks them.
+- `tests/file-size.test.js` and `tests/function-size.test.js` enforce both, in `test-and-format`. This replaces the 1,500-line file limit of 2026-11-12.
+- Not yet enforced: layers (screens call the app logic, which calls the data layer). That needs browser modules first, so that a lint rule can read each file's imports.
+
 ## Approve and Next is always on (2026-11-25)
 
 Colin, on the Term Questionnaire page: "Teachers should be able to approve and next regardless of the comment- don't grey it out. That will confuse users." Then: "Always on".
