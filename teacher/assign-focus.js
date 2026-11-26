@@ -67,11 +67,7 @@
     if (pageState._grader) return;
     var rows = document.querySelectorAll('#gb-roster-list .student-row');
     if (!rows.length) {
-      /** @type {any} */ (document.getElementById('sidebar-mount')).innerHTML = renderSidebar(
-        pageState.activeCourse,
-        pageState.focusStudentId,
-        'toggleFocusStudent',
-      );
+      SidebarKeep.draw(renderSidebar(pageState.activeCourse, pageState.focusStudentId, 'toggleFocusStudent'));
       return;
     }
     var picked = /** @type {any} */ (null);
