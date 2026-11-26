@@ -193,7 +193,8 @@ describe('grade-format-guard', () => {
     'teacher/cm-grading.js': 1,
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
-    'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
+    'teacher/assign-blank-rubric.js': 4, // the compact rubric editor's column heads (moved from page-assignments.js, which keeps 23 of its 27)
+    'teacher/page-assignments.js': 23, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
     'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,

@@ -536,3 +536,10 @@ declare var RubricBank: any;
 interface Window {
   RubricBank?: any;
 }
+declare var RubricChecks: any;
+declare var RubricCommentLines: any;
+declare var RubricGuard: any;
+declare var RubricScale: any;
+interface Window {
+  RubricChecks?: any;
+}
