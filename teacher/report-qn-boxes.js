@@ -93,7 +93,29 @@ window.ReportQnBoxes = (function () {
           : '<span class="qn-ev-bar off" style="height:4px"></span>';
       })
       .join('');
-    return `<span class="qn-ev-bars" role="img" aria-label="${_esc(words)}">${b}</span>`;
+    return `<span class="qn-ev-bars" aria-hidden="true" data-words="${_esc(words)}">${b}</span>`;
+  }
+
+  /* The six bars as one button; pressed, the six ratings open under it, each
+     habit with its four steps, Rarely to Consistently. d: { habits: [{ key,
+     name, v }], scale, open }. */
+  // html-safe: names, words and keys esc()'d; ratings are numbers
+  function habitsButton(barsHtml, d, words) {
+    var menu = '';
+    if (d.open) {
+      menu = `<div class="qn-menu qn-habits-menu" role="menu" aria-label="Work Habits ratings" id="tq-habits-menu"><span class="qn-menu-head">Work Habits</span>${d.habits
+        .map(function (h) {
+          var steps = d.scale
+            .map(function (w, k) {
+              var on = h.v === k + 1;
+              return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-hm-step${h.v > k ? ' lit' : ''}${on ? ' on' : ''}" data-action="tqSentences" data-do="rateHabit" data-habit="${_esc(h.key)}" data-value="${k + 1}" aria-label="${_esc(h.name + ': ' + w)}" title="${_esc(h.name + ': ' + w)}"><span style="height:${BAR_H[k]}px"></span></button>`;
+            })
+            .join('');
+          return `<div class="qn-hm-row"><span class="qn-hm-name">${_esc(h.name)}</span><span class="qn-hm-steps" role="group" aria-label="${_esc(h.name)}">${steps}</span><span class="qn-hm-word">${_esc(h.v ? d.scale[h.v - 1] : 'Not rated')}</span></div>`;
+        })
+        .join('')}</div>`;
+    }
+    return `<span class="qn-ev-habits"><button type="button" class="qn-ev-bars-btn${d.open ? ' on' : ''}" data-action="tqSentences" data-do="habitsMenu" aria-haspopup="menu" aria-expanded="${!!d.open}" aria-label="${_esc('Work Habits ratings. ' + words)}" title="Opens the six ratings.">${barsHtml}</button>${menu}</span>`;
   }
 
   /** A track filled to the share, then "N of M". @param {number} n @param {number} total */
@@ -127,12 +149,10 @@ window.ReportQnBoxes = (function () {
           return h.name + ': ' + (h.v ? d.scale[h.v - 1] : 'Not rated');
         })
         .join(', ');
-      return bars(
-        d.habits.map(function (h) {
-          return h.v;
-        }),
-        words,
-      );
+      var ratings = d.habits.map(function (h) {
+        return h.v;
+      });
+      return habitsButton(bars(ratings, words), d, words);
     }
     if (kind === 'attendance' && d.absent != null) return fact(d.absent + ' Absent · ' + d.late + ' Late');
     if (kind === 'voice') return fact(d.goal ? 'Goal Check-In' : 'About Me');
