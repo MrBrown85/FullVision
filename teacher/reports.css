@@ -5110,7 +5110,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   padding-left: 32px;
 }
 
-/* Browse Sentences: the sheet over the page. */
+/* Browse Sentences: the sheet over the page. The tabs and the Fits | All
+   switch are the app's sliders (.seg, .seg-btn); Done, Use, Remove and
+   Write Your Own are its buttons (.btn). */
 .qn-browse-overlay {
   padding: 30px 40px;
 }
@@ -5135,172 +5137,103 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-browse-top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 14px 18px;
   background: var(--surface);
   border-bottom: 1px solid var(--surface-2);
 }
 .qn-browse-title {
   flex: 1;
-  font-size: 17px;
+  font-size: var(--text-xl);
   font-weight: 700;
 }
 .qn-browse-search {
-  width: 240px;
+  width: 220px;
+  height: 32px;
+  box-sizing: border-box;
   font: inherit;
-  font-size: 13px;
-  padding: 6px 10px;
+  font-size: var(--text-base);
+  padding: 0 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--seg-track);
   color: var(--text);
 }
-.qn-browse-search:focus-visible {
-  outline: 2px solid var(--active);
+.qn-browse-search:focus {
+  background: var(--surface);
 }
-.qn-browse-done {
-  height: 30px;
-  border: 0;
-  background: var(--active-fill);
-  color: #fff;
-  padding: 0 16px;
-  border-radius: 15px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.qn-browse-done:focus-visible {
+.qn-browse-search:focus-visible,
+.qn-browse .btn:focus-visible,
+.qn-browse .seg-btn:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
 .qn-browse-body {
-  padding: 14px 18px;
+  padding: 14px 18px 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .qn-browse-parts {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  background: var(--seg-track);
-  border-radius: 9px;
-  padding: 2px;
-  font-size: 13px;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.qn-browse-tab,
+.qn-browse-fits .seg-btn {
+  height: 28px;
+  padding: 0 8px;
+  line-height: 1;
+  border-radius: 6px;
+  font-size: var(--text-base);
 }
 .qn-browse-tab {
-  border: 0;
-  height: 28px;
-  padding: 0 4px;
-  border-radius: 7px;
-  font: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-  text-align: center;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1 1 0;
+  min-width: max-content;
 }
-.qn-browse-tab[aria-selected='true'] {
-  background: var(--seg-thumb);
-  font-weight: 600;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.12),
-    0 0 0 0.5px rgba(0, 0, 0, 0.04);
-}
-.qn-browse-tab:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: -2px;
+.qn-browse-fits .seg-btn {
+  min-width: 124px;
 }
 .qn-browse-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  font-size: 13px;
-}
-.qn-browse-fitwrap {
-  position: relative;
-}
-.qn-browse-fits {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  padding: 4px 10px 4px 12px;
-  border-radius: 8px;
-  font: inherit;
-  font-size: 13px;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-  cursor: pointer;
-}
-.qn-browse-fits:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
-}
-.qn-browse-n,
-.qn-browse-fits svg {
-  color: var(--text-2);
-}
-.qn-fits-menu {
-  left: 0;
-  right: auto;
-  top: calc(100% + 4px);
-  width: 300px;
-  max-width: none;
-}
-.qn-browse-order {
-  flex: 1;
-  text-align: right;
-  color: var(--text-2);
-  font-size: 12.5px;
 }
 .qn-browse-listwrap {
-  position: relative;
   background: var(--surface);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
-.qn-browse-listwrap::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 48px;
-  background: linear-gradient(rgba(255, 255, 255, 0), var(--surface));
-  pointer-events: none;
-}
 .qn-browse-list {
   overflow-y: auto;
-  padding-bottom: 32px;
 }
-/* The cases: a heading per case that opens and closes its sentences; the
-   student's own case is marked with the first name. */
-.qn-browse-group + .qn-browse-group {
-  border-top: 1px solid var(--surface-2);
-}
+/* The cases: a heading per case that opens and closes its sentences. */
 .qn-browse-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   width: 100%;
-  padding: 8px 14px;
+  box-sizing: border-box;
+  padding: 12px 16px 8px;
   border: 0;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
 .qn-browse-head svg {
   flex: none;
+  align-self: center;
   color: var(--text-2);
   transition: transform 0.12s;
 }
@@ -5312,7 +5245,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   outline-offset: -2px;
 }
 .qn-browse-head-label {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5320,53 +5252,40 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-browse-head-n {
   flex: none;
-  font-size: 12.5px;
-  font-weight: 400;
-  color: var(--text-2);
-}
-.qn-chip-own {
-  flex: none;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 6px;
-  background: var(--active-fill);
-  color: #fff;
+  color: var(--text-2);
 }
 .qn-browse-group-rows[hidden] {
   display: none;
 }
 .qn-browse-none {
-  padding: 10px 14px 12px 32px;
+  padding: 10px 16px 12px;
   font-size: 13px;
   color: var(--text-3);
 }
 .qn-browse-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 12px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 8px 12px 8px 16px;
+  border-top: 1px solid var(--divider-subtle);
+  background: var(--surface);
+  transition: background-color var(--duration-micro) ease;
 }
-.qn-browse-row + .qn-browse-row {
-  border-top: 1px solid var(--surface-2);
+.qn-browse-row:hover {
+  background: var(--overlay-hover);
 }
 .qn-browse-row.on {
   background: var(--qn-inuse-bg);
 }
-.qn-browse-text {
+.qn-browse-sentence {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.qn-browse-sentence {
-  font-size: 14.5px;
-  line-height: 1.45;
-}
-.qn-browse-meta {
-  font-size: 12px;
-  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.4;
 }
 .qn-chip-yours {
   flex: none;
@@ -5377,33 +5296,39 @@ body.qn-roster #gb-sidebar .student-row-note {
   background: var(--score-4-bg);
   color: var(--score-4-text);
 }
-.qn-browse-use {
+/* How many other students in the class have the sentence. */
+.qn-browse-shared {
   flex: none;
-  font: inherit;
-  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--divider-subtle);
+  font-size: 12px;
   font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 7px;
-  white-space: nowrap;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--link);
-  cursor: pointer;
-}
-.qn-browse-use:disabled {
-  color: var(--text-3);
-  cursor: not-allowed;
-}
-.qn-browse-use:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
+  color: var(--text);
 }
 .qn-browse-inuse {
   flex: none;
-  font-size: 12.5px;
-  padding: 4px 12px;
-  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--link);
   white-space: nowrap;
+}
+.qn-browse-row .btn,
+.qn-browse-bar .btn {
+  flex: none;
+  min-width: 64px;
+  white-space: nowrap;
+}
+.qn-browse-row .btn:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
 }
 /* A search with no match here: where else it matches (Nov 3 sweep). */
 .qn-browse-elsewhere {
@@ -5414,23 +5339,16 @@ body.qn-roster #gb-sidebar .student-row-note {
   margin-top: 6px;
 }
 .qn-browse-empty {
-  padding: 18px 14px;
+  padding: 18px 16px;
   font-size: 13.5px;
   color: var(--text-2);
 }
-.qn-browse-hint {
-  font-size: 12px;
-  color: var(--text-2);
-  text-align: center;
-}
 .qn-browse-handle {
-  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 10px 0 8px;
   cursor: ns-resize;
-  background: var(--bg);
-  border-top: 1px solid var(--surface-2);
   touch-action: none;
 }
 .qn-browse-handle:focus-visible {
@@ -5723,8 +5641,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text);
   max-width: 100%;
 }
-.qn-own-add,
-.qn-browse-add-top {
+.qn-own-add {
   flex: none;
   border: 0;
   background: transparent;
@@ -5736,23 +5653,15 @@ body.qn-roster #gb-sidebar .student-row-note {
   white-space: nowrap;
   cursor: pointer;
 }
-.qn-browse-addrow,
-.qn-browse-own {
-  padding: 4px 14px;
-  border-top: 1px solid var(--surface-2);
-}
-.qn-browse-addrow:first-child,
-.qn-browse-own:first-child {
-  border-top: 0;
-}
-.qn-browse-add {
-  padding: 6px 0;
-}
 .qn-browse-ownwrap {
   background: var(--surface);
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  padding: 4px 14px 8px;
+  box-shadow: 0 0 0 2px var(--active-fill) inset;
+  padding: 6px 14px 10px;
+}
+.qn-browse-ownwrap .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .qn-browse-del {
   flex: none;
@@ -5787,8 +5696,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   display: none;
 }
 .qn-own-add:focus-visible,
-.qn-browse-add-top:focus-visible,
-.qn-browse-add:focus-visible,
 .qn-browse-del:focus-visible,
 .qn-sel-add:focus-visible,
 .qn-own-select:focus-visible {

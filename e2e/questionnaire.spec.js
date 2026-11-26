@@ -1103,8 +1103,7 @@ test.describe('the Sentences card', () => {
     // A classmate's comment holds a Grade sentence for another case.
     await page.locator('#tq-browse-btn').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
-    await sheet.locator('#tq-browse-fits').click();
-    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    await sheet.locator('#tq-browse-all').click();
     const emerging = sheet.locator('.qn-browse-group[data-case="p:Emerging"]');
     await emerging.locator('.qn-browse-head').click();
     const pick = await emerging.locator('.qn-browse-sentence').first().textContent();
@@ -1118,12 +1117,12 @@ test.describe('the Sentences card', () => {
     const n = await rows(page).count();
     const before = await box.inputValue();
     await page.locator('#tq-browse-btn').click();
-    await sheet.locator('#tq-browse-fits').click();
-    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    await sheet.locator('#tq-browse-all').click();
     await emerging.locator('.qn-browse-head').click();
     // Least used first: the classmate's sentence is now further down.
     const row = emerging.locator('.qn-browse-row').filter({ hasText: pick });
-    await expect(row.locator('.qn-browse-meta')).toHaveText('Used for 1 classmate');
+    await expect(row.locator('.qn-browse-shared')).toHaveText('1');
+    await expect(row.locator('.qn-browse-shared')).toHaveAttribute('title', 'Used for 1 other student in this class');
     await row.locator('.qn-browse-use').click();
     await page.keyboard.press('Escape');
     // Added, never in another row's place: the Grade row is still Cece's.
@@ -1160,24 +1159,23 @@ test.describe('the Sentences card', () => {
       'Closing',
     ]);
     await expect(sheet.locator('#tq-browse-search')).toBeFocused();
-    await expect(sheet.locator('.qn-browse-order')).toHaveText('Least used first');
-    await expect(sheet.locator('.qn-browse-hint')).toHaveText(
-      'The list scrolls. Drag the bottom edge to show more at once.',
-    );
+    // No "Least used first" label, no hint, no grey line under a sentence.
+    await expect(sheet.locator('.qn-browse-order, .qn-browse-hint, .qn-browse-meta')).toHaveCount(0);
+    await expect(sheet.locator('.qn-browse-bar .btn')).toHaveText('+ Write Your Own');
     // Grade: the one in use, In Use, and the count. The sentences sit
     // under headings that name the case; Cece's own case is first, marked
     // with her name and open.
-    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Fits Cece \d+ of \d+/);
-    await expect(sheet.locator('.qn-browse-row.on .qn-browse-inuse')).toHaveText('In Use');
-    await expect(sheet.locator('.qn-browse-row.on .qn-browse-meta')).toHaveText(/^In use/);
+    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Fits Cece · \d+$/);
+    await expect(sheet.locator('#tq-browse-all')).toHaveText(/^All · \d+$/);
+    await expect(sheet.locator('.qn-browse-row.on .qn-browse-inuse')).toHaveText('In the Comment');
+    await expect(sheet.locator('.qn-browse-row.on .qn-browse-unuse')).toHaveAccessibleName('Remove From Comment');
     const heads = sheet.locator('.qn-browse-head');
     await expect(heads.first().locator('.qn-browse-head-label')).toHaveText('Proficient');
-    await expect(heads.first().locator('.qn-chip-own')).toHaveText('Cece');
+    await expect(sheet.locator('.qn-chip-own')).toHaveCount(0);
     await expect(heads.first()).toHaveAttribute('aria-expanded', 'true');
     // Every sentence: a frame with the word as a slot sits under every
     // proficiency word, previewed for that word; only Cece's own fits.
-    await sheet.locator('#tq-browse-fits').click();
-    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    await sheet.locator('#tq-browse-all').click();
     await expect(heads.locator('.qn-browse-head-label')).toContainText([
       'Proficient',
       'Excellent',
@@ -1209,7 +1207,7 @@ test.describe('the Sentences card', () => {
     // cell); Cece's rated cells come first and open, the rest closed; a
     // closed case opens on a click.
     await sheet.locator('[role="tab"]', { hasText: 'Work Habits' }).click();
-    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
+    await expect(sheet.locator('#tq-browse-all')).toHaveAttribute('aria-pressed', 'true');
     const labels = await heads.locator('.qn-browse-head-label').allTextContents();
     const cells = labels.filter(l => / · (Consistently|Usually|Sometimes|Rarely)$/.test(l));
     expect(cells.length).toBe(24);
@@ -1243,10 +1241,9 @@ test.describe('the Sentences card', () => {
     // Next Step: Use from inside a group puts a sentence in the comment and the row says In Use.
     await sheet.locator('[role="tab"]', { hasText: 'Next Step' }).click();
     await sheet.locator('#tq-browse-fits').click();
-    await sheet.locator('#tq-fits-menu [data-fits="1"]').click();
-    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Fits Cece \d+ of \d+/);
+    await expect(sheet.locator('#tq-browse-fits')).toHaveAttribute('aria-pressed', 'true');
     const rowsList = sheet.locator('.qn-browse-row');
-    const fitCount = Number((await sheet.locator('#tq-browse-n').textContent()).split(' of ')[0]);
+    const fitCount = Number((await sheet.locator('#tq-browse-fits').textContent()).split(' · ')[1]);
     await expect(rowsList).toHaveCount(fitCount);
     const ownGroup = sheet.locator('.qn-browse-group.own').first();
     // Her own competencies' course-set sentences come first (Nov 4), each
@@ -1269,13 +1266,8 @@ test.describe('the Sentences card', () => {
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-sentence').filter({ hasText: text })).toHaveCount(1);
     await expect(page.locator('#tq-narrative')).toHaveValue(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     // Every sentence: more rows and more cases, Use on every one.
-    await sheet.locator('#tq-browse-fits').click();
-    await expect(sheet.locator('#tq-fits-menu [role="option"]')).toHaveText([
-      /Fits Cece\d+$/,
-      /Every sentence for this part\d+$/,
-    ]);
-    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
-    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
+    await sheet.locator('#tq-browse-all').click();
+    await expect(sheet.locator('#tq-browse-all')).toHaveAttribute('aria-pressed', 'true');
     expect(await rowsList.count()).toBeGreaterThan(fitCount);
     await expect(heads.locator('.qn-browse-head-label', { hasText: /^Social Studies · Evidence$/ })).toHaveCount(1);
     await expect(sheet.locator('.qn-browse-use[disabled]')).toHaveCount(0);
@@ -1385,25 +1377,23 @@ test('Write Your Own: saved from Browse Sentences, shown as Yours, used, and sti
   await page.locator('#tq-browse-btn').click();
   const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
   await sheet.locator('[role="tab"]', { hasText: 'Work Habits' }).click();
-  // Under a case heading: "+ Write Your Own", bound to that case (no picker).
-  const inCase = sheet.locator('.qn-browse-group-rows:not([hidden]) .qn-browse-add').first();
-  await expect(inCase).toHaveText('+ Write Your Own');
-  await inCase.click();
+  // One "+ Write Your Own" in the bar, none under the groups; its box takes
+  // the part and the case.
   const box = sheet.locator('#tq-own');
+  await expect(sheet.locator('.qn-browse-bar .btn')).toHaveText('+ Write Your Own');
+  await expect(sheet.locator('.qn-browse-group .qn-browse-add')).toHaveCount(0);
+  await sheet.locator('#tq-browse-write').click();
   await expect(box.locator('#tq-own-input')).toBeFocused();
-  await expect(box.locator('#tq-own-part')).toHaveCount(0);
-  await box.locator('.qn-line-cancel').click();
-  await expect(box).toHaveCount(0);
-  // At the top: "+ Add to My Bank" with Belongs Under.
-  await expect(sheet.locator('.qn-browse-add-top')).toHaveText('+ Add to My Bank');
-  await sheet.locator('.qn-browse-add-top').click();
-  await expect(box.locator('#tq-own-input')).toBeFocused();
-  await expect(box.locator('.qn-own-hint')).toHaveText(
-    'Write it for this student. In the saved sentence, the words in brackets change for each student.',
-  );
+  // No grey line under the box (Colin, Nov 26).
+  await expect(box.locator('.qn-own-hint')).toHaveCount(0);
   await expect(box.locator('#tq-own-part')).toHaveValue('habits');
-  await expect(box.locator('#tq-own-case')).toHaveValue('');
+  // The first group shown is a case of hers, so the sentence goes under it.
+  const firstGroup = await sheet.locator('.qn-browse-group').first().getAttribute('data-case');
+  await expect(box.locator('#tq-own-case')).toHaveValue(firstGroup);
+  await box.locator('#tq-own-case').selectOption('');
   await expect(box.getByLabel('Used For')).toHaveValue('');
+  await expect(box.locator('.btn-primary')).toHaveText('Add to Work Habits');
+  await expect(box.locator('.btn-ghost')).toHaveText('Cancel');
   await expect(box.locator('label.qn-own-label', { hasText: 'Used For' })).toBeVisible();
   await expect(box.locator('#tq-own-case option').first()).toHaveText('Any Student');
   await expect(box).not.toContainText('slots');
@@ -1426,7 +1416,12 @@ test('Write Your Own: saved from Browse Sentences, shown as Yours, used, and sti
   await expect(mine.locator('.qn-browse-del')).toBeVisible();
   await expect(mine.locator('.qn-browse-use')).toBeFocused();
   await mine.locator('.qn-browse-use').click();
-  await expect(mine.locator('.qn-browse-inuse')).toHaveText('In Use');
+  await expect(mine.locator('.qn-browse-inuse')).toHaveText('In the Comment');
+  // Remove takes it out of the comment, and the row has Use again.
+  await mine.locator('.qn-browse-unuse').click();
+  await expect(mine.locator('.qn-browse-use')).toBeVisible();
+  await expect(page.locator('#tq-narrative')).not.toHaveValue(/She brings her notebook/);
+  await mine.locator('.qn-browse-use').click();
   await expect(page.locator('#tq-narrative')).toHaveValue(
     /She brings her notebook and starts the warm-up without a reminder\./,
   );
@@ -1900,13 +1895,13 @@ test('Add to My Bank: Belongs Under starts on the part it was opened from and sa
   const box = sheet.locator('#tq-own');
   // From the Strength tab: Strengths.
   await sheet.locator('[role="tab"]', { hasText: 'Strength' }).click();
-  await sheet.locator('.qn-browse-add-top').click();
+  await sheet.locator('#tq-browse-write').click();
   await expect(box.locator('#tq-own-part')).toHaveValue('strengths');
   await expect(box.locator('.qn-own-hint', { hasText: 'My Bank keeps no' })).toHaveCount(0);
-  await box.locator('.qn-line-cancel').click();
+  await box.locator('.btn-ghost').click();
   // From the Grade tab: Grade is not a part My Bank keeps, and it says so.
   await sheet.locator('[role="tab"]', { hasText: 'Grade' }).click();
-  await sheet.locator('.qn-browse-add-top').click();
+  await sheet.locator('#tq-browse-write').click();
   await expect(box.locator('.qn-own-hint', { hasText: 'My Bank keeps no Grade sentences' })).toHaveCount(1);
   // The box is two lines and wraps a long sentence.
   const input = box.locator('#tq-own-input');
@@ -1916,7 +1911,7 @@ test('Add to My Bank: Belongs Under starts on the part it was opened from and sa
   );
   expect(await input.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(await input.evaluate(el => el.clientHeight)).toBeGreaterThan(40);
-  await box.locator('.qn-line-cancel').click();
+  await box.locator('.btn-ghost').click();
 
   // A search with no match here offers the parts where it does match.
   await sheet.locator('[role="tab"]', { hasText: 'Closing' }).click();
@@ -2002,3 +1997,33 @@ test('the address follows the student; a reload reopens that student', async ({ 
   await page.locator('#tq-narrative').waitFor();
   await expect(page.locator('.qn')).toHaveAttribute('data-sid', next);
 });
+
+/* The sheet's sliders hold their words, in the page font and a wide one. */
+for (const font of FONTS) {
+  test(
+    'Browse Sentences: the part tabs and Fits | All show every word, no sideways scroll (' + font + ' font)',
+    async ({ page }) => {
+      await open(page);
+      await page.locator('#tq-generate').click();
+      await page.locator('#tq-browse-btn').click();
+      await useFont(page, font);
+      const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+      await expect(sheet).toBeVisible();
+      const clipped = await sheet.evaluate(
+        el =>
+          [...el.querySelectorAll('.qn-browse-tab, .qn-browse-fits .seg-btn')].filter(
+            b => b.scrollWidth > b.clientWidth + 1,
+          ).length,
+      );
+      expect(clipped).toBe(0);
+      expect(await sheet.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      // The Fits | All switch is reached by Tab and works from the keyboard.
+      await sheet.locator('#tq-browse-fits').focus();
+      await page.keyboard.press('Tab');
+      await expect(sheet.locator('#tq-browse-all')).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(sheet.locator('#tq-browse-all')).toHaveAttribute('aria-pressed', 'true');
+      await expect(sheet.locator('#tq-browse-all')).toBeFocused();
+    },
+  );
+}
