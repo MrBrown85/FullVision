@@ -361,9 +361,7 @@ window.Router = (function () {
     // Clear DOM mounts
     document.getElementById('main').innerHTML = '';
     document.getElementById('page-toolbar-mount').innerHTML = '';
-    document.getElementById('sidebar-mount').innerHTML = '';
-    document.getElementById('sidebar-mount').style.display = '';
-    document.getElementById('page-layout').classList.remove('sidebar-hidden', 'sidebar-overlay');
+    SidebarKeep.release(); // the student list stays for the page to patch
 
     // Re-render dock on every route change
     _renderDock(dockPage);
@@ -379,6 +377,7 @@ window.Router = (function () {
           if (seq === _routeSeq) _onRoute();
         },
         function () {
+          SidebarKeep.settle();
           if (seq === _routeSeq) _showPageLoadFailed(title);
         },
       );
@@ -402,6 +401,7 @@ window.Router = (function () {
         }, 0);
       }
     }
+    SidebarKeep.settle();
     // The page sent the teacher on from its init (an old link's redirect);
     // that route has drawn and titled the page already.
     if (seq !== _routeSeq) return;

@@ -401,7 +401,7 @@ window.PageReports = (function () {
     const mount = document.getElementById('sidebar-mount');
     if ((before ? before.ordinal : null) !== (after ? after.ordinal : null) && mount && mount.innerHTML) {
       _restoreSidebarBadges();
-      mount.innerHTML = renderSidebar(cid, null);
+      SidebarKeep.draw(renderSidebar(cid, null));
     }
   }
 
@@ -1697,7 +1697,7 @@ window.PageReports = (function () {
     populateReportPeriods(false);
     renderReports();
     _syncFromServer(cid);
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid, null);
+    SidebarKeep.draw(renderSidebar(cid, null));
   }
 
   /* ── Questionnaire delegation (now in report-questionnaire.js) ── */
@@ -1737,7 +1737,7 @@ window.PageReports = (function () {
       openEditStudent: function (cid, sid) {
         if (typeof PageStudent !== 'undefined' && PageStudent.openEditStudent) {
           PageStudent.openEditStudent(cid, sid, function () {
-            document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse, null);
+            SidebarKeep.draw(renderSidebar(activeCourse, null));
             renderReports();
           });
         }
@@ -2098,7 +2098,7 @@ window.PageReports = (function () {
     // Show sidebar
     document.getElementById('sidebar-mount').style.display = '';
     document.getElementById('page-layout').classList.remove('sidebar-hidden');
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse, null);
+    SidebarKeep.draw(renderSidebar(activeCourse, null));
     initSidebarToggle();
 
     // Render the toolbar + output container into main
