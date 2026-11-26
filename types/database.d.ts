@@ -876,6 +876,7 @@ export type Database = {
       }
       criterion: {
         Row: {
+          comments: NonNullable<Json>
           created_at: string
           display_order: number
           id: string
@@ -896,6 +897,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          comments?: NonNullable<Json>
           created_at?: string
           display_order?: number
           id?: string
@@ -915,6 +917,7 @@ export type Database = {
           weight?: number
         }
         Update: {
+          comments?: NonNullable<Json>
           created_at?: string
           display_order?: number
           id?: string
@@ -1825,91 +1828,6 @@ export type Database = {
           },
         ]
       }
-      phone_report: {
-        Row: {
-          closed_at: string | null
-          course_id: string
-          created_by: string | null
-          expires_on: string
-          id: string
-          issued_at: string
-          term: number
-          term_label: string | null
-          updated_at: string
-        }
-        ComputedFields: never
-        Insert: {
-          closed_at?: string | null
-          course_id: string
-          created_by?: string | null
-          expires_on: string
-          id?: string
-          issued_at?: string
-          term: number
-          term_label?: string | null
-          updated_at?: string
-        }
-        Update: {
-          closed_at?: string | null
-          course_id?: string
-          created_by?: string | null
-          expires_on?: string
-          id?: string
-          issued_at?: string
-          term?: number
-          term_label?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "phone_report_course_id_fkey"
-            columns: ["course_id"]
-            referencedRelation: "course"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "phone_report_created_by_fkey"
-            columns: ["created_by"]
-            referencedRelation: "teacher"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      phone_report_student: {
-        Row: {
-          data: NonNullable<Json>
-          enrollment_id: string
-          report_id: string
-          updated_at: string
-        }
-        ComputedFields: never
-        Insert: {
-          data: NonNullable<Json>
-          enrollment_id: string
-          report_id: string
-          updated_at?: string
-        }
-        Update: {
-          data?: NonNullable<Json>
-          enrollment_id?: string
-          report_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "phone_report_student_enrollment_id_fkey"
-            columns: ["enrollment_id"]
-            referencedRelation: "enrollment"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "phone_report_student_report_id_fkey"
-            columns: ["report_id"]
-            referencedRelation: "phone_report"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       photo_check_log: {
         Row: {
           at: string
@@ -2682,6 +2600,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          overall_comments: NonNullable<Json>
           scale: Json | null
           style: string
           updated_at: string
@@ -2693,6 +2612,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          overall_comments?: NonNullable<Json>
           scale?: Json | null
           style?: string
           updated_at?: string
@@ -2703,6 +2623,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          overall_comments?: NonNullable<Json>
           scale?: Json | null
           style?: string
           updated_at?: string
@@ -3155,74 +3076,6 @@ export type Database = {
             foreignKeyName: "student_teacher_id_fkey"
             columns: ["teacher_id"]
             referencedRelation: "teacher"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      student_access_code: {
-        Row: {
-          code_hmac: string | null
-          created_at: string
-          enrollment_id: string
-          expires_at: string
-          id: string
-          key_id: string | null
-          opened_at: string | null
-          phone_report_id: string | null
-          pw_hmac: string | null
-          questionnaire_id: string | null
-          report_issue_id: string | null
-          revoked_at: string | null
-          used_at: string | null
-        }
-        ComputedFields: never
-        Insert: {
-          code_hmac?: string | null
-          created_at?: string
-          enrollment_id: string
-          expires_at: string
-          id?: string
-          key_id?: string | null
-          opened_at?: string | null
-          phone_report_id?: string | null
-          pw_hmac?: string | null
-          questionnaire_id?: string | null
-          report_issue_id?: string | null
-          revoked_at?: string | null
-          used_at?: string | null
-        }
-        Update: {
-          code_hmac?: string | null
-          created_at?: string
-          enrollment_id?: string
-          expires_at?: string
-          id?: string
-          key_id?: string | null
-          opened_at?: string | null
-          phone_report_id?: string | null
-          pw_hmac?: string | null
-          questionnaire_id?: string | null
-          report_issue_id?: string | null
-          revoked_at?: string | null
-          used_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_access_code_enrollment_id_fkey"
-            columns: ["enrollment_id"]
-            referencedRelation: "enrollment"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "student_access_code_phone_report_id_fkey"
-            columns: ["phone_report_id"]
-            referencedRelation: "phone_report"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "student_access_code_questionnaire_id_fkey"
-            columns: ["questionnaire_id"]
-            referencedRelation: "questionnaire"
             referencedColumns: ["id"]
           },
         ]
@@ -4094,11 +3947,6 @@ export type Database = {
         Args: { p_assessment_id: string; p_enrollment_id: string }
         Returns: number
       }
-      _phone_report_json: { Args: { p_id: string }; Returns: Json }
-      _phone_report_put: {
-        Args: { p_course_id: string; p_report_id: string; p_students: Json }
-        Returns: undefined
-      }
       _photo_keep_class: {
         Args: { p_course_id: string; p_now: string }
         Returns: Json
@@ -4164,6 +4012,10 @@ export type Database = {
         Returns: number
       }
       _revision_state: { Args: { p_request_id: string }; Returns: Json }
+      _rubric_comment_list: {
+        Args: { p_criterion: boolean; p_list: Json }
+        Returns: Json
+      }
       _score_audit_diff: {
         Args: {
           p_new_status: string
@@ -4244,6 +4096,23 @@ export type Database = {
         }
         Returns: Json
       }
+      add_criterion_comment: {
+        Args: {
+          p_criterion_id: string
+          p_idempotency_key?: string
+          p_level: number
+          p_text: string
+        }
+        Returns: Json
+      }
+      add_rubric_overall_comment: {
+        Args: {
+          p_idempotency_key?: string
+          p_rubric_id: string
+          p_text: string
+        }
+        Returns: Json
+      }
       answer_reflection: {
         Args: {
           p_answer: string
@@ -4293,10 +4162,6 @@ export type Database = {
       clear_section_override: {
         Args: { p_enrollment_id: string; p_section_id: string }
         Returns: undefined
-      }
-      close_phone_report: {
-        Args: { p_id: string; p_idempotency_key?: string }
-        Returns: Json
       }
       confirm_quiz: {
         Args: {
@@ -4381,17 +4246,6 @@ export type Database = {
           p_kind?: string
         }
         Returns: string
-      }
-      create_phone_report: {
-        Args: {
-          p_course_id: string
-          p_expires_on: string
-          p_idempotency_key?: string
-          p_students: Json
-          p_term: number
-          p_term_label: string
-        }
-        Returns: Json
       }
       create_report_issue: {
         Args: {
@@ -4716,7 +4570,6 @@ export type Database = {
         Args: { p_course_id: string }
         Returns: Json
       }
-      list_phone_reports: { Args: { p_course_id: string }; Returns: Json }
       list_questionnaire_templates: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -5155,15 +5008,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      update_phone_report: {
-        Args: {
-          p_expires_on?: string
-          p_id: string
-          p_idempotency_key?: string
-          p_students?: Json
-        }
-        Returns: Json
-      }
       update_student: {
         Args: { p_id: string; p_patch: Json }
         Returns: undefined
@@ -5302,6 +5146,7 @@ export type Database = {
           p_idempotency_key?: string
           p_linked_tag_ids?: Json
           p_name: string
+          p_overall_comments?: Json
           p_scale?: Json
           p_style?: string
         }
