@@ -3505,10 +3505,10 @@ window.DashClassManager = (function () {
     // opened — and re-injects that stale id on the next configure().
     if (state._activeCourseChanged && state._onCourseChange) {
       state._activeCourseChanged = false;
-      state._onCourseChange(state._activeCourse);
+      (0, state._onCourseChange)(state._activeCourse);
       return;
     }
-    if (state._onRender) state._onRender();
+    if (state._onRender) (0, state._onRender)();
   }
 
   /* ── Block picker and the empty state: teacher/cm-block-picker.js ── */
