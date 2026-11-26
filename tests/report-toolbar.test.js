@@ -40,6 +40,13 @@ describe('the Reports toolbar', () => {
       ['tqEditStudent', 'Edit Student'],
       ['tqInfo', 'Where This Information Comes From'],
     ]);
+    // Each with its icon first, as a card's ⋯ menu has.
+    expect(
+      items.map(b => [b.firstElementChild.tagName.toLowerCase(), b.firstElementChild.getAttribute('aria-hidden')]),
+    ).toEqual([
+      ['svg', 'true'],
+      ['svg', 'true'],
+    ]);
     expect(more.parentNode.querySelector('.assess-menu').hidden).toBe(true);
   });
 

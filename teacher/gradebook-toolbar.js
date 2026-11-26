@@ -507,8 +507,8 @@
       '<div class="assess-menu-wrap atb-more-wrap">' +
       '<button type="button" class="atb-icon-btn" data-action="toggleCardMenu" data-atb="more" aria-haspopup="menu" aria-expanded="false" aria-label="More" title="More">' +
       '<span class="atb-ico atb-ico-dots" aria-hidden="true"></span></button><div class="assess-menu" role="menu" aria-label="More" hidden>' +
-      _item('printGrades', 'Print Grades') +
-      _item('exportScoresCSV', 'Export') +
+      _item('printGrades', LINE_ICONS.print, 'Print Grades') +
+      _item('exportScoresCSV', LINE_ICONS.export, 'Export') +
       '</div></div>' +
       '<a class="tb-action-btn" role="link" tabindex="0" data-href="/assignments?course=' +
       esc(s.cid) +
@@ -516,13 +516,16 @@
       '</div></div>'
     );
   }
-  // html-safe: fixed words
-  /** @param {string} action @param {string} label */
-  function _item(action, label) {
+  // Its icon, then its label, as a card's ⋯ menu has.
+  // html-safe: fixed words and icons
+  /** @param {string} action @param {string} icon @param {string} label */
+  function _item(action, icon, label) {
     return (
       '<button type="button" role="menuitem" class="assess-menu-item" data-action="' +
       action +
-      '"><span>' +
+      '">' +
+      icon +
+      '<span>' +
       label +
       '</span></button>'
     );

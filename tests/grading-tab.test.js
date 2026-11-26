@@ -5,6 +5,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { parseHTML } from 'linkedom';
 
 const CID = 'e0000000-0000-4000-8000-00000000g7ab';
 const TAG = 'tag-1';
@@ -482,5 +483,29 @@ describe('Points and Proficiency as one scale on the Grading tab', () => {
   it('offers a class backup from Class Actions', () => {
     expect(main.innerHTML).toContain('data-action="cmDownloadBackup"');
     expect(main.innerHTML).toContain('Download Class Backup');
+  });
+
+  it('draws an icon before each Class Actions item, archived or not', () => {
+    const items = () => {
+      const { document: doc } = parseHTML('<!DOCTYPE html><html><body>' + main.innerHTML + '</body></html>');
+      return [...doc.querySelectorAll('.cm-class-actions-menu [role="menuitem"]')].map(b => [
+        b.textContent,
+        b.firstElementChild.tagName.toLowerCase(),
+        b.firstElementChild.getAttribute('aria-hidden'),
+      ]);
+    };
+    expect(items()).toEqual([
+      ['Duplicate Class', 'svg', 'true'],
+      ['Download Class Backup', 'svg', 'true'],
+      ['Archive Class', 'svg', 'true'],
+    ]);
+    DashClassManager.handleAction('cmToggleArchive', { dataset: { cid: CID } });
+    if (confirms.length) confirms[confirms.length - 1].run();
+    expect(items()).toEqual([
+      ['Duplicate Class', 'svg', 'true'],
+      ['Download Class Backup', 'svg', 'true'],
+      ['Unarchive Class', 'svg', 'true'],
+      ['Delete Class', 'svg', 'true'],
+    ]);
   });
 });

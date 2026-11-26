@@ -20,7 +20,9 @@
  *    toolbar and the filter strip below it. That one was written by this
  *    file's own walk on the new code, after checking that every byte before
  *    the toolbar and after the strip is what it was: only the toolbar's
- *    markup and the strip's differ, in every picture.
+ *    markup and the strip's differ, in every picture. It was written again
+ *    the same day for the icons before ⋯'s Print Grades and Export: each
+ *    picture differs from the last only by those two icons.
  * 2. With the switch on and When I Return Them: the dashed mark on every
  *    kind of work in both views, the words a screen reader hears, the key,
  *    the count on the "N to return" filter and on each column's Return N

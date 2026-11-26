@@ -4193,22 +4193,29 @@ window.DashClassManager = (function () {
       '<div class="cm-std-menu cm-class-actions-menu" role="menu" hidden>' +
       '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmDuplicateCourse" data-cid="' +
       cid +
-      '">Duplicate Class</button>' +
+      '">' +
+      LINE_ICONS.copy +
+      '<span>Duplicate Class</span></button>' +
       '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmDownloadBackup" data-cid="' +
       cid +
-      '">Download Class Backup</button>' +
+      '">' +
+      LINE_ICONS.download +
+      '<span>Download Class Backup</span></button>' +
       '<span class="cm-std-menu-sep" role="separator"></span>' +
       '<button type="button" role="menuitem" class="cm-std-menu-item' +
       (isArchived ? '' : ' danger') +
       '" data-action="cmToggleArchive" data-cid="' +
       cid +
       '">' +
-      (isArchived ? 'Unarchive Class' : 'Archive Class') +
+      LINE_ICONS.archive +
+      (isArchived ? '<span>Unarchive Class</span>' : '<span>Archive Class</span>') +
       '</button>' +
       (isArchived
         ? '<button type="button" role="menuitem" class="cm-std-menu-item danger" data-action="cmDeleteCourse" data-cid="' +
           cid +
-          '">Delete Class</button>'
+          '">' +
+          LINE_ICONS.trash +
+          '<span>Delete Class</span></button>'
         : '<div class="cm-class-actions-note">Delete Class appears here once a class is archived.</div>') +
       '</div>' +
       '</div>' +

@@ -99,6 +99,16 @@ describe('the bar', () => {
     expect($('.atb-show')).toBeNull();
     expect($('.atb-chips')).toBeNull();
     expect($$('.atb-more-wrap .assess-menu-item').map(b => b.textContent.trim())).toEqual(['Print Grades', 'Export']);
+    // Each with its icon first, as a card's ⋯ menu has.
+    expect(
+      $$('.atb-more-wrap .assess-menu-item').map(b => [
+        b.firstElementChild.tagName.toLowerCase(),
+        b.firstElementChild.getAttribute('aria-hidden'),
+      ]),
+    ).toEqual([
+      ['svg', 'true'],
+      ['svg', 'true'],
+    ]);
     expect($('.atb-more-wrap [data-action="toggleCardMenu"]').getAttribute('aria-label')).toBe('More');
     expect($('.atb-end [data-href]').textContent).toBe('+ New Assessment');
     // The old pill, Filters button and strip are gone.
