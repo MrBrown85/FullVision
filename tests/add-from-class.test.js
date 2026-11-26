@@ -254,7 +254,7 @@ describe('Add From Another Class', () => {
       expect(addBtn().textContent).toBe('Add');
       // The toolbar's ▾ menu item has the dialog's name.
       const src = readFileSync(new URL('../teacher/assign-toolbar.js', import.meta.url), 'utf-8');
-      expect(src).toContain("_item('addFromClass', 'Add From Another Class')");
+      expect(src).toContain("_item('addFromClass', LINE_ICONS.bringIn, 'Add From Another Class')");
     });
 
     it('shows a date as the app writes it, never 2026-11-04', async () => {

@@ -23,8 +23,10 @@
  *    Run that only on code from before a change the page is meant to keep
  *    out; never to make a failing comparison pass. The toolbar's seven pictures
  *    were written again on Nov 25 2026 for the "Three Things" toolbar
- *    (docs/DECISIONS.md); every other picture is still the old one, the
- *    category pill put back as the span it was (see PILL below).
+ *    (docs/DECISIONS.md), and again that day for the icons before its menus'
+ *    items (each differs from the last only by those icons); every other
+ *    picture is still the old one, the category pill put back as the span it
+ *    was (see PILL below).
  * 2. With the switch on and When I Return Them, on the page: the Show bar's
  *    To Return option and its filter; a card's chips and Return N Graded, which
  *    asks first; the Draft or Returned mark on every kind of row; grading in
@@ -380,7 +382,7 @@ describe('with the build switch off the Assignments page is what it was', () => 
   // the class's Student Page is on, and the ▾ is drawn only when its menu has an item. The item
   // alone is taken out before comparing, with the ▾ when it was the only one.
   const NEW_QUIZ =
-    /<button type="button" role="menuitem" class="assess-menu-item" data-action="newQuiz"><span>New Quiz<\/span><\/button>/g;
+    /<button type="button" role="menuitem" class="assess-menu-item" data-action="newQuiz"><svg[^>]*>[\s\S]*?<\/svg><span>New Quiz<\/span><\/button>/g;
   const EMPTY_NEW_MENU =
     /<div class="assess-menu-wrap atb-new-wrap"><button [^>]*><svg[\s\S]*?<\/svg><\/button><div class="assess-menu" role="menu" aria-label="More Ways to Add" hidden><\/div><\/div>/;
   // Pin moved on purpose (Colin, Nov 25, "Three Things"): the category pill is a button, and the
