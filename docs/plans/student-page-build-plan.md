@@ -684,7 +684,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 
 **PRs.** `S16-T1` Reports gains a third tab host. `S16-M1` (Batch F) what Mark Ready and Save need to keep. `S16-F1` the MyEdBC Input table with the 500-character limit, Generate, Mark Ready. `S16-F2` the Export Sheet with Download CSV, Print and Copy. `S16-F3` it asks before using a class with drafts, as Progress Reports does.
 
-**Status (Nov 11 morning).** Paused by Colin (DECISIONS, "Student page build rulings (2026-11-10, late night)" 15). `S16-T1` Done (PR 963). `S16-F1` is a draft (PR 1031), left as it is. Nothing else is started, and nothing of S16 or Batch F is merged, reviewed or applied until he says otherwise.
+**Status (Nov 11 morning).** Paused by Colin (DECISIONS, "Student page build rulings (2026-11-10, late night)" 15). `S16-T1` Done (PR 963). `S16-F1` is a draft (PR 1031, closed), left as it is: its code stays on GitHub in PR 1031 and on the local branch `s16-f1-myed-input` (commit `0f0bd762`), kept as the reference sketch for when S16 restarts (Colin, Nov 26). Reports has changed a great deal since Nov 10, so S16 is rebuilt from this plan with the sketch beside it. Nothing else is started, and nothing of S16 or Batch F is merged, reviewed or applied until he says otherwise.
 
 **Files.** `teacher/page-reports.js`, `teacher/myed-input.js`, `teacher/report-questionnaire.js`, `shared/calc.js` (read only: `levelCode`).
 
