@@ -264,7 +264,7 @@ describe('the Comment Bank in the grader', () => {
     key(field(), 'Escape');
     openField(CARA);
     type('show your');
-    expect(chips()).toEqual(['Cara, show your work']);
+    expect(chips()).toEqual(['Cara, show your work1×']);
   });
 
   it('the whole bank opens as a panel: the level picked first, each comment once, Edit Comments; a second click shuts it', () => {

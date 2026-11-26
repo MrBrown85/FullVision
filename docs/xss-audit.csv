@@ -134,9 +134,12 @@ teacher/cm-terms.js,222,14,innerHTML,REVIEWED,helper:_cmTermKeptHtml,,kept.inner
 teacher/comment-personal.js,1712,4,innerHTML,REVIEWED,helper:_sheetHtml,,o.innerHTML = _sheetHtml()
 teacher/competency-evidence.js,310,4,innerHTML,REVIEWED,marked at the sink,,"drawer.innerHTML = innerHtml(_cid, _sid, sec, tag)"
 teacher/competency-evidence.js,322,16,innerHTML,REVIEWED,marked at the sink,,"list.innerHTML = listHtml(_cid, _sid, ev, assessMap)"
-teacher/crit-comment.js,349,4,insertAdjacentHTML,REVIEWED,marked at the sink,,"at[0].insertAdjacentHTML(at[1], html)"
-teacher/crit-comment.js,364,4,innerHTML,REVIEWED,marked at the sink,,"box.innerHTML = _critOwnFieldsHtml(st.cid, st.aid, st.sid, crit)"
-teacher/crit-comment.js,432,6,insertAdjacentHTML,REVIEWED,marked at the sink,,"edit.insertAdjacentHTML('beforebegin', _critNoteHtml(st.cid, st.aid, st.sid, crit, note))"
+teacher/crit-bank.js,264,4,innerHTML,REVIEWED,helper:_chipsHtml,,"inst.chips.innerHTML = _chipsHtml(inst, v)"
+teacher/crit-bank.js,267,4,innerHTML,REVIEWED,marked at the sink,,"inst.panel.innerHTML = inst.open ? _panelHtml(inst, v) : ''"
+teacher/crit-bank.js,603,4,innerHTML,REVIEWED,marked at the sink,,wrap.innerHTML = rowHtml(ctx)
+teacher/crit-comment.js,406,4,insertAdjacentHTML,REVIEWED,marked at the sink,,"at[0].insertAdjacentHTML(at[1], html)"
+teacher/crit-comment.js,422,4,innerHTML,REVIEWED,marked at the sink,,"box.innerHTML = _critOwnFieldsHtml(st.cid, st.aid, st.sid, crit)"
+teacher/crit-comment.js,492,6,insertAdjacentHTML,REVIEWED,marked at the sink,,"edit.insertAdjacentHTML('beforebegin', _critNoteHtml(st.cid, st.aid, st.sid, crit, note))"
 teacher/dash-bulletins.js,380,4,innerHTML,REVIEWED,marked at the sink,,slot.innerHTML = next
 teacher/dash-class-manager.js,919,4,innerHTML,ESC_WRAPPED,concat,,"keep.innerHTML = '<span class=""cm-keep-copy-text""><strong>Keep a copy first</strong><span>A CSV of ' + esc(name) + '’s scores and observations in ' + esc((COURSES[cid] && COURSES[…"
 teacher/dash-class-manager.js,1723,4,innerHTML,ESC_WRAPPED,fn-return,,"picker.innerHTML = Object.keys(BC_DESIGNATIONS) .filter(function (code) { return have.indexOf(code) < 0; }) .map(function (code) { return ( '<button type=""button"" role=""menuitem"" …"

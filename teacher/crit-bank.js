@@ -200,7 +200,7 @@
   }
   function _levelName(rubric, k) {
     var RS = /** @type {any} */ (window).RubricScale;
-    return RS && rubric ? RS.name(rubric, k) : PROF_LABELS[k] || '';
+    return RS && rubric ? RS.name(rubric, k) : 'Level ' + k;
   }
   function _levelTone(rubric, k) {
     var RS = /** @type {any} */ (window).RubricScale;
@@ -447,8 +447,30 @@
       else if (label) _toggle(inst);
       else _add(inst);
     });
+    // The preview makes the box grow, which moves the chips down from under
+    // the pointer. So the chip's place before the move still counts as the
+    // chip: the preview stays while the pointer is there, and a click there
+    // picks the comment the preview shows.
     function chipOf(e) {
       return e.target && e.target.closest ? e.target.closest('.rsg-crit-reuse-chip, .rsg-crit-bank-chip') : null;
+    }
+    function within(r, e) {
+      return (
+        !!r &&
+        typeof e.clientX === 'number' &&
+        e.clientX >= r.left &&
+        e.clientX <= r.right &&
+        e.clientY >= r.top &&
+        e.clientY <= r.bottom
+      );
+    }
+    function holds(inst, e) {
+      var h = inst.hover;
+      return !!h && (within(h.r, e) || within(h.chip.getBoundingClientRect(), e));
+    }
+    function clear(inst) {
+      inst.hover = null;
+      _mark(inst);
     }
     function on(type, fn) {
       host.addEventListener(type, function (e) {
@@ -457,17 +479,37 @@
         if (chip) fn(inst, chip, e);
       });
     }
-    function enter(inst, chip) {
+    function peek(inst, chip) {
       _peek(inst, chip.getAttribute('title') || '');
     }
-    function leave(inst, chip, e) {
+    on('mouseover', function (inst, chip) {
+      var r = chip.getBoundingClientRect();
+      inst.hover = { chip: chip, r: { left: r.left, right: r.right, top: r.top, bottom: r.bottom } };
+      peek(inst, chip);
+    });
+    on('mouseout', function (inst, chip, e) {
       if (e.relatedTarget && chip.contains(e.relatedTarget)) return;
-      _mark(inst);
-    }
-    on('mouseover', enter);
-    on('mouseout', leave);
-    on('focusin', enter);
-    on('focusout', leave);
+      if (!holds(inst, e)) clear(inst);
+    });
+    on('focusin', peek);
+    on('focusout', function (inst, chip, e) {
+      if (!(e.relatedTarget && chip.contains(e.relatedTarget))) _mark(inst);
+    });
+    host.addEventListener('mousemove', function (e) {
+      var inst = get();
+      if (inst && inst.hover && !holds(inst, e)) clear(inst);
+    });
+    host.addEventListener('mouseleave', function () {
+      var inst = get();
+      if (inst && inst.hover) clear(inst);
+    });
+    host.addEventListener('click', function (e) {
+      var inst = get();
+      if (!inst || !inst.hover || chipOf(e) || !within(inst.hover.r, e)) return;
+      var chip = inst.hover.chip;
+      inst.hover = null;
+      chip.click();
+    });
   }
 
   /* ── The criterion's editor ─────────────────────────────── */
