@@ -131,7 +131,7 @@ describe('with the student page and Send Work on', () => {
       'Eraser',
     ]);
     expect(q('[data-tool="pen"]').getAttribute('aria-pressed')).toBe('true');
-    expect(q('.m-markup-sees')).toBeNull();
+    expect(q('.m-markup-sees').textContent).toBe(displayNameFirst(st) + ' sees these when you return the work.');
     expect(q('.m-markup-hint')).toBeNull();
     // The sample's notes are numbered pins with their words, escaped.
     expect([...root().querySelectorAll('.markup-pin text')].map(p => p.textContent)).toEqual(['1', '2', '3']);
@@ -320,6 +320,22 @@ describe('with the student page and Send Work on', () => {
     const out = getStudentMarkup(CID, jordan, LAB).files[0].marks.marks;
     expect(out.filter(m => m.type === 'cross')).toHaveLength(0);
     expect(out.filter(m => m.type === 'pen')).toHaveLength(2);
+  });
+
+  it('a class that does not hold grades says the student sees them once you tap Done', () => {
+    turnOn({ mode: 'on_save' });
+    MMarkUp.open(CID, LAB, jordan, 0);
+    expect(q('.m-markup-sees').textContent).toMatch(/ sees these once you tap Done\.$/);
+  });
+
+  it('a piece with Students See Your Mark Up off says the student won’t see them', () => {
+    const real = getAssessmentStudentWork;
+    vi.spyOn(globalThis, 'getAssessmentStudentWork').mockImplementation((c, a) => ({
+      ...real(c, a),
+      students_see_markup: false,
+    }));
+    MMarkUp.open(CID, LAB, jordan, 0);
+    expect(q('.m-markup-sees').textContent).toMatch(/ won’t see these marks\.$/);
   });
 
   it('a save answered after the screen closed changes nothing', async () => {

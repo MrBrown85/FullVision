@@ -3349,7 +3349,13 @@ body.fv-switching-course::after {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-/* Red, green and blue for the Pen and Highlight, beside the hint. */
+.m-markup-card .m-markup-sees {
+  margin-top: 4px;
+  padding-left: 28px;
+  text-align: left;
+  color: #636366;
+}
+/* Red, green and blue for the Pen and Highlight. */
 .m-markup-foot {
   display: flex;
   align-items: center;
@@ -3394,6 +3400,7 @@ body.fv-switching-course::after {
   flex-direction: column;
   gap: 8px;
 }
+.m-markup-sees,
 .m-markup-msg {
   margin: 0;
   font-size: 13px;
