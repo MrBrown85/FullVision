@@ -54,6 +54,7 @@ grant delete, insert, select, update on table public.enrollment to authenticated
 revoke all on table public.feedback_reflection from public;
 revoke all on table public.fv_idempotency from public;
 grant delete, insert, select, update on table public.fv_idempotency to authenticated;
+revoke all on table public.fv_owner from public;
 revoke all on table public.goal from public;
 grant delete, insert, select, update on table public.goal to authenticated;
 revoke all on table public.grade_return from public;
@@ -519,6 +520,9 @@ grant execute on routine public.fv_idem_store(p_key uuid, p_endpoint text, p_res
 revoke all on routine public.fv_overall_proficiency(p_enrollment_id uuid, p_course_id uuid) from public;
 grant execute on routine public.fv_overall_proficiency(p_enrollment_id uuid, p_course_id uuid) to authenticated;
 grant execute on routine public.fv_overall_proficiency(p_enrollment_id uuid, p_course_id uuid) to service_role;
+revoke all on routine public.fv_owner_health() from public;
+grant execute on routine public.fv_owner_health() to authenticated;
+grant execute on routine public.fv_owner_health() to service_role;
 revoke all on routine public.fv_owns_assessment(aid uuid) from public;
 grant execute on routine public.fv_owns_assessment(aid uuid) to authenticated;
 grant execute on routine public.fv_owns_assessment(aid uuid) to service_role;

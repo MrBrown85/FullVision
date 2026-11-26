@@ -1264,6 +1264,29 @@ export type Database = {
           },
         ]
       }
+      fv_owner: {
+        Row: {
+          added_at: string
+          teacher_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          added_at?: string
+          teacher_id: string
+        }
+        Update: {
+          added_at?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_teacher_id_fkey"
+            columns: ["teacher_id"]
+            referencedRelation: "teacher"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goal: {
         Row: {
           body: string
@@ -4418,6 +4441,7 @@ export type Database = {
         Args: { p_course_id: string; p_enrollment_id: string }
         Returns: number
       }
+      fv_owner_health: { Args: Record<PropertyKey, never>; Returns: Json }
       fv_owns_assessment: { Args: { aid: string }; Returns: boolean }
       fv_owns_course: { Args: { cid: string }; Returns: boolean }
       fv_owns_enrollment: { Args: { eid: string }; Returns: boolean }

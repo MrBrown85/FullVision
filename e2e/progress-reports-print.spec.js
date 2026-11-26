@@ -1007,7 +1007,10 @@ test.describe('The Quick Report’s choices, read as parts', () => {
     expect(sheets).toBeGreaterThan(1);
     await expect(student).toHaveAttribute('data-sheets', String(sheets));
     await expect(student.locator('.sheet-badge')).toHaveText(sheets + ' sheets');
-    await expect(page.locator('#studio-fit')).toContainText('sheets for');
+    // The class's count is laid out in pieces after the page is drawn: on
+    // GitHub's runner it took past the default 5 s (Nov 26, 2026), so this
+    // waits as line 825 does.
+    await expect(page.locator('#studio-fit')).toContainText('sheets for', { timeout: 30_000 });
 
     // The head: the name, the class, block and term, and Page X of Y.
     const first = student.locator('.fb-sheet').first();

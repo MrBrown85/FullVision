@@ -554,6 +554,34 @@ window.ReportQuestionnaire = (function () {
     var cur = _current();
     var chip = document.getElementById('tq-approved-chip');
     if (chip && cur && !_approved(cur.id)) chip.remove();
+    _syncStale();
+  }
+  /* The "approved sentences no longer match" card follows the saved
+     comment: drawn again in place when a save changed it (Generate, a
+     sentence edited, a habit rated), taken off once the approval is gone.
+     Without this the card kept the old sentences while the box held the
+     new ones, and its buttons found nothing to act on. */
+  function _syncStale() {
+    var st = _current();
+    var card = document.getElementById('tq-comment-card');
+    var el = _box();
+    if (!st || !card || !el || String(el.dataset.sid) !== String(st.id)) return;
+    var old = document.getElementById('tq-stale');
+    var stale = _commentTab === 'this' ? staleFor(_activeCourse, st) : null;
+    var rating = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
+    if (!stale) {
+      if (old) old.remove();
+      return;
+    }
+    var html = _staleHtml(_activeCourse, st, rating, stale);
+    if (old) {
+      // html-safe: _staleHtml escapes every value with esc
+      old.outerHTML = html;
+      return;
+    }
+    var top = card.querySelector('.qn-comment-top');
+    // html-safe: _staleHtml escapes every value with esc
+    if (top) top.insertAdjacentHTML('afterend', html);
   }
 
   /* ── Before Generate (the States mockup) ─────────────────── */
@@ -590,12 +618,15 @@ window.ReportQuestionnaire = (function () {
      orange dot in place of the ✓. The app never changes approved text by
      itself. A rating with no record (approved before the record was kept,
      or a server without the column) is never flagged. */
+  /* Only an approved comment has approved sentences to keep: once the
+     approval is gone (typing, Generate) the comment is a draft again, and a
+     sentence that no longer matches shows on its row (claimChanges). */
   var _staleCache = {};
   function staleFor(cid, student, termId) {
     termId = termId || getTermId();
     var r = getStudentTermRating(cid, student.id, termId) || {};
     var meta = r.draftMeta;
-    if (!meta) return null;
+    if (!meta || !r.approvedAt) return null;
     var marks = Array.isArray(meta.sentences) && meta.sentences.length > 0;
     // The pronouns changed since the approval (draft_meta.pronouns).
     var pron = !!r.approvedAt && !!meta.pronouns && !_samePronouns(meta.pronouns, ReportBlocks.getPronouns(student));
@@ -708,71 +739,8 @@ window.ReportQuestionnaire = (function () {
     return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
-  var CLASS_SENTENCE_NAMES = {
-    closing: 'the closing sentence',
-    support: 'the support line',
-    late_work: 'the late-work line',
-  };
   function _cap(t) {
     return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
-  }
-  function _sentenceCount(n) {
-    return n === 1 ? 'one sentence no longer matches' : CommentBank.numberWords(n) + ' sentences no longer match';
-  }
-  /* What changed, as the card's note says it: the pieces marked since the
-     approval (the States mockup's "“…” was marked …, so one sentence no
-     longer matches the gradebook."), and any class sentence edited since.
-     The day a mark was entered is not kept, so the note says "after" the
-     approval's day. */
-  function staleNote(stale, day) {
-    var out = [];
-    var marks = stale.changes.filter(function (c) {
-      return c.kind === 'marks';
-    }).length;
-    if (marks && stale.moved === false) {
-      // The facts are as they were at approval: the sentence was already
-      // out of date then.
-      out.push(_cap(_sentenceCount(marks)) + ' the gradebook.');
-    } else if (marks) {
-      var p = stale.pieces || [];
-      var q = p.map(function (t) {
-        return CommentRealiser.quoteTitle(t) || '“' + t + '”';
-      });
-      var who =
-        p.length === 1
-          ? q[0] + ' was marked'
-          : p.length === 2
-            ? q[0] + ' and ' + q[1] + ' were marked'
-            : p.length > 2
-              ? _cap(CommentBank.numberWords(p.length)) + ' assignments were marked'
-              : // No piece was marked since: the grades worked out from the
-                // same marks changed.
-                'Grades changed';
-      out.push(who + ' after ' + day + ', so ' + _sentenceCount(marks) + ' the gradebook.');
-    }
-    var cls = stale.changes.filter(function (c) {
-      return c.kind === 'class';
-    });
-    if (cls.length) {
-      var names = CommentBank.list(
-        cls.map(function (c) {
-          return CLASS_SENTENCE_NAMES[c.key] || 'a class sentence';
-        }),
-      );
-      out.push(_cap(names) + ' changed after ' + day + ', so ' + _sentenceCount(cls.length) + ' your class settings.');
-    }
-    var pron = stale.changes.filter(function (c) {
-      return c.kind === 'pronouns';
-    }).length;
-    var named = stale.changes.filter(function (c) {
-      return c.kind === 'name';
-    }).length;
-    if (pron || named) {
-      var whose = pron && stale.renamed ? 'The name and pronouns' : pron ? 'The pronouns' : 'The name';
-      out.push(whose + ' changed after ' + day + ', so ' + _sentenceCount(pron + named) + (pron ? ' them.' : ' it.'));
-    }
-    out.push('Approved text is never changed for you.');
-    return out.join(' ');
   }
 
   function _staleHtml(cid, student, rating, stale) {
@@ -802,7 +770,7 @@ window.ReportQuestionnaire = (function () {
       })
       .join('');
     return `<div class="qn-stale" id="tq-stale">
-        <div class="qn-stale-note">${esc(staleNote(stale, day))}</div>
+        <div class="qn-stale-note">${esc(ReportQnBoxes.staleNote(stale, day))}</div>
         ${boxes}
         ${rating.approvedAt ? '<span class="qn-stale-hint">Using the new sentence clears the approval until you approve again. In the roster, flagged students show an orange dot instead of a ✓.</span>' : ''}
       </div>`;
@@ -820,7 +788,7 @@ window.ReportQuestionnaire = (function () {
     var r = getStudentTermRating(_activeCourse, st.id, termId) || {};
     var stale = staleFor(_activeCourse, st, termId);
     var c = stale && stale.changes[Number(i)];
-    if (!c) return;
+    if (!c) return rerender();
     if (what === 'keep' && c.kind === 'pronouns') {
       var kept = (Array.isArray(r.draftMeta.pronoun_kept) ? r.draftMeta.pronoun_kept : []).concat(c.before);
       upsertTermRating(_activeCourse, st.id, termId, {
@@ -870,7 +838,7 @@ window.ReportQuestionnaire = (function () {
           rows[at].text = rows[at].drafted = x.after;
         }
       });
-      if (next === text) return;
+      if (next === text) return rerender();
       _rows[key] = rows;
       upsertTermRating(_activeCourse, st.id, termId, { narrative: next });
       _syncLast(key, _rows[key], next);
@@ -2531,7 +2499,7 @@ window.ReportQuestionnaire = (function () {
       return x.row === i;
     });
     var rows = (_rowsFor(st, f) || []).slice();
-    if (!c || !rows[i]) return;
+    if (!c || !rows[i]) return rerender();
     if (what === 'keep') {
       rows[i] = Object.assign({}, rows[i], { kept: true });
       _rows[key] = rows;
@@ -5902,6 +5870,7 @@ window.ReportQuestionnaire = (function () {
     if (!st || !card) return;
     var before = ReportQnMotion.measure(card);
     card.outerHTML = _sentencesHtml(_activeCourse, st, _facts(st));
+    _syncStale();
     _fitMenus();
     ReportQnMotion.play(document.getElementById('tq-sentences'), before, ReportQnMotion.dragKey());
   }
@@ -7330,12 +7299,12 @@ window.ReportQuestionnaire = (function () {
       n > 0 || listed
         ? `<button type="button" class="qn-see-missing" data-action="tqSentences" data-do="missOpen" aria-haspopup="menu" aria-expanded="${!!listed}" title="Lists the missing work. Each piece opens in the grader.">See the ${seeN}</button>`
         : '';
-    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-missing"${_rowAttr(i)}>
+    // The count it rests on is the tooltip, not grey text (decision 2).
+    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-missing" title="${esc(_missingSource(f))}"${_rowAttr(i)}>
       ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">Missing Work</span></div>
       <div class="qn-req-body">
         <span class="qn-req-text">${esc(sentence)}${lateBtn}</span>
         ${line}
-        <span class="qn-req-source">${esc(_missingSource(f))}</span>
       </div>
       ${see}${listed ? _missMenuHtml(cid) : ''}
     </div>`;
@@ -8721,7 +8690,7 @@ window.ReportQuestionnaire = (function () {
     tqClaim: tqClaim,
     claimChanges: claimChanges,
     staleFor: staleFor,
-    staleNote: staleNote,
+    staleNote: ReportQnBoxes.staleNote,
     metaFor: metaFor,
     lastTermIds: lastTermIds,
     browseOpen: browseOpen,

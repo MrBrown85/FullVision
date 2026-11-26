@@ -572,10 +572,10 @@ test.describe('checks and approval', () => {
     await expect(row.locator('.qn-req-text')).toContainText(title);
     // The missing-work sentence is ringed inside the comment (the LayoutE mockup).
     await expect(page.locator('#tq-marks .qn-mark.missing')).toContainText(title);
-    await expect(row.locator('.qn-req-source').last()).toHaveText(
-      // Of the year's work to Report 2's end (Colin, 2026-11-03), not Term 2's alone.
-      '1 of 37',
-    );
+    // The count is the row's tooltip, not grey text under it (plan decision 2):
+    // of the year's work to Report 2's end (Colin, 2026-11-03), not Term 2's alone.
+    await expect(row.locator('.qn-req-source')).toHaveCount(0);
+    await expect(row).toHaveAttribute('title', '1 of 37');
     const approve = page.locator('#tq-approve-next');
     await expect(approve).toBeEnabled();
     await expect(approve).toHaveAttribute(

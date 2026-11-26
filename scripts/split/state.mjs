@@ -15,6 +15,11 @@
 // each use of a moved variable `x` is now `state.x`, each `var x = …;` is now
 // `state.x = …;`, and one `var state = {};` line is new. Anything else fails.
 // Only variables that are reassigned move; functions and set-once values stay.
+//
+// The holder is a plain `{}`. A read of `state.x` before x is first assigned
+// gives undefined only while nothing has added `x` to Object.prototype; the
+// tool refuses the names JavaScript itself puts there, and cannot see a
+// library that adds more.
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { analyze as scopes } from 'eslint-scope';
@@ -35,6 +40,19 @@ const isCalled = id =>
   !!id.parent &&
   ((id.parent.type === 'CallExpression' && id.parent.callee === id) ||
     (id.parent.type === 'TaggedTemplateExpression' && id.parent.tag === id));
+
+const isNameless = e =>
+  !!e &&
+  ((e.type === 'FunctionExpression' && !e.id) ||
+    e.type === 'ArrowFunctionExpression' ||
+    (e.type === 'ClassExpression' && !e.id));
+
+const inFunction = (m, node) => {
+  for (let n = node.parent; n && n !== m.closure.fn.body; n = n.parent) {
+    if (/Function/.test(n.type)) return true;
+  }
+  return false;
+};
 
 const topOf = (m, node) => {
   let n = node;
@@ -103,6 +121,27 @@ export function pick(m) {
     if (TAKEN.has(v.name)) {
       problems.push(`${v.name} is a name every object already has (${where}); left as it is`);
       continue;
+    }
+    /* `var x = function () {}` names the function x; `state.x = function () {}`
+       leaves it nameless, which shows in .name and in an error's stack. */
+    const nameless = v.references.find(r => r.isWrite() && isNameless(r.writeExpr));
+    if (nameless) {
+      problems.push(
+        `${v.name} is given a function or class with no name of its own at line ${nameless.identifier.loc.start.line}; left as it is`,
+      );
+      continue;
+    }
+    /* `var x;` leaves an earlier value alone; `state.x = undefined;` would
+       reset it. So a bare declaration moves only when nothing above it, in
+       code that runs while the file loads, touches the variable. */
+    if (!def.node.init) {
+      const early = v.references.find(r => r.identifier.start < decl.start && !inFunction(m, r.identifier));
+      if (early) {
+        problems.push(
+          `${v.name} is declared with no value (${where}) after line ${early.identifier.loc.start.line} already uses it while loading; left as it is`,
+        );
+        continue;
+      }
     }
     moved.push(v);
   }
