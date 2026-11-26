@@ -565,3 +565,7 @@ interface Window {
 declare var AssignToolbar: any;
 declare var printFileName: any;
 declare var setPrintTitle: any;
+declare var ClassResults: any;
+interface Window {
+  ClassResults?: any;
+}
