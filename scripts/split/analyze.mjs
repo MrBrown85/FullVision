@@ -40,7 +40,7 @@ export function parse(src) {
 /* The closure a file is made of, if it is one: the function in
    `window.Name = (function () { … })();` when that statement is most of the
    file. */
-export function closureOf(ast, src) {
+export function closureOf(ast) {
   for (const st of ast.body) {
     if (st.type !== 'ExpressionStatement') continue;
     let e = st.expression;
@@ -53,7 +53,9 @@ export function closureOf(ast, src) {
     const fn = e.callee;
     if (fn.type !== 'FunctionExpression' && fn.type !== 'ArrowFunctionExpression') continue;
     if (fn.body.type !== 'BlockStatement') continue;
-    if (st.end - st.start < src.length * 0.8) continue;
+    // Most of the file's code, comments above and below it aside.
+    const code = ast.body[ast.body.length - 1].end - ast.body[0].start;
+    if (st.end - st.start < code * 0.8) continue;
     return { fn, name, statement: st };
   }
   return null;
