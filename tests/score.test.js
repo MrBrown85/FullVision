@@ -6,7 +6,7 @@
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { assignAll, assignBetween } from './helpers/assign-sources.js';
+import { assignAll, assignBetween, assignFiles } from './helpers/assign-sources.js';
 
 describe('score-comments', () => {
   /**
@@ -192,7 +192,7 @@ describe('score-save-parity', () => {
 
   describe('No score writer works out the type on its own', () => {
     const files = [
-      'teacher/page-assignments.js',
+      ...assignFiles(),
       'teacher/page-gradebook.js',
       'teacher-mobile/tab-grade.js',
       'shared/data.js',

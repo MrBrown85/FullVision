@@ -10,6 +10,7 @@ import './setup.js';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
+import { assignFiles } from './helpers/assign-sources.js';
 
 const tick = (ms = 20) => new Promise(r => setTimeout(r, ms));
 
@@ -379,7 +380,8 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
     // list of rows or its count of drafts. Now shared/data.js sends all
     // three, for a signed-in teacher only (tests/grade-return-server.test.js);
     // no other file names them.
-    ['shared/grade-state.js', 'shared/grader.js', 'teacher/page-assignments.js'].forEach(file => {
+    // The Assignments page is teacher/page-assignments.js and the teacher/assign-*.js cut from it.
+    ['shared/grade-state.js', 'shared/grader.js'].concat(assignFiles()).forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/['"`](return_grades|list_course_grade_returns|course_draft_count)['"`]\s*,/);
       expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);

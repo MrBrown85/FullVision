@@ -295,6 +295,7 @@ load('s/page-carousel.js');
 // Bulletins on the student's page, as teacher/app.html loads it for Preview as Student (B1d).
 load('s/bulletins-view.js');
 load('teacher/focus-back.js');
+load('teacher/keep-dom.js');
 load('teacher/sidebar-keep.js');
 load('teacher/ui.js');
 load('teacher/markup.js');
@@ -410,7 +411,6 @@ load('teacher/grades-print.js');
 load('teacher/rubric-library.js');
 load('teacher/rubric-bank.js');
 load('teacher/grading-setup-copy.js');
-load('teacher/keep-dom.js');
 load('teacher/assign-show.js');
 load('teacher/assign-toolbar.js');
 load('teacher/grade-change.js');
