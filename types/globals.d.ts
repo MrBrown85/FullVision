@@ -570,3 +570,8 @@ interface Window {
   ClassResults?: any;
 }
 declare var RubricWords: any;
+declare var ObsCapture: any;
+declare var ObsFollowUps: any;
+interface Window {
+  ObsFollowUps?: any;
+}
