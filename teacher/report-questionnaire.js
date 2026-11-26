@@ -1407,7 +1407,7 @@ window.ReportQuestionnaire = (function () {
   function _glanceRowHtml(row, label, body, fig, list, chip) {
     var open = !!_glanceOpen[row];
     var kind = _GLANCE_KIND[row];
-    return `<div class="qn-fact qn-glance-row" data-lit="${_GLANCE_PART[row] || ''}" style="--qn-part:${ReportQnBoxes.look(kind, '').tint}">
+    return `<div class="qn-fact qn-glance-row" data-lit="${_GLANCE_PART[row] || ''}" data-tone="${_GLANCE_KIND[row]}">
         <button type="button" class="qn-glance-toggle" data-action="tqGlanceToggle" data-row="${row}" aria-expanded="${open}" aria-controls="tq-glance-${row}">
           ${ReportQnBoxes.tile(kind)}
           <span class="qn-fact-body"><span class="qn-fact-label">${label}</span>${body}</span>
@@ -1519,7 +1519,7 @@ window.ReportQuestionnaire = (function () {
           ),
           true,
         )
-      : `<div class="qn-fact qn-glance-row" data-lit="notHandedIn" style="--qn-part:${ReportQnBoxes.look('notHandedIn', '').tint}">
+      : `<div class="qn-fact qn-glance-row" data-lit="notHandedIn">
         <div class="qn-glance-toggle static">${ReportQnBoxes.tile('notHandedIn')}
         <div class="qn-fact-body"><span class="qn-fact-label">Missing Work</span><span class="qn-glance-name">None so far this year</span></div></div>
       </div>`;
@@ -1532,7 +1532,7 @@ window.ReportQuestionnaire = (function () {
       <div class="qn-band">Skills</div>
       ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
       <div class="qn-band">Work</div>
-      <div class="qn-fact qn-best" data-lit="bestPiece" style="--qn-part:${ReportQnBoxes.look('bestPiece', '').tint}">
+      <div class="qn-fact qn-best" data-lit="bestPiece">
         ${ReportQnBoxes.tile('bestPiece')}
         ${
           best

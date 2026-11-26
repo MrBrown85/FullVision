@@ -2834,7 +2834,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   margin-top: 1px;
 }
 .qn-fact-label {
-  color: var(--qn-part, var(--text-2));
+  color: var(--qn-ink, var(--text-2));
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -3188,6 +3188,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   .obs-card-meta:not(:has(.obs-card-dim, .obs-card-context, .obs-card-assessment, .obs-card-link, .obs-card-quoted)) {
   display: none;
 }
+.qn-obs .obs-card-context {
+  color: var(--text-2);
+}
 .qn-obs .obs-card-meta .obs-card-dim {
   color: var(--text);
   font-weight: 500;
@@ -3456,7 +3459,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-voice .qn-fact-label {
   display: block;
-  color: color-mix(in srgb, #b83a72 78%, var(--text));
+  color: var(--qn-ink, var(--text-2));
 }
 .qn-voice-text {
   flex: 1;
@@ -6109,6 +6112,25 @@ body.qn-roster #gb-sidebar .student-row-note {
   --qn-habit: #6b4fbb;
   --qn-missing-ink: #a35f00;
   --qn-obs-fill: #f5f5f7;
+  /* Each part's colour (the ring and tint) and its text shade, light and dark. */
+  --qn-c-grade: #0066cc;
+  --qn-ink-grade: #0062c4;
+  --qn-c-bestPiece: #a8690a;
+  --qn-ink-bestPiece: #85530a;
+  --qn-c-strengths: #2e7d4f;
+  --qn-ink-strengths: #25673f;
+  --qn-c-habits: #6b4fbb;
+  --qn-ink-habits: #5e43a8;
+  --qn-c-attendance: #3f6fb5;
+  --qn-ink-attendance: #33609f;
+  --qn-c-voice: #b83a72;
+  --qn-ink-voice: #9a2c5d;
+  --qn-c-notHandedIn: #a35f00;
+  --qn-ink-notHandedIn: #8a5000;
+  --qn-c-nextStep: #0f7b83;
+  --qn-ink-nextStep: #0b666d;
+  --qn-c-change: #5b5b60;
+  --qn-ink-change: #56565b;
 }
 @media (prefers-color-scheme: dark) {
   .qn {
@@ -6122,6 +6144,24 @@ body.qn-roster #gb-sidebar .student-row-note {
     --qn-habit: #a18cf0;
     --qn-missing-ink: #ffd60a;
     --qn-obs-fill: rgba(255, 255, 255, 0.07);
+    --qn-c-grade: #4da3ff;
+    --qn-ink-grade: #4da3ff;
+    --qn-c-bestPiece: #e6b050;
+    --qn-ink-bestPiece: #e6b050;
+    --qn-c-strengths: #5fc486;
+    --qn-ink-strengths: #5fc486;
+    --qn-c-habits: #b3a1f5;
+    --qn-ink-habits: #b3a1f5;
+    --qn-c-attendance: #86b3ea;
+    --qn-ink-attendance: #86b3ea;
+    --qn-c-voice: #f08ab4;
+    --qn-ink-voice: #f08ab4;
+    --qn-c-notHandedIn: #ffd60a;
+    --qn-ink-notHandedIn: #ffd60a;
+    --qn-c-nextStep: #4fc3cb;
+    --qn-ink-nextStep: #4fc3cb;
+    --qn-c-change: #a1a1a6;
+    --qn-ink-change: #a1a1a6;
   }
 }
 /* The card itself is only the page's section: the title, then the boxes. */
@@ -6162,35 +6202,47 @@ body.qn-roster #gb-sidebar .student-row-note {
    colour is --qn-part. Under Reduce Motion it is not drawn. */
 [data-lit='grade'],
 .qn-box[data-part='grade'] {
-  --qn-part: #0066cc;
+  --qn-part: var(--qn-c-grade);
+  --qn-ink: var(--qn-ink-grade);
 }
 [data-lit='bestPiece'],
 .qn-box[data-part='bestPiece'] {
-  --qn-part: #a8690a;
+  --qn-part: var(--qn-c-bestPiece);
+  --qn-ink: var(--qn-ink-bestPiece);
 }
 [data-lit='strengths'],
 .qn-box[data-part='strengths'] {
-  --qn-part: #2e7d4f;
+  --qn-part: var(--qn-c-strengths);
+  --qn-ink: var(--qn-ink-strengths);
 }
 [data-lit='habits'],
 .qn-box[data-part='habits'] {
-  --qn-part: #6b4fbb;
+  --qn-part: var(--qn-c-habits);
+  --qn-ink: var(--qn-ink-habits);
 }
 [data-lit='attendance'],
 .qn-box[data-part='attendance'] {
-  --qn-part: #3f6fb5;
+  --qn-part: var(--qn-c-attendance);
+  --qn-ink: var(--qn-ink-attendance);
 }
 [data-lit='voice'],
 .qn-box[data-part='voice'] {
-  --qn-part: #b83a72;
+  --qn-part: var(--qn-c-voice);
+  --qn-ink: var(--qn-ink-voice);
 }
 [data-lit='notHandedIn'],
 .qn-box[data-part='notHandedIn'] {
-  --qn-part: #a35f00;
+  --qn-part: var(--qn-c-notHandedIn);
+  --qn-ink: var(--qn-ink-notHandedIn);
 }
 [data-lit='nextStep'],
 .qn-box[data-part='nextStep'] {
-  --qn-part: #0f7b83;
+  --qn-part: var(--qn-c-nextStep);
+  --qn-ink: var(--qn-ink-nextStep);
+}
+[data-tone='change'] {
+  --qn-part: var(--qn-c-change);
+  --qn-ink: var(--qn-ink-change);
 }
 .qn-box,
 .qn-card[data-lit],
