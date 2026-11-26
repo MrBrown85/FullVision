@@ -80,6 +80,7 @@
     "teacher/gradebook-toolbar.js",
     "teacher/assign-list.js",
     "teacher/crit-comment.js",
+    "teacher/rubric-comment-lines.js",
     "teacher/add-from-class.js",
     "teacher/assign-draft.js",
     "teacher/assessment-type-field.js",

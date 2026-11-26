@@ -474,3 +474,19 @@ interface Window {
     MAX_COMMENTS: number;
   };
 }
+
+// Comments in the rubric editor (teacher/rubric-comment-lines.js).
+interface Window {
+  RubricCommentLines: {
+    on(): boolean;
+    init(api: { render: (sel?: string | null) => void; get: () => any; courseId: () => string }): void;
+    tools(b: any, cid: string, i: number): string;
+    cell(b: any, cid: string, c: any, i: number, lv: number): string;
+    foot(b: any): string;
+    overallRow(b: any, cid: string, cols: number): string;
+    keep(a: Element | null): string | null;
+    size(trs: ArrayLike<Element>): void;
+    dropBlank(rubric: any): void;
+    off(): void;
+  };
+}

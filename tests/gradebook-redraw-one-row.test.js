@@ -268,6 +268,9 @@ describe('closing the grader opened from the gradebook', () => {
   function openFromGradebook(seed, sid) {
     mount(seed, { course: CID });
     runInThisContext(readFileSync('teacher/crit-comment.js', 'utf-8'), { filename: 'teacher/crit-comment.js' });
+    runInThisContext(readFileSync('teacher/rubric-comment-lines.js', 'utf-8'), {
+      filename: 'teacher/rubric-comment-lines.js',
+    });
     runInThisContext(readFileSync('teacher/page-assignments.js', 'utf-8'), { filename: 'teacher/page-assignments.js' });
     click(scoresCell(LAB, sid));
     expect(document.getElementById('grader-overlay')).not.toBeNull();
