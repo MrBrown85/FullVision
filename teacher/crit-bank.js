@@ -257,14 +257,22 @@
   }
 
   // html-safe: built by _chipsHtml; the label and chevron are ours
-  function _render(inst) {
-    var v = _view(inst);
+  /* Drawn on every key while the teacher types, so the row and panel are put in again only when they change:
+     a new row each key, on a long Assignments page, made typing lag on a slow computer (Nov 25, 2026). */
+  function _render(inst, view) {
+    var v = view || _view(inst);
     inst.items = [];
     inst.box.hidden = !v.show;
-    inst.chips.innerHTML = _chipsHtml(inst, v);
+    var chips = _chipsHtml(inst, v);
+    if (chips !== inst.chipsDrawn) inst.chips.innerHTML = inst.chipsDrawn = chips;
     inst.panel.hidden = !inst.open;
     // html-safe: built by _panelHtml
-    inst.panel.innerHTML = inst.open ? _panelHtml(inst, v) : '';
+    var panel = inst.open ? _panelHtml(inst, v) : '';
+    if (panel !== inst.panelDrawn) inst.panel.innerHTML = inst.panelDrawn = panel;
+    // A drawing never has a chip marked by ↓ ↑ (_mark); one kept from before loses its mark.
+    Array.prototype.forEach.call(inst.box.querySelectorAll('.is-hi'), function (c) {
+      c.classList.remove('is-hi');
+    });
     inst.label.setAttribute('aria-expanded', String(inst.open));
     inst.label.classList.toggle('is-on', inst.open);
     if (inst.host && inst.host.classList) inst.host.classList.toggle('is-bank-open', inst.open);
@@ -315,7 +323,7 @@
     if (inst.ctx.kind === 'crit') _grow(inst.input, full);
   }
   function _unpeek(inst) {
-    if (!inst.input) return;
+    if (!inst.input || inst.input.getAttribute('placeholder') === inst.placeholder) return; // no preview showing
     inst.input.setAttribute('placeholder', inst.placeholder);
     if (inst.ctx.kind === 'crit') _grow(inst.input, null);
   }
@@ -536,7 +544,7 @@
     var v = _view(inst);
     if (v.part) inst.kept = false;
     _unpeek(inst);
-    _render(inst);
+    _render(inst, v);
   }
   function drop() {
     _crit = null;
