@@ -348,6 +348,7 @@ load('teacher/cm-roster-import.js');
 load('teacher/cm-guardians.js');
 load('teacher/cm-other-classes.js');
 load('teacher/cm-grading.js');
+load('teacher/cm-wizard.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-competencies.js');
