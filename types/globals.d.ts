@@ -532,3 +532,7 @@ interface Window {
   AssessmentCopy?: any;
   HandoutFiles?: any;
 }
+declare var RubricBank: any;
+interface Window {
+  RubricBank?: any;
+}
