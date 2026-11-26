@@ -205,6 +205,7 @@ declare var GradeState: {
   returnNGraded(...args: any[]): any;
   draftsSentence(...args: any[]): any;
   returnQuestion(...args: any[]): any;
+  returnTogether(...args: any[]): any;
 };
 // shared/reporting-term-presets.js (not checked yet): the school whose preset
 // a class's terms come from, or null.
