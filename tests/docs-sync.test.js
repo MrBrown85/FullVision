@@ -19,8 +19,8 @@ describe('docs/ARCHITECTURE.md', () => {
       arch.indexOf('The phone loads the same list'),
     );
     const listed = [...section.matchAll(/^\d+\. .*?`((?:shared|vendor)\/[^`]+)`/gm)].map(m => m[1]);
-    // Every shared script up to rubric-checks.js; later ones belong to features.
-    const core = loaded.slice(0, loaded.indexOf('shared/rubric-checks.js') + 1);
+    // Every shared script up to rubric-comments.js; later ones belong to features.
+    const core = loaded.slice(0, loaded.indexOf('shared/rubric-comments.js') + 1);
     expect(listed).toEqual(core);
   });
 

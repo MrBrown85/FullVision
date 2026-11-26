@@ -24,11 +24,21 @@
     scrollIntoView: function (el, opts) {
       if (el && el.scrollIntoView) el.scrollIntoView(opts);
     },
+    // The level picked for this student on this criterion (0 for none).
+    level: function () {
+      return 0;
+    },
   };
   function configure(deps) {
     Object.keys(deps || {}).forEach(function (k) {
       _deps[k] = deps[k];
     });
+    if (_CB()) _CB().configure(deps);
+  }
+  // The Comment Bank (teacher/crit-bank.js), loaded before this file.
+  /** @returns {any} */
+  function _CB() {
+    return /** @type {any} */ (window).CritBank;
   }
   /** @type {any} */
   var _critCommentState = null; // { cid, sid, aid, critId, draft, reuse, own } while a field is open
@@ -229,6 +239,47 @@
         '</div>';
     return html;
   }
+  /* The Comment Bank (teacher/crit-bank.js), behind the commentBank switch:
+     Last Time above the box, the Bank row under Same As. */
+  function _bankOn() {
+    return !!_CB() && _CB().enabled();
+  }
+  function _bankCtx(cid, aid, sid, crit) {
+    var group = _deps.groupRow(aid, sid);
+    var isGroup = !!(group && group.view);
+    var who = isGroup ? null : _studentOf(cid, sid);
+    return {
+      kind: 'crit',
+      cid: cid,
+      aid: aid,
+      sid: sid,
+      critId: crit.id,
+      first: who ? displayNameFirst(who) : '',
+      group: isGroup,
+    };
+  }
+  // A comment picked from the Bank is written as a Same As pick is: at once.
+  function _critBankSet(text) {
+    /** @type {any} */
+    var inp = document.getElementById('crit-comment-input');
+    if (!inp) return;
+    inp.value = text;
+    _critCommentInput(inp);
+    _saveCriterionCommentDraft();
+    _focusCritCommentInput();
+  }
+  function _bankWire() {
+    var st = _critCommentState;
+    var inp = document.getElementById('crit-comment-input');
+    var edit = st && inp && inp.closest('.rsg-crit-edit');
+    var crit = st && _deps.criterion(st.aid, st.critId);
+    if (!edit || !crit || !_bankOn()) return;
+    _CB().wire(edit, _bankCtx(st.cid, st.aid, st.sid, crit), {
+      set: _critBankSet,
+      save: _saveCriterionCommentDraft,
+      focus: _focusCritCommentInput,
+    });
+  }
   // html-safe: criterion, student and group names and comments through esc; ids are ours; limits are numbers
   function _critCommentEditorHtml(cid, aid, sid, crit) {
     var st = _critCommentState;
@@ -237,8 +288,13 @@
     var label = 'Comment on ' + (crit.name || 'this criterion') + (who ? ' for ' + who : '');
     var len = text.trim().length;
     st.reuse = _critCommentReuse(cid, aid, sid, crit);
+    var bank = _bankOn();
+    var ctx = bank ? _bankCtx(cid, aid, sid, crit) : null;
     return (
-      '<div class="rsg-crit-edit" data-stop-prop="true">' +
+      '<div class="rsg-crit-edit' +
+      (bank ? ' has-bank' : '') +
+      '" data-stop-prop="true">' +
+      (bank ? _CB().lastHtml(ctx) : '') +
       '<div class="rsg-crit-edit-box"><textarea class="rsg-crit-input" id="crit-comment-input" rows="1" maxlength="' +
       CRIT_COMMENT_MAX +
       '" placeholder="' +
@@ -277,6 +333,7 @@
             .join('') +
           '</div>'
         : '') +
+      (bank ? _CB().rowHtml(ctx) : '') +
       _critOwnFieldsHtml(cid, aid, sid, crit) +
       '</div>'
     );
@@ -349,6 +406,7 @@
     at[0].insertAdjacentHTML(at[1], html);
     if (note) note.remove();
     _syncCritCommentChip(st);
+    _bankWire();
     _focusCritCommentInput(who);
   }
   // Line for One Student: a member's own field opens under the group's.
@@ -389,6 +447,7 @@
     }
     var reuse = inp.closest('.rsg-crit-edit').querySelector('.rsg-crit-reuse');
     if (reuse) reuse.hidden = !!len;
+    if (_CB()) _CB().typed();
     clearTimeout(_critCommentTimer);
     _critCommentTimer = setTimeout(_saveCriterionCommentDraft, 800);
   }
@@ -423,6 +482,7 @@
     if (!st) return;
     _saveCriterionCommentDraft();
     _critCommentState = null;
+    if (_CB()) _CB().drop();
     var row = _critRowEl(st.aid, st.sid, st.critId);
     var edit = row && row.querySelector('.rsg-crit-edit');
     var crit = _deps.criterion(st.aid, st.critId);
@@ -439,6 +499,7 @@
   function _dropCriterionComment() {
     _saveCriterionCommentDraft();
     _critCommentState = null;
+    if (_CB()) _CB().drop();
     _critCommentFlowEl = null;
   }
   // A redraw draws an open field again with what was typed (the row's
@@ -452,6 +513,7 @@
       return;
     }
     _syncCritCommentChip(st);
+    _bankWire();
     var active = document.activeElement;
     if (!active || active === document.body) _focusCritCommentInput();
   }
@@ -505,6 +567,7 @@
     var active = document.activeElement;
     var edit = st && active && active.closest && active.closest('.rsg-crit-edit');
     if (!edit || !active.classList.contains('rsg-crit-input')) return false;
+    if (_CB() && _CB().key(e)) return true;
     if (e.key === 'Tab') {
       var fields = Array.prototype.slice.call(edit.querySelectorAll('.rsg-crit-input'));
       var to = fields[fields.indexOf(active) + (e.shiftKey ? -1 : 1)];

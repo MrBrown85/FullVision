@@ -127,14 +127,11 @@ window.PageAssignments = (function () {
   var _pendingFormRubric = null;
   // Scores to move to a copied rubric once the edit is saved (PR 10).
   var _scoreMoveAfterSave = null;
-  // An Advanced Rubric checkbox being dragged to a new place in its level.
-  var _dragCheck = null;
   var _rubricDirty = false;
   // The rubric as saved and its scored-student counts, for the edit guard.
   var _rubricBefore = null;
   var _rubricScored = {};
   var _rubricAutoTags = [];
-  var _expandedCriterion = 0;
 
   // Comment popover state
   var _commentPopoverState = null;
@@ -5334,6 +5331,7 @@ window.PageAssignments = (function () {
           return _blankRowHtml(cid, d, c, i, levels, style) + '';
         })
         .join('') +
+      _cm('overallRow', levels.length + (canAddCol ? 1 : 0)) +
       '</tbody></table>';
     var foot =
       '<div class="af-tag-rubric-note af-ge-foot">' +
@@ -5341,6 +5339,7 @@ window.PageAssignments = (function () {
       (own
         ? ''
         : '<button type="button" class="af-link-btn" data-action="gePicker" data-i="-1">+ From Competency</button>') +
+      _cm('foot') +
       (_blank.picker && _blank.picker.i === -1 ? _blankPickerHtml(cid, -1) : '') +
       '</div>';
     return (
@@ -5381,6 +5380,10 @@ window.PageAssignments = (function () {
       .join('');
   }
 
+  // Comments in the editor (teacher/rubric-comment-lines.js): '' while its switch is off.
+  function _cm(what, a, b, c) {
+    return window.RubricCommentLines ? RubricCommentLines[what](_blank, activeCourse, a, b, c) : '';
+  }
   function _blankRowHtml(cid, d, c, i, levels, style) {
     var chips = _blankChipsHtml(cid, c.tagIds || [], i);
     var menuOpen = _blank.menu === i;
@@ -5472,6 +5475,7 @@ window.PageAssignments = (function () {
           esc((c.levels && c.levels[lv]) || '') +
           '</textarea>' +
           checks +
+          _cm('cell', c, i, lv) +
           '</td>'
         );
       })
@@ -5490,7 +5494,9 @@ window.PageAssignments = (function () {
       i +
       '" aria-expanded="' +
       menuOpen +
-      '" aria-label="Weight and points">···</button></div>' +
+      '" aria-label="Weight and points">···</button>' +
+      _cm('tools', i) +
+      '</div>' +
       menu +
       (_blank.picker && _blank.picker.i === i ? _blankPickerHtml(cid, i) : '') +
       '</th>' +
@@ -5630,6 +5636,7 @@ window.PageAssignments = (function () {
     var a = document.activeElement;
     var keep =
       focusSel ||
+      (window.RubricCommentLines && RubricCommentLines.keep(a)) ||
       (a && a.dataset && a.dataset.ge && a.dataset.k
         ? '[data-ge="' + a.dataset.ge + '"][data-k="' + a.dataset.k + '"]'
         : a && a.dataset && a.dataset.ge
@@ -5684,6 +5691,7 @@ window.PageAssignments = (function () {
         t.style.height = (r.name && !i ? r.heights[0] : tallest) + 'px';
       });
     });
+    if (window.RubricCommentLines) RubricCommentLines.size(trs);
   }
 
   // Typing: the draft follows each field; nothing redraws.
@@ -9988,98 +9996,11 @@ window.PageAssignments = (function () {
     });
   }
 
-  function renderRubricEditor() {
-    if (!_editingRubric) return;
-    var existing = document.getElementById('rubric-modal');
-    if (existing) existing.remove();
-    var r = _editingRubric;
-    var sections = getSections(activeCourse);
-    var style = rubricStyle(r);
-    var html =
-      '<div class="rubric-modal-overlay" id="rubric-modal" data-action="rubricModalBackdrop" role="dialog" aria-modal="true">' +
-      '<div class="rubric-editor' +
-      _RUBRIC_STYLE_CLASS[style] +
-      '"><div class="rubric-editor-header"><h2 class="rubric-editor-title">' +
-      (r._isNew ? 'New Rubric' : 'Edit Rubric') +
-      '</h2>' +
-      // Standard: one descriptor per level. Advanced: checkboxes inside each
-      // level cell as well (Rubric Bank plan \u00a75). Single-Point: the
-      // Proficient standard only (grader plan PR 15).
-      '<div class="seg seg-sm rubric-style-seg" role="radiogroup" aria-label="Rubric Style">' +
-      _editorStyles(r)
-        .map(function (s) {
-          return (
-            '<button type="button" class="seg-btn" role="radio" aria-checked="' +
-            (style === s) +
-            '" data-action="setRubricStyle" data-style="' +
-            s +
-            '">' +
-            _RUBRIC_STYLE_NAMES[s] +
-            '</button>'
-          );
-        })
-        .join('') +
-      '</div>' +
-      '<button class="rubric-editor-close" data-action="cancelRubricEdit" title="Close" aria-label="Close">\u2715</button></div>' +
-      '<div class="rubric-editor-body"><p class="rubric-guard-note" id="re-guard-note" hidden></p>' +
-      '<p class="rubric-style-hint" id="re-style-hint"' +
-      (_RUBRIC_STYLE_HINTS[style] ? '' : ' hidden') +
-      '>' +
-      _RUBRIC_STYLE_HINTS[style] +
-      '</p>' +
-      '<input class="rubric-name-input" id="re-name" value="' +
-      esc(r.name) +
-      '" placeholder="Rubric name\u2026" aria-label="Rubric name"><div id="re-criteria">';
-    r.criteria.forEach(function (crit, ci) {
-      html += renderCriterionBlock(ci, crit, r.criteria, sections);
-    });
-    html +=
-      '</div></div><div class="rubric-editor-footer"><button class="rubric-add-criterion-btn" data-action="addCriterion">+ Add Criterion</button>' +
-      (style === 'six_point'
-        ? ''
-        : '<button class="rubric-add-criterion-btn" data-action="criterionFromCompetency" title="Add criteria for competencies, with their descriptors drafted">+ From Competency</button>') +
-      '<button class="btn btn-ghost" data-action="cancelRubricEdit">Cancel</button><button class="btn btn-primary" data-action="saveRubricEdit">Save Rubric</button></div></div></div>';
-    document.body.insertAdjacentHTML('beforeend', html);
-    setTimeout(function () {
-      var inp = document.getElementById('re-name');
-      if (inp) inp.focus();
-    }, 50);
-  }
-  function _editorIsAdvanced() {
-    return !!_editingRubric && rubricStyle(_editingRubric) === 'advanced';
-  }
-  function _editorIsSixPoint() {
-    return false;
-  }
-  // Advanced and Six-Point rubrics hold checkboxes in each level.
-  function _editorHasChecks() {
-    return _editorIsAdvanced() || _editorIsSixPoint();
-  }
-  /* The styles the editor offers. Six-Point is offered in English and Social
-     Studies classes (SixPoint.courseOffers). Its six levels don't fit the
-     four-level styles, so only a rubric not yet saved switches in or out. */
-  function _editorStyles(r) {
-    var style = rubricStyle(r);
-    var offered = false;
-    return RUBRIC_STYLES.filter(function (s) {
-      if (r._isNew) return s !== 'six_point' || offered || style === 'six_point';
-      return style === 'six_point' ? s === 'six_point' : s !== 'six_point';
-    });
-  }
-  function _editorIsSinglePoint() {
-    return !!_editingRubric && rubricStyle(_editingRubric) === 'single_point';
-  }
   var _RUBRIC_STYLE_NAMES = {
     standard: 'Standard',
     advanced: 'Advanced',
     single_point: 'Single-Point',
     six_point: 'Six-Point',
-  };
-  var _RUBRIC_STYLE_CLASS = {
-    standard: '',
-    advanced: ' advanced',
-    single_point: ' single-point',
-    six_point: ' advanced six-point',
   };
   var _RUBRIC_STYLE_HINTS = {
     standard: '',
@@ -10091,37 +10012,6 @@ window.PageAssignments = (function () {
       'The BC six-point scale, scored holistically: 6 Superior to 1 Unacceptable. Each score has a descriptor and checkboxes; ticking boxes suggests the highest score whose boxes are all ticked. Each score counts as the FullVision level shown under it. A blank paper (NR) is Missing.',
   };
   /* ── Advanced Rubrics: the checkboxes in each level cell ──────────── */
-  /* One level cell's checkbox list: a row per checkbox (drag handle, box,
-     label, remove) and "+ Add Checkbox". Enter in a label adds the next. */
-  function _renderCheckList(ci, crit, L) {
-    var html = '<div class="rubric-check-list" data-check-list="' + ci + ':' + L.n + '">';
-    RubricChecks.checksAt(crit, L.n).forEach(function (check) {
-      var ids = ' data-check-id="' + esc(check.id) + '" data-crit="' + ci + '" data-level="' + L.n + '"';
-      html +=
-        '<div class="rubric-check-row" draggable="true"' +
-        ids +
-        '>' +
-        '<span class="rubric-check-handle" title="Drag to reorder" aria-hidden="true">⠇</span>' +
-        '<span class="rubric-check-box" aria-hidden="true"></span>' +
-        '<input class="rubric-check-input" value="' +
-        esc(check.label || '') +
-        '" placeholder="What you look for…" aria-label="' +
-        L.name +
-        ' checkbox" data-action-blur="critCheckLabel"' +
-        ids +
-        '>' +
-        '<button type="button" class="rubric-check-remove" data-action="removeCritCheck"' +
-        ids +
-        ' title="Remove Checkbox" aria-label="Remove Checkbox">✕</button></div>';
-    });
-    html +=
-      '<button type="button" class="rubric-add-check-btn" data-action="addCritCheck" data-crit="' +
-      ci +
-      '" data-level="' +
-      L.n +
-      '">+ Add Checkbox</button></div>';
-    return html;
-  }
   /* Replace one level's checkboxes, renumbering them; other levels stay. */
   function _setLevelChecks(crit, level, list) {
     var others = (crit.checks || []).filter(function (k) {
@@ -10133,145 +10023,9 @@ window.PageAssignments = (function () {
     });
     crit.checks = others.concat(list);
   }
-  function _focusCheckInput(checkId) {
-    var input = document.querySelector('.rubric-check-input[data-check-id="' + checkId + '"]');
-    if (input) input.focus();
-  }
-  /* A new checkbox after `afterId`, or at the end of the level. */
-  function addCritCheck(ci, level, afterId) {
-    if (!_editingRubric) return;
-    var crit = _editingRubric.criteria[ci];
-    if (!crit) return;
-    var list = RubricChecks.checksAt(crit, level);
-    var at = list.length;
-    if (afterId) {
-      var i = list.findIndex(function (k) {
-        return k.id === afterId;
-      });
-      if (i >= 0) at = i + 1;
-    }
-    var check = { id: uid(), level: level, label: '', displayOrder: at };
-    list.splice(at, 0, check);
-    _setLevelChecks(crit, level, list);
-    _rubricDirty = true;
-    _refreshCriterionDOM(ci);
-    _focusCheckInput(check.id);
-  }
-  function updateCritCheckLabel(ci, checkId, value) {
-    if (!_editingRubric) return;
-    var crit = _editingRubric.criteria[ci];
-    var check = (crit && crit.checks ? crit.checks : []).find(function (k) {
-      return k && k.id === checkId;
-    });
-    if (!check) return;
-    var label = String(value || '').trim();
-    if (check.label === label) return;
-    check.label = label;
-    _rubricDirty = true;
-  }
-  function removeCritCheck(ci, checkId) {
-    if (!_editingRubric) return;
-    var crit = _editingRubric.criteria[ci];
-    var check = (crit && crit.checks ? crit.checks : []).find(function (k) {
-      return k && k.id === checkId;
-    });
-    if (!check) return;
-    var level = Number(check.level);
-    _setLevelChecks(
-      crit,
-      level,
-      RubricChecks.checksAt(crit, level).filter(function (k) {
-        return k.id !== checkId;
-      }),
-    );
-    _rubricDirty = true;
-    _refreshCriterionDOM(ci);
-  }
-  /* Move a checkbox to `toIndex` within its level. */
-  function moveCritCheck(ci, checkId, toIndex) {
-    if (!_editingRubric) return;
-    var crit = _editingRubric.criteria[ci];
-    var check = (crit && crit.checks ? crit.checks : []).find(function (k) {
-      return k && k.id === checkId;
-    });
-    if (!check) return;
-    var level = Number(check.level);
-    var list = RubricChecks.checksAt(crit, level).filter(function (k) {
-      return k.id !== checkId;
-    });
-    var at = Math.max(0, Math.min(list.length, toIndex));
-    list.splice(at, 0, check);
-    _setLevelChecks(crit, level, list);
-    _rubricDirty = true;
-    _refreshCriterionDOM(ci);
-  }
-  /* Standard | Advanced | Single-Point. Leaving Advanced drops every
-     checkbox, so it asks first when there are any; scores keep their
-     levels. Every switch keeps the descriptors: Single-Point only hides all
-     but the Proficient one. */
-  function setRubricStyle(style) {
-    if (!_editingRubric) return;
-    var next = rubricStyle({ style: style });
-    if (rubricStyle(_editingRubric) === next) return;
-    if (next !== 'advanced' && next !== 'six_point' && RubricChecks.countChecks(_editingRubric) > 0) {
-      showConfirm(
-        'Switch to a ' + _RUBRIC_STYLE_NAMES[next] + ' Rubric?',
-        'The checkboxes in every level will be removed. Students’ scores keep their levels.',
-        'Remove Checkboxes',
-        'danger',
-        function () {
-          _applyRubricStyle(next);
-        },
-      );
-      return;
-    }
-    _applyRubricStyle(next);
-  }
-  function _applyRubricStyle(next) {
-    if (!_editingRubric) return;
-    var wasSix = rubricStyle(_editingRubric) === 'six_point';
-    _editingRubric.style = next;
-    if (next !== 'advanced' && next !== 'six_point') {
-      _editingRubric.criteria.forEach(function (c) {
-        if (c) c.checks = [];
-      });
-    }
-    // Into or out of Six-Point (a new rubric only): levels 5 and 6 come or go.
-    if (wasSix !== (next === 'six_point')) {
-      _editingRubric.criteria.forEach(function (c) {
-        if (!c) return;
-        c.levels = Object.assign(_blankEditorLevels(next), c.levels || {});
-        if (next !== 'six_point') {
-          delete c.levels[5];
-          delete c.levels[6];
-          c.checks = (c.checks || []).filter(function (k) {
-            return k && Number(k.level) <= 4;
-          });
-        }
-      });
-      _rubricDirty = true;
-      renderRubricEditor();
-      return;
-    }
-    _rubricDirty = true;
-    document.querySelectorAll('.rubric-style-seg .seg-btn').forEach(function (b) {
-      b.setAttribute('aria-checked', String(b.dataset.style === next));
-    });
-    var editor = document.querySelector('#rubric-modal .rubric-editor');
-    if (editor) {
-      editor.classList.toggle('advanced', next === 'advanced' || next === 'six_point');
-      editor.classList.toggle('single-point', next === 'single_point');
-      editor.classList.toggle('six-point', next === 'six_point');
-    }
-    var hint = document.getElementById('re-style-hint');
-    if (hint) {
-      hint.textContent = _RUBRIC_STYLE_HINTS[next];
-      hint.hidden = !_RUBRIC_STYLE_HINTS[next];
-    }
-    _refreshCriterionDOM(_expandedCriterion);
-  }
   /* A checkbox without a label is nothing to save. */
   function _dropBlankChecks(rubric) {
+    if (window.RubricCommentLines) RubricCommentLines.dropBlank(rubric);
     (rubric.criteria || []).forEach(function (c) {
       if (!c || !c.checks) return;
       [6, 5, 4, 3, 2, 1].forEach(function (level) {
@@ -10285,546 +10039,13 @@ window.PageAssignments = (function () {
       });
     });
   }
-  /* The editor's level columns, in the class's Rubric Levels order. A
-     Six-Point rubric's are its six scores, each in the colour of the level it
-     counts as. */
-  function _rubricEditorLevels() {
-    if (_editorIsSixPoint())
-      return RubricScale.keys(_editingRubric, levelOrderFor(activeCourse)).map(function (n) {
-        var stored = RubricScale.toStored(_editingRubric, n);
-        return {
-          n: n,
-          name: RubricScale.label(_editingRubric, n),
-          tone: RubricScale.tone(_editingRubric, n),
-          countsAs: scoreLevelText(stored.level, stored.mod),
-        };
-      });
-    return levelOrderFor(activeCourse).map(function (n) {
-      return { n: n, name: PROF_LABELS[n], tone: n };
-    });
-  }
-  // A tag's teacher-facing name. Never the id: real tag ids are UUIDs.
-  /* How a chip names the criterion that already uses its competency: by
-     number when the criterion is named after the competency. */
-  // A competency the whole rubric scores can't go on a criterion too.
-  function _markWholeRubricTags(used) {
-    ((_editingRubric && _editingRubric.tagIds) || []).forEach(function (t) {
-      used[t] = 'the whole rubric';
-    });
-    return used;
-  }
-  function _usedByLabel(crit, idx, tagId) {
-    var tag = getTagById(activeCourse, tagId);
-    var tagName = _rubricTagName(tag, getSectionForTag(activeCourse, tagId));
-    var name = (crit && crit.name) || '';
-    return name && name.trim().toLowerCase() !== String(tagName).trim().toLowerCase() ? name : 'criterion ' + (idx + 1);
-  }
-  function _rubricTagName(tag, sec) {
-    return (tag && (tag.label || tag.name)) || (sec && sec.name) || (tag && tag.code) || '';
-  }
-  // Sections split into the course's competency groups, if it has any.
-  function _rubricTagGroups(sections) {
-    var lm = getLearningMap(activeCourse);
-    var groups = (lm && lm.competencyGroups) || [];
-    if (!groups.length) return [{ name: '', secs: sections }];
-    var byId = {};
-    var out = groups.map(function (g) {
-      return (byId[g.id] = { name: g.name, secs: [] });
-    });
-    var rest = { name: 'Other', secs: [] };
-    sections.forEach(function (sec) {
-      (sec.groupId && byId[sec.groupId] ? byId[sec.groupId] : rest).secs.push(sec);
-    });
-    out.push(rest);
-    return out.filter(function (g) {
-      return g.secs.length;
-    });
-  }
-  function renderCriterionBlock(ci, crit, allCriteria, sections) {
-    var otherUsed = {};
-    allCriteria.forEach(function (c, i) {
-      if (i !== ci)
-        (c.tagIds || []).forEach(function (t) {
-          otherUsed[t] = _usedByLabel(c, i, t);
-        });
-    });
-    _markWholeRubricTags(otherUsed);
-    var selectedTagIds = new Set(crit.tagIds || []);
-    var isCollapsed = ci !== _expandedCriterion;
-    // Collapsed summary: the competency names this criterion assesses.
-    var headerChips = '';
-    (crit.tagIds || []).forEach(function (tid) {
-      var tag = getTagById(activeCourse, tid);
-      var sec = getSectionForTag(activeCourse, tid);
-      var name = _rubricTagName(tag, sec);
-      if (!name) return;
-      headerChips +=
-        '<span class="rubric-header-chip" style="--sec:' +
-        cssColor(sec && sec.color) +
-        '" title="' +
-        esc(name) +
-        '">' +
-        esc(name) +
-        '</span>';
-    });
-    // No competency: the criterion counts toward the overall grade only.
-    var compNote = '';
-    if (!selectedTagIds.size) {
-      headerChips += '<span class="rubric-header-chip rubric-header-chip-overall">Overall grade only</span>';
-      compNote = '<p class="rubric-part-note">Counts toward the overall grade only, not toward a competency.</p>';
-    }
-    // T-UI-09 · per-criterion weight. Any positive number; normalized at read-time (Pass D §1.1).
-    var critWeight = crit.weight != null && !isNaN(Number(crit.weight)) ? Number(crit.weight) : 1;
-    var html =
-      '<div class="rubric-criterion' +
-      (isCollapsed ? ' collapsed' : '') +
-      '" data-crit-idx="' +
-      ci +
-      '"><div class="rubric-criterion-header" data-action="toggleCriterionExpand" data-index="' +
-      ci +
-      '">' +
-      '<span class="rubric-criterion-chevron" aria-hidden="true">▾</span>' +
-      '<span class="rubric-criterion-num">' +
-      (ci + 1) +
-      '</span><input class="rubric-criterion-name" value="' +
-      esc(crit.name) +
-      '" data-action-blur="critName" data-crit-idx="' +
-      ci +
-      '" data-stop-prop="true" placeholder="Criterion name" aria-label="Criterion name">' +
-      '<div class="rubric-header-chips">' +
-      headerChips +
-      '</div>' +
-      '<label class="rubric-criterion-weight-label" data-stop-prop="true" title="How much this criterion counts compared with the others.">Weight <input class="rubric-criterion-weight" type="number" min="0" step="0.5" value="' +
-      critWeight +
-      '" data-action-blur="critWeight" data-action-input="critWeightLive" data-crit-idx="' +
-      ci +
-      '" data-stop-prop="true" aria-label="Criterion weight"></label>' +
-      '<button class="rubric-criterion-delete" data-action="removeCriterion" data-index="' +
-      ci +
-      '" data-stop-prop="true" title="Remove criterion" aria-label="Remove criterion">✕</button></div>' +
-      '<div class="rubric-criterion-body">' +
-      '<div class="rubric-part"><div class="rubric-part-label">Competencies assessed' +
-      '<span class="rubric-part-hint">Optional</span></div>' +
-      compNote;
-    _rubricTagGroups(sections).forEach(function (g) {
-      if (g.name) html += '<div class="rubric-comp-group">' + esc(g.name) + '</div>';
-      html += '<div class="rubric-comp-chips">';
-      g.secs.forEach(function (sec) {
-        (sec.tags || []).forEach(function (tag) {
-          var inThis = selectedTagIds.has(tag.id);
-          var usedBy = otherUsed[tag.id];
-          var name = _rubricTagName(tag, sec);
-          html +=
-            '<button type="button" class="rubric-comp-chip' +
-            (inThis ? ' selected' : '') +
-            '" style="--sec:' +
-            cssColor(sec.color) +
-            '" aria-pressed="' +
-            inThis +
-            '"' +
-            (usedBy
-              ? ' disabled title="Already used in ' + esc(usedBy) + '"'
-              : ' data-action="toggleCritTag" data-index="' + ci + '" data-tagid="' + esc(tag.id) + '"') +
-            '><span class="rubric-comp-mark" aria-hidden="true">' +
-            (inThis ? '✓' : '') +
-            '</span>' +
-            esc(name) +
-            (usedBy ? '<span class="rubric-comp-used">' + esc(usedBy) + '</span>' : '') +
-            '</button>';
-        });
-      });
-      html += '</div>';
-    });
-    // T-UI-10 · per-level point values sit in each level's header.
-    // levelValues stays null unless a value differs from 4/3/2/1.
-    var lv = crit.levelValues || {};
-    // One competency: its I-can statements can draft the four descriptors.
-    var draftBtn = '';
-    if (window.RubricDraft && !_editorIsSixPoint() && (crit.tagIds || []).length === 1) {
-      var draftTag = getTagById(activeCourse, crit.tagIds[0]);
-      if (draftTag) {
-        var generic = !RubricDraft.statementsOf(draftTag).length;
-        var ownWording = !!_savedWording(draftTag);
-        draftBtn =
-          '<button type="button" class="rubric-draft-btn" data-action="draftCriterion" data-index="' +
-          ci +
-          '" title="' +
-          (ownWording
-            ? 'Uses your own wording for this competency from an earlier rubric.'
-            : generic
-              ? 'This competency has no I-can statements, so the draft uses the proficiency scale wording only.'
-              : 'Write the four descriptors from this competency\u2019s I-can statements.') +
-          '">Draft from ' +
-          esc(_rubricTagName(draftTag, getSectionForTag(activeCourse, draftTag.id))) +
-          '</button>';
-      }
-    }
-    var single = _editorIsSinglePoint();
-    html +=
-      '</div><div class="rubric-part"><div class="rubric-part-label">' +
-      (single ? 'Proficient Standard' : 'Level descriptors') +
-      draftBtn +
-      '</div><div class="rubric-levels">';
-    // A single-point rubric states only the Proficient standard; the other
-    // levels' wording and point values are kept, just not shown.
-    (single ? [{ n: 3, name: PROF_LABELS[3], tone: 3 }] : _rubricEditorLevels()).forEach(function (L) {
-      var pts = lv[L.n] != null ? lv[L.n] : L.n;
-      // A Six-Point score has no points of its own: it counts as its level.
-      var ptsHtml = L.countsAs
-        ? '<span class="rubric-level-counts" title="What this score counts as in grades">Counts as ' +
-          esc(L.countsAs) +
-          '</span>'
-        : '<label class="rubric-level-pts" title="Points for ' +
-          L.name +
-          '"><input class="rubric-level-value" type="number" step="0.5" min="0" value="' +
-          esc(pts) +
-          '" data-crit="' +
-          ci +
-          '" data-level="' +
-          L.n +
-          '" data-action-blur="critLevelValue" aria-label="' +
-          L.name +
-          ' points"> pts</label>';
-      html +=
-        '<div class="rubric-level-card" style="--lvl:var(--score-' +
-        L.tone +
-        ')"><div class="rubric-level-header"><span class="rubric-level-name">' +
-        (single ? 'Meeting the Standard' : esc(L.name)) +
-        '</span>' +
-        ptsHtml +
-        '</div><textarea class="rubric-level-text" data-crit="' +
-        ci +
-        '" data-level="' +
-        L.n +
-        '" data-action-blur="critLevel" placeholder="What does ' +
-        (single ? 'meeting the standard' : L.name.toLowerCase()) +
-        ' look like?" aria-label="' +
-        (single ? 'Proficient standard' : L.name + ' descriptor') +
-        '">' +
-        esc((crit.levels && crit.levels[L.n]) || '') +
-        '</textarea>' +
-        (_editorHasChecks() ? _renderCheckList(ci, crit, L) : '') +
-        '</div>';
-    });
-    html += '</div></div></div></div>';
-    return html;
-  }
-  function toggleCriterionExpand(idx) {
-    _expandedCriterion = _expandedCriterion === idx ? -1 : idx;
-    document.querySelectorAll('.rubric-criterion').forEach(function (el, i) {
-      if (i === _expandedCriterion) el.classList.remove('collapsed');
-      else el.classList.add('collapsed');
-    });
-  }
-  function updateCritName(idx, name) {
-    if (!_editingRubric) return;
-    _editingRubric.criteria[idx].name = name.trim() || 'Unnamed';
-    _rubricDirty = true;
-  }
-  function updateCritLevel(idx, level, text) {
-    if (!_editingRubric) return;
-    if (!_editingRubric.criteria[idx].levels) _editingRubric.criteria[idx].levels = {};
-    _editingRubric.criteria[idx].levels[level] = text.trim();
-    _rubricDirty = true;
-  }
-  // T-UI-09 · per-criterion weight. Any positive number allowed; normalization
-  // happens at read-time (Pass D §1.1). Blank / zero falls back to 1.
-  function updateCritWeight(idx, value) {
-    if (!_editingRubric) return;
-    var v = parseFloat(value);
-    _editingRubric.criteria[idx].weight = isNaN(v) || v < 0 ? 1 : v;
-    _rubricDirty = true;
-  }
-  // T-UI-10 · per-level point value override. levelValues is lazily created.
-  // Reverting a value back to the default (4/3/2/1) removes the override so
-  // the criterion stays "clean" and rendering code can skip the overrides.
-  function updateCritLevelValue(idx, level, value) {
-    if (!_editingRubric) return;
-    var crit = _editingRubric.criteria[idx];
-    if (!crit) return;
-    var v = parseFloat(value);
-    var lvl = parseInt(level, 10);
-    var defaults = { 4: 4, 3: 3, 2: 2, 1: 1 };
-    if (!crit.levelValues) crit.levelValues = {};
-    if (isNaN(v) || v === defaults[lvl]) {
-      delete crit.levelValues[lvl];
-      if (Object.keys(crit.levelValues).length === 0) crit.levelValues = null;
-    } else {
-      crit.levelValues[lvl] = v;
-    }
-    _rubricDirty = true;
-    _updateGuardNote();
-  }
-  function toggleCritTag(critIdx, tagId) {
-    if (!_editingRubric) return;
-    _rubricDirty = true;
-    var crit = _editingRubric.criteria[critIdx];
-    if (!crit.tagIds) crit.tagIds = [];
-    var i = crit.tagIds.indexOf(tagId);
-    if (i >= 0) crit.tagIds.splice(i, 1);
-    else crit.tagIds.push(tagId);
-    _refreshCriterionDOM(critIdx);
-  }
-  function _refreshCriterionDOM(ci) {
-    if (!_editingRubric) return;
-    // Full re-render of criteria section (simpler than partial DOM updates in module context)
-    var mount = document.getElementById('re-criteria');
-    if (!mount) return;
-    var sections = getSections(activeCourse);
-    var h = '';
-    _editingRubric.criteria.forEach(function (c, i) {
-      h += renderCriterionBlock(i, c, _editingRubric.criteria, sections);
-    });
-    mount.innerHTML = h;
-  }
-  // A criterion's empty descriptors: six on a Six-Point rubric, else four.
-  function _blankEditorLevels(style) {
-    var levels = { 4: '', 3: '', 2: '', 1: '' };
-    if (style === 'six_point') {
-      levels[6] = '';
-      levels[5] = '';
-    }
-    return levels;
-  }
-  function addCriterion() {
-    if (!_editingRubric) return;
-    _rubricDirty = true;
-    var num = _editingRubric.criteria.length + 1;
-    // T-UI-09 · weight defaults to 1.0 (normalized across rubric at read-time).
-    // T-UI-10 · levelValues null means use defaults (4/3/2/1) — only set when
-    // teacher customizes via the disclosure.
-    _editingRubric.criteria.push({
-      id: uid(),
-      name: 'Criterion ' + num,
-      tagIds: [],
-      levels: _blankEditorLevels(rubricStyle(_editingRubric)),
-      weight: 1,
-      levelValues: null,
-      checks: [],
-    });
-    _expandedCriterion = _editingRubric.criteria.length - 1;
-    _refreshCriterionDOM(_expandedCriterion);
-  }
   /* ── Criteria from competencies (shared/rubric-draft.js) ─── */
-  /* The teacher's own wording for a competency, from earlier rubrics. */
-  function _savedWording(tag) {
-    if (typeof getCompetencyDescriptor !== 'function' || !window.RubricDraft) return null;
-    return getCompetencyDescriptor(RubricDraft.competencyKey(tag));
-  }
   function _whenWordingLoaded() {
     return Promise.resolve(typeof loadCompetencyDescriptors === 'function' ? loadCompetencyDescriptors() : null).catch(
       function () {
         return null;
       },
     );
-  }
-  /* Pick competencies; each becomes a criterion named after it, linked to
-     it, with its descriptors drafted. A competency already on a criterion of
-     this rubric can't be picked, as in the criterion block. */
-  function openCriterionFromCompetency() {
-    if (!_editingRubric || !window.RubricDraft || !window.AssessmentCopy) return;
-    var used = {};
-    _editingRubric.criteria.forEach(function (c) {
-      (c.tagIds || []).forEach(function (t) {
-        used[t] = _usedByLabel(c, _editingRubric.criteria.indexOf(c), t);
-      });
-    });
-    _markWholeRubricTags(used);
-    var chips = '';
-    var any = false;
-    _rubricTagGroups(getSections(activeCourse)).forEach(function (g) {
-      if (g.name) chips += '<div class="rubric-comp-group">' + esc(g.name) + '</div>';
-      chips += '<div class="rubric-comp-chips">';
-      g.secs.forEach(function (sec) {
-        (sec.tags || []).forEach(function (tag) {
-          any = true;
-          var usedBy = used[tag.id];
-          chips +=
-            '<button type="button" class="rubric-comp-chip" style="--sec:' +
-            cssColor(sec.color) +
-            '" aria-pressed="false"' +
-            (usedBy
-              ? ' disabled title="Already used in ' + esc(usedBy) + '"'
-              : ' data-pick-tag="' + esc(tag.id) + '"') +
-            '><span class="rubric-comp-mark" aria-hidden="true"></span>' +
-            esc(_rubricTagName(tag, sec)) +
-            (usedBy ? '<span class="rubric-comp-used">' + esc(usedBy) + '</span>' : '') +
-            '</button>';
-        });
-      });
-      chips += '</div>';
-    });
-    var html = any
-      ? '<div class="copy-review-note">Each competency you pick becomes a criterion. Its descriptors are drafted from the competency\u2019s I-can statements, or use your own wording if you have rewritten them in an earlier rubric; change any of them before you save.</div>' +
-        chips
-      : '<div class="copy-review-note">This class has no competencies yet. Add them in Class Settings first.</div>';
-    function updateOk(root) {
-      var n = root.querySelectorAll('[data-pick-tag][aria-pressed="true"]').length;
-      var ok = root.querySelector('[data-copy-ok]');
-      if (!ok) return;
-      ok.disabled = !n;
-      ok.textContent = n ? 'Add ' + n + (n === 1 ? ' Criterion' : ' Criteria') : 'Add';
-    }
-    AssessmentCopy.dialog({
-      title: 'Criteria From Competencies',
-      html: html,
-      okLabel: 'Add',
-      onOpen: function (root) {
-        root.classList.add('crit-from-comp-dialog');
-        updateOk(root);
-        root.addEventListener('click', function (e) {
-          var chip = e.target.closest('[data-pick-tag]');
-          if (!chip) return;
-          var on = chip.getAttribute('aria-pressed') !== 'true';
-          chip.setAttribute('aria-pressed', on ? 'true' : 'false');
-          chip.classList.toggle('selected', on);
-          chip.querySelector('.rubric-comp-mark').textContent = on ? '\u2713' : '';
-          updateOk(root);
-        });
-      },
-      onOk: function (root) {
-        var ids = Array.from(root.querySelectorAll('[data-pick-tag][aria-pressed="true"]')).map(function (b) {
-          return b.dataset.pickTag;
-        });
-        if (!ids.length) return false;
-        var editing = _editingRubric;
-        _whenWordingLoaded().then(function () {
-          if (_editingRubric === editing) addCriteriaFromTags(ids);
-        });
-        return true;
-      },
-    });
-  }
-  function addCriteriaFromTags(tagIds) {
-    if (!_editingRubric) return;
-    var crits = _editingRubric.criteria;
-    var used = {};
-    crits.forEach(function (c) {
-      (c.tagIds || []).forEach(function (t) {
-        used[t] = true;
-      });
-    });
-    _markWholeRubricTags(used);
-    var added = [];
-    (tagIds || []).forEach(function (id) {
-      if (used[id]) return;
-      var tag = getTagById(activeCourse, id);
-      if (!tag) return;
-      used[id] = true;
-      var drafted = RubricDraft.draftCriterion(tag, uid, _savedWording(tag));
-      // In an Advanced Rubric each I-can statement is a Proficient checkbox.
-      drafted.checks = _editorIsAdvanced()
-        ? RubricDraft.statementsOf(tag).map(function (statement, i) {
-            return { id: uid(), level: 3, label: statement, displayOrder: i };
-          })
-        : [];
-      added.push(drafted);
-    });
-    if (!added.length) return;
-    // A new rubric's untouched first criterion is replaced, not left beside.
-    if (crits.length === 1 && RubricDraft.isBlankCriterion(crits[0]) && !_rubricScored[crits[0].id]) crits.splice(0, 1);
-    added.forEach(function (c) {
-      crits.push(c);
-    });
-    _rubricDirty = true;
-    _expandedCriterion = crits.indexOf(added[0]);
-    _refreshCriterionDOM(_expandedCriterion);
-    _updateGuardNote();
-    var first = document.querySelector('.rubric-criterion[data-crit-idx="' + _expandedCriterion + '"]');
-    if (first) first.scrollIntoView({ block: 'nearest' });
-  }
-  /* Draft the four descriptors of a criterion with one competency. Typed
-     descriptors are only replaced after the teacher says so. */
-  function draftCriterionDescriptors(idx) {
-    if (!_editingRubric || !window.RubricDraft) return;
-    var crit = _editingRubric.criteria[idx];
-    if (!crit || (crit.tagIds || []).length !== 1) return;
-    var tag = getTagById(activeCourse, crit.tagIds[0]);
-    if (!tag) return;
-    var tagName = _rubricTagName(tag, getSectionForTag(activeCourse, tag.id));
-    var editing = _editingRubric;
-    function apply() {
-      // The wording may load after the editor closed or moved on.
-      if (_editingRubric !== editing) return;
-      var c = _editingRubric.criteria[idx];
-      if (!c || c !== crit) return;
-      c.levels = RubricDraft.draftLevels(tag, _savedWording(tag)).levels;
-      if (RubricDraft.isDefaultName(c.name)) c.name = tagName || c.name;
-      // An Advanced Rubric also gets each I-can statement as a Proficient
-      // checkbox, as "+ From Competency" gives it, but only when Proficient
-      // has no boxes yet: boxes the teacher wrote are never replaced.
-      if (_editorIsAdvanced()) {
-        var hasProficient = (c.checks || []).some(function (k) {
-          return Number(k.level) === 3;
-        });
-        if (!hasProficient) {
-          c.checks = (c.checks || []).concat(
-            RubricDraft.statementsOf(tag).map(function (statement, i) {
-              return { id: uid(), level: 3, label: statement, displayOrder: i };
-            }),
-          );
-        }
-      }
-      _rubricDirty = true;
-      _expandedCriterion = idx;
-      _refreshCriterionDOM(idx);
-    }
-    if (!RubricDraft.hasDescriptors(crit)) {
-      _whenWordingLoaded().then(apply);
-      return;
-    }
-    showConfirm(
-      'Replace the descriptors?',
-      'Your descriptors for "' +
-        crit.name +
-        '" will be replaced with ' +
-        (_savedWording(tag)
-          ? 'your own wording for this competency from an earlier rubric.'
-          : 'a draft from the competency\u2019s I-can statements.'),
-      'Replace',
-      'primary',
-      apply,
-    );
-  }
-  function removeCriterion(idx) {
-    if (!_editingRubric) return;
-    if (_editingRubric.criteria.length <= 1) {
-      alert('A rubric needs at least one criterion.');
-      return;
-    }
-    var crit = _editingRubric.criteria[idx];
-    function _doRemove() {
-      if (!_editingRubric) return;
-      _rubricDirty = true;
-      _editingRubric.criteria.splice(idx, 1);
-      if (idx < _expandedCriterion) _expandedCriterion--;
-      else if (idx === _expandedCriterion) _expandedCriterion = -1;
-      _refreshCriterionDOM(0);
-      _updateGuardNote();
-    }
-    // A criterion with scores is removed only after the teacher says so.
-    var students = crit ? _rubricScored[crit.id] || 0 : 0;
-    if (!students) {
-      _doRemove();
-      return;
-    }
-    showConfirm(
-      'Remove a scored criterion?',
-      RubricGuard.removeMessage(crit, students),
-      'Remove and drop scores',
-      'danger',
-      _doRemove,
-    );
-  }
-  /* Shows or hides the note about changed top values on scored criteria. */
-  function _updateGuardNote() {
-    var note = document.getElementById('re-guard-note');
-    if (!note) return;
-    var text = _rubricBefore
-      ? RubricGuard.topChangeNote(RubricGuard.reviewEdit(_rubricBefore, _editingRubric, _rubricScored))
-      : '';
-    note.textContent = text;
-    note.hidden = !text;
   }
   function cancelRubricEdit() {
     if (_blank && _blank.host === 'modal') return _cancelBlank();
@@ -11798,15 +11019,6 @@ window.PageAssignments = (function () {
       newRubricUI: function () {
         newRubricUI(el.dataset.style);
       },
-      setRubricStyle: function () {
-        setRubricStyle(el.dataset.style);
-      },
-      addCritCheck: function () {
-        addCritCheck(parseInt(el.dataset.crit, 10), parseInt(el.dataset.level, 10));
-      },
-      removeCritCheck: function () {
-        removeCritCheck(parseInt(el.dataset.crit, 10), el.dataset.checkId);
-      },
       newRubricFromForm: function () {
         newRubricFromForm();
       },
@@ -12181,26 +11393,6 @@ window.PageAssignments = (function () {
       saveRubricEdit: function () {
         saveRubricEdit();
       },
-      addCriterion: function () {
-        addCriterion();
-      },
-      criterionFromCompetency: function () {
-        openCriterionFromCompetency();
-      },
-      draftCriterion: function () {
-        draftCriterionDescriptors(parseInt(el.dataset.index, 10));
-      },
-      toggleCriterionExpand: function () {
-        // A click into the name or weight field edits it; it doesn't fold the criterion.
-        if (e.target !== el && e.target.closest('input, textarea, select, label')) return;
-        toggleCriterionExpand(parseInt(el.dataset.index, 10));
-      },
-      removeCriterion: function () {
-        removeCriterion(parseInt(el.dataset.index, 10));
-      },
-      toggleCritTag: function () {
-        toggleCritTag(parseInt(el.dataset.index, 10), el.dataset.tagid);
-      },
       stepFactor: function () {
         FactorField.stepIn(document.getElementById('af-weight'), Number(el.dataset.dir));
       },
@@ -12242,10 +11434,6 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionInput === 'critCommentInput' || el.dataset.actionInput === 'critOwnInput') {
       CritComment.input(el);
-      return;
-    }
-    if (el.dataset.actionInput === 'critWeightLive') {
-      updateCritWeight(parseInt(el.dataset.critIdx, 10), el.value);
       return;
     }
     // Points input live update
@@ -12391,27 +11579,6 @@ window.PageAssignments = (function () {
       el.classList.toggle('has-text', !!tagText);
       return;
     }
-    if (el.dataset.actionBlur === 'critName') {
-      updateCritName(parseInt(el.dataset.critIdx, 10), el.value);
-      return;
-    }
-    if (el.dataset.actionBlur === 'critLevel') {
-      updateCritLevel(parseInt(el.dataset.crit, 10), parseInt(el.dataset.level, 10), el.value);
-      return;
-    }
-    if (el.dataset.actionBlur === 'critCheckLabel') {
-      updateCritCheckLabel(parseInt(el.dataset.crit, 10), el.dataset.checkId, el.value);
-      return;
-    }
-    // T-UI-09 / T-UI-10 · rubric weight + per-level value overrides.
-    if (el.dataset.actionBlur === 'critWeight') {
-      updateCritWeight(parseInt(el.dataset.critIdx, 10), el.value);
-      return;
-    }
-    if (el.dataset.actionBlur === 'critLevelValue') {
-      updateCritLevelValue(parseInt(el.dataset.crit, 10), parseInt(el.dataset.level, 10), el.value);
-      return;
-    }
     // Points input commit on blur. A re-render that removes the input also
     // blurs it; that is not the teacher leaving the field.
     if (el.classList.contains('gb-pts-input')) {
@@ -12469,30 +11636,6 @@ window.PageAssignments = (function () {
         e.preventDefault();
         e.target.value = _moduleNameSaved(e.target);
         e.target.blur();
-      }
-      return;
-    }
-    // A checkbox label in the rubric editor: Enter adds the next checkbox
-    // (a blank one stays alone); Alt+↑/↓ moves it within its level.
-    var checkInput = e.target && e.target.closest ? e.target.closest('.rubric-check-input') : null;
-    if (checkInput) {
-      var ci = parseInt(checkInput.dataset.crit, 10);
-      var checkId = checkInput.dataset.checkId;
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        updateCritCheckLabel(ci, checkId, checkInput.value);
-        if (checkInput.value.trim()) addCritCheck(ci, parseInt(checkInput.dataset.level, 10), checkId);
-        return;
-      }
-      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        e.preventDefault();
-        updateCritCheckLabel(ci, checkId, checkInput.value);
-        var row = checkInput.closest('.rubric-check-row');
-        var rows = Array.from(row.parentNode.querySelectorAll('.rubric-check-row'));
-        var from = rows.indexOf(row);
-        moveCritCheck(ci, checkId, e.key === 'ArrowUp' ? from - 1 : from + 1);
-        _focusCheckInput(checkId);
-        return;
       }
       return;
     }
@@ -12621,31 +11764,7 @@ window.PageAssignments = (function () {
   }
 
   /* ── Drag event handlers (delegated) ────────────────────── */
-  /* The checkbox list a drag is over, when it is the dragged checkbox's own. */
-  function _checkDropList(e) {
-    if (!_dragCheck) return null;
-    var list = e.target.closest ? e.target.closest('.rubric-check-list') : null;
-    return list && list.dataset.checkList === _dragCheck.ci + ':' + _dragCheck.level ? list : null;
-  }
-  function _clearCheckDropMarks() {
-    document.querySelectorAll('.rubric-check-row.drop-before, .rubric-check-row.drop-after').forEach(function (r) {
-      r.classList.remove('drop-before', 'drop-after');
-    });
-  }
   function _handleDragStart(e) {
-    // A checkbox in the rubric editor, moving within its level.
-    var checkRow = e.target.closest('.rubric-check-row');
-    if (checkRow) {
-      _dragCheck = { ci: checkRow.dataset.crit, level: checkRow.dataset.level, id: checkRow.dataset.checkId };
-      e.dataTransfer.effectAllowed = 'move';
-      try {
-        e.dataTransfer.setData('text/plain', checkRow.dataset.checkId);
-      } catch (err) {
-        /* some browsers refuse setData on a synthetic drag */
-      }
-      checkRow.classList.add('dragging');
-      return;
-    }
     // Collab drag must be checked FIRST — members are nested inside assess cards
     var collabDrag = e.target.closest('[data-collab-drag-sid]');
     if (collabDrag) {
@@ -12666,14 +11785,6 @@ window.PageAssignments = (function () {
   function _handleDragEnd(e) {
     // A student dropped nowhere, or back where they were, comes back into view.
     AC.collabDragEnd();
-    if (_dragCheck) {
-      _dragCheck = null;
-      _clearCheckDropMarks();
-      document.querySelectorAll('.rubric-check-row.dragging').forEach(function (r) {
-        r.classList.remove('dragging');
-      });
-      return;
-    }
     if (_dragAssessId) {
       onAssessDragEnd();
       return;
@@ -12686,19 +11797,6 @@ window.PageAssignments = (function () {
     _dragFromGroup = null;
   }
   function _handleDragOver(e) {
-    if (_dragCheck) {
-      var checkList = _checkDropList(e);
-      if (!checkList) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      _clearCheckDropMarks();
-      var overRow = e.target.closest('.rubric-check-row');
-      if (overRow && overRow.dataset.checkId !== _dragCheck.id) {
-        var box = overRow.getBoundingClientRect();
-        overRow.classList.add(e.clientY < box.top + box.height / 2 ? 'drop-before' : 'drop-after');
-      }
-      return;
-    }
     // Module drop zone
     var dropZone = e.target.closest('[data-mod-drop-zone]');
     if (dropZone && _dragModuleId) {
@@ -12759,11 +11857,6 @@ window.PageAssignments = (function () {
     }
   }
   function _handleDragLeave(e) {
-    if (_dragCheck) {
-      var leftList = e.target.closest ? e.target.closest('.rubric-check-list') : null;
-      if (leftList && !leftList.contains(e.relatedTarget)) _clearCheckDropMarks();
-      return;
-    }
     var dropZone = e.target.closest('[data-mod-drop-zone]');
     if (dropZone) {
       dropZone.classList.remove('drag-over');
@@ -12789,26 +11882,6 @@ window.PageAssignments = (function () {
     }
   }
   function _handleDrop(e) {
-    if (_dragCheck) {
-      var checkList = _checkDropList(e);
-      var drag = _dragCheck;
-      _dragCheck = null;
-      _clearCheckDropMarks();
-      if (!checkList) return;
-      e.preventDefault();
-      var rows = Array.from(checkList.querySelectorAll('.rubric-check-row'));
-      var overRow = e.target.closest('.rubric-check-row');
-      var to = rows.length - 1;
-      if (overRow && overRow.dataset.checkId !== drag.id) {
-        var box = overRow.getBoundingClientRect();
-        var others = rows.filter(function (r) {
-          return r.dataset.checkId !== drag.id;
-        });
-        to = others.indexOf(overRow) + (e.clientY < box.top + box.height / 2 ? 0 : 1);
-      }
-      moveCritCheck(parseInt(drag.ci, 10), drag.id, to);
-      return;
-    }
     // Module drop zone
     var dropZone = e.target.closest('[data-mod-drop-zone]');
     if (dropZone && _dragModuleId) {
@@ -17587,6 +16660,7 @@ window.PageAssignments = (function () {
     _addDocListener('keydown', _startKeydown, true);
     _addDocListener('input', _startSearch);
     _addDocListener('input', _blankInput);
+    if (window.RubricCommentLines) RubricCommentLines.init({ render: _blankRender, get: () => _blank });
     _addDocListener('pointerdown', _blankOutside, true);
     _addDocListener('mouseover', _afTipOver);
     _addDocListener('mouseout', _afTipOut);
@@ -17699,15 +16773,15 @@ window.PageAssignments = (function () {
     delete window.toggleFocusStudent;
   }
 
-  // The criterion comment (teacher/crit-comment.js) borrows the class on
-  // screen and three of this page's helpers.
+  // The criterion comment (teacher/crit-comment.js) borrows the class on screen,
+  // four of this page's helpers and the level picked.
   CritComment.configure({
-    course: function () {
-      return activeCourse;
-    },
+    course: () => activeCourse,
     groupRow: _groupRowFor,
     criterion: getRubricCriterion,
     scrollIntoView: _scrollIntoViewIfNeeded,
+    level: (cid, sid, aid, crit) =>
+      _sixRubricOf(cid, aid) ? _sixScoreNow(cid, sid, aid, crit) : _criterionState(cid, sid, aid, crit).level,
   });
 
   /* ── Public API ─────────────────────────────────────────── */

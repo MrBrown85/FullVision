@@ -172,6 +172,7 @@ create table rubric (
   name       text        not null,
   copy_group uuid,                                                    -- shared by a rubric and its copies in the teacher's other classes; null = never copied (20261018_rubric_copy_group)
   style      text        not null default 'standard',                 -- standard | advanced: checkboxes inside each level cell (20261022_advanced_rubric_checks) | single_point: the Proficient standard only, with Work On and Went Beyond notes (20261027_single_point_rubric)
+  overall_comments jsonb not null default '[]',                     -- the teacher's overall comment bank: [text], at most 40; teacher-only, never on the student page (2026112601_rubric_comment_bank)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -190,6 +191,7 @@ create table criterion (
   level_1_value       numeric     not null,
   weight              numeric     not null,
   display_order       integer     not null default 0,
+  comments            jsonb       not null default '[]',               -- the teacher's comment bank: [{level, text}], at most 40; teacher-only, never on the student page (2026112601_rubric_comment_bank)
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
@@ -1149,6 +1151,8 @@ create table feedback_reflection (
 -- docs/schema.generated.sql; their bodies are in migrations/ and
 -- docs/backend-design/*-paths.sql. Writes go through public RPCs, each
 -- idempotent through p_idempotency_key (fv_idem_check, CLAUDE.md rule 7).
+-- add_criterion_comment(criterion, level, text, key): Add to Bank, one comment at one level; returns the criterion's list (2026112601)
+-- add_rubric_overall_comment(rubric, text, key): Add to Bank for the overall comment; returns the rubric's list (2026112601)
 
 -- ─── Triggers ───────────────────────────────────────────────────────────────
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()

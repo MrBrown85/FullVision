@@ -166,7 +166,11 @@ let realPage = null;
 
 function loadAssignmentsPage() {
   realPage = window.PageAssignments;
+  runInThisContext(readFileSync('teacher/crit-bank.js', 'utf-8'), { filename: 'teacher/crit-bank.js' });
   runInThisContext(readFileSync('teacher/crit-comment.js', 'utf-8'), { filename: 'teacher/crit-comment.js' });
+  runInThisContext(readFileSync('teacher/rubric-comment-lines.js', 'utf-8'), {
+    filename: 'teacher/rubric-comment-lines.js',
+  });
   runInThisContext(readFileSync('teacher/page-assignments.js', 'utf-8'), { filename: 'teacher/page-assignments.js' });
 }
 

@@ -120,6 +120,7 @@ const PRECACHE_URLS = [
   '/shared/grader.js',
   '/shared/rubric-draft.js',
   '/shared/rubric-checks.js',
+  '/shared/rubric-comments.js',
   '/shared/rubric-scale.js',
   '/shared/core-self.js',
   '/shared/student-view.js',
@@ -183,7 +184,7 @@ const PRECACHE_URLS = [
   // Demo Mode's sample class (DEFAULT_COURSES) is read from this file on
   // every start, never from the saved classes, so an offline start needs
   // it. The address is exactly the one shared/data-demo.js _loadSeedScript asks.
-  '/shared/seed-data.js?v=46',
+  '/shared/seed-data.js?v=47',
   '/teacher/comment-realiser.js',
   '/teacher/comment-lint.js',
   '/shared/bank-comment.js',
@@ -308,9 +309,11 @@ const PRECACHE_URLS = [
   '/teacher/assign-toolbar.js',
   '/teacher/grade-change.js',
   '/teacher/assign-list.js',
+  '/teacher/crit-bank.js',
   '/teacher/crit-comment.js',
   '/teacher/assign-draft.js',
   '/teacher/assessment-type-field.js',
+  '/teacher/rubric-comment-lines.js',
   '/teacher/page-assignments.js',
   '/teacher/rubric-words.js',
   '/teacher/bulletin-share.js',

@@ -1064,6 +1064,8 @@ const TB_PAGES = [
    (queued writes replayed on reconnect). */
 const FV_IDEMPOTENT_RPCS = {
   move_rubric_scores: true,
+  add_criterion_comment: true,
+  add_rubric_overall_comment: true,
   create_assessment: true,
   create_course: true,
   create_custom_tag: true,
