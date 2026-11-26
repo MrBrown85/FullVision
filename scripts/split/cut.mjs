@@ -61,6 +61,18 @@ export function cut(src, opts) {
   if (!a.closure) throw new Error('this file is not one closure');
   const host = a.closure.name;
   const G = opts.global;
+  /* The object state.mjs made: the `var name = {};` line right after
+     'use strict'. It is `state` unless that name was taken. */
+  const second = a.body[1];
+  const holderName =
+    second &&
+    second.type === 'VariableDeclaration' &&
+    second.declarations.length === 1 &&
+    second.declarations[0].init &&
+    second.declarations[0].init.type === 'ObjectExpression' &&
+    !second.declarations[0].init.properties.length
+      ? second.declarations[0].id.name
+      : 'state';
   /* A `state.x = …;` line sets up the main file's own object while it loads:
      it stays behind, even inside the lines asked for. */
   const setsState = i => {
@@ -71,7 +83,7 @@ export function cut(src, opts) {
       e.type === 'AssignmentExpression' &&
       e.left.type === 'MemberExpression' &&
       e.left.object.type === 'Identifier' &&
-      e.left.object.name === 'state'
+      e.left.object.name === holderName
     );
   };
   const asked = picked(a, opts.ranges);
@@ -137,7 +149,7 @@ export function cut(src, opts) {
     if (node.type === 'VariableDeclaration') {
       return node.declarations.every(
         d =>
-          (d.id.name === 'state' && d.init && d.init.type === 'ObjectExpression' && !d.init.properties.length) ||
+          (d.id.name === holderName && d.init && d.init.type === 'ObjectExpression' && !d.init.properties.length) ||
           (d.init &&
             d.init.type === 'MemberExpression' &&
             d.init.object.type === 'Identifier' &&
@@ -155,7 +167,7 @@ export function cut(src, opts) {
   const kept = a.statements.filter(st => !inPiece.has(st.i));
   const holder = kept.find(st => {
     const node = a.body[st.i];
-    return node.type === 'VariableDeclaration' && node.declarations[0].id.name === 'state';
+    return node.type === 'VariableDeclaration' && node.declarations[0].id.name === holderName;
   });
   const directive = kept.find(st => a.body[st.i].directive);
   const afterPointers = holder || directive;
@@ -170,8 +182,8 @@ export function cut(src, opts) {
   const pointerText = given.length
     ? `\n${pad}/* In ${base} (moved ${today}). */\n` + given.map(n => `${pad}var ${n} = ${G}.${n};`).join('\n')
     : '';
-  const firstCall = ['state', ...handedFns].filter(n => n !== 'state' || handedFixed.includes('state'));
-  const lateFixed = handedFixed.filter(n => n !== 'state');
+  const firstCall = [holderName, ...handedFns].filter(n => n !== holderName || handedFixed.includes(holderName));
+  const lateFixed = handedFixed.filter(n => n !== holderName);
   const callText = list => `${pad}${G}.configure({ ${list.map(n => `${n}: ${n}`).join(', ')} });`;
   let lateAfter = null;
   for (const n of lateFixed) {
