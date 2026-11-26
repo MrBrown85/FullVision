@@ -2387,11 +2387,11 @@ describe('categories: the server’s list is read before the whole list is saved
     // Class Settings saves and reorders through the two that check and send in one moment.
     expect(count(/(?<![.\w])saveCategoriesNow\(/g)).toEqual({
       'shared/data-categories.js': 1,
-      'teacher/dash-class-manager.js': 1,
+      'teacher/cm-edit-actions.js': 1,
     });
     expect(count(/(?<![.\w])reorderCategoriesNow\(/g)).toEqual({
       'shared/data-categories.js': 1,
-      'teacher/dash-class-manager.js': 1,
+      'teacher/cm-edit-actions.js': 1,
     });
     // Asked of the server directly, never left in the outbox.
     const data = read('shared/data-categories.js');
