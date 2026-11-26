@@ -240,7 +240,9 @@ describe('a saved comment that holds a retired sentence', () => {
      record (values) as the approval kept it. */
   function savedWithRetired() {
     const f = facts1();
-    f.absent = 3;
+    // The year's total is 10; this term's share, which the old sentence said, is 3.
+    f.absent = 10;
+    f.absentTerm = 3;
     const ctx = CommentBank.context(f, {});
     let seed = 5;
     while (!CommentBank.draft(ctx, { seed }).ids.includes('m01')) seed++;
@@ -297,10 +299,24 @@ describe('a saved comment that holds a retired sentence', () => {
     clearProfCache();
     const now = CommentBank.facts(CID, PRI, TERM);
     now.absent = f.absent;
+    now.absentTerm = f.absentTerm;
     const s = CommentBank.staleness(meta, now, {}, { text });
     expect(s.changes.some(c => c.kind === 'marks' && c.before === OLD_NH)).toBe(true);
     // The retired attendance sentence still holds.
     expect(s.changes.some(c => c.before === OLD_ATT)).toBe(false);
+  });
+
+  it('a retired "this term" attendance sentence follows this term\u2019s share, not the year\u2019s total', () => {
+    const { f, text, meta } = savedWithRetired();
+    const flagged = over => {
+      const s = CommentBank.staleness(meta, Object.assign({}, f, over), {}, { text });
+      return !!s && s.changes.some(c => c.before === OLD_ATT);
+    };
+    expect(flagged({})).toBe(false);
+    // The year's total moves (more absences since): the old sentence still holds.
+    expect(flagged({ absent: 12 })).toBe(false);
+    // Its own number changes: flagged.
+    expect(flagged({ absentTerm: 4 })).toBe(true);
   });
 
   it('opens with the same text and the same rows: a bank row, never the teacher’s own sentence', () => {

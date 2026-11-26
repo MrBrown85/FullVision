@@ -158,6 +158,47 @@ describe('Report 2 with Report 1’s attendance blank (Colin, 2026-11-03: “Yea
   });
 });
 
+describe('the comment says the year’s total (Colin, 2026-11-25: “The year’s total”, “so far this year”)', () => {
+  // Report 1 had 5 absences and 2 lates; Report 2 has 14 and 6. This term's
+  // share is 9 and 4; the comment says 14 and 6.
+  beforeEach(() => {
+    localStorage.clear();
+    delete _cache.termRatings[CID];
+    _cache.students[CID] = [MAX];
+    COURSES[CID] = { id: CID, name: 'Science 8', gradingSystem: 'proficiency' };
+    saveTermAttendance(CID, MAX.id, 'term-1', 5, 2);
+    saveTermAttendance(CID, MAX.id, 'term-2', 14, 6);
+  });
+
+  it('reads the year’s totals as the facts, and keeps this term’s share for the retired sentences', () => {
+    const f = CommentBank.facts(CID, MAX, 'term-2');
+    expect([f.absent, f.late]).toEqual([14, 6]);
+    expect([f.absentTerm, f.lateTerm]).toEqual([9, 4]);
+    expect(CommentBank.attendanceText(f.absent, f.late)).toBe('missed 14 classes and been late six times');
+  });
+
+  it('Generate states the year’s totals with “so far this year”, never this term’s share', () => {
+    const ctx = CommentBank.context(CommentBank.facts(CID, MAX, 'term-2'), {});
+    const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
+    const att = habits.rows.filter(r => r.group === 'Attendance').map(r => r.text);
+    expect(att.length).toBeGreaterThan(3);
+    expect(att.filter(t => /so far this year/i.test(t)).length).toBeGreaterThan(3);
+    att.forEach(t => {
+      expect(t).toMatch(/14 classes/);
+      expect(t).toMatch(/six times/);
+      expect(t).not.toMatch(/this term|\b9\b|\bfour times\b/i);
+    });
+  });
+
+  it('the Attendance card and the printed block still read the term’s own figures', () => {
+    const att = getTermAttendance(CID, MAX.id, 'term-2');
+    expect(att).toMatchObject({ absences: 14, lates: 6, absencesThisTerm: 9, latesThisTerm: 4 });
+    const html = ReportBlocks.renderBlockAttendance(CID, MAX, { termId: 'term-2' }, {});
+    expect(html).toContain('Classes Absent</span> <b>9</b>');
+    expect(html).toContain('This Term');
+  });
+});
+
 describe('the Attendance card’s boxes (live run: 99999999 and 1e+21 printed, 2.7 became “two”)', () => {
   const RQ = ReportQuestionnaire;
   let hadDoc, oldDoc, els;
