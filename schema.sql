@@ -243,7 +243,7 @@ create table enrollment (
   show_overall_grade boolean,                                         -- Show Overall Grade for this student: null follows the class (course.show_my_learning), true shown, false hidden (2026111720)
   page_paused_at  timestamptz,                                        -- set: the student page is paused for this student since then, every card scan and session route answers closed; null: open (2026111720)
   unique (student_id, course_id),
-  unique (id, course_id)                                             -- enrollment_id_course_uk: what the score tables' keys point at (2026112602, not applied)
+  unique (id, course_id)                                             -- enrollment_id_course_uk: what the score tables' keys point at (2026112602)
 );
 -- Per-student options (2026111720_student_page_per_student). No reason is
 -- stored for either. Teachers: set_student_page_options(course, ids,
@@ -284,7 +284,7 @@ create table assessment (
   display_order  integer     not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),
-  unique (id, course_id)                                            -- assessment_id_course_uk: what the score tables' keys point at (2026112602, not applied)
+  unique (id, course_id)                                            -- assessment_id_course_uk: what the score tables' keys point at (2026112602)
 );
 
 -- A teacher's reminder to one student about one bulletin (2026111809, applied Nov 18): the student page
@@ -307,7 +307,7 @@ create table score (
   id            uuid        not null primary key,
   enrollment_id uuid        not null,
   assessment_id uuid        not null,
-  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602, not applied)
+  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602)
   value         numeric,
   status        text,                                                -- null | 'NS' | 'EXC' | 'LATE' | 'ABS' …
   comment       text,
@@ -323,7 +323,7 @@ create table tag_score (
   id            uuid        not null primary key,
   enrollment_id uuid        not null,
   assessment_id uuid        not null,
-  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602, not applied)
+  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602)
   tag_id        uuid        not null references tag(id)        on delete cascade,  -- in the row's class (trigger tag_score_class_parent)
   value         integer,                                             -- proficiency 1..4; null = no level yet, the row holds only its comment (20261027_score_comments)
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, a third of a level; no 1− or 4+ (20261013_proficiency_plus_minus)
@@ -338,7 +338,7 @@ create table rubric_score (
   id            uuid        not null primary key,
   enrollment_id uuid        not null,
   assessment_id uuid        not null,
-  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602, not applied)
+  course_id     uuid,                                                -- the row's class: its enrollment's. Filled by the database; a value sent by a caller is thrown away (2026112602)
   criterion_id  uuid        not null references criterion(id)  on delete cascade,  -- in the row's class (trigger rubric_score_class_parent)
   value         integer,                                             -- 1..4; null = no level yet, the row holds only its comment (20261027_score_comments)
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, as tag_score (20261013_proficiency_plus_minus)
@@ -358,7 +358,7 @@ create table dibels_score (
   id             uuid        not null primary key,
   enrollment_id  uuid        not null,
   assessment_id  uuid        not null,
-  course_id      uuid,                                             -- the row's class, as on score (2026112602, not applied)
+  course_id      uuid,                                             -- the row's class, as on score (2026112602)
   period         text        not null,                             -- boy | moy | eoy
   orf_wrc        integer,                                          -- oral reading fluency: words read correctly; null = not entered, never negative
   orf_errors     integer,                                          -- oral reading fluency: errors
@@ -375,7 +375,7 @@ create table dibels_score (
 create table rubric_check_score (
   enrollment_id uuid        not null,
   assessment_id uuid        not null,
-  course_id     uuid,                                                -- the row's class, as on score (2026112602, not applied)
+  course_id     uuid,                                                -- the row's class, as on score (2026112602)
   check_id      uuid        not null references criterion_check(id) on delete cascade,  -- in the row's class (trigger rubric_check_score_class_parent)
   created_at    timestamptz not null default now(),
   primary key (enrollment_id, assessment_id, check_id),
@@ -453,7 +453,7 @@ create table grade_return_repair_log (                              -- what a ni
 -- fv_owns_rubric_score_cell, fv_owns_rubric_check_cell).
 
 -- The same rule for every writer, in the tables themselves
--- (2026112602_score_rows_carry_their_class, not applied): each of the five carries
+-- (2026112602_score_rows_carry_their_class): each of the five carries
 -- course_id, set from its enrollment on every insert by trigger <table>_class
 -- (_score_row_class) and never taken from the caller. Its two keys to
 -- enrollment and assessment carry the class with them, against unique
