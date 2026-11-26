@@ -253,6 +253,7 @@ const PRECACHE_URLS = [
   '/teacher/cm-competency-edit.js',
   '/teacher/cm-relink.js',
   '/teacher/cm-competency-import.js',
+  '/teacher/cm-competency-cards.js',
   '/teacher/dash-class-manager.js',
   '/teacher/dash-overview.js',
   '/teacher/dash-competencies.js',
