@@ -3,6 +3,8 @@ declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
   // Build flags (shared/build-flags.js): unfinished work stays behind one.
   BuildFlags: { on(name: string): boolean };
+  // The top bar (teacher/top-bar.js): drawn once, then only its lit tab changes.
+  TopBar: { draw(activePage: string): void; barKey(html: string): string };
   SegGlide: {
     run(track: HTMLElement, from: { left: number; width: number }, to: DOMRect, ms?: number): void;
     lit(track: Element): HTMLElement | null;
