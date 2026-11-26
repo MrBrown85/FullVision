@@ -241,6 +241,8 @@
   font-size: var(--text-base);
 }
 .dash-inbox-spread {
+  /* Holds the menu a Not In name opens (dash-inbox-rollcall.js, menuOn). */
+  position: relative;
   flex: 0 0 auto;
   /* Never wider than the row: what does not fit beside it scrolls. */
   max-width: 100%;
@@ -410,7 +412,8 @@
   border-radius: 999px;
   cursor: pointer;
 }
-.dash-inbox-notin-chip:hover {
+.dash-inbox-notin-chip:hover,
+.dash-inbox-notin-chip.is-open {
   background: var(--divider-subtle);
 }
 

@@ -167,9 +167,13 @@ window.DashInboxStacks = (function () {
         o.notIn
           .map(function (/** @type {any} */ n) {
             return (
-              '<button type="button" class="dash-inbox-notin-chip" data-dash-inbox="stack-notin" data-aid="' +
+              '<button type="button" class="dash-inbox-notin-chip" data-dash-inbox="' +
+              (rc ? 'stack-notin-st' : 'stack-notin') +
+              '" data-aid="' +
               esc(s.aid) +
-              '" title="' +
+              '" data-sid="' +
+              esc(n.sid) +
+              '" aria-haspopup="menu" title="' +
               esc(n.name) +
               '">' +
               esc(_short(n.name)) +
@@ -539,6 +543,16 @@ window.DashInboxStacks = (function () {
     }
     if (kind === 'stack-page') {
       _grade(cid, aid, el.getAttribute('data-sid') || '', ctx.redraw);
+      return true;
+    }
+    // A name in Not In: Roll Call's menu for that student, in place.
+    if (kind === 'stack-notin-st') {
+      var host = /** @type {HTMLElement | null} */ (el.closest('.dash-inbox-spread'));
+      if (!host || !RC || !RC.menuOn) return true;
+      var ids = DashInboxQueue.open(cid, aid).notIn.map(function (/** @type {any} */ n) {
+        return n.sid;
+      });
+      RC.menuOn(host, /** @type {HTMLElement} */ (el), cid, aid, el.getAttribute('data-sid') || '', ids, ctx.redraw);
       return true;
     }
     if (kind === 'stack-notin') {

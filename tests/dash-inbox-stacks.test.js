@@ -232,13 +232,24 @@ describe('the To Grade view', () => {
     expect(calls[0][3].queue).toEqual(queue);
   });
 
-  it('a Not In name goes to Roll Call on that piece when it is there', () => {
+  it("a Not In name opens Roll Call's menu for that student; the heading goes to Roll Call", () => {
+    const shown = [];
+    const menus = [];
+    window.DashInboxRollCall = { show: (...a) => shown.push(a), menuOn: (...a) => menus.push(a) };
     clickOn(mountTile(), '.dash-inbox-stack');
     const doc = mountTile();
-    const calls = [];
-    window.DashInboxRollCall = { show: (...a) => calls.push(a) };
+    const open = DashInboxQueue.open(CID, LIGHT);
+    const chip = doc.querySelector('.dash-inbox-notin-chip');
+    expect(chip.getAttribute('data-sid')).toBe(open.notIn[0].sid);
+    expect(chip.getAttribute('aria-haspopup')).toBe('menu');
     expect(clickOn(doc, '.dash-inbox-notin-chip').handled).toBe(true);
-    expect(calls).toEqual([[CID, LIGHT]]);
+    expect(shown).toEqual([]);
+    expect(menus).toHaveLength(1);
+    expect(menus[0][0]).toBe(doc.querySelector('.dash-inbox-spread'));
+    expect(menus[0][1]).toBe(chip);
+    expect(menus[0].slice(2, 6)).toEqual([CID, LIGHT, open.notIn[0].sid, open.notIn.map(n => n.sid)]);
+    expect(clickOn(doc, '.dash-inbox-notin-link').handled).toBe(true);
+    expect(shown).toEqual([[CID, LIGHT]]);
   });
 
   it('lets go of an open stack whose work is all graded', () => {
