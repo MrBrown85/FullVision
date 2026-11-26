@@ -105,7 +105,7 @@ Each line is one PR with its own test. Estimates are mine and not measured.
 3. **See the Work's preview** (Colin, "especially hover-overs"). Built: #1380, open. One request signs a draw's links, thumbnails are fetched when the pointer comes into a card, the card shows in 100 ms, and pictures are kept in memory.
 4. **Assignments: open or close only that card, and refresh only what changed** (finding 2, and section 7's A2).
 5. **Gradebook: update the cell, not the table**, and do not redraw when the grader closes with nothing changed (finding 3, section 7's G1).
-6. **Score writes: the changed cell only; hold the device write; remember the migration** (finding 4). This touches how marks are saved, so it goes under "Marks may be moved; Colin and Karen must see no change" and its design is reviewed first.
+6. **Score writes: the changed cell only; hold the device write; remember the migration** (finding 4). This touches how marks are saved, so it goes under "Marks may be moved; Colin and Karen must see no change" and its design is reviewed first. The held write's design (`score-device-write-design.md`, Nov 13) recommends not building that part: the write costs under a millisecond a click.
 7. **The rest of the copy family** (finding 5).
 8. **Section 7, in its own order.**
 9. **Start-up: the three calls side by side** (finding 6).
