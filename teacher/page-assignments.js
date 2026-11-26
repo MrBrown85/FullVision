@@ -6,6 +6,8 @@ window.PageAssignments = (function () {
      assigned again as the teacher works. One object, so a part of this
      file that moves to its own file can be handed it once. */
   var pageState = {};
+  /* In assign-grader-dialog.js (moved 2026-11-26). */
+  var openGrader = AssignGraderDialog.openGrader;
   /* In assign-grader-keys.js (moved 2026-11-26). */
   var _graderCardKey = AssignGraderKeys._graderCardKey;
   var _graderKeydown = AssignGraderKeys._graderKeydown;
@@ -779,6 +781,44 @@ window.PageAssignments = (function () {
     closeGrader: closeGrader,
     _focusGraderPoints: _focusGraderPoints,
     _scrollIntoViewIfNeeded: _scrollIntoViewIfNeeded,
+    stepFocusStudent: stepFocusStudent,
+  });
+  AssignGraderDialog.configure({
+    pageState: pageState,
+    _addDocListener: _addDocListener,
+    _graderAddWorkFiles: _graderAddWorkFiles,
+    _graderAfterEvent: _graderAfterEvent,
+    _graderCaughtReturn: _graderCaughtReturn,
+    _graderGroupAction: _graderGroupAction,
+    _graderQueueOf: _graderQueueOf,
+    _graderReflectAction: _graderReflectAction,
+    _graderReturn: _graderReturn,
+    _graderReturnAll: _graderReturnAll,
+    _graderReturnNext: _graderReturnNext,
+    _graderRevisionAction: _graderRevisionAction,
+    _graderSetShow: _graderSetShow,
+    _graderWorkAction: _graderWorkAction,
+    _graderWorkEnlarge: _graderWorkEnlarge,
+    _handleClick: _handleClick,
+    _handleKeydown: _handleKeydown,
+    _refreshGraderChrome: _refreshGraderChrome,
+    _reportNotePreview: _reportNotePreview,
+    _saveReportNote: _saveReportNote,
+    _workFitSaved: _workFitSaved,
+    closeGrader: closeGrader,
+    _focusGraderPoints: _focusGraderPoints,
+    _graderKeydown: _graderKeydown,
+    _handleBlur: _handleBlur,
+    _handleChange: _handleChange,
+    _handleFocus: _handleFocus,
+    _handleInput: _handleInput,
+    _handleMouseOut: _handleMouseOut,
+    _handleMouseOver: _handleMouseOver,
+    _handlePointerDown: _handlePointerDown,
+    _hideChipTip: _hideChipTip,
+    _loadDibelsOnce: _loadDibelsOnce,
+    _queuePrintMarks: _queuePrintMarks,
+    render: render,
     stepFocusStudent: stepFocusStudent,
   });
 
@@ -2096,160 +2136,6 @@ window.PageAssignments = (function () {
   pageState._grader = null;
   // True from a dialog over this page closing until the page is next drawn.
   pageState._pageBehind = false;
-
-  function openGrader(cid, aid, sid, opts) {
-    if (pageState._grader) closeGrader();
-    opts = opts || {};
-    // What came in since the class was read (S6-W1); the dialog is drawn again when it changes.
-    if (typeof refreshStudentWork === 'function') refreshStudentWork(cid, { force: true });
-    pageState.activeCourse = cid;
-    _loadDibelsOnce(cid);
-    // Over this page (Grade Submissions, the Work Wall): the page's cards and
-    // student, put back when the dialog closes.
-    var page = opts.overPage
-      ? {
-          open: pageState.openAssessIds,
-          focus: pageState.focusStudentId,
-          expanded: pageState._allExpanded,
-          collapsed: pageState._collapsedIds,
-          rubricViews: pageState.rubricViewStates,
-        }
-      : null;
-    pageState.openAssessIds = new Set([aid]);
-    pageState.focusStudentId = sid;
-    pageState._allExpanded = false;
-    pageState._collapsedIds = new Set();
-    pageState.rubricViewStates = {};
-    pageState._commentPopoverState = null;
-    CritComment.drop();
-    pageState._kbFocusEl = null;
-    pageState._statusDebounce = {};
-    AC.configure(cid);
-    // Over this page itself (Grade Submissions, S6-F4): its own listeners
-    // are the dialog's too, and come back when the dialog closes.
-    var pageListeners = pageState._listeners.slice();
-    var overlay = document.createElement('div');
-    overlay.id = 'grader-overlay';
-    overlay.className = 'grader-overlay';
-    overlay.innerHTML =
-      '<div class="grader-dialog" role="dialog" aria-modal="true" aria-labelledby="grader-title" tabindex="-1"></div>';
-    document.body.appendChild(overlay);
-    pageState._grader = {
-      overlay: overlay,
-      aid: aid,
-      studentIds:
-        opts.studentIds && opts.studentIds.length
-          ? opts.studentIds.slice()
-          : sortStudents(getStudents(cid), 'lastName').map(function (s) {
-              return s.id;
-            }),
-      // The gradebook's rows, in their order: group work steps through these.
-      rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
-      onClose: opts.onClose || null,
-      // The pieces that follow (I3): the Inbox's order. Ignored when the piece opened is not among them.
-      queue: _graderQueueOf(opts.queue, aid),
-      qi: 0,
-      queueShow: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
-      caughtUp: false,
-      pageListeners: opts.overPage ? pageListeners : null,
-      page: page,
-      // Show: To Grade, To Return, Returned, Not In or All (S1-F2, S6-F3).
-      show: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
-      // The student's work beside the scoring (S6-F1): its page, the fit,
-      // each page's turn, and Focus on Work.
-      work: { page: 0, fit: _workFitSaved(), turns: {}, focus: false, pics: {} },
-      // A reflection's answer being written, by reflection (S10-F3), the
-      // one being sent, and a line about it.
-      reflectDrafts: {},
-      reflectBusy: null,
-      reflectMsg: null,
-    };
-    if (pageState._grader.queue)
-      pageState._grader.qi = pageState._grader.queue.findIndex(function (q) {
-        return q.aid === aid;
-      });
-    overlay.addEventListener('mousedown', function (e) {
-      if (e.target === overlay) closeGrader();
-    });
-    overlay.addEventListener('click', function (e) {
-      // Grade From Paper's Set Logan To menu (S6-F2): a grid row's fill options.
-      var fill = e.target.closest('.grader-setto-menu [data-action="graderSetTo"]');
-      if (fill) return _graderWorkAction('work-setto', fill);
-      // Side by Side: a click on a page shows it full width, scrolled to it.
-      var tile = e.target.closest('.grader-work-pages.fit-all .grader-work-page');
-      if (tile) return _graderWorkEnlarge(tile);
-      var btn = e.target.closest('[data-grader]');
-      if (!btn) return;
-      var what = btn.dataset.grader;
-      if (what === 'close') closeGrader();
-      else if (what === 'next' || what === 'prev') stepFocusStudent(what === 'next' ? 1 : -1);
-      else if (what === 'return') _graderReturn();
-      else if (what === 'return-next') _graderReturnNext();
-      else if (what === 'show') _graderSetShow(btn.dataset.show);
-      else if (what === 'returnAll') _graderReturnAll(btn);
-      else if (what === 'caught-return') _graderCaughtReturn(btn);
-      else if (what === 'caught-close') closeGrader();
-      else if (what.indexOf('work-') === 0) _graderWorkAction(what, btn);
-      else if (what.indexOf('reflect-') === 0) _graderReflectAction(what, btn);
-      else if (what.indexOf('revision-') === 0) _graderRevisionAction(what, btn);
-      else _graderGroupAction(what, btn.dataset.sid);
-    });
-    // Add Work's Choose Files (S6-F2).
-    overlay.addEventListener('change', function (e) {
-      if (e.target.classList.contains('grader-work-files')) _graderAddWorkFiles(e.target);
-    });
-    // A click anywhere but the open ⋯ menu closes it.
-    overlay.addEventListener('mousedown', function (e) {
-      if (
-        !pageState._grader ||
-        !pageState._grader.menuSid ||
-        e.target.closest('.grader-member-menu, .grader-member-more, .grader-change-one-btn')
-      )
-        return;
-      pageState._grader.menuSid = null;
-      _refreshGraderChrome();
-    });
-    // The Note for the Report: the preview follows each key, the note saves
-    // on Enter or leaving the box (and so before Done, a step or closing).
-    overlay.addEventListener('input', function (e) {
-      if (e.target.classList.contains('grader-report-note-input')) _reportNotePreview(e.target);
-      // An answer being written is kept while the dialog redraws (S10-F3).
-      if (e.target.classList.contains('grader-reflect-input') && pageState._grader)
-        pageState._grader.reflectDrafts[e.target.dataset.id] = e.target.value;
-    });
-    overlay.addEventListener('change', function (e) {
-      if (e.target.classList.contains('grader-report-note-input')) _saveReportNote(e.target);
-    });
-    overlay.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter' || !e.target.classList.contains('grader-report-note-input')) return;
-      e.preventDefault();
-      e.target.blur();
-    });
-    _addDocListener('click', _handleClick);
-    _addDocListener('input', _handleInput);
-    _addDocListener('change', _handleChange);
-    _addDocListener('focus', _handleFocus, true);
-    _addDocListener('mousedown', _handleFocus);
-    _addDocListener('blur', _handleBlur, true);
-    _addDocListener('keydown', _handleKeydown);
-    _addDocListener('keydown', _graderKeydown);
-    ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
-      _addDocListener(type, _graderAfterEvent);
-    });
-    ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
-      _addDocListener(type, _queuePrintMarks);
-    });
-    _addDocListener('mouseover', _handleMouseOver);
-    _addDocListener('mouseout', _handleMouseOut);
-    _addDocListener('pointerdown', _handlePointerDown);
-    _addDocListener('scroll', _hideChipTip, true);
-    render();
-    // Kept straight after the draw, so the first key is the dialog's; it no
-    // longer scrolls, which laid the new dialog out at once (61 ms).
-    overlay.querySelector('.grader-dialog').focus({ preventScroll: true });
-    // Points work: the box is ready to type in.
-    _focusGraderPoints(aid);
-  }
 
   /* ── Grader parts (S6-T1) ─────────────────────────────────
      The dialog is put together from four parts, each with its own markup
@@ -4367,6 +4253,7 @@ window.PageAssignments = (function () {
     notin: 'Not In',
     all: 'All',
   };
+  AssignGraderDialog.configure({ AC: AC, _SHOW_LABELS: _SHOW_LABELS });
   /* Show's buttons: To Grade and Not In join them while the piece takes
      student work (S6-F3, Grader.workOn). */
   function _graderShowKeys(cid, a) {
