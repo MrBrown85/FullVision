@@ -39,9 +39,10 @@
 --
 -- == What it does to existing rows ==
 -- Nothing but the two new columns: every existing criterion and rubric reads [] (a constant default, stored
--- once; no row is rewritten and no sync cursor moves). Live pre-check, read-only, on <date>: <n> criteria,
--- <m> rubrics (local-test/rubric-comment-bank-live-precheck.sql, the rows "count: criteria" and
--- "count: rubrics"; the query is select count(*) from public.criterion, and from public.rubric).
+-- once; no row is rewritten and no sync cursor moves). Live pre-check, read-only, on 2026-11-26 (about 02:00
+-- UTC): 423 criteria, 130 rubrics (local-test/rubric-comment-bank-live-precheck.sql, the rows "count: criteria"
+-- and "count: rubrics"; the query is select count(*) from public.criterion, and from public.rubric). The
+-- fingerprints query gave no rows on live the same night: all 13 functions match.
 --
 -- == What applying it accepts ==
 -- A browser still on the old app ignores the new keys in the bundle, and its rubric saves keep the bank. A
