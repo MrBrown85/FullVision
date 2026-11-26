@@ -1,6 +1,6 @@
 /**
  * Stage 5 review fixes for the New Class wizard and the importer (group 3 of
- * 3): an empty class name goes back to Class Details, a typed name survives
+ * 3): an empty class name goes back to Name Your Class, a typed name survives
  * Back, old-bank competencies that share an id tick separately, and two
  * courses with the same name get folder names that differ.
  */
@@ -59,10 +59,11 @@ function startWizard(index) {
 }
 
 describe('the wizard', () => {
-  it('sends a custom class with no name back to Class Details', async () => {
+  it('sends a custom class with no name back to Name Your Class', async () => {
     await startWizard(newBankIndex(['DRAFT10']));
     act('cwSkipToCustom');
-    withName('', () => act('cwGoToStep3'));
+    expect(main.innerHTML).toContain('id="cm-new-grade"');
+    expect(main.innerHTML).toContain('None yet. Add them in the Competencies tab.');
     var original = document.getElementById;
     var field = { value: '', style: {}, focus() {} };
     document.getElementById = id => (id === 'cm-new-name' ? field : original(id));
@@ -75,16 +76,20 @@ describe('the wizard', () => {
     expect(main.innerHTML).not.toContain('The BC curriculum expects every competency to be taught.');
   });
 
-  it('keeps a typed class name after Back from Review', async () => {
-    await startWizard(newBankIndex(['DRAFT10']));
+  it('keeps a typed class name after Back to Choose Courses, and drops it for another grade', async () => {
+    await startWizard(newBankIndex(['DRAFT10', 'ELA8']));
     act('cwSelectGrade', { grade: '10' });
-    act('cwSelectSubject', { subject: 'Applied Design, Skills and Technologies' });
     act('cwToggleCourse', { tag: 'DRAFT10' });
     act('cwGoToStep2');
-    act('cwCompsNext');
-    withName('Drafting 10 Block B', () => act('cwGoToStep3'));
-    act('cwGoBack');
+    withName('Drafting 10 Block B', () => act('cwGoBack'));
+    expect(main.innerHTML).toContain('id="cw-rail-name">Drafting 10 Block B<');
+    act('cwGoToStep2');
     expect(main.innerHTML).toMatch(/id="cm-new-name"[^>]*value="Drafting 10 Block B"/);
+    act('cwGoBack');
+    act('cwSelectGrade', { grade: '8' });
+    act('cwToggleCourse', { tag: 'ELA8' });
+    act('cwGoToStep2');
+    expect(main.innerHTML).toMatch(/id="cm-new-name"[^>]*value="English Language Arts 8"/);
   });
 
   it('ticks old-bank competencies that share an id separately', async () => {
@@ -109,9 +114,9 @@ describe('the wizard', () => {
     };
     await startWizard(old);
     act('cwSelectGrade', { grade: '11' });
-    act('cwSelectSubject', { subject: 'Mathematics' });
     act('cwToggleCourse', { tag: 'CS11' });
     act('cwGoToStep2');
+    act('cwOpenRow', { row: 'comps' });
     var keys = (main.innerHTML.match(/data-key="([^"]+)"/g) || []).map(s => s.slice(10, -1));
     expect(keys).toHaveLength(2);
     expect(new Set(keys).size).toBe(2);

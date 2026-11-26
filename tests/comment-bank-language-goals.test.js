@@ -201,7 +201,7 @@ describe('the Language Goals row on the review screen', () => {
     upsertTermRating(CID, NOOR.id, TERM, { reportingBasis: 'language_goals' });
     const html = open();
     expect(html).toContain('<span class="qn-req-label">Language Goals</span>');
-    expect(html).toContain('No language goal lines chosen for this class. The comment leaves this sentence out.');
+    expect(html).toContain('>+ Language Goal ▾</button>');
     expect(html).toContain('data-do="langMenu"');
     // The other student, on the grade path, has no such row.
     expect(open(SAM.id)).not.toContain('Language Goals</span>');
@@ -215,7 +215,7 @@ describe('the Language Goals row on the review screen', () => {
     expect(settings().languageGoalsChosen).toEqual(['lg-reads-aloud']);
     let html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain('No language goal picked for Noor. The comment leaves this sentence out.');
-    expect(html).toContain('>Language Goal ▾</button>');
+    expect(html).toContain('>+ Language Goal ▾</button>');
     RQ.tqLine('langMenu');
     html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain('role="menu" aria-label="Language goal lines for History 12"');
@@ -240,7 +240,7 @@ describe('the Language Goals row on the review screen', () => {
     expect(settings().languageGoalsFor[TERM][NOOR.id]).toBe(own.id);
     html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain(
-      'She can greet the class in English; the next step is a full sentence.</span><span class="qn-req-source">One of your language goal lines for History 12',
+      'title="One of your language goal lines for History 12">She can greet the class in English; the next step is a full sentence.</span>',
     );
     RQ.tqLine('pickLang', { dataset: { line: 'none' } });
     expect(settings().languageGoalsFor[TERM][NOOR.id]).toBeNull();

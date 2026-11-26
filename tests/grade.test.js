@@ -194,7 +194,6 @@ describe('grade-format-guard', () => {
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
     'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
-    'teacher/gradebook-chrome.js': 1, // the name tip's word for a competency with no evidence (moved from page-gradebook.js)
     'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
     'teacher/report-blocks.js': 21,
@@ -299,8 +298,8 @@ describe('grade-format-guard', () => {
     'teacher/grades-print.js round Math.max(8, r.right - menu.offsetWidth)': 'a menu’s position',
     'teacher/assign-competency-picker.js round r.left + r.width / 2 - boxRect.left - 8': 'a pointer’s position',
     'teacher/page-assignments.js round (parseLocalDate(r.revise_by) - day) / 86400000': 'days',
-    'teacher/page-student.js round p.R - lg.R': 'points between two course % as shown',
-    'teacher/page-student.js round one.R - lg.R': 'points between two course % as shown',
+    'teacher/student-outlook.js round p.R - lg.R': 'points between two course % as shown',
+    'teacher/student-outlook.js round one.R - lg.R': 'points between two course % as shown',
     'teacher/page-student.js round levelBarPercent(cid, r.v)': 'a bar’s width',
     'teacher/report-blocks.js round (nowG.pct - thenG.pct) * 10': 'the change between two course % as shown',
     'teacher/report-blocks.js round (profPlus / total) * 100': 'a share of scores',

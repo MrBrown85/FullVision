@@ -25,8 +25,13 @@
     return;
   }
 
+  /* The loader is served from the project's own region: an EU project
+     (ingest.de.sentry.io) from js-de.sentry-cdn.com. The US address,
+     js.sentry-cdn.com, answers an EU key with a stand-in that does nothing,
+     so nothing reached Sentry until Nov 26, 2026. */
+  var eu = /\.ingest\.de\.sentry\.io\//.test(SENTRY_DSN);
   var loader = document.createElement('script');
-  loader.src = 'https://js.sentry-cdn.com/' + keyMatch[1] + '.min.js';
+  loader.src = 'https://' + (eu ? 'js-de' : 'js') + '.sentry-cdn.com/' + keyMatch[1] + '.min.js';
   loader.crossOrigin = 'anonymous';
   loader.async = true;
   (document.head || document.documentElement).appendChild(loader);

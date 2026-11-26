@@ -499,6 +499,106 @@ window.DashInboxRollCall = (function () {
     _listenOff(root, btn);
   }
 
+  /** A not-in student's two choices. Roll Call and the To Grade stack's Not
+   * In list both show them.
+   * @param {string} sid */
+  function _menuItems(sid) {
+    return (
+      '<button type="button" role="menuitem" class="dash-inbox-rc-item" data-dash-rc="paper" data-sid="' +
+      esc(sid) +
+      '">Handed In on Paper</button>' +
+      '<button type="button" role="menuitem" class="dash-inbox-rc-item" data-dash-rc="scan" data-sid="' +
+      esc(sid) +
+      '">Add a Scan or Photo</button>'
+    );
+  }
+
+  /** The same menu on a name in the To Grade stack's Not In list
+   * (dash-inbox-stacks.js), placed in `host` under the name. Handed In on
+   * Paper and Add a Scan or Photo do what they do in Roll Call; Escape or a
+   * click outside closes it. Another name's click opens that one instead.
+   * @param {HTMLElement} host @param {HTMLElement} chip @param {string} cid @param {string} aid
+   * @param {string} sid @param {string[]} notIn the not-in students, class-list order
+   * @param {() => void} redraw */
+  function menuOn(host, chip, cid, aid, sid, notIn, redraw) {
+    var was = host.querySelector('.dash-inbox-rc-pop');
+    var same = chip.classList.contains('is-open');
+    _menuOff(host);
+    if (was && same) return;
+    chip.classList.add('is-open');
+    chip.setAttribute('aria-expanded', 'true');
+    var pop = document.createElement('div');
+    pop.className = 'dash-inbox-rc-pop is-menu';
+    pop.setAttribute('role', 'menu');
+    pop.setAttribute('aria-label', chip.getAttribute('title') || 'Not in');
+    // html-safe: _menuItems escapes the id
+    pop.innerHTML = _menuItems(sid);
+    host.appendChild(pop);
+    _place(host, pop, chip, false);
+    var items = Array.prototype.slice.call(pop.querySelectorAll('.dash-inbox-rc-item'));
+    if (items[0]) items[0].focus({ preventScroll: true });
+    var off = function (/** @type {Event} */ e) {
+      if (_graderOpen()) return;
+      if (e.type === 'keydown') {
+        var k = /** @type {KeyboardEvent} */ (e).key;
+        if (k === 'Escape') {
+          e.stopPropagation();
+          e.preventDefault();
+          _menuOff(host);
+          chip.focus();
+          return;
+        }
+        var at = items.indexOf(document.activeElement);
+        if (at < 0) return;
+        if (k === 'Tab') {
+          _menuOff(host);
+          return;
+        }
+        var to = k === 'ArrowDown' ? Math.min(items.length - 1, at + 1) : k === 'ArrowUp' ? Math.max(0, at - 1) : -1;
+        if (to < 0) return;
+        e.preventDefault();
+        items[to].focus({ preventScroll: true });
+        return;
+      }
+      var t = /** @type {any} */ (e.target);
+      var item = t && t.closest && t.closest('.dash-inbox-rc-item');
+      if (item && pop.contains(item)) {
+        e.stopPropagation();
+        e.preventDefault();
+        _menuOff(host);
+        if (item.getAttribute('data-dash-rc') === 'paper') paper(cid, aid, sid);
+        else if (window.PageAssignments && PageAssignments.openGrader)
+          PageAssignments.openGrader(cid, aid, sid, {
+            studentIds: notIn.indexOf(sid) >= 0 ? notIn : [sid],
+            onClose: redraw,
+          });
+        return;
+      }
+      if (t && t.closest && (t.closest('.dash-inbox-rc-pop') || chip.contains(t))) return;
+      _menuOff(host);
+    };
+    /** @type {any} */ (host)._fvMenuOff = off;
+    document.addEventListener('click', off, true);
+    document.addEventListener('keydown', off, true);
+  }
+
+  /** Closes menuOn's menu in `host`, if open. @param {HTMLElement} host */
+  function _menuOff(host) {
+    var off = /** @type {any} */ (host)._fvMenuOff;
+    if (off) {
+      document.removeEventListener('click', off, true);
+      document.removeEventListener('keydown', off, true);
+      /** @type {any} */ (host)._fvMenuOff = null;
+    }
+    host.querySelectorAll('.dash-inbox-rc-pop').forEach(function (p) {
+      p.remove();
+    });
+    host.querySelectorAll('.is-open[aria-expanded]').forEach(function (c) {
+      c.classList.remove('is-open');
+      c.removeAttribute('aria-expanded');
+    });
+  }
+
   /** @param {HTMLElement} root @param {boolean} focus */
   function _showMenu(root, focus) {
     _closePop(root);
@@ -516,13 +616,8 @@ window.DashInboxRollCall = (function () {
     pop.className = 'dash-inbox-rc-pop is-menu';
     pop.setAttribute('role', 'menu');
     pop.setAttribute('aria-label', chip.getAttribute('title') || 'Not in');
-    pop.innerHTML =
-      '<button type="button" role="menuitem" class="dash-inbox-rc-item" data-dash-rc="paper" data-sid="' +
-      esc(_open.sid) +
-      '">Handed In on Paper</button>' +
-      '<button type="button" role="menuitem" class="dash-inbox-rc-item" data-dash-rc="scan" data-sid="' +
-      esc(_open.sid) +
-      '">Add a Scan or Photo</button>';
+    // html-safe: _menuItems escapes the id
+    pop.innerHTML = _menuItems(_open.sid);
     root.appendChild(pop);
     _place(root, pop, chip, false);
     if (focus) {
@@ -853,6 +948,7 @@ window.DashInboxRollCall = (function () {
     show: show,
     paper: paper,
     picked: picked,
+    menuOn: menuOn,
     mount: mount,
     unmount: unmount,
     PIECE_KEY: PIECE_KEY,

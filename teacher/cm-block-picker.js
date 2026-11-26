@@ -1,4 +1,4 @@
-/* cm-block-picker.js — Class Settings: the block picker (None, A–E, X or Other) and the first screen for a teacher with no classes.
+/* cm-block-picker.js — Class Settings: the block picker (None, A–E, X or Other), the first screen for a teacher with no classes, and the New Class wizard's rows.
    Moved from teacher/dash-class-manager.js on 2026-11-12; DashClassManager uses it through CmBlockPicker. */
 var CmBlockPicker = (function () {
   'use strict';
@@ -138,12 +138,111 @@ var CmBlockPicker = (function () {
     });
   }
 
+  /* ── New Class wizard: pieces with no state of their own ─────── */
+  /* One row in Choose Courses: a course, or a preset that ticks several.
+     A row the find box leaves out is hidden. */
+  function _cwCourseRow(r) {
+    var find = String(r.name).toLowerCase();
+    var n = r.counts.competencies;
+    return (
+      '<div class="cw-course-item' +
+      (r.on ? ' selected' : '') +
+      '" role="checkbox" tabindex="0" aria-checked="' +
+      (r.on ? 'true' : 'false') +
+      '" data-action="' +
+      r.action +
+      '" data-tag="' +
+      esc(r.key) +
+      '" data-find="' +
+      esc(find) +
+      '"' +
+      (r.q && find.indexOf(r.q) < 0 ? ' hidden' : '') +
+      '><span class="cw-course-check" aria-hidden="true">' +
+      (r.on ? '✓' : '') +
+      // The spaces keep the parts apart when a screen reader reads the row.
+      '</span><span class="cw-course-name">' +
+      esc(r.name) +
+      '</span> ' +
+      (r.sub ? '<span class="cw-course-sub">' + esc(r.sub) + '</span> ' : '') +
+      '<span class="cw-course-count">' +
+      n +
+      (n === 1 ? ' Competency' : ' Competencies') +
+      '</span></div>'
+    );
+  }
+
+  function _cwSeg(id, labelId, list, value, action) {
+    return (
+      '<div class="seg cm-seg" id="' +
+      id +
+      '" role="radiogroup" aria-labelledby="' +
+      labelId +
+      '"' +
+      (id === 'cm-cg-span' ? '' : ' aria-describedby="' + id + '-desc"') +
+      '>' +
+      list
+        .map(function (o) {
+          var on = o.value === value;
+          return (
+            '<button type="button" class="seg-btn cm-seg-btn' +
+            (on ? ' active' : '') +
+            '"' +
+            segAttr(on, 'radio') +
+            ' data-val="' +
+            o.value +
+            '" data-action="' +
+            (typeof action === 'function' ? action(o) : action) +
+            '" data-group="' +
+            id +
+            '">' +
+            o.label +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* One row of Already Set for You: what Create Class sets, and Change to
+     open it here (openKey: the row open now). A row with nothing to change here shows it with Show. */
+  function _cwSetRow(openKey, key, label, value, panel, readOnly) {
+    var open = openKey === key;
+    return (
+      '<div class="cw-set-row' +
+      (open ? ' open' : '') +
+      '"><div class="cw-set-head"><span class="cw-set-label">' +
+      label +
+      '</span><span class="cw-set-value">' +
+      value +
+      '</span>' +
+      (panel
+        ? '<button type="button" class="cw-cc-btn cw-set-btn" data-action="cwOpenRow" data-row="' +
+          key +
+          '" aria-expanded="' +
+          open +
+          '" aria-label="' +
+          (open ? (readOnly ? 'Hide ' : 'Done With ') : readOnly ? 'Show ' : 'Change ') +
+          label +
+          '">' +
+          (open ? (readOnly ? 'Hide' : 'Done') : readOnly ? 'Show' : 'Change') +
+          '</button>'
+        : '') +
+      '</div>' +
+      (panel && open ? '<div class="cw-set-panel">' + panel() + '</div>' : '') +
+      '</div>'
+    );
+  }
+
   return {
     blockPickerHtml: blockPickerHtml,
     readBlockPicker: readBlockPicker,
     blockChipSelect: blockChipSelect,
     blockOtherInput: blockOtherInput,
     _cmEmptyStateHtml: _cmEmptyStateHtml,
+    wizardCourseRow: _cwCourseRow,
+    wizardSeg: _cwSeg,
+    wizardSetRow: _cwSetRow,
     cmOpenDemoMode: cmOpenDemoMode,
   };
 })();

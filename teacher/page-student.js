@@ -393,83 +393,41 @@ window.PageStudent = (function () {
      (withMissingLeftOut), so it carries the category weights. It is shown
      only for a class with a % and only when at least a third of the work
      is marked: a guess from two scores misleads. */
-  var OV_THIN = 1 / 3;
-
   function _ovPctText(lg) {
     return (lg.S ? lg.S + ' ' : '') + lg.R + '%';
   }
 
   // Worked out once a draw (the Overview and Grades tabs both read it), and only on those tabs.
+  // What is missing and where it leads is StudentOutlook.model, which the Gradebook's card reads too.
   function _overviewModel(ctx) {
     if (ctx.ov) return ctx.ov;
     var cid = ctx.cid;
-    var course = COURSES[cid] || {};
     var letterOnly = courseGradeMode(cid) === 'letter';
     var overall = getOverallProficiency(cid, studentId);
-    var lg = courseShowsLetterGrades(course) ? getCourseLetterData(cid, studentId) : null;
-    var hasPct = !!(lg && lg.R != null);
-    var statusOf = function (a) {
-      return ctx.statuses[studentId + ':' + a.id] || '';
-    };
     var cellOf = {};
     ctx.cells.forEach(function (c) {
       cellOf[c.a.id] = c.cell;
     });
-    var counted = ctx.assessments.filter(function (a) {
-      return countsTowardGrades(cid, a);
-    });
-    var assigned = counted.filter(function (a) {
-      return statusOf(a) !== 'EXC';
-    });
-    var missing = counted.filter(function (a) {
-      return statusOf(a) === 'NS';
-    });
-    var marked = assigned.filter(function (a) {
-      var c = cellOf[a.id];
-      return statusOf(a) !== 'NS' && c && (c.kind === 'points' || c.kind === 'level' || c.kind === 'complete');
-    });
-    var thin = missing.length > 0 && assigned.length > 0 && marked.length / assigned.length < OV_THIN;
-
+    var o = StudentOutlook.model(cid, studentId, ctx.assessments, cellOf);
+    var lg = o.lg;
+    var hasPct = !!(lg && lg.R != null);
     var now = { hasPct: hasPct, lg: lg, level: overall, showLevel: !letterOnly && overall > 0 };
     now.text = hasPct ? _ovPctText(lg) : overall > 0 ? formatLevel(cid, overall) : 'No Grade Yet';
 
-    var proj = null;
-    var gains = {};
-    if (hasPct && missing.length && !thin) {
-      var p = withMissingLeftOut(studentId, null, function () {
-        return getCourseLetterData(cid, studentId);
-      });
-      if (p && p.R != null && p.R > lg.R) {
-        proj = { lg: p, text: _ovPctText(p), cost: Math.round(p.R - lg.R) };
-        missing.forEach(function (a) {
-          var one = withMissingLeftOut(studentId, [a.id], function () {
-            return getCourseLetterData(cid, studentId);
-          });
-          gains[a.id] = one && one.R != null ? Math.max(0, Math.round(one.R - lg.R)) : 0;
-        });
-      }
-    }
-    var dueOf = function (a) {
-      return a.dueDate || a.date || '';
-    };
-    missing = missing.slice().sort(function (x, y) {
-      return (gains[y.id] || 0) - (gains[x.id] || 0) || dueOf(x).localeCompare(dueOf(y));
-    });
-
     return (ctx.ov = {
       cid: cid,
-      course: course,
+      course: COURSES[cid] || {},
       now: now,
-      proj: proj,
-      thin: thin,
-      gains: gains,
-      missing: missing,
-      assigned: assigned,
-      marked: marked,
-      handedIn: assigned.length - missing.length,
+      proj: o.proj ? { lg: o.proj.lg, text: _ovPctText(o.proj.lg), cost: o.proj.cost } : null,
+      thin: o.thin,
+      gains: o.gains,
+      missing: o.missing,
+      assigned: o.assigned,
+      marked: o.marked,
+      handedIn: o.handedIn,
       cellOf: cellOf,
-      statusOf: statusOf,
-      dueOf: dueOf,
+      statusOf: o.statusOf,
+      dueOf: o.dueOf,
     });
   }
 

@@ -3,6 +3,13 @@ declare function getReturnedScores(cid: string): Record<string, Score[]> | null;
 interface Window {
   // Build flags (shared/build-flags.js): unfinished work stays behind one.
   BuildFlags: { on(name: string): boolean };
+  SegGlide: {
+    run(track: HTMLElement, from: { left: number; width: number }, to: DOMRect, ms?: number): void;
+    lit(track: Element): HTMLElement | null;
+    trackOf(el: any): HTMLElement | null;
+    motionOK(): boolean;
+    MS: number;
+  };
   // The data layer's namespace (shared/data.js and the data-*.js files).
   // Only what a checked file calls is typed; the rest is unknown until
   // those files are checked.
@@ -108,6 +115,7 @@ interface Window {
   RubricScale: any;
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
+  ReportQnBoxes: any;
   CmStdHelp: unknown;
   CmKeepMenu: unknown;
   FocusBack: { from(el: Element | null): () => void };

@@ -66,13 +66,6 @@ window.PageGradebook = (function () {
   // header's tip; a mouse click keeps the tip its hover showed. Safari's
   // click carries no pointerType of its own.
   var _lastPointer = 'mouse';
-  /* Name-cell tooltip HTML, keyed on student.id. Populated by GradebookChrome.nameTip,
-   * read by _showNameTip. Replaces the previous round-trip through
-   * data-tip="…" (which relied on every contributor to `tip` using esc()
-   * correctly so the browser's attribute-decode-plus-innerHTML cycle
-   * reconstructed the intended HTML without injection). Keeping the HTML
-   * in a JS-side map removes the attribute round-trip entirely. */
-  var _nameTipHtml = {};
   function _flushActiveScoreEditor() {
     var active = document.activeElement;
     if (!active || typeof active.blur !== 'function' || !active.classList) return;
@@ -1501,7 +1494,6 @@ window.PageGradebook = (function () {
     var color = PROF_COLORS[grade.level] || PROF_COLORS[0];
     var label = levelWord(cid, overall);
     var basisRow = _basisRow(cid, s.id);
-    _nameTipHtml[s.id] = GradebookChrome.nameTip(cid, s, sections);
     return (
       '<div class="gb-grid-rowhead gb-grid-rowhead-comp' +
       altClass +
@@ -1920,7 +1912,6 @@ window.PageGradebook = (function () {
       })
       .join('');
     var basisRow = _basisRow(cid, s.id);
-    _nameTipHtml[s.id] = GradebookChrome.nameTip(cid, s, sections);
     // What this student has waiting, for Show's point to preview (gradebook.css).
     var has = [
       ['tograde', _work],
@@ -3045,6 +3036,7 @@ window.PageGradebook = (function () {
   /* One use of Mark Blank Cells Missing / Excused, for its Undo toast and
      Cmd+Z: true while every cell it marked still holds that status. */
   function _bulkStatusStillSet(undo) {
+    if (undo.still) return undo.still(); // a use of the name's menu
     var st = getAssignmentStatuses(undo.cid);
     return undo.statuses.every(function (u) {
       return st[u.sid + ':' + undo.aid] === u.status;
@@ -3054,6 +3046,7 @@ window.PageGradebook = (function () {
   /* Takes off the statuses one use set, where a cell still holds it, and
      drops them from Undo Marking Blank Cells' list. */
   function _undoBulkStatus(undo) {
+    if (undo.back) return undo.back();
     var i = _undoStack.indexOf(undo);
     if (i >= 0) _undoStack.splice(i, 1);
     var st = getAssignmentStatuses(undo.cid);
@@ -3987,29 +3980,36 @@ window.PageGradebook = (function () {
     gbTip.style.top = top + 'px';
   }
 
-  /* Under the student's row (over it near the bottom of the window), so the
-     row and its scores stay in view. */
+  // The card on a student's name (GradebookChrome.showNameTip).
   function _showNameTip(name) {
-    var gbTip = document.getElementById('gb-tooltip');
-    var tipHtml = name.dataset.sid ? _nameTipHtml[name.dataset.sid] : null;
-    if (!gbTip || !tipHtml) return;
-    gbTip.className = '';
-    // html-safe: tipHtml is built by GradebookChrome.nameTip, which escapes category and section names and grade text.
-    gbTip.innerHTML = tipHtml;
-    gbTip.style.display = 'block';
-    // A long competency list goes into two columns so the card fits the
-    // window; past that it is cut at the window's height.
-    gbTip.classList.toggle('gb-tip-wide', gbTip.offsetHeight > window.innerHeight - 16);
-    _tipSource = name;
-    var row = name.closest('.gb-grid-rowhead') || name;
-    var rect = row.getBoundingClientRect();
-    var left = rect.left + 8;
-    var top = rect.bottom + 4;
-    if (top + gbTip.offsetHeight > window.innerHeight - 8) top = rect.top - gbTip.offsetHeight - 4;
-    if (top < 8) top = 8;
-    if (top + gbTip.offsetHeight > window.innerHeight - 8) top = window.innerHeight - gbTip.offsetHeight - 8;
-    gbTip.style.left = left + 'px';
-    gbTip.style.top = top + 'px';
+    if (GradebookChrome.showNameTip(name, activeCourse)) _tipSource = name;
+  }
+
+  // Show Only This Student in the name's menu; no `sid` shows everyone. The address follows, for a reload.
+  function _showOnly(sid) {
+    filterStudentIds = sid ? [sid] : [];
+    Router.setUrl('/gradebook?course=' + activeCourse + (sid ? '&students=' + sid : ''));
+    render();
+  }
+
+  // A click or right-click on a name opens its menu (gradebook-student-menu.js), as a column's title does.
+  function _studentMenu(e, name) {
+    e.preventDefault();
+    clearTimeout(_nameTipTimer);
+    _hideTip();
+    GradebookStudentMenu.open(e, name, {
+      cid: activeCourse,
+      item: _ctxItem,
+      place: _placeContextMenu,
+      wire: _wireMenu,
+      dismiss: _dismissContextMenu,
+      undoStack: _undoStack,
+      only: filterStudentIds,
+      showOnly: _showOnly,
+      redraw: function (cid) {
+        if (_mounted && activeCourse === cid) render();
+      },
+    });
   }
 
   /* A Competencies-view header clamps its title to two lines; hovering the
@@ -4163,6 +4163,9 @@ window.PageGradebook = (function () {
       });
     }
 
+    // A plain click on a name opens its menu; Cmd, Ctrl or Shift + click still opens the page in a new tab.
+    var who = !e.metaKey && !e.ctrlKey && !e.shiftKey && e.target.closest('#gb-rowheads .gb-grid-rowhead-name');
+    if (who) return _studentMenu(e, who);
     // The toolbar's own: the filter panel, a folder in it, the ⋯ menu.
     if (GradebookToolbar.click(e)) return;
 
@@ -4200,12 +4203,7 @@ window.PageGradebook = (function () {
         setView(el.dataset.mode);
       },
       toggleNewestFirst: toggleNewestFirst,
-      clearStudentFilter: function () {
-        filterStudentIds = [];
-        // Drop ?students= from the address so a reload shows everyone too.
-        Router.setUrl('/gradebook?course=' + activeCourse);
-        render();
-      },
+      clearStudentFilter: _showOnly,
       // A filter changed: the page draws again, and the keyboard stays on its row.
       toggleCategoryFilter: function () {
         var back = GradebookToolbar.keep(el);
@@ -4385,6 +4383,8 @@ window.PageGradebook = (function () {
         } else showScoreContextMenu(e, cell);
         return;
       }
+      var who = e.target.closest('#gb-rowheads .gb-grid-rowhead-name');
+      if (who) return _studentMenu(e, who);
       var header = e.target.closest('.gb-grid-colhead, .gb-scores-assess-head');
       // A slanted title acts on the column it leans along, not the box under the pointer.
       if (_inSlantedHeads(e.target)) {

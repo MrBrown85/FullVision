@@ -98,6 +98,20 @@ async function openColumnMenu(page, aid) {
   return null;
 }
 
+/* The menu on a student's name in the Gradebook's Scores view, opened from
+   the keyboard; a reason when the row or the menu is not there. */
+async function openNameMenu(page, sid) {
+  await closeOverlays(page);
+  const cid = await page.evaluate(() => getActiveCourse());
+  if (!(await page.evaluate(() => location.pathname === '/gradebook'))) await go(page, '/gradebook?course=' + cid);
+  const name = page.locator('#gb-rowheads .gb-grid-rowhead-name[data-sid="' + sid + '"]');
+  if (!(await name.count())) return 'no row';
+  await name.focus();
+  await page.keyboard.press('Enter');
+  if (!(await until(page, () => !!document.querySelector('.gb-ctx-menu [data-ctx="sub:missing"]')))) return 'no menu';
+  return null;
+}
+
 export const ACTIONS = [
   /* ── Marks ─────────────────────────────────────────────────────── */
   {
@@ -430,6 +444,54 @@ export const ACTIONS = [
           return 'marked, nothing to undo';
         }
         await item.click();
+        await tick(page, 100);
+        return 'undone from the menu';
+      }
+      return 'marked';
+    },
+  },
+  {
+    kind: 'rowMarks',
+    screen: true,
+    weight: 2,
+    pick(rng, view) {
+      const s = rng.pick(view.students);
+      return (
+        s && {
+          sid: s.id,
+          list: rng.pick(['missing', 'excuse', 'clear']),
+          line: rng.int(6),
+          undo: rng.chance(0.4) ? rng.pick(['toast', 'menu']) : '',
+        }
+      );
+    },
+    // The real screen: the menu on a student's name, one line of Mark
+    // Missing, Excuse or Clear (Grader.markStudentCells), then its Undo
+    // from the toast or the menu's Undo Last Marking
+    // (Grader.undoMarkStudentCells).
+    async run(page, a) {
+      const opened = await openNameMenu(page, a.sid);
+      if (opened) return opened;
+      await page.locator('.gb-ctx-menu [data-ctx="sub:' + a.list + '"]').click();
+      const lines = page.locator('.gb-ctx-sub[data-sub="' + a.list + '"] .gb-ctx-item:not(.is-disabled)');
+      const n = await lines.count();
+      if (!n) {
+        await closeOverlays(page);
+        return 'nothing to change';
+      }
+      await lines.nth(a.line % n).click();
+      await tick(page, 100);
+      if (a.undo === 'toast') {
+        const btn = page.locator('#undo-toast .undo-toast-btn');
+        if (!(await btn.count())) return 'marked, no toast';
+        await btn.click();
+        await tick(page, 100);
+        return 'undone from the toast';
+      }
+      if (a.undo === 'menu') {
+        const again = await openNameMenu(page, a.sid);
+        if (again) return 'marked, then ' + again;
+        await page.locator('.gb-ctx-menu [data-ctx="undoLast"]').click();
         await tick(page, 100);
         return 'undone from the menu';
       }

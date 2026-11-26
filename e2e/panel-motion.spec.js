@@ -3,7 +3,8 @@
  * are pressed, and the page beside them takes its new width at once, as the
  * slide starts. They end fully open or fully closed, even when pressed again
  * mid-slide. The top tabs' lit pill glides from the page left to the page
- * opened. With reduced motion there is no slide or glide: the change is
+ * opened, and so does every other slider's, here and on the phone, even one
+ * drawn again on the click. With reduced motion there is no slide or glide: the change is
  * complete at once.
  */
 import { test, expect } from '@playwright/test';
@@ -121,13 +122,19 @@ test.describe('with motion', () => {
     await openDemo(page);
     const left = sel => page.evaluate(q => document.querySelector(q).getBoundingClientRect().left, sel);
     // Every frame from a click: where the gliding pill is, the lit tab's
-    // name, and the colour of the lit tab's own pill.
+    // name, and the colour of the lit tab's own pill. It watches until the
+    // pill has glided and gone, and a few frames after, not for a fixed time:
+    // on GitHub's runners the first visit to Reporting (its scripts load and
+    // run) held the glide up past 800 ms, so no frame after it was ever seen.
+    // (Giving up after 10 s ends a glide that never comes.)
     const watch = () =>
       page.evaluate(
         () =>
           new Promise(resolve => {
             const out = [];
             const start = performance.now();
+            let seenGlide = false;
+            let after = 0;
             const tick = () => {
               const glide = document.querySelector('.tb-seg .seg-glide');
               const on = document.querySelector('.tb-seg-active');
@@ -136,7 +143,9 @@ test.describe('with motion', () => {
                 on.textContent,
                 getComputedStyle(on).backgroundColor,
               ]);
-              if (performance.now() - start < 800) requestAnimationFrame(tick);
+              if (glide) seenGlide = true;
+              else if (seenGlide) after++;
+              if (after < 5 && performance.now() - start < 10000) requestAnimationFrame(tick);
               else resolve(out);
             };
             requestAnimationFrame(tick);
@@ -151,13 +160,34 @@ test.describe('with motion', () => {
       expect(after.every(([, lit, bg]) => lit === name && bg === thumb)).toBe(true);
     };
 
-    // Assignments to Dashboard: some frame has the pill part-way there.
+    // Assignments to Dashboard: half-way through the glide the pill is part-way there. The glide is held at its
+    // middle to look: on GitHub's runners the frames came too far apart to catch it moving (Nov 25, 2026).
     const from = await left('.tb-seg-active');
     const to = await left('.tb-seg-link[data-href="/dashboard"]');
+    await page.evaluate(() => {
+      window.__mid = null;
+      const seen = new MutationObserver(list =>
+        list.forEach(m =>
+          m.addedNodes.forEach(n => {
+            if (!n.classList || !n.classList.contains('seg-glide') || window.__mid !== null) return;
+            const anim = n.getAnimations()[0];
+            anim.ready.then(() => {
+              anim.pause();
+              anim.currentTime = anim.effect.getTiming().duration / 2;
+              window.__mid = n.getBoundingClientRect().left;
+              anim.play();
+            });
+          }),
+        ),
+      );
+      seen.observe(document.querySelector('#dock-mount'), { childList: true, subtree: true });
+    });
     let frames = watch();
     await page.click('.tb-seg-link[data-href="/dashboard"]');
     let seen = await frames;
-    expect(seen.some(([x]) => x !== null && x < from - 5 && x > to + 5)).toBe(true);
+    const mid = await page.evaluate(() => window.__mid);
+    expect(mid).toBeLessThan(from - 5);
+    expect(mid).toBeGreaterThan(to + 5);
     landed(seen, 'Dashboard');
 
     // Reporting loads its scripts on the first visit and draws the tabs
@@ -212,6 +242,77 @@ test.describe('with motion', () => {
   });
 });
 
+/* Every frame from a click on `go`: the glide's place, and the lit button's
+   name and pill colour in `track`. */
+async function glideFrames(page, track, go, ms = 700) {
+  const frames = page.evaluate(
+    ([track, ms]) =>
+      new Promise(resolve => {
+        const out = [];
+        const start = performance.now();
+        const tick = () => {
+          const glide = document.querySelector('.seg-glide');
+          const t = document.querySelector(track);
+          const on = t && SegGlide.lit(t);
+          out.push([
+            glide ? glide.getBoundingClientRect().left : null,
+            on ? on.textContent.trim() : '',
+            on ? getComputedStyle(on).backgroundColor : '',
+          ]);
+          if (performance.now() - start < ms) requestAnimationFrame(tick);
+          else resolve(out);
+        };
+        requestAnimationFrame(tick);
+      }),
+    [track, ms],
+  );
+  await page.locator(go).click();
+  return frames;
+}
+
+/* The glide ran, and once its pill was gone the lit button's own pill was
+   there in full: no frame with neither, no fade back in. */
+function glidedAndLanded(seen, name, thumb) {
+  const first = seen.findIndex(([x]) => x !== null);
+  expect(first).toBeGreaterThanOrEqual(0);
+  const after = seen.slice(first).filter(([x]) => x === null);
+  expect(after.length).toBeGreaterThan(0);
+  expect(after.every(([, lit, bg]) => lit.startsWith(name) && bg === thumb)).toBe(true);
+}
+
+test.describe('every slider', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  test('a slider drawn again on a click glides and lands (Assignments: Show)', async ({ page }) => {
+    await openDemo(page);
+    const track = '.atb-show:not(.dash-show)';
+    const thumb = await page.evaluate(
+      t => getComputedStyle(SegGlide.lit(document.querySelector(t))).backgroundColor,
+      track,
+    );
+    const seen = await glideFrames(page, track, track + ' .seg-btn:nth-child(2)');
+    glidedAndLanded(seen, 'Submitted', thumb);
+    await expect(page.locator('.seg-glide')).toHaveCount(0);
+    await expect(page.locator('.seg-gliding')).toHaveCount(0);
+  });
+
+  test("the phone's sliders glide too (Grade: To Return)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/login.html');
+    await page.locator('#demo-mode-btn').click();
+    await page.waitForURL(/teacher-mobile\//);
+    await page.locator('.m-tab-item[data-tab="observe"]').click();
+    const track = '.m-obs-track';
+    await page.locator(track).waitFor();
+    const thumb = await page.evaluate(
+      t => getComputedStyle(SegGlide.lit(document.querySelector(t))).backgroundColor,
+      track,
+    );
+    const seen = await glideFrames(page, track, track + ' .m-seg-btn:nth-child(2)');
+    glidedAndLanded(seen, 'Strength', thumb);
+  });
+});
+
 test.describe('with reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 
@@ -233,6 +334,13 @@ test.describe('with reduced motion', () => {
     await page.click('.tb-seg-link[data-href="/reports"]');
     await expect(page.locator('.tb-seg-active')).toHaveText('Reporting');
     await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0);
+  });
+
+  test('a slider drawn again changes at once', async ({ page }) => {
+    await openDemo(page);
+    const seen = await glideFrames(page, '.atb-show', '.atb-show .seg-btn:nth-child(2)', 300);
+    expect(seen.every(([x]) => x === null)).toBe(true);
+    await expect(page.locator('.atb-show .seg-btn:nth-child(2)')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

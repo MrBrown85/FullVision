@@ -141,8 +141,8 @@ describe('the draft', () => {
   it('leaves the support, closing and late-work lines out when the class has none', () => {
     const d = draftOf(facts({ notHandedIn: { count: 1, titles: ['Assessing the Treaty of Versailles'], groups: [] } }));
     ['support', 'closer', 'lateWork'].forEach(k => expect(stepText(d, k), k).toBeUndefined());
-    // One of the one-title Not Handed In frames (m01-m06): the title, quoted.
-    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in/);
+    // One of the one-title Not Handed In frames (m01, m27): the title, quoted.
+    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in|to hand in/);
     expect(stepText(d, 'notHandedIn')).toMatch(/“Assessing the Treaty of Versailles\.?”/);
   });
 
@@ -165,8 +165,8 @@ describe('the draft', () => {
     });
     const d = draftOf(f);
     const steps = d.sentences.map(s => s.step);
-    // One of the two-title Not Handed In frames (m01, m07-m11): both titles.
-    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in/);
+    // One of the two-title Not Handed In frames (m01, m28): both titles.
+    expect(stepText(d, 'notHandedIn')).toMatch(/not handed in|to hand in/);
     expect(stepText(d, 'notHandedIn')).toMatch(
       /“Assessing the Treaty of Versailles” and “Current Events: Week of October 13\.?”/,
     );
@@ -439,10 +439,10 @@ describe('the class settings (report_config) and the review screen', () => {
   it('shows the empty states when the class has nothing set', () => {
     seed();
     const html = open();
-    expect(html).toContain('No support lines chosen for this class. The comment leaves this sentence out.');
-    expect(html).toContain('>Choose…</button>');
-    expect(html).toContain('No closing sentence for this class.');
-    expect(html).toContain('>Add One…</button>');
+    expect(html).toContain('>+ Support Line ▾</button>');
+    expect(html).not.toContain('No support lines chosen');
+    expect(html).toContain('>+ Closing Sentence for the Class</button>');
+    expect(html).not.toContain('No closing sentence for this class');
     expect(html).toContain('<span id="tq-limit-text"> · no limit</span> ▾');
     expect(html).not.toContain('qn-required');
   });
@@ -451,7 +451,7 @@ describe('the class settings (report_config) and the review screen', () => {
     seed(['a9', 'a8']);
     COURSES[CID].lateWorkPolicy = 'Late work is accepted until December 4.';
     const html = open();
-    expect(html).toContain('<span class="qn-req-label">Not Handed In</span>');
+    expect(html).toContain('<span class="qn-req-label">Missing Work</span>');
     expect(html).toMatch(/<span class="qn-req-text">[^<]*“Task 9”[^<]*“Task 10\.?”/);
     expect(html).toContain('>Late work is accepted until December 4.</button>');
     expect(html).toContain('2 of 10 · check that both are really missing before you approve');
@@ -580,7 +580,7 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(settings().supportFor[TERM][GAB.id]).toBe(own.id);
     html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain(
-      'In class, I will meet with the group each Friday.</span><span class="qn-req-source">One of your support lines for History 12',
+      'title="One of your support lines for History 12">In class, I will meet with the group each Friday.</span>',
     );
     RQ.tqLine('pickSupport', { dataset: { line: 'none' } });
     html = RQ.renderTermQuestionnaire(CID);

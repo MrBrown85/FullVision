@@ -118,9 +118,8 @@ describe('Demo Mode sends nothing to Supabase', () => {
     DashClassManager.handleAction('cwGoToStep2', { dataset: {} });
     const originalGetElementById = document.getElementById;
     document.getElementById = id => (id === 'cm-new-name' ? { value: 'Science 9 Demo' } : originalGetElementById(id));
-    DashClassManager.handleAction('cwGoToStep3', { dataset: {} });
-    document.getElementById = originalGetElementById;
     DashClassManager.handleAction('cwFinishCreate', { dataset: {} });
+    document.getElementById = originalGetElementById;
     await tick(50);
 
     const cid = Object.keys(COURSES).find(id => COURSES[id].name === 'Science 9 Demo');

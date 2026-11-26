@@ -130,9 +130,20 @@ describe('missing work so far this year', () => {
     withTerm1Missing(() => {
       const ctx = CommentBank.context(facts(), {});
       const missing = COMMENT_BANK.sentences.filter(s => (s.claims || []).indexOf('notHandedIn') >= 0);
-      const thisTerm = missing.filter(s => /\bthis term\b/i.test(s.text));
-      expect(thisTerm.length).toBeGreaterThan(0);
-      thisTerm.forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(false));
-      expect(missing.some(s => !/\bthis term\b/i.test(s.text) && CommentBank.fits(s, ctx))).toBe(true);
+      // No missing-work sentence says "this term" (Nov 26: the count is the
+      // year to date); the gate in _fitsSlots still keeps one out that a
+      // teacher wrote with those words.
+      expect(missing.filter(s => /\bthis term\b/i.test(s.text))).toEqual([]);
+      expect(missing.some(s => CommentBank.fits(s, ctx))).toBe(true);
+      const own = {
+        id: 'mine:nh',
+        part: 'habits',
+        group: 'Not Handed In',
+        text: 'This term, {He} has work not handed in.',
+        claims: ['notHandedIn'],
+        mine: true,
+        src: 'yours',
+      };
+      expect(CommentBank.fits(own, ctx)).toBe(false);
     }));
 });

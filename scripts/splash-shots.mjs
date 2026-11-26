@@ -323,14 +323,14 @@ const SHOTS = [
     file: 'curriculum.jpg',
     async run(page, base) {
       // New Class, English Language Arts 8: its competencies in the
-      // Ministry's words, ready to untick.
+      // Ministry's words, ready to untick (Name Your Class › Competencies).
       await page.locator('[data-action="openClassManager"]').first().click();
       await page.locator('[data-action="cmStartCreate"]').first().click();
-      await page.locator('.cw-grade-btn', { hasText: 'Grade 8' }).click();
-      await page.locator('.cw-subject-btn', { hasText: 'English Language Arts' }).first().click();
-      await page.locator('.cw-course-item').first().click();
+      await page.getByRole('radio', { name: 'Grade 8' }).click();
+      await page.locator('.cw-course-item[data-tag="ELA8"]').click();
       await page.locator('[data-action="cwGoToStep2"]').click();
-      await page.locator('[data-action="cwCompsNext"]').waitFor();
+      await page.getByRole('button', { name: 'Change Competencies' }).click();
+      await page.locator('.cw-cc-check').first().waitFor();
       await page.mouse.move(0, 0);
       await pause(page, 800);
       return {

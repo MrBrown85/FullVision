@@ -1004,6 +1004,8 @@ const LINE_ICONS = {
     _LINE_SVG +
     '<path d="M9.5 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5z"/><path d="M9.5 1.5V5H13"/><path d="M5.5 8.5h5M5.5 11h3.5"/></svg>',
   plus: _LINE_SVG + '<path d="M8 3v10M3 8h10"/></svg>',
+  student: _LINE_SVG + '<circle cx="8" cy="5.25" r="2.75"/><path d="M2.5 14a5.5 5.5 0 0 1 11 0"/></svg>',
+  filter: _LINE_SVG + '<path d="M2 3h12l-4.5 5.5V13l-3 1.5V8.5z"/></svg>',
   image:
     _LINE_SVG +
     '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><circle cx="5.5" cy="6.5" r="1.25"/><path d="M14.5 10.5l-3.5-3.5-6.5 6.5"/></svg>',

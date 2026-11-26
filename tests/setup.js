@@ -310,6 +310,7 @@ load('teacher/comment-bank.js');
 load('teacher/comment-personal.js');
 load('teacher/report-qn-browse-cases.js');
 load('teacher/report-qn-voice-observations.js');
+load('teacher/report-qn-boxes.js');
 load('teacher/report-toolbar.js');
 load('teacher/report-questionnaire.js');
 load('teacher/grade-report.js');
@@ -401,7 +402,9 @@ load('teacher/card-menu.js');
 load('teacher/assign-competency-picker.js');
 load('teacher/student-edit-dialog.js');
 load('teacher/student-groups.js');
+load('teacher/student-outlook.js');
 load('teacher/gradebook-chrome.js');
+load('teacher/gradebook-student-menu.js');
 load('teacher/gradebook-toolbar.js');
 load('teacher/router.js');
 

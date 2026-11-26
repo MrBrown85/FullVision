@@ -499,10 +499,9 @@ describe('dash-class-manager-active-course-handoff', () => {
         if (id === 'cm-new-name') return { value: 'Humanities 8' };
         return originalGetElementById(id);
       };
-      DashClassManager.handleAction('cwGoToStep3', stubEl({}));
+      const finished = DashClassManager.handleAction('cwFinishCreate', stubEl({}));
       document.getElementById = originalGetElementById;
-
-      await DashClassManager.handleAction('cwFinishCreate', stubEl({}));
+      await finished;
 
       var created = Object.keys(COURSES).find(function (cid) {
         return COURSES[cid].name === 'Humanities 8';
