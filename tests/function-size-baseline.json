@@ -32,7 +32,6 @@
   "s/quiz.js :: onClick": 51,
   "s/reflect.js :: formHtml": 61,
   "s/seen-watch.js :: watch": 87,
-  "s/send.js :: checkHtml": 56,
   "s/send.js :: onClick": 64,
   "s/send.js :: refused": 76,
   "s/send.js :: resume": 91,

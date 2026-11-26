@@ -1402,12 +1402,25 @@ label.sp-btn:focus-within {
 .sp-send-note {
   width: 100%;
   box-sizing: border-box;
+  /* Six lines to start; it grows with the writing (StudentPage.grow), so a long note is read whole. */
+  min-height: 160px;
   border: 1px solid var(--sp-line, #d1d1d6);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   font: inherit;
   font-size: 16px;
-  resize: vertical;
+  line-height: 1.45;
+  background: #fff;
+  resize: none;
+  overflow: hidden;
+}
+.sp-send-count {
+  margin: -4px 0 0;
+  font-size: 14px;
+  color: #58585d;
+}
+.sp-send-count:empty {
+  display: none;
 }
 /* Sent, Not Sent Yet, One Page Didn't Send: centred on the screen. */
 .sp-send-center {
