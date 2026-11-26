@@ -2406,6 +2406,12 @@
   flex-direction: column;
   gap: 10px;
 }
+/* The column scrolls on its own (max-height below); its cards keep their
+   height instead of shrinking to fit it. Attendance was squeezed to a sliver
+   on a 1000 px tall window. */
+.qn-right > * {
+  flex-shrink: 0;
+}
 /* Side by side (Questionnaire glance plan, step 6): the right column (the
    Teacher Comment, Attendance, Sentences) stays in view while the left
    scrolls, and scrolls on its own when it is taller than the window. The

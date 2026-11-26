@@ -111,6 +111,11 @@ export const NO_TEACHER = {
     read: 'all',
     reason: 'The shared list of term questionnaire templates. Every teacher reads it; no teacher may change it.',
   },
+  'public.fv_owner': {
+    read: 'none',
+    reason:
+      'The accounts allowed to read the site-wide counts on fullvision.ca/health (fv_owner_health). Only the database owner reads or changes it.',
+  },
   'student_submit.card_key': {
     read: 'none',
     reason: 'One row: the id of the key the student cards are signed with. Only the student page server uses it.',

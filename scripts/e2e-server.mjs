@@ -58,7 +58,7 @@ const APP_ROUTES = [
   '/observations/starters',
   '/reports',
 ];
-const REWRITES = { '/': '/login.html', '/app.html': '/teacher/app.html' };
+const REWRITES = { '/': '/login.html', '/app.html': '/teacher/app.html', '/health': '/health.html' };
 for (const route of APP_ROUTES) REWRITES[route] = '/teacher/app.html';
 
 async function staticResponse(urlPath) {
