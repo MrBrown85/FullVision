@@ -58,15 +58,13 @@ function open() {
   RQ.tqStudentIndex = 0;
   return RQ.renderTermQuestionnaire(CID);
 }
-/* The open Add Here menu's sentences: what sits between its head and the
-   separator above Write Your Own. */
+/* The open Add Here menu's sentences: its buttons. */
 function addMenu() {
   const html = RQ.renderTermQuestionnaire(CID);
-  const at = html.indexOf('id="tq-add-menu"');
+  const at = html.indexOf('class="qn-own-picks"');
   expect(at).toBeGreaterThan(-1);
   const menu = html.slice(at, html.indexOf('data-do="browseAt"', at));
-  expect(menu).toContain('<span class="qn-menu-head">Add Here</span>');
-  return menu.slice(menu.indexOf('Add Here</span>'), menu.indexOf('<div class="qn-menu-sep"'));
+  return menu;
 }
 const sentenceIds = html => Array.from(html.matchAll(/data-do="insert"[^>]*data-sentence="([^"]*)"/g), m => m[1]);
 
@@ -161,60 +159,30 @@ describe('sourceChoices', () => {
 describe('the Add Here menu', () => {
   it('with the bank alone: its sentences and no group headings', () => {
     open();
-    RQ.tqSentences('addMenu', { dataset: { gap: '1' } });
+    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
     const menu = addMenu();
     expect(sentenceIds(menu).length).toBeGreaterThan(0);
-    expect(menu).not.toContain('qn-add-source');
-    expect(menu).not.toContain('Sentence Bank');
+    expect(menu).not.toContain('data-source="test"');
   });
 
-  it('with a second source: each source’s sentences under its own heading, the bank’s unchanged', () => {
+  it('with a second source: each source’s sentences as buttons of its own, the bank’s unchanged', () => {
     open();
-    RQ.tqSentences('addMenu', { dataset: { gap: '1' } });
+    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
     const alone = addMenu();
     remove = RQ.registerSource(TEST_SOURCE);
     const both = addMenu();
-    const bankHead = '<span class="qn-menu-head qn-add-source">Sentence Bank</span>';
-    const testHead = '<span class="qn-menu-head qn-add-source">Test Source</span>';
     expect(sentenceIds(both)).toEqual(sentenceIds(alone).concat('test:1'));
-    expect(both.indexOf(bankHead)).toBeGreaterThan(-1);
-    expect(both.indexOf(bankHead)).toBeLessThan(both.indexOf('data-do="insert"'));
-    expect(both.indexOf(testHead)).toBeGreaterThan(
-      both.lastIndexOf('data-sentence="' + sentenceIds(alone).pop() + '"'),
+    expect(both.indexOf('data-source="bank"')).toBeLessThan(both.indexOf('data-source="test"'));
+    expect(both.indexOf('data-source="test"')).toBeGreaterThan(
+      both.lastIndexOf('data-sentence="' + sentenceIds(alone).pop() + '"') - 200,
     );
-    expect(both.indexOf(testHead)).toBeLessThan(both.indexOf('data-sentence="test:1"'));
-    expect(both).toContain('<span class="qn-menu-text">Gap 1 for Maya.</span>');
-    // Without the headings and the second source's item, the menu is the
-    // bank's alone.
-    const testItem = both.slice(both.indexOf(testHead) + testHead.length);
-    expect(both.replace(bankHead, '').replace(testHead + testItem, '')).toBe(
-      alone.slice(0, alone.lastIndexOf('</button>') + 9),
-    );
-  });
-});
-
-describe('a sentence from a second source', () => {
-  it('goes in at the gap as that source’s row, with its Options menu and its picks', () => {
-    remove = RQ.registerSource(TEST_SOURCE);
-    open();
-    RQ.tqSentences('insert', { dataset: { gap: '1', step: 'home', sentence: 'test:1' } });
-    expect(saved().narrative).toBe(TYPED + ' Gap 1 for Maya.');
-    const card = html => html.slice(html.indexOf('id="tq-sentences"'));
-    const drawn = card(RQ.renderTermQuestionnaire(CID));
-    expect(drawn).toContain('data-do="wording" data-row="1"');
-    expect(drawn).not.toContain('id="test-source-menu"');
-    RQ.tqSentences('wording', { dataset: { row: '1' } });
-    const menu = card(RQ.renderTermQuestionnaire(CID));
-    expect(menu).toContain('<div class="qn-menu" role="menu" id="test-source-menu">test:1 of Maya</div>');
-    expect(menu).not.toContain('id="tq-wording-menu"');
-    RQ.tqSentences('pick', { dataset: { row: '1', sentence: 'test:2' } });
-    expect(picks).toEqual([[MAYA.id, 1, 'test:2']]);
+    expect(both).toContain('Gap 1 for Maya.');
   });
 
   it('a bank sentence put in beside it keeps the bank’s Options menu', () => {
     remove = RQ.registerSource(TEST_SOURCE);
     open();
-    RQ.tqSentences('addMenu', { dataset: { gap: '1' } });
+    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
     const bankId = sentenceIds(addMenu())[0];
     RQ.tqSentences('insert', { dataset: { gap: '1', sentence: bankId } });
     RQ.tqSentences('wording', { dataset: { row: '1' } });

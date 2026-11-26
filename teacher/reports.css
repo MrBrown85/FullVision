@@ -4957,109 +4957,6 @@ body.qn-roster #gb-sidebar .student-row-note {
     background-color: transparent;
   }
 }
-/* The gap after a row: nothing in the flow, so the rows never move. A
-   band 12px tall over the hairline takes the hover; the line, the + and
-   the tooltip show on hover, keyboard focus or while the menu is open. */
-.qn-gap {
-  position: relative;
-  height: 0;
-  z-index: 2;
-}
-/* The open menu above the next gap's hover band. */
-.qn-gap.open {
-  z-index: 3;
-}
-.qn-gap::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -6px;
-  height: 12px;
-}
-.qn-gap-line {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  top: -1px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--active);
-  opacity: 0;
-  pointer-events: none;
-}
-.qn-gap-add {
-  position: absolute;
-  left: 7px;
-  top: -9px;
-  width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  border: 0;
-  background: var(--active-fill);
-  color: #fff;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 18px;
-  padding: 0;
-  text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  cursor: pointer;
-}
-.qn-gap-tip {
-  position: absolute;
-  left: 32px;
-  top: -13px;
-  background: #1d1d1f;
-  color: #fff;
-  border-radius: 8px;
-  padding: 5px 10px;
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  opacity: 0;
-  pointer-events: none;
-}
-.qn-gap:hover .qn-gap-line,
-.qn-gap:focus-within .qn-gap-line,
-.qn-gap.open .qn-gap-line,
-.qn-gap:hover .qn-gap-add,
-.qn-gap:focus-within .qn-gap-add,
-.qn-gap.open .qn-gap-add,
-.qn-gap:hover .qn-gap-tip,
-.qn-gap:focus-within .qn-gap-tip {
-  opacity: 1;
-}
-.qn-gap.open .qn-gap-tip {
-  opacity: 0;
-}
-.qn-gap-add:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
-}
-/* The Add Here menu, from the + (the InsertRows mockup). */
-.qn-add-menu {
-  left: 30px;
-  right: auto;
-  top: 10px;
-}
-.qn-add-item {
-  gap: 10px;
-}
-.qn-add-part {
-  width: 72px;
-  flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  padding-top: 2px;
-}
-.qn-add-none {
-  padding: 6px 10px;
-}
 /* The Options menu of a Your Sentence row. */
 .qn-options {
   width: 270px;
@@ -6363,14 +6260,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-box .qn-drop-line {
   margin: 2px 0;
 }
-/* The gap's + sits inside the box's left padding. */
-.qn-box .qn-gap-add {
-  left: -3px;
-}
-.qn-box .qn-gap-line {
-  left: 0;
-  right: 0;
-}
 @media (max-width: 600px) {
   .qn-sentences .qn-box .qn-req-row {
     flex-wrap: nowrap;
@@ -6382,4 +6271,284 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn-req-top .qn-card-link {
     margin-left: 0;
   }
+}
+
+/* ── Adding and editing in one click (slice 4) ── */
+.qn-add-sentence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: #0066cc;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 11px;
+  cursor: pointer;
+}
+.qn-add-sentence:hover {
+  background: #0059b3;
+}
+.qn-add-sentence:focus-visible,
+.qn-gap-add:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+/* The gap between two sentences or two boxes takes the room the space
+   between them took, so nothing moves. The line and the pill are drawn
+   over it after the pointer rests (180 ms) or at once on keyboard focus. */
+.qn-box .qn-gap {
+  position: relative;
+  height: 5px;
+  margin: 0 -14px;
+  z-index: 2;
+}
+.qn-box .qn-gap + .qn-req-row {
+  margin-top: 0;
+}
+.qn-box .qn-gap:last-child {
+  height: 11px;
+}
+.qn-box:has(> .qn-gap:last-child) {
+  padding-bottom: 0;
+}
+/* The part of the hover area that lies in the space between two boxes. */
+.qn-box .qn-gap:last-child::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 8px;
+}
+.qn-gap-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1.5px;
+  height: 2px;
+  background: #0066cc;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1ms;
+}
+.qn-box .qn-gap:last-child .qn-gap-line {
+  top: calc(100% + 3px);
+}
+.qn-gap-add {
+  position: absolute;
+  z-index: 1;
+  left: 44px;
+  top: -6px;
+  height: 18px;
+  border: 0;
+  border-radius: 9px;
+  background: #0066cc;
+  color: #fff;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 18px;
+  padding: 0 9px;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--qn-box-bg);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 1ms;
+}
+.qn-box .qn-gap:last-child .qn-gap-add {
+  top: calc(100% - 5px);
+}
+.qn-box[data-part='notHandedIn'] .qn-gap-add {
+  box-shadow: 0 0 0 2px var(--qn-missing-bg);
+}
+.qn-box .qn-gap:hover .qn-gap-line,
+.qn-box .qn-gap:hover .qn-gap-add {
+  opacity: 1;
+  transition-delay: 180ms;
+}
+.qn-box .qn-gap:focus-within .qn-gap-line,
+.qn-box .qn-gap:focus-within .qn-gap-add {
+  opacity: 1;
+  transition-delay: 0s;
+}
+/* While a sentence is dragged, no bar shows. */
+.qn-sentences.dragging .qn-gap-line,
+.qn-sentences.dragging .qn-gap-add {
+  display: none;
+}
+/* A sentence's own edges lie over the pill, so a click there reaches it. */
+.qn-box .qn-srow .qn-req-text {
+  position: relative;
+  z-index: 3;
+  cursor: text;
+}
+.qn-box .qn-edit-field,
+.qn-box .qn-edit-field:focus {
+  box-shadow: 0 0 0 2px #0066cc !important;
+}
+.qn-edit-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--qn-box-bg);
+  border: 0;
+  border-radius: 6px;
+  padding: 0 4px;
+  margin: 0 -4px;
+  box-shadow: 0 0 0 2px #0066cc;
+  outline: 0;
+  position: relative;
+  z-index: 6;
+}
+.qn-box .qn-srow.editing {
+  position: relative;
+  z-index: 6;
+}
+/* The writing box at a gap: the choices as tinted buttons under it. */
+.qn-own-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.qn-own-pick {
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--qn-tint-bg);
+  color: var(--link);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-own-pick:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-box .qn-own-gap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Dragging and motion (slice 5) ── */
+.qn-box .qn-srow-handle {
+  touch-action: none;
+  user-select: none;
+}
+.qn-sentences {
+  position: relative;
+}
+/* The lifted sentence: its own background rings it, a long shadow lifts it,
+   it is a little larger and follows the pointer. */
+.qn-box .qn-srow.lifted {
+  position: relative;
+  z-index: 20;
+  background: var(--lift-bg, var(--qn-box-bg));
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 6px var(--lift-bg, var(--qn-box-bg)),
+    0 14px 34px 6px rgba(0, 0, 0, 0.2);
+  cursor: grabbing;
+}
+.qn-slot {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  background: #dbe8fa;
+  border-radius: 12px;
+  z-index: 1;
+  pointer-events: none;
+}
+.qn-sentences.dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+/* What hangs off a sentence waits until it lands. */
+.qn-sentences.dragging .qn-claim,
+.qn-sentences.dragging .qn-pron-note,
+.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-line-menu,
+.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-edited,
+.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-own-add {
+  visibility: hidden;
+}
+.qn-box .qn-srow,
+.qn-box .qn-req-row.flag {
+  transition: background-color 150ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .qn-sentences *,
+  .qn-sentences *::before,
+  .qn-sentences *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ── The menus (slice 6) ── */
+.qn-menu-right {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.qn-see-missing {
+  flex: none;
+  min-height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(138, 90, 0, 0.14);
+  color: #6b4200;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.qn-see-missing:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+@media (prefers-color-scheme: dark) {
+  .qn-see-missing {
+    background: rgba(255, 214, 10, 0.16);
+    color: #ffd60a;
+  }
+}
+.qn-miss-menu {
+  width: 520px;
+}
+.qn-miss-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+}
+.qn-miss-item .qn-menu-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.qn-miss-open {
+  flex: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
 }

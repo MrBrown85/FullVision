@@ -822,7 +822,7 @@ describe('the card drawn for a Demo Mode student', () => {
     // One row per unit: the next-step sentences share a row.
     const units = RQ.units(RQ.rowsFromDraft(d)).length;
     expect(units).toBeLessThan(d.sentences.length);
-    expect((card.match(/class="qn-srow-handle" draggable="true"/g) || []).length).toBe(units);
+    expect((card.match(/class="qn-srow-handle" aria-label="Move this sentence"/g) || []).length).toBe(units);
     expect((card.match(/data-do="wording"/g) || []).length).toBe(units);
     expect((card.match(/<span class="qn-req-label">Next Step<\/span>/g) || []).length).toBe(1);
     expect(card).toContain('<span class="qn-req-label">Grade</span>');
@@ -858,12 +858,12 @@ describe('the card drawn for a Demo Mode student', () => {
     expect((card.match(/data-do="options"/g) || []).length).toBe(2);
     expect(card).toContain('Typed by you · kept when you regenerate');
     expect(card).not.toContain('data-do="wording"');
-    // A gap after each row, with its + and tooltip; none before the first.
+    // A gap after each row, with its pill; none before the first.
     expect((card.match(/class="qn-gap" data-gap="\d+"/g) || []).length).toBe(2);
     expect(card).toContain('data-gap="1"');
     expect(card).toContain('data-gap="2"');
     expect(card).not.toContain('data-gap="0"');
     expect(card).toContain('aria-label="Add a sentence here"');
-    expect(card).toContain('<span class="qn-gap-tip" role="tooltip">Add a sentence here</span>');
+    expect(card).toContain('+ Add a Sentence Here</button>');
   });
 });

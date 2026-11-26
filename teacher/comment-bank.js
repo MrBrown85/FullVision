@@ -2734,6 +2734,13 @@ window.CommentBank = (function () {
       },
       defaultFocusId: (focus && focus.sec && focus.sec.id) || null,
       focusId: rating.focusSectionId || (focus && focus.sec && focus.sec.id) || null,
+      // The teacher's picks for this report (Term Questionnaire, Pick the
+      // Piece and Pick the Skill): the first assessment the report mentions
+      // is the best piece, the first strength tag is the competency named
+      // as the strength. Both are saved with the term rating as they are
+      // today (mention_assessments, strength_tags).
+      bestPickId: (rating.mentionAssessments || [])[0] || null,
+      strengthPickId: (rating.strengths || [])[0] || null,
       // The year's totals, as the teacher typed them (Colin, 2026-11-25: "the
       // year's total", "so far this year"). absentTerm and lateTerm are this
       // term's share, which only a retired "this term" sentence is checked
@@ -3303,6 +3310,14 @@ window.CommentBank = (function () {
      the table, [{ comp, key, skill }]. A competency the table has no skill
      for is left out; the comment never prints a bare competency label. */
   function strengthSkills(f) {
+    // The teacher's pick: the competency named as the strength, when it can be.
+    var pick = f.strengthPickId
+      ? (f.comps || []).find(function (c) {
+          return c.id === f.strengthPickId && c.level > 0;
+        })
+      : null;
+    var picked = pick ? skillFor(f, pick) : null;
+    if (picked) return [{ comp: pick, key: picked.key, skill: picked.skill, steps: picked.steps || null }];
     return strongestOf(f.comps)
       .map(function (c) {
         var sk = skillFor(f, c);
@@ -3582,6 +3597,21 @@ window.CommentBank = (function () {
     }, -Infinity);
   }
   function bestOrderOf(f) {
+    var picked = f.bestPickId
+      ? (f.work || []).find(function (w) {
+          return w.id === f.bestPickId;
+        })
+      : null;
+    var rest = bestOrderRest(f);
+    return picked
+      ? [picked].concat(
+          rest.filter(function (w) {
+            return w !== picked;
+          }),
+        )
+      : rest;
+  }
+  function bestOrderRest(f) {
     var strongSk = strengthSkills(f)[0];
     var strongComp = strongSk ? strongSk.comp : null;
     var onStrength = function (w) {
@@ -8438,6 +8468,8 @@ window.CommentBank = (function () {
     strengthNowOf: strengthNowOf,
     progressOf: progressOf,
     bestPieceOf: bestPieceOf,
+    bestOrderOf: bestOrderOf,
+    skillFor: skillFor,
     bestPieceSkillOf: bestPieceSkillOf,
     highestFallbackOf: highestFallbackOf,
     setEntry: setEntry,
@@ -8459,7 +8491,6 @@ window.CommentBank = (function () {
     nextStepOf: nextStepOf,
     levelStepOf: levelStepOf,
     sharedNextStep: sharedNextStep,
-    skillFor: skillFor,
     bankEntry: bankEntry,
     nextSkillOf: nextSkillOf,
     skillOf: skillOf,
