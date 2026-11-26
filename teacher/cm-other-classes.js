@@ -70,7 +70,8 @@
   // teacher is typing in.
   function _cmRefreshSidebar() {
     var el = document.querySelector('.cm-sidebar');
-    if (el && state.classManagerOpen) el.outerHTML = renderCmSidebar(Object.keys(COURSES));
+    var mount = el ? el.parentElement : null;
+    if (mount && state.classManagerOpen) CmKeepDraw.draw(mount, renderCmSidebar(Object.keys(COURSES)));
   }
 
   function _cmAfterLoad(cid) {
@@ -190,6 +191,28 @@
     if (el && el.classList) el.classList.toggle(name, on);
   }
 
+  /* What the detail pane shows: the New Class form, Re-link, a file's
+     incoming competencies, a class still loading, or a class's tabs. */
+  function _cmDetailHtml() {
+    if (state.cmMode === 'create') {
+      return renderCmCreateForm();
+    } else if (state.cmRelinkStep > 0 && state.cmRelinkCid && COURSES[state.cmRelinkCid]) {
+      return renderCmRelinkPanel(state.cmRelinkCid);
+    } else if (state.cmCompReview && state.cmCompReview.kind === 'file' && COURSES[state.cmCompReview.cid]) {
+      return _cmRenderCompReview(state.cmCompReview.cid);
+    } else if (state.cmSelectedCourse && COURSES[state.cmSelectedCourse] && !_cmClassReady(state.cmSelectedCourse)) {
+      return (
+        '<div class="cm-detail-inner cm-tabbed"><div class="cm-head"><div class="cm-head-text">' +
+        '<h1 class="cm-head-title">' +
+        esc(COURSES[state.cmSelectedCourse].name) +
+        '</h1><div class="cm-head-meta" role="status">Loading this class\u2026</div></div></div></div>'
+      );
+    } else if (state.cmSelectedCourse && COURSES[state.cmSelectedCourse]) {
+      return renderCmDetail(state.cmSelectedCourse);
+    }
+    return '';
+  }
+
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
     // Class Settings reads the year so far for every class: its previews
@@ -217,15 +240,18 @@
     _cmMark(document.body, 'cm-open', true);
     var toolbarMount = document.getElementById('page-toolbar-mount');
     if (toolbarMount) {
-      toolbarMount.innerHTML =
+      CmKeepDraw.paint(
+        toolbarMount,
+        '.cm-toolbar',
         '<div class="page-toolbar dash-toolbar cm-toolbar">' +
-        renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') +
-        '<span class="dash-toolbar-spacer"></span>' +
-        // The tabbed view names the class in its own header.
-        (state.cmMode === 'create' || state.cmRelinkStep > 0
-          ? '<span class="cm-toolbar-detail">' + esc(detailTitle) + '</span>'
-          : '') +
-        '</div>';
+          renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') +
+          '<span class="dash-toolbar-spacer"></span>' +
+          // The tabbed view names the class in its own header.
+          (state.cmMode === 'create' || state.cmRelinkStep > 0
+            ? '<span class="cm-toolbar-detail">' + esc(detailTitle) + '</span>'
+            : '') +
+          '</div>',
+      );
     }
 
     // The class list takes the student list's place beside the page; the
@@ -245,59 +271,32 @@
     _cmMark(document.getElementById('main'), 'cm-listing', true);
 
     html += '<div class="cm-layout">';
-    if (sideMount) sideMount.innerHTML = renderCmSidebar(courseIds);
+    if (sideMount) CmKeepDraw.paint(sideMount, '.cm-sidebar', renderCmSidebar(courseIds));
     else html += renderCmSidebar(courseIds);
     html += '<div class="cm-detail">';
 
-    if (state.cmMode === 'create') {
-      html += renderCmCreateForm();
-    } else if (state.cmRelinkStep > 0 && state.cmRelinkCid && COURSES[state.cmRelinkCid]) {
-      html += renderCmRelinkPanel(state.cmRelinkCid);
-    } else if (state.cmCompReview && state.cmCompReview.kind === 'file' && COURSES[state.cmCompReview.cid]) {
-      html += _cmRenderCompReview(state.cmCompReview.cid);
-    } else if (state.cmSelectedCourse && COURSES[state.cmSelectedCourse] && !_cmClassReady(state.cmSelectedCourse)) {
-      html +=
-        '<div class="cm-detail-inner cm-tabbed"><div class="cm-head"><div class="cm-head-text">' +
-        '<h1 class="cm-head-title">' +
-        esc(COURSES[state.cmSelectedCourse].name) +
-        '</h1><div class="cm-head-meta" role="status">Loading this class\u2026</div></div></div></div>';
-    } else if (state.cmSelectedCourse && COURSES[state.cmSelectedCourse]) {
-      html += renderCmDetail(state.cmSelectedCourse);
-    }
+    html += _cmDetailHtml();
 
     html += '</div></div>';
     // Preserve scroll position of the detail pane across re-renders
     var detailEl = document.querySelector('.cm-detail');
     var scrollTop = detailEl ? detailEl.scrollTop : 0;
     var kept = CmKeepMenu.mark([state.cmSelectedCourse, state.cmTab, state.cmMode].join('|'));
-    /** @type {any} */ (document.getElementById('main')).innerHTML = html;
+    var shape = [
+      state.cmMode,
+      state.cmSelectedCourse,
+      state.cmRelinkStep > 0,
+      state.cmCompReview && state.cmCompReview.kind,
+      state.cmSelectedCourse && _cmClassReady(state.cmSelectedCourse),
+    ].join('|');
+    CmKeepDraw.paintMain(document.getElementById('main'), html, shape, state.cmTab);
     if (scrollTop > 0) {
       var newDetail = document.querySelector('.cm-detail');
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
-    _cmRosterScrollCue();
+    CmKeepDraw.rosterCue();
     CmKeepMenu.restore(kept, [state.cmSelectedCourse, state.cmTab, state.cmMode].join('|'), _cmFloatOverScroll);
     _cmRestoreKeptFocus();
-  }
-
-  /* The roster is wider than most windows (twelve columns). While columns
-     are hidden off its right edge, the edge fades and a line says to scroll
-     sideways, so the scrolling is plain to see. */
-  function _cmRosterScrollCue() {
-    var scroller = document.querySelector('.cm-rs-scroll');
-    if (!scroller || !scroller.addEventListener) return;
-    var section = scroller.closest('.cm-rs-section');
-    var note = document.getElementById('cm-rs-more');
-    function update() {
-      var more =
-        /** @type {any} */ (scroller).scrollLeft + /** @type {any} */ (scroller).clientWidth <
-        /** @type {any} */ (scroller).scrollWidth - 1;
-      if (section) section.classList.toggle('cm-rs-more-right', more);
-      if (note)
-        note.hidden = /** @type {any} */ (scroller).scrollWidth <= /** @type {any} */ (scroller).clientWidth + 1;
-    }
-    scroller.addEventListener('scroll', update, { passive: true });
-    update();
   }
 
   /* The badge on a class row: its block ("A"), or the name's initials
