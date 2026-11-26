@@ -243,15 +243,23 @@ test.describe('with motion', () => {
 });
 
 /* Every frame from a click on `go`: the glide's place, and the lit button's
-   name and pill colour in `track`. */
-async function glideFrames(page, track, go, ms = 700) {
+   name and pill colour in `track`. It watches until the glide has run and
+   gone, and a few frames after, not for a fixed time: on GitHub's runner a
+   page drawn again on the click held the glide up past the 700 ms this once
+   watched, so no frame after it was seen (Nov 26, 2026, as the top tabs'
+   test above). `ms` ends a glide that never comes. */
+async function glideFrames(page, track, go, ms = 10000) {
   const frames = page.evaluate(
     ([track, ms]) =>
       new Promise(resolve => {
         const out = [];
         const start = performance.now();
+        let seenGlide = false;
+        let after = 0;
         const tick = () => {
           const glide = document.querySelector('.seg-glide');
+          if (glide) seenGlide = true;
+          else if (seenGlide) after++;
           const t = document.querySelector(track);
           const on = t && SegGlide.lit(t);
           out.push([
@@ -259,7 +267,7 @@ async function glideFrames(page, track, go, ms = 700) {
             on ? on.textContent.trim() : '',
             on ? getComputedStyle(on).backgroundColor : '',
           ]);
-          if (performance.now() - start < ms) requestAnimationFrame(tick);
+          if (after < 5 && performance.now() - start < ms) requestAnimationFrame(tick);
           else resolve(out);
         };
         requestAnimationFrame(tick);
