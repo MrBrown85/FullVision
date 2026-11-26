@@ -2063,7 +2063,9 @@ function fillSidebarBadges(cid) {
       return;
     }
     document.querySelectorAll('[data-prof-sid]').forEach(function (el) {
-      el.innerHTML = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid'));
+      // Left as it is when the grade is the same, so the chips do not flash.
+      var h = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid'));
+      if (el.innerHTML !== h) el.innerHTML = h;
     });
   });
 }
@@ -2270,7 +2272,7 @@ function refreshSidebar() {
       }
     }
   }
-  mount.innerHTML = renderSidebar(cid, selId, clickFn);
+  SidebarKeep.draw(renderSidebar(cid, selId, clickFn));
 }
 
 /* ── Collapsible sidebar (shared across all pages) ─────────── */

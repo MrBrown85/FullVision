@@ -264,6 +264,7 @@
     "teacher/report-scores.js",
     "teacher/report-sheets.js",
     "teacher/router.js",
+    "teacher/sidebar-keep.js",
     "teacher/rubric-bank.js",
     "teacher/rubric-guard.js",
     "teacher/rubric-library.js",

@@ -207,11 +207,11 @@ window.PageAssignments = (function () {
     pageState.rubricViewStates = {};
     // The roster's grades are the year so far, as on the Gradebook.
     if (typeof setActiveTerm === 'function') setActiveTerm(pageState.activeCourse, null);
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(
+    SidebarKeep.draw(renderSidebar(
       pageState.activeCourse,
       pageState.focusStudentId,
       'toggleFocusStudent',
-    );
+    ));
     render();
   }
 
@@ -268,11 +268,11 @@ window.PageAssignments = (function () {
     if (pageState._grader) return;
     var rows = document.querySelectorAll('#gb-roster-list .student-row');
     if (!rows.length) {
-      document.getElementById('sidebar-mount').innerHTML = renderSidebar(
+      SidebarKeep.draw(renderSidebar(
         pageState.activeCourse,
         pageState.focusStudentId,
         'toggleFocusStudent',
-      );
+      ));
       return;
     }
     var picked = null;
@@ -16737,11 +16737,11 @@ window.PageAssignments = (function () {
     // The roster's grades are the year so far, as on the Gradebook,
     // whether the page was reached in the app or loaded fresh.
     if (typeof setActiveTerm === 'function') setActiveTerm(pageState.activeCourse, null);
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(
+    SidebarKeep.draw(renderSidebar(
       pageState.activeCourse,
       pageState.focusStudentId,
       'toggleFocusStudent',
-    );
+    ));
     initSidebarToggle();
 
     // Expose switchCourse globally for dock

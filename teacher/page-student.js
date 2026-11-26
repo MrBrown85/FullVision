@@ -3084,11 +3084,11 @@ window.PageStudent = (function () {
     // Show sidebar with student roster
     document.getElementById('sidebar-mount').style.display = '';
     document.getElementById('page-layout').classList.remove('sidebar-hidden');
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(
+    SidebarKeep.draw(renderSidebar(
       activeCourse,
       studentId,
       'PageStudent.switchStudent',
-    );
+    ));
     initSidebarToggle();
 
     // Expose switchCourse for dock
