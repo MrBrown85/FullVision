@@ -6576,7 +6576,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-habits-menu {
   top: calc(100% + 2px);
   right: 0;
-  width: 440px;
+  width: 480px;
 }
 .qn-hm-row {
   display: flex;
@@ -6621,7 +6621,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-hm-word {
   flex: none;
-  width: 84px;
+  width: 108px;
   text-align: right;
   font-size: 12.5px;
   font-weight: 600;
