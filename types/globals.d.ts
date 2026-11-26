@@ -4,7 +4,7 @@ interface Window {
   // Build flags (shared/build-flags.js): unfinished work stays behind one.
   BuildFlags: { on(name: string): boolean };
   // Draws markup into a place, keeping the parts that did not change (teacher/keep-dom.js).
-  KeepDom: { patch(root: Element, html: string): void };
+  KeepDom: { patch(root: Element, html: string | DocumentFragment, opts?: any): void };
   // The top bar (teacher/top-bar.js): drawn once, then only its lit tab changes.
   TopBar: { draw(activePage: string): void; barKey(html: string): string };
   SegGlide: {
