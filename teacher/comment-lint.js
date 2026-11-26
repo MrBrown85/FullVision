@@ -430,7 +430,7 @@ window.CommentLint = (function () {
      true): tests/comment-bank-lint.test.js fails an undeclared one, and
      the draft holds one such sentence (CommentBank.advises). */
   var ADVICE_RE =
-    /\bnext step\b|\bto do next\b|\b(one|the) thing to do\b|\bthe aim this term\b|\bthe change to make\b|\bthe place to start\b|\bcan start with\b|\bthe first thing for \w+ to do\b/i;
+    /\bnext step\b|\bto do next\b|\b(one|the) thing to do\b|\bthe aim this (term|year)\b|\bthe change to make\b|\bthe place to start\b|\bcan start with\b|\bthe first thing for \w+ to do\b/i;
   function advisesText(text) {
     return ADVICE_RE.test(plain(text));
   }
