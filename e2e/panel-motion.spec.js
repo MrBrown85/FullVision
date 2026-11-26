@@ -121,13 +121,19 @@ test.describe('with motion', () => {
     await openDemo(page);
     const left = sel => page.evaluate(q => document.querySelector(q).getBoundingClientRect().left, sel);
     // Every frame from a click: where the gliding pill is, the lit tab's
-    // name, and the colour of the lit tab's own pill.
+    // name, and the colour of the lit tab's own pill. It watches until the
+    // pill has glided and gone, and a few frames after, not for a fixed time:
+    // on GitHub's runners the first visit to Reporting (its scripts load and
+    // run) held the glide up past 800 ms, so no frame after it was ever seen.
+    // (Giving up after 10 s ends a glide that never comes.)
     const watch = () =>
       page.evaluate(
         () =>
           new Promise(resolve => {
             const out = [];
             const start = performance.now();
+            let seenGlide = false;
+            let after = 0;
             const tick = () => {
               const glide = document.querySelector('.tb-seg .seg-glide');
               const on = document.querySelector('.tb-seg-active');
@@ -136,7 +142,9 @@ test.describe('with motion', () => {
                 on.textContent,
                 getComputedStyle(on).backgroundColor,
               ]);
-              if (performance.now() - start < 800) requestAnimationFrame(tick);
+              if (glide) seenGlide = true;
+              else if (seenGlide) after++;
+              if (after < 5 && performance.now() - start < 10000) requestAnimationFrame(tick);
               else resolve(out);
             };
             requestAnimationFrame(tick);
