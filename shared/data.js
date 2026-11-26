@@ -1699,13 +1699,15 @@ function classesToPreload() {
   });
 }
 
-var _preloadRun = null;
+var _preloadRun = null,
+  _preloadFull = false; // a background copy didn't fit (it makes no room): the rest load when opened
 function preloadClasses() {
   if (_preloadRun) return _preloadRun;
+  _preloadFull = false;
   _preloadRun = classesToPreload()
     .reduce(function (chain, cid) {
       return chain.then(function () {
-        return loadClass(cid);
+        if (!_preloadFull) return loadClass(cid);
       });
     }, Promise.resolve())
     .then(function () {
@@ -1898,7 +1900,7 @@ function _persistLoadedField(cid, field, value) {
     } catch (e) {
       same = false;
     }
-    if (!same) _safeLSSet(lsKey, json);
+    if (!same) _safeLSSet(lsKey, json, cid === getActiveCourse() ? 'copy' : 'background');
     else _keepText(lsKey, json);
   }
   if (_SERVER_STATE_FIELDS[field]) _rememberServerState(field, cid, value);
@@ -4292,7 +4294,7 @@ function _bundleToCache(cid, bundle) {
     _saveClassMeta(cid, {
       version: _classVersion[cid],
       savedAt: now,
-      lastOpenedAt: now,
+      lastOpenedAt: cid === getActiveCourse() ? now : (_classMeta(cid) || {}).lastOpenedAt || 0,
       owner: _teacherId,
       schema: _BUNDLE_SCHEMA,
       dirty: false,
@@ -4511,10 +4513,8 @@ function _purgeStaleSavedCopies() {
   });
 }
 
-/* Browser storage is full: remove the saved copy opened longest ago, never
-   the open class, and never while writes wait in the outbox (it shares the
-   same storage). Its unsaved category draft stays. Returns true when
-   something was removed. */
+/* Storage is full: remove the saved copy opened longest ago (one never opened first), never the open class and never
+   while writes wait in the outbox (it shares the storage). Its category draft stays. True when something went. */
 function _evictOldestSavedCopy(keepCid) {
   if (_hasUnsentWrites()) return false;
   var oldest = null;
@@ -4524,8 +4524,7 @@ function _evictOldestSavedCopy(keepCid) {
       var key = localStorage.key(i);
       var m = key && key.match(/^gb-bundle-meta-(.+)$/);
       if (!m || m[1] === keepCid || m[1] === getActiveCourse()) continue;
-      var meta = _safeParseLS(key, null) || {};
-      var at = meta.lastOpenedAt || meta.savedAt || 0;
+      var at = (_safeParseLS(key, null) || {}).lastOpenedAt || 0;
       if (at < oldestAt) {
         oldestAt = at;
         oldest = m[1];
@@ -5012,7 +5011,9 @@ function _safeParseLS(key, fallback, keep) {
   }
 }
 
-function _safeLSSet(key, value) {
+/* kind 'copy' (the open class) or 'background' (preloadClasses): what the server sent, so failing loses nothing and
+   leaves the sync dot alone; the phone said it lost changes at sign-in once classes outgrew 5 MB (Nov 25, 2026). */
+function _safeLSSet(key, value, kind) {
   try {
     localStorage.setItem(key, value);
     _storageSaved(key);
@@ -5020,7 +5021,9 @@ function _safeLSSet(key, value) {
     return true;
   } catch (e) {
     var keyClass = /^gb-/.test(key) && key.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
-    if (e.name === 'QuotaExceededError' && /^gb-/.test(key) && _evictOldestSavedCopy(keyClass ? keyClass[1] : null)) {
+    var full = e.name === 'QuotaExceededError';
+    if (full && kind === 'background') _preloadFull = true;
+    else if (full && /^gb-/.test(key) && _evictOldestSavedCopy(keyClass ? keyClass[1] : null)) {
       try {
         localStorage.setItem(key, value);
         _storageSaved(key);
@@ -5033,9 +5036,8 @@ function _safeLSSet(key, value) {
     console.warn('localStorage write failed (' + key + '):', e);
     if (key.indexOf('gb-scores-') === 0) _scoresApart[key] = true;
     _copyKeyUnsaved(key);
-    // Every quota failure counts until that key saves again; the sync dot
-    // says so (getSaveProblem).
-    if (e.name === 'QuotaExceededError' && !_storageFullKeys.has(key)) {
+    // Every other quota failure counts until that key saves again (getSaveProblem, the sync dot).
+    if (full && !kind && !_storageFullKeys.has(key)) {
       _storageFullKeys.add(key);
       _saveProblemChanged();
     }

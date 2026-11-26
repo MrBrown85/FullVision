@@ -42,7 +42,7 @@ async function open(page, { extra = 0 } = {}) {
 test('the card: the strip, the newest three read only, View All', async ({ page }) => {
   await open(page);
   const card = page.locator('.qn-obs');
-  await expect(card.locator('.qn-card-title')).toHaveText('Observations');
+  await expect(card.locator('.qn-box-name')).toHaveText('Observations');
   await expect(card.locator('.qno-seg-word')).toHaveText(['Strength', 'Growth', 'Concern', 'Note', 'All']);
   await expect(card.locator('.qno-seg-n')).toHaveText(['4', '0', '1', '1', '6']);
   await expect(card.locator('.obs-card')).toHaveCount(3);

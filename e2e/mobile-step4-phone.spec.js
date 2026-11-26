@@ -413,13 +413,33 @@ test('student card says when more rows are below', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 560 }); // so the card's list runs past its bottom
   await openPhone(page);
   const box = page.locator('.m-card-stack-item[data-depth="0"] .m-sc-scroll');
+  const list = page.locator('.m-card-stack-item[data-depth="0"] .m-sc-list');
   await expect(box).toHaveClass(/m-more-below/);
-  const cue = await box.evaluate(el => getComputedStyle(el, '::after').content);
+  await expect(list).toHaveClass(/m-more-below/);
+  const cue = await list.evaluate(el => getComputedStyle(el, '::after').content);
   expect(cue).toContain('More Below');
+  /* The cue sits on the list's foot, and stays there when the card changes height: it was
+     sticky inside the scrolling list, and on an iPhone it stayed a row too high until a
+     swipe (Nov 25, 2026). Now it is pinned to the box around the list, which doesn't scroll. */
+  const foot = () =>
+    list.evaluate(el => {
+      const after = getComputedStyle(el, '::after');
+      return {
+        position: after.position,
+        bottom: after.bottom,
+        gap: Math.round(
+          el.getBoundingClientRect().bottom - el.querySelector('.m-sc-scroll').getBoundingClientRect().bottom,
+        ),
+      };
+    });
+  expect(await foot()).toEqual({ position: 'absolute', bottom: '0px', gap: 0 });
+  await page.setViewportSize({ width: 375, height: 620 });
+  expect(await foot()).toEqual({ position: 'absolute', bottom: '0px', gap: 0 });
   await box.evaluate(el => {
     el.scrollTop = el.scrollHeight;
   });
   await expect(box).not.toHaveClass(/m-more-below/);
+  await expect(list).not.toHaveClass(/m-more-below/);
 });
 
 // Group 3 #86: titles and chips are whole on a phone: a long assessment
