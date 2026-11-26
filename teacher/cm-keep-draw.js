@@ -42,24 +42,30 @@ window.CmKeepDraw = (function () {
     }
   }
 
+  /** Whether the teacher's typing in a box stays: it has the focus, and the
+   * page still holds the value the typing began from.
+   * @param {HTMLInputElement | HTMLTextAreaElement} box @param {string} want */
+  function _typing(box, want) {
+    return box === document.activeElement && CmKeepMenu.began(box) === want;
+  }
+
   /** The typed value and the checked state, which the attributes stop
    * carrying once the teacher has touched a control.
-   * @param {Element} old @param {Element} next @param {string | null} before what the old markup held */
-  function _controls(old, next, before) {
-    var typing = old === document.activeElement;
+   * @param {Element} old @param {Element} next */
+  function _controls(old, next) {
     if (old.tagName === 'INPUT') {
       var inp = /** @type {HTMLInputElement} */ (old);
       var want = next.getAttribute('value') || '';
       if (inp.type === 'checkbox' || inp.type === 'radio') {
         var on = next.hasAttribute('checked');
         if (inp.checked !== on) inp.checked = on;
-      } else if (!(typing && before === next.getAttribute('value')) && inp.value !== want) {
+      } else if (inp.value !== want && !_typing(inp, want)) {
         inp.value = want;
       }
     } else if (old.tagName === 'TEXTAREA') {
       var ta = /** @type {HTMLTextAreaElement} */ (old);
       var text = next.textContent || '';
-      if (!(typing && before === text) && ta.value !== text) ta.value = text;
+      if (ta.value !== text && !_typing(ta, text)) ta.value = text;
       ta.defaultValue = text;
     } else if (old.tagName === 'SELECT') {
       var sel = /** @type {HTMLSelectElement} */ (old);
@@ -70,13 +76,9 @@ window.CmKeepDraw = (function () {
 
   /** @param {Element} old @param {Element} next @param {CmFresh} fresh */
   function _element(old, next, fresh) {
-    /** @type {string | null} */
-    var before = null;
-    if (old.tagName === 'TEXTAREA') before = /** @type {HTMLTextAreaElement} */ (old).defaultValue;
-    else if (old.tagName === 'INPUT') before = old.getAttribute('value');
     _attrs(old, next);
     if (old.tagName !== 'TEXTAREA') _children(old, next, fresh);
-    _controls(old, next, before);
+    _controls(old, next);
   }
 
   /** @param {Element} old @param {Element} next @param {CmFresh} fresh */

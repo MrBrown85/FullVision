@@ -221,5 +221,5 @@ window.CmKeepMenu = (function () {
     if (m.focus) _focusAgain(m.focus);
   }
 
-  return { mark: mark, restore: restore };
+  return { mark: mark, restore: restore, began: _began };
 })();
