@@ -48,6 +48,9 @@ function _rubricCriteriaPayload(rubric) {
     if (levelValues[1] != null || levelValues['1'] != null)
       payload.level1Value = Number(levelValues[1] != null ? levelValues[1] : levelValues['1']);
     if (crit && _isUuid(crit.id)) payload.id = crit.id;
+    // The comment bank (docs/plans/comment-bank-plan.md): sent only once the
+    // database has the column.
+    if (_commentBankOn()) payload.comments = _criterionCommentsOf(crit);
     // Advanced Rubrics: the checkboxes in each level cell, ordered within
     // their level. A Standard rubric sends an empty list, which clears any
     // checkboxes it had.
@@ -66,6 +69,38 @@ function _rubricCriteriaPayload(rubric) {
       });
     return payload;
   });
+}
+/* The Comment Bank is live for this build (shared/build-flags.js). */
+function _commentBankOn() {
+  return typeof BuildFlags !== 'undefined' && BuildFlags.on('commentBank');
+}
+/* A criterion's banked comments as {level, text}, bad rows dropped. */
+function _criterionCommentsOf(crit) {
+  return ((crit && crit.comments) || [])
+    .filter(function (c) {
+      return c && Number(c.level) >= 1 && typeof c.text === 'string' && c.text !== '';
+    })
+    .map(function (c) {
+      return { level: Number(c.level), text: c.text };
+    });
+}
+/* A rubric's overall comments, empty ones dropped. */
+function _overallCommentsOf(rubric) {
+  return ((rubric && rubric.overallComments) || []).filter(function (t) {
+    return typeof t === 'string' && t !== '';
+  });
+}
+/* A comments column from the server (jsonb) as the list the client keeps. */
+function _commentsFromRow(value) {
+  return Array.isArray(value)
+    ? value
+        .filter(function (c) {
+          return c && Number(c.level) >= 1 && typeof c.text === 'string';
+        })
+        .map(function (c) {
+          return { level: Number(c.level), text: c.text };
+        })
+    : [];
 }
 /* 'advanced' or 'single_point' when the rubric says so; anything else, a
    missing field included, is a Standard rubric. */
@@ -91,7 +126,9 @@ async function _loadCanonicalRubrics(cid) {
   if (!sb || !_isUuid(cid) || typeof sb.from !== 'function') return [];
   if (_signInWait) await _signInWait; // not read before start-up's re-check has passed
 
-  var rubricsQuery = sb.from('rubric').select('id,name,created_at,copy_group,style,scale');
+  var rubricsQuery = sb
+    .from('rubric')
+    .select('id,name,created_at,copy_group,style,scale' + (_commentBankOn() ? ',overall_comments' : ''));
   if (typeof rubricsQuery.eq === 'function') rubricsQuery = rubricsQuery.eq('course_id', cid);
   var rubricsRes = await rubricsQuery;
   if (rubricsRes.error) throw rubricsRes.error;
@@ -110,7 +147,8 @@ async function _loadCanonicalRubrics(cid) {
     .from('criterion')
     .select(
       'id,rubric_id,name,level_6_descriptor,level_5_descriptor,level_4_descriptor,level_3_descriptor,level_2_descriptor,level_1_descriptor,' +
-        'level_4_value,level_3_value,level_2_value,level_1_value,weight,display_order',
+        'level_4_value,level_3_value,level_2_value,level_1_value,weight,display_order' +
+        (_commentBankOn() ? ',comments' : ''),
     );
   if (typeof criteriaQuery.in === 'function') criteriaQuery = criteriaQuery.in('rubric_id', rubricIds);
   var criteriaRes = await criteriaQuery;
@@ -240,6 +278,7 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       displayOrder: Number(row.display_order || 0),
       levelValues: Object.keys(levelValues).length ? levelValues : null,
       checks: checksByCriterion[row.id] || [],
+      comments: _commentsFromRow(row.comments),
     });
   });
 
@@ -251,6 +290,11 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       style: rubricStyle(row),
       tagIds: (tagsByRubric[row.id] || []).slice(),
       criteria: criteriaByRubric[row.id] || [],
+      overallComments: Array.isArray(row.overall_comments)
+        ? row.overall_comments.filter(function (t) {
+            return typeof t === 'string';
+          })
+        : [],
     };
     if (row.copy_group) rubric.copyGroup = row.copy_group;
     if (Array.isArray(row.scale) && row.scale.length >= 2) rubric.scale = row.scale;
@@ -306,6 +350,7 @@ function _rubricSignature(rubric) {
     rubricStyle(rubric),
     _rubricWholeTagIds(rubric),
     _rubricScale(rubric),
+    _commentBankOn() ? _overallCommentsOf(rubric) : null,
   ]);
 }
 /* The competencies a whole rubric scores, as saved: server ids only. */
@@ -316,7 +361,7 @@ function _rubricWholeTagIds(rubric) {
 function _rubricsContentSignature(rubrics) {
   return JSON.stringify(
     (rubrics || []).map(function (rubric) {
-      return [
+      var parts = [
         _rubricName(rubric),
         _rubricCriteriaPayload(rubric).map(function (c) {
           var copy = Object.assign({}, c);
@@ -324,6 +369,8 @@ function _rubricsContentSignature(rubrics) {
           return copy;
         }),
       ];
+      if (_commentBankOn()) parts.push(_overallCommentsOf(rubric));
+      return parts;
     }),
   );
 }
@@ -397,6 +444,8 @@ function _persistRubricsToCanonical(cid, prev, arr) {
               copyGroup: rubric.copyGroup || null,
               // null when this copy never loaded them: the server keeps its own.
               linkedTagIds: rubric && Array.isArray(rubric.tagIds) ? _rubricWholeTagIds(rubric) : null,
+              // Only once the database takes it (the Comment Bank switch).
+              overallComments: _commentBankOn() ? _overallCommentsOf(rubric) : undefined,
             },
             { entryId: rec ? rec.entryId : undefined },
           ).then(function (res) {

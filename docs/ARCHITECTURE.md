@@ -128,6 +128,7 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 45. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
 46. `shared/rubric-draft.js`
 47. `shared/rubric-checks.js`
+48. `shared/rubric-comments.js` (`RubricComments`, the Comment Bank per rubric: pure helpers and the two Add to Bank writes)
 
 The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `shared/student-voice.js` and before `shared/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`. It also loads `shared/data-bulletins-queue.js` after the Bulletins files (the phone's Bulletins tab, slice B1f: a post with a photo waits in the photo queue).
 

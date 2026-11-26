@@ -2,8 +2,9 @@
  * The student list and the Help panel slide (by transform) when their buttons
  * are pressed, and the page beside them takes its new width at once, as the
  * slide starts. They end fully open or fully closed, even when pressed again
- * mid-slide. With reduced motion there is no
- * slide: the change is complete at once.
+ * mid-slide. The top tabs' lit pill glides from the page left to the page
+ * opened. With reduced motion there is no slide or glide: the change is
+ * complete at once.
  */
 import { test, expect } from '@playwright/test';
 
@@ -115,6 +116,100 @@ test.describe('with motion', () => {
     await page.click('[data-action="toggleHelp"]');
     await expect(page.locator('#help-panel')).toHaveCount(0);
   });
+
+  test('the lit tab glides from the page left to the page opened', async ({ page }) => {
+    await openDemo(page);
+    const left = sel => page.evaluate(q => document.querySelector(q).getBoundingClientRect().left, sel);
+    // Every frame from a click: where the gliding pill is, the lit tab's
+    // name, and the colour of the lit tab's own pill.
+    const watch = () =>
+      page.evaluate(
+        () =>
+          new Promise(resolve => {
+            const out = [];
+            const start = performance.now();
+            const tick = () => {
+              const glide = document.querySelector('.tb-seg .seg-glide');
+              const on = document.querySelector('.tb-seg-active');
+              out.push([
+                glide ? glide.getBoundingClientRect().left : null,
+                on.textContent,
+                getComputedStyle(on).backgroundColor,
+              ]);
+              if (performance.now() - start < 800) requestAnimationFrame(tick);
+              else resolve(out);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
+    const thumb = await page.evaluate(() => getComputedStyle(document.querySelector('.tb-seg-active')).backgroundColor);
+    // Once the glide's pill is gone the tab's own pill is there in full: no
+    // frame with neither, and no fade back in.
+    const landed = (seen, name) => {
+      const after = seen.slice(seen.findIndex(([x]) => x !== null)).filter(([x]) => x === null);
+      expect(after.length).toBeGreaterThan(0);
+      expect(after.every(([, lit, bg]) => lit === name && bg === thumb)).toBe(true);
+    };
+
+    // Assignments to Dashboard: some frame has the pill part-way there.
+    const from = await left('.tb-seg-active');
+    const to = await left('.tb-seg-link[data-href="/dashboard"]');
+    let frames = watch();
+    await page.click('.tb-seg-link[data-href="/dashboard"]');
+    let seen = await frames;
+    expect(seen.some(([x]) => x !== null && x < from - 5 && x > to + 5)).toBe(true);
+    landed(seen, 'Dashboard');
+
+    // Reporting loads its scripts on the first visit and draws the tabs
+    // twice; the glide still runs and lands.
+    frames = watch();
+    await page.click('.tb-seg-link[data-href="/reports"]');
+    seen = await frames;
+    expect(seen.some(([x]) => x !== null)).toBe(true);
+    landed(seen, 'Reporting');
+    await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0);
+    await expect(page.locator('.tb-seg')).not.toHaveClass(/seg-gliding/);
+
+    // The same tab again (a link inside the page) moves nothing.
+    await page.evaluate(() => window.Router.navigate('/reports'));
+    await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0);
+  });
+
+  /* On a slow computer the Dashboard's draw holds the glide's start back by
+     more than its safety timer, which ended the glide before it moved: the
+     pill jumped, and this file's test above failed on GitHub's runners
+     (Nov 25, 2026). The timer now counts from the glide's start. */
+  test('on a slow computer the lit tab still glides all the way', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'slows the CPU through Chrome DevTools');
+    await openDemo(page);
+    // Each glide's pill, and whether its glide had run to the end when the pill was taken away.
+    await page.evaluate(() => {
+      window.__glides = [];
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (frames, opts) {
+        const anim = animate.call(this, frames, opts);
+        if (this.classList.contains('seg-glide')) window.__glides.push({ el: this, anim, endedAs: null });
+        return anim;
+      };
+      new MutationObserver(list =>
+        list.forEach(m =>
+          m.removedNodes.forEach(n => {
+            const g = window.__glides.find(x => x.el === n || (n.contains && n.contains(x.el)));
+            if (g && g.endedAs === null) g.endedAs = g.anim.playState;
+          }),
+        ),
+      ).observe(document.body, { childList: true, subtree: true });
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 12 });
+    await page.click('.tb-seg-link[data-href="/dashboard"]');
+    await expect(page.locator('.tb-seg-active')).toHaveText('Dashboard');
+    await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0, { timeout: 15000 });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    const ended = await page.evaluate(() => window.__glides.map(g => g.endedAs));
+    expect(ended.length).toBeGreaterThan(0);
+    expect(ended).toEqual(ended.map(() => 'finished'));
+  });
 });
 
 test.describe('with reduced motion', () => {
@@ -131,6 +226,13 @@ test.describe('with reduced motion', () => {
     expect(await helpWidth(page)).toBe(400);
     await page.click('[data-action="toggleHelp"]');
     await expect(page.locator('#help-panel')).toHaveCount(0);
+  });
+
+  test('the lit tab changes at once', async ({ page }) => {
+    await openDemo(page);
+    await page.click('.tb-seg-link[data-href="/reports"]');
+    await expect(page.locator('.tb-seg-active')).toHaveText('Reporting');
+    await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0);
   });
 });
 

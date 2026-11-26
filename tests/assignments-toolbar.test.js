@@ -55,6 +55,17 @@ const moreItems = () =>
 const newItems = () =>
   Array.from(document.querySelectorAll('.atb-new .assess-menu-item')).map(b => b.textContent.trim());
 const chips = () => Array.from(document.querySelectorAll('.atb-chip')).map(c => c.textContent.trim());
+// A menu's items that do not begin with their icon (a card's ⋯ menu has one before each).
+const iconless = sel =>
+  Array.from(document.querySelectorAll(sel + ' .assess-menu-item'))
+    .filter(
+      b =>
+        !(
+          b.firstElementChild?.tagName.toLowerCase() === 'svg' &&
+          b.firstElementChild.getAttribute('aria-hidden') === 'true'
+        ),
+    )
+    .map(b => b.textContent.trim());
 const cardIds = () => Array.from(document.querySelectorAll('#main .assess-card')).map(c => c.id.slice(3));
 const settled = () => new Promise(r => setTimeout(r, 10));
 
@@ -187,6 +198,23 @@ describe('the ⋯ menu', () => {
     expect(document.querySelector('.atb-end > [data-alv-view="cards"]')).toBeNull();
   });
 
+  it('has an icon before every item, Expand All and Collapse All too when they come back', async () => {
+    openAssignments(() => seed(), CID);
+    await settled();
+    expect(iconless('.atb-more-wrap')).toEqual([]);
+    click(document.querySelector('#ac-' + A1 + ' .assess-header'));
+    click(document.querySelector('.atb-more-wrap [data-action="expandAllAssess"]'));
+    click(document.querySelector('.atb-more-wrap [data-action="collapseAllAssess"]'));
+    expect(moreItems()).toEqual(['Expand All', 'Bulk Edit', 'Rubrics']);
+    expect(iconless('.atb-more-wrap')).toEqual([]);
+    click(document.querySelector('#ac-' + A1 + ' .assess-header'));
+    expect(moreItems()).toEqual(['Expand All', 'Collapse All', 'Bulk Edit', 'Rubrics']);
+    expect(iconless('.atb-more-wrap')).toEqual([]);
+    click(document.querySelector('.atb-more-wrap [data-alv-view="list"]'));
+    expect(moreItems()).toEqual(['Rubrics']);
+    expect(iconless('.atb-more-wrap')).toEqual([]);
+  });
+
   it('is a menu of the page’s own kind: .assess-menu with .assess-menu-item, closed to begin with', async () => {
     openAssignments(() => seed(), CID);
     await settled();
@@ -203,6 +231,7 @@ describe('the ▾ menu', () => {
     openAssignments(() => seed({ student_page_enabled: true }), CID);
     await settled();
     expect(newItems()[0]).toBe('New Quiz');
+    expect(iconless('.atb-new')).toEqual([]);
     expect(document.querySelector('[data-atb="new"]').getAttribute('aria-label')).toBe('More Ways to Add');
     closePages();
     clearClass(CID);

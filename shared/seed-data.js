@@ -1356,11 +1356,24 @@ function seedIfNeeded() {
         name: 'Lab Investigation Rubric',
         // An Advanced Rubric: a checklist inside each level (the checks on each criterion below).
         style: 'advanced',
+        overallComments: [
+          'You planned a fair test and recorded what happened. Next, explain your result using the science words from class.',
+          '[Name], your lab was complete and careful. Choose one change to test next.',
+        ],
         criteria: [
           {
             id: 'crit_sci8_lab_inquiry',
             name: 'Scientific Inquiry',
             tagIds: ['QAP', 'PI'],
+            comments: [
+              {
+                level: 2,
+                text: 'You followed the steps. Next time, name the one variable you are changing before you start.',
+              },
+              { level: 3, text: 'Your question was testable and you kept the other variables the same.' },
+              { level: 3, text: '[Name], your safety steps were complete and you followed them without reminders.' },
+              { level: 4, text: 'You tested more than one variable and explained why your design was fair.' },
+            ],
             levels: {
               4: 'Independently designs controlled experiments with multiple variables, demonstrating sophisticated understanding of scientific method.',
               3: 'Plans and conducts fair tests with identified variables and appropriate safety procedures.',
@@ -1387,6 +1400,11 @@ function seedIfNeeded() {
             id: 'crit_sci8_lab_data',
             name: 'Data & Analysis',
             tagIds: ['IP', 'EM'],
+            comments: [
+              { level: 2, text: 'Your table is clear. Describe the main pattern in a sentence.' },
+              { level: 3, text: 'Your data has units and you described the main pattern. Name one source of error.' },
+              { level: 4, text: 'You explained why one result surprised you and how you would reduce the error.' },
+            ],
             levels: {
               4: 'Collects precise data, identifies subtle patterns, and provides insightful error analysis that extends beyond expected conclusions.',
               3: 'Collects accurate data, identifies major patterns, and provides reasonable error analysis.',
@@ -1408,6 +1426,10 @@ function seedIfNeeded() {
             id: 'crit_sci8_lab_comm',
             name: 'Communication',
             tagIds: ['CA', 'SC'],
+            comments: [
+              { level: 2, text: 'State your result in one full sentence, then use the science words from class.' },
+              { level: 3, text: 'You stated your result clearly and used the science words correctly.' },
+            ],
             levels: {
               4: 'Presents findings with clarity and precision, using sophisticated scientific vocabulary and making meaningful real-world connections.',
               3: 'Presents findings clearly using appropriate scientific vocabulary and connects results to relevant contexts.',

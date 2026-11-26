@@ -130,13 +130,16 @@
   }
 
   /* ── The two menus ─────────────────────────────────────────── */
-  /** @param {string} action @param {string} label @param {string} [attrs] */
-  function _item(action, label, attrs) {
+  // Each item has its icon before the label, as a card's ⋯ menu does.
+  /** @param {string} action @param {string} icon @param {string} label @param {string} [attrs] */
+  function _item(action, icon, label, attrs) {
     return (
       '<button type="button" role="menuitem" class="assess-menu-item" ' +
       (action ? 'data-action="' + action + '"' : '') +
       (attrs || '') +
-      '><span>' +
+      '>' +
+      icon +
+      '<span>' +
       label +
       '</span></button>'
     );
@@ -146,12 +149,12 @@
   // html-safe: fixed words
   /** @param {State} s */
   function moreItemsHtml(s) {
-    var rubrics = _item('openRubricBank', 'Rubrics');
+    var rubrics = _item('openRubricBank', LINE_ICONS.rubric, 'Rubrics');
     if (s.bulk) return rubrics;
     return (
-      (s.cards && !s.allOpen ? _item('expandAllAssess', 'Expand All') : '') +
-      (s.cards && !s.noneOpen ? _item('collapseAllAssess', 'Collapse All') : '') +
-      _item('', 'Bulk Edit', ' data-alv-view="list"') +
+      (s.cards && !s.allOpen ? _item('expandAllAssess', LINE_ICONS.expand, 'Expand All') : '') +
+      (s.cards && !s.noneOpen ? _item('collapseAllAssess', LINE_ICONS.collapse, 'Collapse All') : '') +
+      _item('', LINE_ICONS.checklist, 'Bulk Edit', ' data-alv-view="list"') +
       '<span class="assess-menu-sep" role="separator"></span>' +
       rubrics
     );
@@ -160,7 +163,8 @@
   /** @param {State} s */
   function newItemsHtml(s) {
     return (
-      (s.quiz ? _item('newQuiz', 'New Quiz') : '') + (s.copy ? _item('addFromClass', 'Add From Another Class') : '')
+      (s.quiz ? _item('newQuiz', LINE_ICONS.quiz, 'New Quiz') : '') +
+      (s.copy ? _item('addFromClass', LINE_ICONS.bringIn, 'Add From Another Class') : '')
     );
   }
 
@@ -201,11 +205,15 @@
     if (expand && !wantExpand) expand.remove();
     if (collapse && !wantCollapse) collapse.remove();
     // html-safe: built by _item
-    if (!expand && wantExpand) menu.insertAdjacentHTML('afterbegin', _item('expandAllAssess', 'Expand All'));
+    if (!expand && wantExpand)
+      menu.insertAdjacentHTML('afterbegin', _item('expandAllAssess', LINE_ICONS.expand, 'Expand All'));
     if (!collapse && wantCollapse) {
       var after = menu.querySelector('[data-action="expandAllAssess"]');
       // html-safe: built by _item
-      (after || menu).insertAdjacentHTML(after ? 'afterend' : 'afterbegin', _item('collapseAllAssess', 'Collapse All'));
+      (after || menu).insertAdjacentHTML(
+        after ? 'afterend' : 'afterbegin',
+        _item('collapseAllAssess', LINE_ICONS.collapse, 'Collapse All'),
+      );
     }
   }
 

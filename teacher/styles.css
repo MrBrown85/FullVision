@@ -1403,10 +1403,9 @@ body.offline-active #app-dock {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition:
-    background-color var(--duration-micro) ease,
-    color var(--duration-micro) ease,
-    box-shadow var(--duration-micro) ease;
+  /* Only the words' colour eases. The pill never fades: it glides (ui.js,
+     _segGlide) or changes at once, and a fade made it blink where it landed. */
+  transition: color var(--duration-micro) ease;
 }
 .seg-btn:hover {
   color: var(--text);
@@ -3753,8 +3752,9 @@ body.offline-active #app-dock {
       transform var(--motion-fast) var(--motion-ease);
   }
   /* A segmented control's chosen pill glides to its new place (ui.js,
-     segSelect). The real pill hides for the glide, then is back. */
-  .seg.seg-gliding:not(.tb-seg) {
+     segSelect; the top tabs from router.js). The real pill hides for the
+     glide, then is back. */
+  .seg.seg-gliding {
     position: relative;
   }
   .seg.seg-gliding > .seg-btn {
@@ -3770,6 +3770,7 @@ body.offline-active #app-dock {
     border-radius: 6px;
     box-shadow: var(--shadow-sm);
     pointer-events: none;
+    transform-origin: 0 50%;
   }
   /* Class picker: gone while the list slides, then fades in. */
   .page-layout.sidebar-sliding .assess-course-select,

@@ -1830,6 +1830,8 @@ describe('data-idempotency-keys', () => {
       // and submit_support_report from migrations/20261105_support_report.sql.
       // Keep in lockstep with the database.
       expect(Object.keys(FV_IDEMPOTENT_RPCS).sort()).toEqual([
+        'add_criterion_comment',
+        'add_rubric_overall_comment',
         'create_assessment',
         'create_course',
         'create_custom_tag',

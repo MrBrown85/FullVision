@@ -1010,6 +1010,27 @@ const LINE_ICONS = {
   link:
     _LINE_SVG +
     '<path d="M6.8 9.2a2.8 2.8 0 0 0 4 0l2.4-2.4a2.8 2.8 0 0 0-4-4l-.9.9"/><path d="M9.2 6.8a2.8 2.8 0 0 0-4 0l-2.4 2.4a2.8 2.8 0 0 0 4 4l.9-.9"/></svg>',
+  // The toolbars' ⋯ menus (Nov 25): one icon before each item, as a card's ⋯ has.
+  expand: _LINE_SVG + '<path d="M5 6l3-3 3 3"/><path d="M5 10l3 3 3-3"/></svg>',
+  collapse: _LINE_SVG + '<path d="M5 2.5l3 3 3-3"/><path d="M5 13.5l3-3 3 3"/></svg>',
+  checklist:
+    _LINE_SVG +
+    '<path d="M1.5 4.5l1.5 1.5 2.5-3"/><path d="M1.5 11l1.5 1.5 2.5-3"/><path d="M8 4.5h6.5M8 11h6.5"/></svg>',
+  // The book the rubric badge on a card shows.
+  rubric:
+    _LINE_SVG + '<path d="M3 3.5A1.5 1.5 0 0 1 4.5 2H13v10.5H4.5A1.5 1.5 0 0 0 3 14z"/><path d="M3 14V3.5"/></svg>',
+  quiz:
+    _LINE_SVG +
+    '<circle cx="8" cy="8" r="6.5"/><path d="M6.1 6.2a2 2 0 0 1 3.8.8c0 1.3-1.9 1.6-1.9 2.8"/><path d="M8 11.9v.1"/></svg>',
+  bringIn:
+    _LINE_SVG +
+    '<path d="M9.5 2h3a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-3"/><path d="M2 8h8.5M7.5 5l3 3-3 3"/></svg>',
+  info: _LINE_SVG + '<circle cx="8" cy="8" r="6.5"/><path d="M8 7.3V11"/><path d="M8 4.9v.1"/></svg>',
+  download: _LINE_SVG + '<path d="M8 2v8M4.5 6.5L8 10l3.5-3.5"/><path d="M2 11v2.5h12V11"/></svg>',
+  export: _LINE_SVG + '<path d="M8 10V2M4.5 5.5L8 2l3.5 3.5"/><path d="M2 11v2.5h12V11"/></svg>',
+  archive:
+    _LINE_SVG +
+    '<rect x="1.5" y="2.5" width="13" height="3.5" rx="1"/><path d="M2.5 6v6.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6"/><path d="M6.5 9h3"/></svg>',
 };
 const TB_PAGES = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
@@ -1041,6 +1062,8 @@ const TB_PAGES = [
    (queued writes replayed on reconnect). */
 const FV_IDEMPOTENT_RPCS = {
   move_rubric_scores: true,
+  add_criterion_comment: true,
+  add_rubric_overall_comment: true,
   create_assessment: true,
   create_course: true,
   create_custom_tag: true,

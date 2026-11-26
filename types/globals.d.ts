@@ -456,3 +456,37 @@ interface Window {
   };
 }
 declare var PrintLegal: Window['PrintLegal'];
+
+// The Comment Bank per rubric (shared/rubric-comments.js).
+interface Window {
+  RubricComments: {
+    at(criterion: any, level: number): string[];
+    all(criterion: any): { level: number; text: string }[];
+    fill(text: string, firstName: string): string;
+    slot(text: string, firstName: string): string;
+    newPart(text: string, bankTexts: string[], firstName: string): string;
+    uses(cid: string, rubricId: string, criterion: any): Record<string, number>;
+    overallUses(cid: string, rubricId: string): Record<string, number>;
+    lastTime(cid: string, sid: string, aid: string, criterion: any): { text: string; title: string } | null;
+    addCriterionComment(cid: string, rubricId: string, criterionId: string, level: number, text: string): boolean;
+    addOverallComment(cid: string, rubricId: string, text: string): boolean;
+    MAX_TEXT: number;
+    MAX_COMMENTS: number;
+  };
+}
+
+// Comments in the rubric editor (teacher/rubric-comment-lines.js).
+interface Window {
+  RubricCommentLines: {
+    on(): boolean;
+    init(api: { render: (sel?: string | null) => void; get: () => any; courseId: () => string }): void;
+    tools(b: any, cid: string, i: number): string;
+    cell(b: any, cid: string, c: any, i: number, lv: number): string;
+    foot(b: any): string;
+    overallRow(b: any, cid: string, cols: number): string;
+    keep(a: Element | null): string | null;
+    size(trs: ArrayLike<Element>): void;
+    dropBlank(rubric: any): void;
+    off(): void;
+  };
+}

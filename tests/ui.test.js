@@ -42,7 +42,7 @@ describe('ui-account-menu', () => {
       var src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf8');
       var bar = readFileSync(resolve(root, 'teacher/assign-toolbar.js'), 'utf8');
       // Rubrics is the last item of the toolbar's ⋯ menu.
-      expect(bar).toContain("_item('openRubricBank', 'Rubrics')");
+      expect(bar).toContain("_item('openRubricBank', LINE_ICONS.rubric, 'Rubrics')");
       expect(src).not.toContain('>Advanced</button>');
       expect(src).not.toContain('tb-advanced-panel');
       expect(src).not.toContain('data-action="deleteAccount"');

@@ -15,10 +15,21 @@
    phoneLook (the phone's new look, docs/plans/phone-look-plan.md) is on
    since Nov 25 and nothing asks for it any more: the phone draws the new
    look and nothing else. The name stays for the same reason as the
-   others. */
+   others.
+
+   commentBank (the Comment Bank per rubric, docs/plans/comment-bank-plan.md)
+   is on since Nov 25 2026; the rubric editor and the grader still ask for
+   it. */
 (function () {
   /** @type {Record<string, boolean>} */
-  var DEFAULTS = { dashRow: true, bulletins: true, quizzes: true, inboxStacks: true, phoneLook: true };
+  var DEFAULTS = {
+    dashRow: true,
+    bulletins: true,
+    quizzes: true,
+    inboxStacks: true,
+    phoneLook: true,
+    commentBank: true,
+  };
 
   /** @param {string} name */
   function on(name) {

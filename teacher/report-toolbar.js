@@ -128,8 +128,8 @@
       DOTS_ICON +
       '</button>' +
       '<div class="assess-menu" role="menu" aria-label="More" hidden>' +
-      _item('tqEditStudent', 'Edit Student') +
-      _item('tqInfo', 'Where This Information Comes From') +
+      _item('tqEditStudent', LINE_ICONS.edit, 'Edit Student') +
+      _item('tqInfo', LINE_ICONS.info, 'Where This Information Comes From') +
       '</div></div>' +
       '<button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. ⌘ Return">' +
       APPROVE_WORDS +
@@ -156,13 +156,16 @@
       '</svg></button>'
     );
   }
-  // html-safe: fixed words
-  /** @param {string} action @param {string} label */
-  function _item(action, label) {
+  // Its icon, then its label, as a card's ⋯ menu has.
+  // html-safe: fixed words and icons
+  /** @param {string} action @param {string} icon @param {string} label */
+  function _item(action, icon, label) {
     return (
       '<button type="button" role="menuitem" class="assess-menu-item" data-action="' +
       action +
-      '"><span>' +
+      '">' +
+      icon +
+      '<span>' +
       label +
       '</span></button>'
     );

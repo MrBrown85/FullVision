@@ -1467,10 +1467,19 @@ a.dash-ins-name:hover {
     0 10px 28px rgba(0, 0, 0, 0.18);
 }
 .cm-std-menu.cm-class-actions-menu .cm-std-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.5;
   white-space: nowrap;
+}
+.cm-std-menu.cm-class-actions-menu .cm-std-menu-item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 .cm-std-menu-sep {
   display: block;

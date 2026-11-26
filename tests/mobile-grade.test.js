@@ -214,12 +214,14 @@ describe('MGrade.renderSwiper', () => {
     expect(html).not.toContain('data-action="m-grade-status"');
   });
 
-  it('shows a status that is set as one chip on the card', () => {
+  it('shows a status that is set as one chip on the card, which takes it off when tapped', () => {
     mockDataLayer({
       getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
     });
     const html = MGrade.renderSwiper(CID, 'a1');
-    expect(html).toContain('<span class="m-grade-chip m-grade-chip-ns">Missing</span>');
+    expect(html).toContain(
+      '<button type="button" class="m-grade-chip m-grade-chip-ns" data-action="m-grade-status" data-val="NS" data-sid="stu1" data-aid="a1" aria-label="Take Off Missing">Missing</button>',
+    );
     expect((html.match(/class="m-grade-chip /g) || []).length).toBe(1);
   });
 
@@ -747,12 +749,12 @@ describe('MGrade filter sheet', () => {
     MGrade.renderPicker(CID);
     MGrade.openFilterSheet(CID);
 
-    expect(capturedHtml).toContain('m-filter-sheet-title">Category');
-    expect(capturedHtml).toContain('m-filter-sheet-title">Date');
-    expect(capturedHtml).toContain('m-filter-sheet-title">Status');
+    expect(capturedHtml).toContain('aria-label="Category"');
+    expect(capturedHtml).toContain('aria-label="Date"');
+    expect(capturedHtml).toContain('aria-label="Status"');
     expect(capturedHtml).toContain('Labs'); // the one category chip
     expect(capturedHtml).toContain('No Category');
-    expect(capturedHtml).not.toContain('m-filter-sheet-title">Module'); // Module section hidden
+    expect(capturedHtml).not.toContain('aria-label="Module"'); // Module section hidden
     expect(capturedHtml).toContain('data-action="m-grade-filter-done"');
     expect(capturedHtml).toContain('data-action="m-grade-filter-clear"');
 
@@ -773,7 +775,7 @@ describe('MGrade filter sheet', () => {
     MGrade.renderPicker(CID);
     MGrade.openFilterSheet(CID);
 
-    expect(capturedHtml).toContain('m-filter-sheet-title">Module');
+    expect(capturedHtml).toContain('aria-label="Module"');
     expect(capturedHtml).toContain('Unit 1');
 
     window.MComponents.presentSheet = origPresent;

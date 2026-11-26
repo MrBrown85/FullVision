@@ -847,10 +847,10 @@ window.MGrade = (function () {
 
     /* ── Filter sheet ───────────────────────────────────────────── */
 
-    /* The filter that applies as it is tapped (S7-F1, the board "Grade
-       Tab, Filter That Applies As You Tap"), in every class: Status, Date,
-       Category and Module chips, "Showing 6 of 18", Clear All and Done.
-       Each tap changes the list under the sheet at once and is kept. */
+    /* The filter that applies as it is tapped (S7-F1): Status, Date,
+       Category and Module as short lists, a check on each row picked (not
+       outlined capsules: Colin, 2026-11-25), "Showing 6 of 18", Clear All
+       and Done. Each tap changes the list under the sheet at once. */
 
     // html-safe: labels go through MC.esc; values are ours or category ids through MC.esc
     function _renderLiveFilterSheet(cid) {
@@ -858,7 +858,7 @@ window.MGrade = (function () {
       var modules = typeof getModules === 'function' ? getModules(cid) : [];
       var chip = function (action, kind, value, label, on) {
         return (
-          '<button type="button" class="m-filter-pill' +
+          '<button type="button" class="m-filter-row' +
           (on ? ' m-filter-active' : '') +
           '" data-action="' +
           action +
@@ -868,9 +868,9 @@ window.MGrade = (function () {
           MC.esc(value) +
           '" aria-pressed="' +
           (on ? 'true' : 'false') +
-          '">' +
+          '"><span class="m-filter-row-label">' +
           MC.esc(label) +
-          '</button>'
+          '</span></button>'
         );
       };
       var one = function (kind, value, label) {
@@ -888,9 +888,11 @@ window.MGrade = (function () {
       };
       var section = function (title, chips) {
         return (
-          '<div class="m-filter-sheet-section"><div class="m-filter-sheet-title">' +
+          '<div class="m-filter-sheet-section" role="group" aria-label="' +
           title +
-          '</div><div class="m-filter-strip m-filter-strip-wrap">' +
+          '"><div class="m-filter-sheet-title" aria-hidden="true">' +
+          title +
+          '</div><div class="m-filter-list">' +
           chips +
           '</div></div>'
         );
@@ -930,12 +932,11 @@ window.MGrade = (function () {
       );
     }
 
-    // The live sheet's chips, drawn again from the filters as they are.
     function _syncLiveChips() {
-      document.querySelectorAll('#m-sheet-container .m-live-filter .m-filter-pill').forEach(function (btn) {
+      document.querySelectorAll('#m-sheet-container .m-live-filter .m-filter-row').forEach(function (btn) {
         var kind = btn.getAttribute('data-kind');
         var val = btn.getAttribute('data-val');
-        var on = kind === 'category' ? _filters.category.indexOf(val) >= 0 : _filters[kind] === val;
+        var on = Array.isArray(_filters[kind]) ? _filters[kind].indexOf(val) >= 0 : _filters[kind] === val;
         btn.classList.toggle('m-filter-active', on);
         btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
@@ -1142,11 +1143,9 @@ window.MGrade = (function () {
       });
     }
 
-    /* What is out of the ordinary on a card, as chips above the paper: IEP,
-       MOD or ELL; a status that is set (Late, Missing, Excused) and, on a
-       pair's or group's card, whose it is; Graded Separately. Nothing at
-       all when there is nothing to say. The chips are not controls: a status
-       is set from ⋯ (grade-look.js). */
+    /* What is out of the ordinary on a card, as chips above the paper: IEP, MOD or ELL; a
+       status (Late, Missing, Excused; set from ⋯, a tap on its chip takes it off) and, on a
+       pair's or group's card, whose it is; Graded Separately. Nothing when there is nothing to say. */
     // html-safe: names go through MC.esc; classes and labels are fixed words
     function _chipsHtml(cid, assessment, unit, allStatuses) {
       var members = unit.view ? unit.view.members : [unit.st.id];
@@ -1177,7 +1176,7 @@ window.MGrade = (function () {
         var who = unit.view && st ? (displayNameFirst(st) || displayName(st)) + ': ' : '';
         if (unit.view && isGradedSeparately(assessment, m)) return add('m-grade-chip', who + 'Graded Separately');
         var status = allStatuses[m + ':' + assessment.id] || null;
-        if (status) add('m-grade-chip m-grade-chip-' + status.toLowerCase(), who + _STATUS_WORDS[status]);
+        if (status) html += MGradeLook.statusChip(m, assessment.id, status, who + _STATUS_WORDS[status]);
       });
       if (unit.separateFrom) add('m-grade-chip', 'Graded Separately');
       return html ? '<div class="m-grade-chips">' + html + '</div>' : '';
@@ -3053,6 +3052,8 @@ window.MGrade = (function () {
       });
       if (groupGradingUnits(cid, a, [])) _redrawSwiper(cid, aid);
       _syncReturnBar();
+      // Undo is the same tap again: it sets back the status that was, or takes this one off.
+      MGradeLook.statusUndo(cid, sid, aid, current, newStatus, () => setStatus(cid, sid, aid, current || newStatus));
     }
 
     /* The entries an undo puts back. Missing or Excused work takes no score
