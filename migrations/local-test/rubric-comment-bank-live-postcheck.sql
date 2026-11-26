@@ -1,4 +1,4 @@
--- Read-only post-check, after the apply for migrations/2026112601_rubric_comment_bank.sql (2026-11-26).
+-- Read-only post-check, after the apply for migrations/2026112601_rubric_comment_bank.sql (2026-11-25).
 -- SELECTs only. Every row says ok. Run it with public on the search path, as Supabase's SQL tools do.
 with want(sig, after_md5) as (values
     -- FINGERPRINTS-BEGIN postcheck

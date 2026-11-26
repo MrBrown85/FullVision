@@ -1,4 +1,4 @@
--- Undo for migrations/2026112601_rubric_comment_bank.sql (2026-11-26).
+-- Undo for migrations/2026112601_rubric_comment_bank.sql (2026-11-25).
 --
 -- == Which lever: PART 0 first ==
 -- PART 0 deletes nothing. PART 1 deletes every banked comment, and refuses while one is kept.

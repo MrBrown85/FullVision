@@ -1,4 +1,4 @@
--- Read-only fingerprint check for migrations/2026112601_rubric_comment_bank.sql (2026-11-26). NOT RUN BY ITS AUTHOR.
+-- Read-only fingerprint check for migrations/2026112601_rubric_comment_bank.sql (2026-11-25). NOT RUN BY ITS AUTHOR.
 -- ONE select, catalog only (pg_proc and pg_get_functiondef; no row of any table is read). It returns ONLY the
 -- functions whose live definition differs from the one the file was built and tested against: no rows means
 -- every one matches, byte for byte. Run it with public on the search path (as Supabase's SQL editor does): an

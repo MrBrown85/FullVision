@@ -1,5 +1,87 @@
--- HEADER-BEGIN
--- HEADER-END
+-- Comment Bank per Rubric (2026-11-25). NOT APPLIED: waits for the owner's OK.
+-- A teacher keeps reusable feedback comments with a rubric: per criterion, at a level, and overall for the
+-- rubric. They are written in the rubric editor, or kept while grading with Add to Bank, and offered under the
+-- comment box while grading. Teacher-only: never printed, never sent to the student page. The plan is
+-- docs/plans/comment-bank-plan.md ("The shape", "Database").
+--
+-- == What it adds ==
+--   1. public.criterion.comments jsonb not null default '[]': [{level, text}], in the order shown.
+--      public.rubric.overall_comments jsonb not null default '[]': [text], in the order shown.
+--      Each with a check that it is a list (criterion_comments_is_list, rubric_overall_comments_is_list).
+--   2. public._rubric_comment_list(list, levels): the one rule for a list, used by every function below. A
+--      level is 1..4, or 1..6 on a rubric with its own levels (as a check's level is read); a text is trimmed
+--      of spaces, tabs and line breaks and must be 1 to 500 characters; a repeat of the same level and text
+--      is kept once, where it first came; at most 40. Anything else stops the call with 22023, nothing saved.
+--   3. public.add_criterion_comment(criterion, level, text, key) and public.add_rubric_overall_comment(rubric,
+--      text, key), for Add to Bank: they append one comment unless the same one is there, refuse past 40, and
+--      return the whole list. They run as the teacher, check the class is theirs (fv_owns_course), replay a
+--      used idempotency key (fv_idem_check / fv_idem_store), and move the class's sync cursor (the existing
+--      triggers on criterion and rubric) so another device reloads the class. A repeat changes nothing and
+--      does not move it.
+--
+-- == What it changes that exists ==
+--   upsert_rubric           gains p_overall_comments (last, default null): null keeps the rubric's overall
+--                           comments, a list replaces them. Each criterion in p_criteria may carry "comments":
+--                           no key (or null) keeps what is stored, a list replaces it; a new criterion with no
+--                           key gets []. The app already in teachers' browsers sends neither, so its saves keep
+--                           the bank. Made from the live nine-argument definition by ten exact edits (each found
+--                           once); the nine-argument one is dropped in the same transaction so PostgREST has one
+--                           function to call; calls of eight or nine arguments, named or not, still match.
+--   get_class_bundle        "comments" on each rubrics.criteria row, "overall_comments" on each rubrics.rubrics
+--                           row. Nothing else in the bundle changes.
+--   duplicate_course        copies both.
+--   import_json_restore     reads "comments" on each criteria row and "overall_comments" on each rubrics row of
+--                           the backup, by the same rule; missing (or not a list) means [].
+-- Each patched in place behind its live md5 (migrations/baseline), one exact edit at a time.
+-- Not changed: student_submit.page lists the criterion fields it sends, so neither column reaches a student
+-- (its md5 is checked; the harness reads a student's page for a class with a bank). get_assessment_detail, a
+-- teacher-only reader that sends whole rows, now also shows a rubric's bank to its own teacher.
+--
+-- == What it does to existing rows ==
+-- Nothing but the two new columns: every existing criterion and rubric reads [] (a constant default, stored
+-- once; no row is rewritten and no sync cursor moves). Live pre-check, read-only, on <date>: <n> criteria,
+-- <m> rubrics (local-test/rubric-comment-bank-live-precheck.sql, the rows "count: criteria" and
+-- "count: rubrics"; the query is select count(*) from public.criterion, and from public.rubric).
+--
+-- == What applying it accepts ==
+-- A browser still on the old app ignores the new keys in the bundle, and its rubric saves keep the bank. A
+-- rubric save from the new editor that carries a list replaces the criterion's list: an Add to Bank made on
+-- another device between that editor opening and its save is replaced too (the app's draft must carry it).
+-- A backup made before this file, restored over the same class, empties the bank of the rubrics it holds,
+-- as it puts back every other rubric field. A backup whose comments break the rule stops the restore.
+-- The undo's PART 0 puts saves back as before and stops Add to Bank, and keeps the bank; its full removal
+-- deletes the bank, and refuses while one comment is kept.
+--
+-- == The checks it makes first ==
+-- It stops with nothing changed unless: the server is PostgreSQL 17; the running role owns criterion and rubric;
+-- every function it relies on or patches is the one it was tested against (md5 of pg_get_functiondef, public on
+-- the search path), or, on a second run, as this file leaves it; the nine-argument upsert_rubric is as live
+-- has it or gone; the four new functions are absent or as this file makes them, and no other function has one
+-- of their names; criterion and rubric have the columns live has (or those and the new one). Its last step
+-- checks everything came out as written, grants included.
+--
+-- == What it does not depend on ==
+-- Collation, locale, time zone, search path and the applying role: comments are compared byte for byte (jsonb
+-- containment), the one ordered aggregate sorts under collate "C", the file sets its own search path and each
+-- function pins its own, the owner is checked and grants are read from proacl. Lengths count characters (the
+-- database is UTF-8). No backslash and no non-ASCII character is in the file.
+--
+-- == Locks ==
+-- criterion and rubric for a moment each (add column with a constant default, and a check that reads the
+-- table); it gives up after five seconds with nothing applied if a long transaction holds one: run it again.
+-- One transaction.
+--
+-- == How to apply ==
+-- Only on the owner's OK. Tested on a throwaway PostgreSQL 17, ICU en-US and C (local-test/README.md,
+-- "Comment Bank per Rubric").
+--   0. local-test/rubric-comment-bank-live-fingerprints.sql, read-only. Expected: no rows.
+--   1. local-test/rubric-comment-bank-live-precheck.sql, read-only. Expected: only the two count rows.
+--   2. This whole file as one migration named rubric_comment_bank.
+--   3. local-test/rubric-comment-bank-live-postcheck.sql. Every row ok.
+--   4. docs/schema.generated.sql and migrations/baseline/ are refreshed from live (docs/database-rebuild.md),
+--      then types/database.d.ts.
+-- Undo: local-test/rubric-comment-bank-undo.sql. PART 0 alone is the stop that deletes nothing; the whole file
+-- is the full removal.
 begin;
 
 set local lock_timeout = '5s';

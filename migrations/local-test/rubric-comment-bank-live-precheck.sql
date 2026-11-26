@@ -1,4 +1,4 @@
--- Read-only pre-check, before the apply for migrations/2026112601_rubric_comment_bank.sql (2026-11-26).
+-- Read-only pre-check, before the apply for migrations/2026112601_rubric_comment_bank.sql (2026-11-25).
 -- SELECTs only. It returns the rows that differ from what the file was written and tested against, and two
 -- count rows: "count: criteria" and "count: rubrics", the rows that get the new empty column (every one of
 -- them reads [] after the apply; none is otherwise touched). Only the two count rows means ready. Run it with
