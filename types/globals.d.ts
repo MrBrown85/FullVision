@@ -501,3 +501,9 @@ interface Window {
 }
 declare var Router: any;
 declare var CmRosterFile: any;
+declare var closeColorPop: any;
+declare var CmBlockPicker: any;
+declare var renderBreadcrumb: any;
+declare var CmKeepMenu: any;
+declare var _avatarColor: any;
+declare var CmQuestionnaires: any;
