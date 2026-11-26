@@ -5,9 +5,11 @@
  * the column's (Colin, Nov 25: "when I left-click a student in this list,
  * give options like 'set all to missing, set all to excused'").
  *
- * Mark Missing, Excuse and Clear act on the student's row: only cells with
- * no score, only work due by today, each line with its count, and one use
- * undone by its toast, Cmd+Z or Undo Last Marking. The lists' keys and
+ * Mark Missing, Excuse and Clear act on the student's row: a blank cell is
+ * one with no grade, whatever its date (Colin, Nov 25: "blank means no
+ * grade"; a first rule of "due by today" passed over nearly every cell in a
+ * class whose pieces were all due at the end of the term). Each line has its
+ * count, and one use is undone by its toast, Cmd+Z or Undo Last Marking. The lists' keys and
  * placing are in e2e/gradebook-student-menu.spec.js, with the click itself:
  * linkedom has no capture phase, so the click that opens a menu here also
  * reaches the menu's own click-away and closes it. These tests open the menu
@@ -18,8 +20,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mount, unmount, click, key, fire } from './helpers/gradebook-dom.js';
 
 const CID = 'cSM';
-// Days counted from now: "due by today" must hold whatever day the test runs.
 const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+// Every piece due at the end of the term, as in the class where the first rule failed.
 const quiz = (id, title, date, categoryId) => ({
   id,
   title,
@@ -27,11 +29,12 @@ const quiz = (id, title, date, categoryId) => ({
   maxPoints: 10,
   tagIds: ['T1'],
   date,
+  dueDate: day(120),
   categoryId,
 });
 
-/* Ava: Quiz One scored, Essay and Quiz Two blank and past due, Lab Missing,
-   Poster Excused, Project not due yet. */
+/* Ava: Quiz One scored; Essay, Quiz Two and Project blank (Project dated a
+   month from now); Lab Missing; Poster Excused. */
 function seed() {
   COURSES[CID] = { id: CID, name: 'History 12', gradingSystem: 'letter' };
   _cache.students[CID] = [
@@ -137,25 +140,35 @@ describe('a click on a student’s name', () => {
 });
 
 describe('the lists say how many cells each line changes', () => {
-  it('Mark Missing: the blank cells due by today, then a category and a month at a time', () => {
+  it('Mark Missing: every cell with no grade, whatever its dates, then a category and a month at a time', () => {
     mount(seed, { course: CID });
     open();
     const got = lines('missing');
-    // Essay and Quiz Two; not the scored quiz, the Missing lab, the Excused poster or the project not yet due.
-    expect(got.slice(0, 3)).toEqual(['All Blank Cells 2', 'In Tests 1', 'In Projects 1']);
-    expect(got.slice(3).every(l => /^Due in [A-Z][a-z]+ 1$/.test(l))).toBe(true);
-    expect(got).toHaveLength(5);
+    // Essay, Quiz Two and Project; not the scored quiz, the Missing lab or the Excused poster.
+    expect(got.slice(0, 3)).toEqual(['All Blank Cells 3', 'In Tests 1', 'In Projects 2']);
+    // A line a month, by the date under each column's title.
+    const months = got.slice(3);
+    expect(months.every(l => /^From [A-Z][a-z]+ [123]$/.test(l))).toBe(true);
+    expect(months.reduce((n, l) => n + Number(l.split(' ').pop()), 0)).toBe(3);
+  });
+
+  it('a cell with something written on it and no grade is not blank', () => {
+    mount(seed, { course: CID });
+    _cache.scores[CID].s1.push({ assessmentId: 'e1', tagId: 'T1', score: 0, date: day(-65), note: 'See me.' });
+    PageGradebook.render();
+    open();
+    expect(lines('missing')[0]).toBe('All Blank Cells 2');
   });
 
   it('Excuse: blank, Missing, or both', () => {
     mount(seed, { course: CID });
     open();
     expect(lines('excuse').slice(0, 5)).toEqual([
-      'Blank Cells 2',
+      'Blank Cells 3',
       'Missing Cells 1',
-      'Blank and Missing Cells 3',
+      'Blank and Missing Cells 4',
       'In Tests 1',
-      'In Projects 2',
+      'In Projects 3',
     ]);
   });
 
@@ -170,12 +183,19 @@ describe('the lists say how many cells each line changes', () => {
 
   it('a student with nothing to change gets greyed lines', () => {
     mount(seed, { course: CID });
-    _cache.statuses[CID] = { 's2:q1': 'EXC', 's2:e1': 'EXC', 's2:q2': 'EXC', 's2:l1': 'EXC', 's2:p1': 'EXC' };
+    _cache.statuses[CID] = {
+      's2:q1': 'EXC',
+      's2:e1': 'EXC',
+      's2:q2': 'EXC',
+      's2:l1': 'EXC',
+      's2:p1': 'EXC',
+      's2:f1': 'EXC',
+    };
     PageGradebook.render();
     open('s2');
     expect(lines('missing')).toEqual(['All Blank Cells']);
     click(document.querySelector('.gb-ctx-sub[data-sub="missing"] .gb-ctx-item'));
-    expect(statuses()['s2:f1']).toBeUndefined();
+    expect(statuses()['s2:f1']).toBe('EXC');
     expect(document.querySelector('[data-ctx="copyMissing"]').classList.contains('is-disabled')).toBe(true);
   });
 });
@@ -185,9 +205,9 @@ describe('a line of a list', () => {
     mount(seed, { course: CID });
     open();
     pick('missing', 'All Blank Cells');
-    expect(statuses()).toEqual({ 's1:e1': 'NS', 's1:q2': 'NS', 's1:l1': 'NS', 's1:p1': 'EXC' });
+    expect(statuses()).toEqual({ 's1:e1': 'NS', 's1:q2': 'NS', 's1:f1': 'NS', 's1:l1': 'NS', 's1:p1': 'EXC' });
     expect(getScores(CID).s1).toHaveLength(1);
-    expect(document.getElementById('undo-toast').textContent).toContain('2 blank cells marked Missing for Ava Adams');
+    expect(document.getElementById('undo-toast').textContent).toContain('3 blank cells marked Missing for Ava Adams');
     expect(document.querySelector('.gb-ctx-menu')).toBeNull();
     // The grid shows them.
     expect(document.querySelector('#gb-data td[data-sid="s1"][data-aid="e1"]').textContent).toContain('M');
@@ -197,8 +217,8 @@ describe('a line of a list', () => {
     mount(seed, { course: CID });
     open();
     pick('excuse', 'Blank and Missing Cells');
-    expect(statuses()).toEqual({ 's1:e1': 'EXC', 's1:q2': 'EXC', 's1:l1': 'EXC', 's1:p1': 'EXC' });
-    expect(document.getElementById('undo-toast').textContent).toContain('3 cells marked Excused for Ava Adams');
+    expect(statuses()).toEqual({ 's1:e1': 'EXC', 's1:q2': 'EXC', 's1:f1': 'EXC', 's1:l1': 'EXC', 's1:p1': 'EXC' });
+    expect(document.getElementById('undo-toast').textContent).toContain('4 cells marked Excused for Ava Adams');
     executeUndo();
     // The lab is Missing again, not blank; the poster was never touched.
     expect(statuses()).toEqual({ 's1:l1': 'NS', 's1:p1': 'EXC' });
@@ -230,6 +250,7 @@ describe('a line of a list', () => {
     setAssignmentStatus(CID, 's1', 'e1', 'EXC');
     executeUndo();
     expect(statuses()).toEqual({ 's1:e1': 'EXC', 's1:l1': 'NS', 's1:p1': 'EXC' });
+    expect(statuses()['s1:f1']).toBeUndefined();
   });
 });
 

@@ -257,7 +257,8 @@
     return '<div class="gb-card-cats" role="img" aria-label="' + esc(label.join('; ')) + '">' + bars + '</div>' + rows;
   }
 
-  /* Missing Work: each piece with its day and, when the class has a % and
+  /* Missing Work: each piece with the date its column shows (a due date is
+     often the end of the term) and, when the class has a % and
      enough is assessed, what handing it in adds; five lines at most (four
      and "N More" past that), then the grade with all of it in. */
   function _missingHtml(cid, sid, o) {
@@ -270,7 +271,7 @@
         '<div class="gb-card-row"><span class="gb-card-what">' +
         esc(a.title || 'Assessment') +
         '</span><small>' +
-        esc(formatShortDate(o.dueOf(a))) +
+        esc(formatShortDate(a.date || a.dueDate)) +
         '</small>' +
         (o.proj ? '<b class="gb-card-gain">' + (o.gains[a.id] > 0 ? '+' + o.gains[a.id] + '%' : '') + '</b>' : '') +
         '</div>';
