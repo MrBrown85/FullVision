@@ -232,7 +232,7 @@ describe('score-save-parity', () => {
     it('the grader dialog and Set Unmarked to max save points once, through setPointsScore', () => {
       const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
       const grader = src.slice(src.indexOf('function _graderCommitPoints('), src.indexOf('function _focusGraderCard('));
-      expect(grader).toContain('Grader.setPoints(cid, focusStudentId, aid, raw)');
+      expect(grader).toContain('Grader.setPoints(cid, pageState.focusStudentId, aid, raw)');
       expect(grader).not.toMatch(/\bsetScore\(/);
       const fill = src.slice(src.indexOf('function confirmFillPoints('), src.indexOf('function livePointsUpdate('));
       expect(fill).toContain('Grader.setPoints(cid, st.id, aid, max)');
