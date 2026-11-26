@@ -1844,13 +1844,7 @@
             ) +
             '</p></div>') +
       planAskHtml(send, p) +
-      '<label class="sp-send-note-label" for="sp-send-note">' +
-      'Note for Your Teacher' +
-      '</label><textarea id="sp-send-note" class="sp-send-note" maxlength="' +
-      NOTE_MAX +
-      '" rows="3">' +
-      esc(send.note) +
-      '</textarea>' +
+      window.SendNote.html(send.note, NOTE_MAX) +
       '<div class="sp-send-foot"><button type="button" class="sp-btn sp-btn-primary sp-btn-big sp-send-go" data-act="send-go"' +
       (!n || send.busy ? ' disabled' : '') +
       '>' +
@@ -2088,7 +2082,7 @@
 
   function onInput(el) {
     if (!el || el.id !== 'sp-send-note' || !S || !S.send) return;
-    S.send.note = String(el.value || '').slice(0, NOTE_MAX);
+    S.send.note = window.SendNote.input(el, NOTE_MAX);
   }
 
   function onChange(el) {

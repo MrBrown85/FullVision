@@ -636,7 +636,7 @@ var StudentPage = (function () {
     // html-safe: the page's render (the name is shared), over this file's screens and the ones questionnaire.js, app.js and assignments.js add: every screen escapes server and typed text with esc; q.id is a question uuid; a result on the Assignments list is calc.js's text, escaped.
     root.innerHTML = render(S);
     if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
-    growAll(root.querySelectorAll('textarea.sp-text'));
+    growAll(root.querySelectorAll('textarea.sp-text, textarea.sp-send-note'));
     rovingRadios(root);
     // A screen file's own step once its screen is drawn (assignments.js: the cards follow the swipe).
     files.forEach(function (f) {
