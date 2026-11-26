@@ -424,6 +424,7 @@ load('teacher/student-outlook.js');
 load('teacher/gradebook-chrome.js');
 load('teacher/gradebook-student-menu.js');
 load('teacher/gradebook-toolbar.js');
+load('teacher/top-bar.js');
 load('teacher/router.js');
 
 // Restore real setTimeout after loading (tests may need it)

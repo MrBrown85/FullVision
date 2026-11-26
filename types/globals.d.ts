@@ -5,6 +5,8 @@ interface Window {
   BuildFlags: { on(name: string): boolean };
   // Draws markup into a place, keeping the parts that did not change (teacher/keep-dom.js).
   KeepDom: { patch(root: Element, html: string): void };
+  // The top bar (teacher/top-bar.js): drawn once, then only its lit tab changes.
+  TopBar: { draw(activePage: string): void; barKey(html: string): string };
   SegGlide: {
     run(track: HTMLElement, from: { left: number; width: number }, to: DOMRect, ms?: number): void;
     lit(track: Element): HTMLElement | null;
