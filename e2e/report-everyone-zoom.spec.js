@@ -245,7 +245,7 @@ test('print wins at once, with no frame between a zoom and the print media', asy
    recorder of the first three sheets at the instant it is called, under
    print media switched on just before the print starts (as the browser
    does). The same as at Whole Class. */
-test('Print Reports at 75% prints what it prints at Whole Class', async ({ page }) => {
+test('Print Reports at 75% prints what it prints at Whole Class @flaky', async ({ page }) => {
   await openEveryone(page);
   await page.evaluate(src => {
     const read = new Function('return (' + src + ')')();

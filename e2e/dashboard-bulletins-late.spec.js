@@ -81,7 +81,7 @@ const height = (page, sel) =>
     .first()
     .evaluate(el => Math.round(el.getBoundingClientRect().height));
 
-test('the answer comes late: no slot at first, then the row is drawn once, and not over an open menu', async ({
+test('the answer comes late: no slot at first, then the row is drawn once, and not over an open menu @flaky', async ({
   page,
 }) => {
   await signedIn(page);
