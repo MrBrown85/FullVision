@@ -249,7 +249,24 @@ window.RubricLibrary = (function () {
             return _norm(check.label);
           });
       }),
+      // The comments of the Comment Bank, [level, text] in order.
+      comments: ((c && c.comments) || [])
+        .filter(function (m) {
+          return m && String(m.text || '').trim();
+        })
+        .map(function (m) {
+          return [Number(m.level), _norm(m.text)];
+        }),
     };
+  }
+
+  /* A rubric's overall comments, as they compare. */
+  function _overallView(rubric) {
+    return ((rubric && rubric.overallComments) || [])
+      .filter(function (t) {
+        return String(t || '').trim();
+      })
+      .map(_norm);
   }
 
   function _styleOf(rubric) {
@@ -306,6 +323,15 @@ window.RubricLibrary = (function () {
       } else skipped.push('the style');
     }
 
+    var bo = _overallView(before);
+    var ao = _overallView(after);
+    if (!_same(bo, ao)) {
+      if (_same(_overallView(copy), bo)) {
+        next.overallComments = structuredClone(after.overallComments || []);
+        lines.push('Overall comments updated');
+      } else skipped.push('the overall comments');
+    }
+
     (before.criteria || []).forEach(function (bc, idx) {
       if (!bc) return;
       var target = _matchCopyCriterion(before, copy, idx, usedIds);
@@ -359,6 +385,12 @@ window.RubricLibrary = (function () {
           nextCrit.checks = freshChecks(ac.checks);
           lines.push('Checkboxes of “' + ac.name + '” updated');
         } else skipped.push('the checkboxes of “' + target.name + '”');
+      }
+      if (!_same(bv.comments, av.comments)) {
+        if (_same(cv.comments, bv.comments)) {
+          nextCrit.comments = structuredClone(ac.comments || []);
+          lines.push('Comments of “' + ac.name + '” updated');
+        } else skipped.push('the comments of “' + target.name + '”');
       }
     });
 
