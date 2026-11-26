@@ -142,7 +142,24 @@
   function _handleFocus(e) {
     var el = e.target;
     if (e.type === 'focus' && el && el.dataset && el.dataset.chipTip) _showChipTip(el);
+    // A grader box keeps the student on the page when the teacher goes into it (_boxStudent).
+    if (e.type === 'focus' && el && el.dataset && /^grader/.test(el.dataset.actionBlur || ''))
+      _boxFor.set(el, pageState.focusStudentId);
     if (el && el.dataset && el.dataset.actionBlur === 'moduleName') _setModuleDraggable(el, false);
+  }
+
+  /* The student a grader box saves for: the one on the page when the teacher went into it, not the one
+     there when its blur runs. Drawing the next student takes the box away, and Chrome blurs it then, after
+     the page has moved on: the box's points went to the next student (Nov 26, 2026). A student who has
+     since left the class list under that id (a new student given their server id) is the page's student.
+     Kept off the markup, which stays as it was drawn. */
+  var _boxFor = new WeakMap();
+  function _boxStudent(el) {
+    var sid = _boxFor.get(el);
+    var listed = getStudents(pageState.activeCourse).some(function (s) {
+      return s.id === sid;
+    });
+    return listed ? sid : pageState.focusStudentId;
   }
 
   function _handleBlur(e) {
@@ -159,23 +176,17 @@
       return;
     }
     if (el.dataset.actionBlur === 'graderPoints') {
-      _graderCommitPoints(el, e.relatedTarget);
+      _graderCommitPoints(el, e.relatedTarget, _boxStudent(el));
       return;
     }
     if (el.dataset.actionBlur === 'graderCritNote') {
       var noteAid = _graderAid(el);
+      var noteSid = _boxStudent(el);
       var text = el.value.trim();
-      if (!noteAid || !pageState.focusStudentId) return;
-      if (
-        text !==
-        getRubricCriterionComment(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          noteAid,
-          _graderCriterion(noteAid, el.dataset.critid),
-        )
-      )
-        Grader.setCriterionComment(pageState.activeCourse, pageState.focusStudentId, noteAid, el.dataset.critid, text);
+      if (!noteAid || !noteSid) return;
+      var noteCrit = _graderCriterion(noteAid, el.dataset.critid);
+      if (text !== getRubricCriterionComment(pageState.activeCourse, noteSid, noteAid, noteCrit))
+        Grader.setCriterionComment(pageState.activeCourse, noteSid, noteAid, el.dataset.critid, text);
       el.classList.toggle('has-text', !!text);
       return;
     }
@@ -209,33 +220,22 @@
     }
     if (el.dataset.actionBlur === 'graderCritBeyond') {
       var beyondAid = _graderAid(el);
+      var beyondSid = _boxStudent(el);
       var beyondText = el.value.trim();
-      if (!beyondAid || !pageState.focusStudentId) return;
-      if (
-        beyondText !==
-        getRubricCriterionBeyond(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          beyondAid,
-          _graderCriterion(beyondAid, el.dataset.critid),
-        )
-      )
-        Grader.setWentBeyond(
-          pageState.activeCourse,
-          pageState.focusStudentId,
-          beyondAid,
-          el.dataset.critid,
-          beyondText,
-        );
+      if (!beyondAid || !beyondSid) return;
+      var beyondCrit = _graderCriterion(beyondAid, el.dataset.critid);
+      if (beyondText !== getRubricCriterionBeyond(pageState.activeCourse, beyondSid, beyondAid, beyondCrit))
+        Grader.setWentBeyond(pageState.activeCourse, beyondSid, beyondAid, el.dataset.critid, beyondText);
       el.classList.toggle('has-text', !!beyondText);
       return;
     }
     if (el.dataset.actionBlur === 'graderTagNote') {
       var tagAid = _graderAid(el);
+      var tagSid = _boxStudent(el);
       var tagText = el.value.trim();
-      if (!tagAid || !pageState.focusStudentId) return;
-      if (tagText !== getTagComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag))
-        Grader.setCompetencyComment(pageState.activeCourse, pageState.focusStudentId, tagAid, el.dataset.tag, tagText);
+      if (!tagAid || !tagSid) return;
+      if (tagText !== getTagComment(pageState.activeCourse, tagSid, tagAid, el.dataset.tag))
+        Grader.setCompetencyComment(pageState.activeCourse, tagSid, tagAid, el.dataset.tag, tagText);
       el.classList.toggle('has-text', !!tagText);
       return;
     }

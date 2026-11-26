@@ -356,7 +356,7 @@
   "teacher/assign-grader-work.js :: _graderWorkAction": 55,
   "teacher/assign-grader-work.js :: _workLineHtml": 101,
   "teacher/assign-grader-work.js :: _workPaneHtml": 92,
-  "teacher/assign-inputs.js :: _handleBlur": 102,
+  "teacher/assign-inputs.js :: _handleBlur": 85,
   "teacher/assign-ledger.js :: refreshLedgerSummary": 81,
   "teacher/assign-ledger.js :: renderPointsGrid": 56,
   "teacher/assign-ledger.js :: toggleStudentStatus": 57,

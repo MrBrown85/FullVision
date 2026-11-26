@@ -119,6 +119,7 @@
       return;
     }
     var memo = _graderFocusMemo();
+    _finishField();
     // With a queue (I3), a step past either end of this piece carries into the next or previous piece.
     if (pageState._grader && _graderQueueStep(dir)) return;
     // Show is on To Return or Returned: the next student it lists (S1-F2).
@@ -158,6 +159,13 @@
     else _scrollIntoViewIfNeeded(card, { block: 'nearest' }, true);
     if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
     else _restoreGraderFocus(memo);
+  }
+
+  /* A box being typed in saves when the teacher leaves it. A step leaves it first, while its student is
+     still the one on the page, so what is in it is saved for them and not lost with the redraw. */
+  function _finishField() {
+    var el = /** @type {any} */ (document.activeElement);
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el.blur) el.blur();
   }
 
   /* The grader opens the next student at the top, under their name: kept

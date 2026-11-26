@@ -546,13 +546,13 @@
   }
   // Saves typed points the way the Assignments ledger does: blank clears, a
   // typed 0 is a score, a typo puts the saved score back, leaving an
-  // unchanged box saves nothing.
-  function _graderCommitPoints(inp, next) {
+  // unchanged box saves nothing. `sid` is the box's student (AssignInputs' _boxStudent), not the page's by now.
+  function _graderCommitPoints(inp, next, sid) {
     var aid = _graderAid(inp);
-    if (!aid || !pageState.focusStudentId) return;
+    if (!aid || !sid) return;
     var cid = pageState.activeCourse;
     var max = parseFloat(inp.dataset.max) || 100;
-    var prev = getPointsScore(cid, pageState.focusStudentId, aid);
+    var prev = getPointsScore(cid, sid, aid);
     var over = _pointsOverLimit(inp.value, max);
     var raw = parsePointsInput(inp.value, max, prev);
     if (raw === prev) {
@@ -563,8 +563,7 @@
     // do. A second write under the assessment's own id left an entry later
     // edits elsewhere never updated, so the cell and course % kept the old
     // points.
-    var sid = pageState.focusStudentId;
-    Grader.setPoints(cid, pageState.focusStudentId, aid, raw);
+    Grader.setPoints(cid, sid, aid, raw);
     refreshSidebarGrades(sid);
     var nextId = next && pageState._grader && pageState._grader.overlay.contains(next) ? next.id : '';
     render();
