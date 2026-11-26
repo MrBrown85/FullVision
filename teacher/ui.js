@@ -1604,8 +1604,8 @@ function segSelect(btn) {
   if (fromBox) _segGlide(seg, fromBox, btn.getBoundingClientRect());
 }
 
-/* The chosen pill slides from its old place to its new one (160 ms, or ms: the
-   top tabs', router.js), by transform alone so a page still drawing can't stall it. */
+/* The chosen pill slides from its old place to its new one (160 ms, or ms: the top tabs', router.js), by
+   transform alone. A page drawing at once holds its start back, so the timer that ends it counts from there. */
 function _segGlide(seg, from, to, ms) {
   if (!seg.animate || !from.width || !to.width) return;
   if (seg._fvGlide) seg._fvGlide.remove();
@@ -1636,7 +1636,7 @@ function _segGlide(seg, from, to, ms) {
   );
   anim.onfinish = done;
   anim.oncancel = done;
-  setTimeout(done, 400);
+  anim.ready.then(() => setTimeout(done, (ms || 160) + 240), done);
 }
 
 /* ── Breadcrumb ────────────────────────────────────────────────

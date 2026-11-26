@@ -174,6 +174,42 @@ test.describe('with motion', () => {
     await page.evaluate(() => window.Router.navigate('/reports'));
     await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0);
   });
+
+  /* On a slow computer the Dashboard's draw holds the glide's start back by
+     more than its safety timer, which ended the glide before it moved: the
+     pill jumped, and this file's test above failed on GitHub's runners
+     (Nov 25, 2026). The timer now counts from the glide's start. */
+  test('on a slow computer the lit tab still glides all the way', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'slows the CPU through Chrome DevTools');
+    await openDemo(page);
+    // Each glide's pill, and whether its glide had run to the end when the pill was taken away.
+    await page.evaluate(() => {
+      window.__glides = [];
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (frames, opts) {
+        const anim = animate.call(this, frames, opts);
+        if (this.classList.contains('seg-glide')) window.__glides.push({ el: this, anim, endedAs: null });
+        return anim;
+      };
+      new MutationObserver(list =>
+        list.forEach(m =>
+          m.removedNodes.forEach(n => {
+            const g = window.__glides.find(x => x.el === n || (n.contains && n.contains(x.el)));
+            if (g && g.endedAs === null) g.endedAs = g.anim.playState;
+          }),
+        ),
+      ).observe(document.body, { childList: true, subtree: true });
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 12 });
+    await page.click('.tb-seg-link[data-href="/dashboard"]');
+    await expect(page.locator('.tb-seg-active')).toHaveText('Dashboard');
+    await expect(page.locator('.tb-seg .seg-glide')).toHaveCount(0, { timeout: 15000 });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    const ended = await page.evaluate(() => window.__glides.map(g => g.endedAs));
+    expect(ended.length).toBeGreaterThan(0);
+    expect(ended).toEqual(ended.map(() => 'finished'));
+  });
 });
 
 test.describe('with reduced motion', () => {
