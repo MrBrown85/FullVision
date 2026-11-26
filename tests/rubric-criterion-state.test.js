@@ -1,6 +1,6 @@
 /**
  * What one rubric criterion shows for one student, on the desktop
- * (_criterionState in teacher/page-assignments.js) and the phone (_critState
+ * (_criterionState in teacher/assign-card-list.js) and the phone (_critState
  * in teacher-mobile/tab-grade.js). A criterion is saved under one key, so
  * neither ever reports "mixed". Both functions sit inside larger modules, so
  * each is cut out of its file and run with the same three helpers it uses.
@@ -52,7 +52,7 @@ describe('a rubric criterion never reads as mixed', () => {
     'another assessment only': { level: 0, mod: 0, mixed: false },
   };
   it.each(cases)('desktop, %s', (label, rows) => {
-    const state = build('teacher/page-assignments.js', '_criterionState', { s1: rows });
+    const state = build('teacher/assign-card-list.js', '_criterionState', { s1: rows });
     expect(state('c', 's1', 'a1', CRIT)).toEqual(desktop[label]);
   });
   it.each(cases)('phone, %s', (label, rows) => {
@@ -63,7 +63,7 @@ describe('a rubric criterion never reads as mixed', () => {
     expect(state('c', 's1', 'a1', CRIT)).toEqual(want);
   });
   it('a criterion without an id has no state', () => {
-    expect(build('teacher/page-assignments.js', '_criterionState', { s1: [entry(3, 0)] })('c', 's1', 'a1', {})).toEqual(
+    expect(build('teacher/assign-card-list.js', '_criterionState', { s1: [entry(3, 0)] })('c', 's1', 'a1', {})).toEqual(
       {
         level: 0,
         mod: 0,
