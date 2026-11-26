@@ -2308,6 +2308,66 @@ AS $function$
      where r.id = p_request_id;
 $function$;
 
+CREATE OR REPLACE FUNCTION public._rubric_comment_list(p_list jsonb, p_criterion boolean)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO 'pg_catalog', 'pg_temp'
+AS $function$
+-- p_criterion false: a rubric's overall comments, a list of texts. True: a criterion's comments, a list of
+-- {level, text}, the level 1 to 6 whatever the rubric's levels are now (a rubric can go from six levels back
+-- to four and keep what was banked, as the restore keeps a checkbox's level). The level may be a number or
+-- the same digit as text. Each text is trimmed of spaces, tabs and line breaks and must then be 1 to 500
+-- characters. A repeat of the same level and text is kept once, where it first came. At most 40. Returns the
+-- list as it is to be stored ({level: number, text}), or stops with 22023 and a plain message.
+declare
+    _e     jsonb;
+    _t     text;
+    _l     text;
+    _lv    int;
+    _item  jsonb;
+    _out   jsonb := '[]'::jsonb;
+    _trim  text := chr(32) || chr(9) || chr(10) || chr(13);
+begin
+    if p_list is null or jsonb_typeof(p_list) <> 'array' then
+        raise exception 'comments must be a list' using errcode = '22023';
+    end if;
+    for _e in select x.v from jsonb_array_elements(p_list) with ordinality as x(v, n) order by x.n loop
+        if not coalesce(p_criterion, false) then
+            if jsonb_typeof(_e) <> 'string' then
+                raise exception 'an overall comment must be text' using errcode = '22023';
+            end if;
+            _t := _e #>> '{}';
+        else
+            if jsonb_typeof(_e) <> 'object' or jsonb_typeof(_e->'text') is distinct from 'string'
+               or coalesce(jsonb_typeof(_e->'level'), 'none') not in ('number', 'string') then
+                raise exception 'a comment must have a level and a text' using errcode = '22023';
+            end if;
+            -- One digit 1 to 6, compared under "C": 3.0, 7, "three" or a huge number are refused here.
+            _l := _e->>'level';
+            if not (_l collate "C" ~ '^[1-6]$') then
+                raise exception 'a comment''s level must be 1 to 6' using errcode = '22023';
+            end if;
+            _lv := _l::int;
+            _t := _e->>'text';
+        end if;
+        _t := btrim(_t, _trim);
+        if length(_t) < 1 or length(_t) > 500 then
+            raise exception 'a comment must be 1 to 500 characters' using errcode = '22023';
+        end if;
+        _item := case when coalesce(p_criterion, false) then jsonb_build_object('level', _lv, 'text', _t) else to_jsonb(_t) end;
+        -- jsonb containment compares texts byte for byte: no collation is involved.
+        if not _out @> jsonb_build_array(_item) then
+            if jsonb_array_length(_out) >= 40 then
+                raise exception 'at most 40 comments' using errcode = '22023';
+            end if;
+            _out := _out || jsonb_build_array(_item);
+        end if;
+    end loop;
+    return _out;
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text)
  RETURNS void
  LANGUAGE plpgsql
@@ -2927,6 +2987,89 @@ begin
     _cached := _assessment_resource_json(_id);
     perform fv_idem_store(p_idempotency_key, 'add_assessment_link', _cached);
     return _cached;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.add_criterion_comment(p_criterion_id uuid, p_level smallint, p_text text, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+-- Adds one comment at one level to a criterion's bank, unless the same level and text is there already, and
+-- returns the criterion's whole list. Refuses past 40.
+declare
+    _cached jsonb;
+    _rubric uuid;
+    _list   jsonb;
+    _one    jsonb;
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+    _cached := fv_idem_check(p_idempotency_key, 'add_criterion_comment');
+    if _cached is not null then
+        return _cached;
+    end if;
+    select r.id into _rubric
+      from rubric r join criterion c on c.rubric_id = r.id
+     where c.id = p_criterion_id and fv_owns_course(r.course_id)
+       for no key update of r;
+    if not found then
+        raise exception 'criterion not found' using errcode = 'P0002';
+    end if;
+    select c.comments into _list from criterion c where c.id = p_criterion_id and c.rubric_id = _rubric
+       for no key update;
+    if not found then
+        raise exception 'criterion not found' using errcode = 'P0002';
+    end if;
+    _one := _rubric_comment_list(jsonb_build_array(jsonb_build_object('level', p_level, 'text', p_text)), true);
+    if not _list @> _one then
+        if jsonb_array_length(_list) >= 40 then
+            raise exception 'this criterion already has 40 comments' using errcode = '22023';
+        end if;
+        _list := _list || _one;
+        update criterion set comments = _list, updated_at = now() where id = p_criterion_id;
+    end if;
+    perform fv_idem_store(p_idempotency_key, 'add_criterion_comment', _list);
+    return _list;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.add_rubric_overall_comment(p_rubric_id uuid, p_text text, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+-- Adds one overall comment to a rubric, unless the same text is there already, and returns the rubric's whole
+-- list. Refuses past 40.
+declare
+    _cached jsonb;
+    _list   jsonb;
+    _one    jsonb;
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+    _cached := fv_idem_check(p_idempotency_key, 'add_rubric_overall_comment');
+    if _cached is not null then
+        return _cached;
+    end if;
+    select r.overall_comments into _list from rubric r
+     where r.id = p_rubric_id and fv_owns_course(r.course_id)
+       for no key update;
+    if not found then
+        raise exception 'rubric not found' using errcode = 'P0002';
+    end if;
+    _one := _rubric_comment_list(jsonb_build_array(to_jsonb(p_text)), false);
+    if not _list @> _one then
+        if jsonb_array_length(_list) >= 40 then
+            raise exception 'this rubric already has 40 overall comments' using errcode = '22023';
+        end if;
+        _list := _list || _one;
+        update rubric set overall_comments = _list, updated_at = now() where id = p_rubric_id;
+    end if;
+    perform fv_idem_store(p_idempotency_key, 'add_rubric_overall_comment', _list);
+    return _list;
 end;
 $function$;
 
@@ -4289,7 +4432,7 @@ begin
 
     for _row in select * from rubric where course_id = p_src_id loop
         _new_id := gen_random_uuid();
-        insert into rubric (id, course_id, name, style, scale) values (_new_id, _new_course, _row.name, _row.style, _row.scale);
+        insert into rubric (id, course_id, name, style, scale, overall_comments) values (_new_id, _new_course, _row.name, _row.style, _row.scale, _row.overall_comments);
         _rubric_map := _rubric_map || jsonb_build_object(_row.id::text, _new_id::text);
     end loop;
 
@@ -4298,13 +4441,13 @@ begin
         insert into criterion (id, rubric_id, name,
             level_4_descriptor, level_3_descriptor, level_2_descriptor, level_1_descriptor,
             level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order,
-            level_5_descriptor, level_6_descriptor)
+            level_5_descriptor, level_6_descriptor, comments)
         values (_new_id, (_rubric_map ->> _row.rubric_id::text)::uuid, _row.name,
             _row.level_4_descriptor, _row.level_3_descriptor,
             _row.level_2_descriptor, _row.level_1_descriptor,
             _row.level_4_value, _row.level_3_value, _row.level_2_value, _row.level_1_value,
             _row.weight, _row.display_order,
-            _row.level_5_descriptor, _row.level_6_descriptor);
+            _row.level_5_descriptor, _row.level_6_descriptor, _row.comments);
         _crit_map := _crit_map || jsonb_build_object(_row.id::text, _new_id::text);
     end loop;
 
@@ -5389,7 +5532,8 @@ begin
     select jsonb_build_object(
         'rubrics', coalesce((
             select jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'created_at', r.created_at,
-                                                'copy_group', r.copy_group, 'style', r.style, 'scale', r.scale)
+                                                'copy_group', r.copy_group, 'style', r.style, 'scale', r.scale,
+                                                'overall_comments', r.overall_comments)
                              order by r.created_at, r.id)
               from public.rubric r where r.course_id = p_course_id), '[]'::jsonb),
         'criteria', coalesce((
@@ -5400,7 +5544,7 @@ begin
                        'level_5_descriptor', c.level_5_descriptor, 'level_6_descriptor', c.level_6_descriptor,
                        'level_4_value', c.level_4_value, 'level_3_value', c.level_3_value,
                        'level_2_value', c.level_2_value, 'level_1_value', c.level_1_value,
-                       'weight', c.weight, 'display_order', c.display_order
+                       'weight', c.weight, 'display_order', c.display_order, 'comments', c.comments
                    ) order by c.display_order, c.id)
               from public.criterion c join public.rubric r on r.id = c.rubric_id
              where r.course_id = p_course_id), '[]'::jsonb),
@@ -7083,11 +7227,13 @@ begin
 
     if p_payload ? 'rubrics' then
       for _row in select * from jsonb_array_elements(p_payload->'rubrics') loop
-        insert into rubric (id, course_id, name, style, scale)
+        insert into rubric (id, course_id, name, style, scale, overall_comments)
         values ((_row->>'id')::uuid, (_row->>'course_id')::uuid, coalesce(_row->>'name',''),
                 coalesce(_row->>'style','standard'),
-                case when jsonb_typeof(_row->'scale') = 'array' then _row->'scale' end)
-        on conflict (id) do update set name=excluded.name, style=excluded.style, scale=excluded.scale, updated_at=now();
+                case when jsonb_typeof(_row->'scale') = 'array' then _row->'scale' end,
+                case when jsonb_typeof(_row->'overall_comments') = 'array'
+                     then public._rubric_comment_list(_row->'overall_comments', false) else '[]'::jsonb end)
+        on conflict (id) do update set name=excluded.name, style=excluded.style, scale=excluded.scale, overall_comments=excluded.overall_comments, updated_at=now();
         _n_rub := _n_rub + 1;
       end loop;
     end if;
@@ -7097,7 +7243,7 @@ begin
         insert into criterion (id, rubric_id, name,
           level_4_descriptor, level_3_descriptor, level_2_descriptor, level_1_descriptor,
           level_4_value, level_3_value, level_2_value, level_1_value, weight, display_order,
-          level_5_descriptor, level_6_descriptor)
+          level_5_descriptor, level_6_descriptor, comments)
         values ((_row->>'id')::uuid, (_row->>'rubric_id')::uuid,
                 coalesce(_row->>'name',''),
                 _row->>'level_4_descriptor', _row->>'level_3_descriptor',
@@ -7108,12 +7254,16 @@ begin
                 coalesce((_row->>'level_1_value')::numeric, 1),
                 coalesce((_row->>'weight')::numeric, 1.0),
                 coalesce((_row->>'display_order')::int, 0),
-                _row->>'level_5_descriptor', _row->>'level_6_descriptor')
+                _row->>'level_5_descriptor', _row->>'level_6_descriptor',
+                case when jsonb_typeof(_row->'comments') = 'array'
+                     then public._rubric_comment_list(_row->'comments', true)
+                     else '[]'::jsonb end)
         on conflict (id) do update set
           name=excluded.name,
           level_4_descriptor=excluded.level_4_descriptor, level_3_descriptor=excluded.level_3_descriptor,
           level_2_descriptor=excluded.level_2_descriptor, level_1_descriptor=excluded.level_1_descriptor,
           level_5_descriptor=excluded.level_5_descriptor, level_6_descriptor=excluded.level_6_descriptor,
+          comments=excluded.comments,
           level_4_value=excluded.level_4_value, level_3_value=excluded.level_3_value,
           level_2_value=excluded.level_2_value, level_1_value=excluded.level_1_value,
           weight=excluded.weight, display_order=excluded.display_order, updated_at=now();
@@ -12001,7 +12151,7 @@ begin
     return _id;
 end; $function$;
 
-CREATE OR REPLACE FUNCTION public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid DEFAULT NULL::uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_style text DEFAULT NULL::text, p_linked_tag_ids jsonb DEFAULT NULL::jsonb, p_scale jsonb DEFAULT NULL::jsonb)
+CREATE OR REPLACE FUNCTION public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid DEFAULT NULL::uuid, p_idempotency_key uuid DEFAULT NULL::uuid, p_style text DEFAULT NULL::text, p_linked_tag_ids jsonb DEFAULT NULL::jsonb, p_scale jsonb DEFAULT NULL::jsonb, p_overall_comments jsonb DEFAULT NULL::jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -12018,6 +12168,8 @@ declare
     _check_id    uuid;
     _kept_checks uuid[];
     _level       int;
+    _comments    jsonb;
+    _overall     jsonb;
 begin
     if (select auth.uid()) is null then
         raise exception 'not authenticated' using errcode = 'PT401';
@@ -12036,6 +12188,11 @@ begin
         raise exception 'p_scale must be an array of 2 to 6 levels, or empty' using errcode = '22023';
     end if;
 
+    -- 2026112601: the rubric's overall comments. Null keeps them; a list replaces them.
+    if p_overall_comments is not null then
+        _overall := public._rubric_comment_list(p_overall_comments, false);
+    end if;
+
     if p_linked_tag_ids is not null and jsonb_typeof(p_linked_tag_ids) <> 'array' then
         raise exception 'p_linked_tag_ids must be a jsonb array' using errcode = '22023';
     end if;
@@ -12047,9 +12204,10 @@ begin
         end if;
         _is_insert := true;
 
-        insert into rubric (course_id, name, copy_group, style, scale)
+        insert into rubric (course_id, name, copy_group, style, scale, overall_comments)
         values (p_course_id, p_name, p_copy_group, coalesce(p_style, 'standard'),
-                case when jsonb_array_length(coalesce(p_scale, '[]'::jsonb)) = 0 then null else p_scale end)
+                case when jsonb_array_length(coalesce(p_scale, '[]'::jsonb)) = 0 then null else p_scale end,
+                coalesce(_overall, '[]'::jsonb))
         returning id into _rubric_id;
     else
         -- A copy group is only ever set, never cleared, by a save. A save
@@ -12059,6 +12217,7 @@ begin
                           scale = case when p_scale is null then scale
                                        when jsonb_array_length(p_scale) = 0 then null
                                        else p_scale end,
+                          overall_comments = coalesce(_overall, overall_comments),
                           updated_at = now()
          where id = p_id
         returning id into _rubric_id;
@@ -12069,6 +12228,12 @@ begin
     end if;
 
     for _elem in select * from jsonb_array_elements(p_criteria) loop
+        -- 2026112601: this criterion's comment bank. No "comments" key (or null) keeps what is stored;
+        -- a list replaces it.
+        _comments := case when jsonb_typeof(_elem->'comments') is distinct from 'null'
+                               and jsonb_typeof(_elem->'comments') is not null
+                          then public._rubric_comment_list(_elem->'comments', true)
+                     end;
         if _elem ? 'id' and nullif(_elem->>'id','') is not null then
             _crit_id := (_elem->>'id')::uuid;
 
@@ -12086,6 +12251,7 @@ begin
                 level_1_value      = coalesce((_elem->>'level_1_value')::numeric, 1),
                 weight             = coalesce((_elem->>'weight')::numeric, 1.0),
                 display_order      = coalesce((_elem->>'display_order')::int, 0),
+                comments           = coalesce(_comments, comments),
                 updated_at         = now()
             where id = _crit_id and rubric_id = _rubric_id;
 
@@ -12099,7 +12265,7 @@ begin
                 level_4_descriptor, level_3_descriptor,
                 level_2_descriptor, level_1_descriptor,
                 level_4_value, level_3_value, level_2_value, level_1_value,
-                weight, display_order, level_5_descriptor, level_6_descriptor
+                weight, display_order, level_5_descriptor, level_6_descriptor, comments
             ) values (
                 _rubric_id,
                 _elem->>'name',
@@ -12111,7 +12277,8 @@ begin
                 coalesce((_elem->>'level_1_value')::numeric, 1),
                 coalesce((_elem->>'weight')::numeric, 1.0),
                 coalesce((_elem->>'display_order')::int, 0),
-                _elem->>'level_5_descriptor', _elem->>'level_6_descriptor'
+                _elem->>'level_5_descriptor', _elem->>'level_6_descriptor',
+                coalesce(_comments, '[]'::jsonb)
             ) returning id into _crit_id;
         end if;
 
