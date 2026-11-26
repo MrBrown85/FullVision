@@ -1,4 +1,4 @@
--- Comment Bank per Rubric (2026-11-25). NOT APPLIED: waits for the owner's OK.
+-- Comment Bank per Rubric (2026-11-25). APPLIED 2026-11-26 (about 02:35 UTC) on the owner's OK; post-check ok on every row.
 -- A teacher keeps reusable feedback comments with a rubric: per criterion, at a level, and overall for the
 -- rubric. They are written in the rubric editor, or kept while grading with Add to Bank, and offered under the
 -- comment box while grading. Teacher-only: never printed, never sent to the student page. The plan is
