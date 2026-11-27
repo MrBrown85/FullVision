@@ -180,10 +180,19 @@ window.ReportOne = (function () {
     'student-reflection-learning': { label: 'Reflection: My Learning', group: 2, wording: true, split: 'table' },
     'student-reflection-habits': { label: 'Reflection: My Habits', group: 2, wording: true, split: 'table' },
     'text-block': { label: 'Your Own Text', group: 3 },
-    'parent-response': { label: 'Parent / Guardian Response', group: 3, pinned: true, wording: true },
+    // At the bottom of the last page, or after the part above it
+    // (report-response.js).
+    'parent-response': {
+      label: 'Parent / Guardian Response',
+      group: 3,
+      pinned: true,
+      wording: true,
+      options: window.ReportResponse.OPTIONS,
+    },
   };
   var ORDER = Object.keys(PARTS);
   var PINNED = 'parent-response';
+  var docks = window.ReportResponse.docks;
   var FEEDBACK = [
     { key: 'fb-rubrics', opt: 'rubrics', label: 'Rubrics' },
     { key: 'fb-comments', opt: 'comments', label: 'Assessment Comments' },
@@ -501,7 +510,8 @@ window.ReportOne = (function () {
     list.splice(at, 0, key);
   }
   /* The parts that print for the class or for one student, in order. The
-     docked response is last. */
+     docked response is last; one that follows the part above it keeps its
+     place. */
   function order(m, sid) {
     var p = _per(m, sid);
     var list = m.parts.filter(function (k) {
@@ -511,7 +521,7 @@ window.ReportOne = (function () {
       p.on.forEach(function (k) {
         if (list.indexOf(k) < 0) _insert(list, k);
       });
-    if (list.indexOf(PINNED) >= 0)
+    if (docks(m) && list.indexOf(PINNED) >= 0)
       list = list
         .filter(function (k) {
           return k !== PINNED;
@@ -598,7 +608,7 @@ window.ReportOne = (function () {
             return typeof c === 'object' ? c : { v: c, label: String(c) };
           }),
         };
-      if (o.text) return { key: o.key, label: name, kind: 'text', value: value || '' };
+      if (o.text || o.date) return { key: o.key, label: name, kind: o.date ? 'date' : 'text', value: value || '' };
       return { key: o.key, label: name, kind: 'toggle', value: !!value };
     });
     if (b && b.fill && b.lines)
@@ -671,13 +681,16 @@ window.ReportOne = (function () {
     });
   }
   /* Moves a part to position `to` among the parts on the report. The
-     letterhead stays first and the response last. */
+     letterhead stays first and a docked response last. */
+  function canMove(key, m) {
+    return key !== 'header' && (key !== PINNED || (!!m && !docks(m)));
+  }
   function move(m, key, to) {
-    if (key === 'header' || key === PINNED || m.parts.indexOf(key) < 0) return m;
+    if (!canMove(key, m) || m.parts.indexOf(key) < 0) return m;
     return _edit(m, function (next) {
       var list = _without(next.parts, key);
       var lo = 1;
-      var hi = list.indexOf(PINNED) >= 0 ? list.indexOf(PINNED) : list.length;
+      var hi = docks(next) && list.indexOf(PINNED) >= 0 ? list.indexOf(PINNED) : list.length;
       list.splice(Math.max(lo, Math.min(hi, to)), 0, key);
       next.parts = list;
       next.setup = '';
@@ -689,6 +702,9 @@ window.ReportOne = (function () {
         next.lines[key] = Number(value) || 0;
         return;
       }
+      // A response let go of the foot starts where it printed: last.
+      if (key === PINNED && optKey === 'place' && value === 'follow' && docks(next) && next.parts.indexOf(PINNED) >= 0)
+        next.parts = _without(next.parts, PINNED).concat([PINNED]);
       if (!next.options[key]) next.options[key] = {};
       next.options[key][optKey] = value;
     });
@@ -1179,8 +1195,9 @@ window.ReportOne = (function () {
     // Attendance and Missing Work sit side by side when they are next to
     // each other and both print.
     var rows = [];
+    var dock = docks(m);
     var body = cells.filter(function (c) {
-      return c.key !== PINNED;
+      return !dock || c.key !== PINNED;
     });
     for (var i = 0; i < body.length; i++) {
       var a = body[i];
@@ -1201,9 +1218,11 @@ window.ReportOne = (function () {
         i++;
       } else rows.push([a]);
     }
-    var slip = cells.filter(function (c) {
-      return c.key === PINNED;
-    })[0];
+    var slip = dock
+      ? cells.filter(function (c) {
+          return c.key === PINNED;
+        })[0]
+      : null;
     _measure(stage, cells);
     var headLine = ReportBlocks.renderContinuedLine(cid, student, sheetsApi.optionsFor(_cellOf(m, 'header')));
     // html-safe: headLine is ReportBlocks.renderContinuedLine, its text esc()'d
@@ -1222,30 +1241,7 @@ window.ReportOne = (function () {
     var sides = r.sides;
     // The response slip docks at the foot of the last side of the report,
     // or on a side of its own when there is no room left there.
-    if (slip) {
-      var ph = Math.min(slip.px, H - headPx - GAP);
-      var afters = sides.filter(function (sd) {
-        return sd.kind === 'after';
-      });
-      sides = sides.filter(function (sd) {
-        return sd.kind !== 'after';
-      });
-      var last = sides[sides.length - 1];
-      var bottom = last
-        ? last.rows.reduce(
-            function (y, row) {
-              return Math.max(y, row.y + row.h);
-            },
-            last.head ? headPx : 0,
-          )
-        : 0;
-      if (!last || bottom + GAP + ph > H) {
-        last = { rows: [], kind: 'continued', from: 0, head: sides.length > 0 };
-        sides.push(last);
-      }
-      last.pinned = { id: PINNED, size: 'row', h: ph, y: H - ph };
-      sides = sides.concat(afters);
-    }
+    if (slip) sides = window.ReportResponse.dock(sides, slip.px, H, headPx, GAP);
     sides.forEach(function (sd) {
       sd.over = sd.rows.some(function (row) {
         return row.y + row.h > H;
@@ -1419,9 +1415,8 @@ window.ReportOne = (function () {
       var d = _def(key);
       return d ? d.group : 1;
     },
-    canMove: function (key) {
-      return key !== 'header' && key !== PINNED;
-    },
+    canMove: canMove,
+    docks: docks,
     exceptions: exceptions,
     removedOf: removedOf,
     wordingOf: wordingOf,

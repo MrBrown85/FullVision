@@ -149,6 +149,8 @@ interface Window {
   CmPtsPointer: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
+  ReportOneOpts: unknown;
+  ReportResponse: any;
   ReportPrintPaper: unknown;
   // The Overview's picture of the grade (teacher/student-overview.js).
   StudentOverview: unknown;

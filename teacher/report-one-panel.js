@@ -112,7 +112,7 @@ window.ReportOnePanel = (function () {
   /* A part that can be dragged: on for the class, not the letterhead or
      the response. */
   function _draggable(m, key) {
-    return ReportOne.canMove(key) && m.parts.indexOf(key) >= 0;
+    return ReportOne.canMove(key, m) && m.parts.indexOf(key) >= 0;
   }
   /* Was the part changed for this student only. */
   function _mine(m, key, sid) {
@@ -155,7 +155,7 @@ window.ReportOnePanel = (function () {
     }
     if (m.titles[key]) bits.push('Prints as “' + m.titles[key] + '”');
     if (m.wording[key]) bits.push('Your wording');
-    if (key === ReportOne.PINNED && on) bits.push('At the foot of the last page');
+    if (key === ReportOne.PINNED && on) bits.push(ReportResponse.where(m));
     if (key === 'proficiency' && on && ReportOne.isOn(m, 'course-grade', c.sid))
       bits.push('Overall prints under ' + ReportOne.label('course-grade', api.cid));
     return bits.length ? '<div class="one-sub">' + esc(bits.join(' · ')) + '</div>' : '';
@@ -217,52 +217,7 @@ window.ReportOnePanel = (function () {
             })
             .join('') +
           '</div></div>';
-      } else if (o.kind === 'text') {
-        h +=
-          '<div class="one-o-row"><label class="one-o-lbl" for="' +
-          lid +
-          '">' +
-          esc(o.label) +
-          '</label>' +
-          (o.long
-            ? '<textarea class="one-o-text" id="' +
-              lid +
-              '" rows="4" data-action="oneOptText"' +
-              base +
-              '>' +
-              esc(o.value) +
-              '</textarea>'
-            : '<input type="text" class="one-o-text" id="' +
-              lid +
-              '" data-action="oneOptText"' +
-              base +
-              ' value="' +
-              esc(o.value) +
-              '">') +
-          '</div>';
-      } else if (o.kind === 'lines') {
-        var v = Number(o.value) || 0;
-        var lo = o.min != null ? o.min : 0;
-        var hi = o.max != null ? o.max : 40;
-        h +=
-          '<div class="one-o-row one-o-lines"><span class="one-o-lbl" id="' +
-          lid +
-          '">' +
-          esc(o.label) +
-          '</span><div class="one-step" role="group" aria-labelledby="' +
-          lid +
-          '"><button type="button" class="one-step-btn" data-action="oneLines"' +
-          base +
-          ' data-value="-1" aria-label="Fewer Lines"' +
-          (v <= lo ? ' aria-disabled="true"' : '') +
-          '>−</button><span class="one-step-n" aria-live="polite">' +
-          v +
-          '</span><button type="button" class="one-step-btn" data-action="oneLines"' +
-          base +
-          ' data-value="1" aria-label="More Lines"' +
-          (v >= hi ? ' aria-disabled="true"' : '') +
-          '>+</button></div></div>';
-      }
+      } else h += ReportOneOpts.rowHtml(o, base, lid);
     });
     flush();
     if (key === 'assessments')
@@ -283,7 +238,7 @@ window.ReportOnePanel = (function () {
     var label = ReportOne.label(key, api.cid);
     var on = c.on;
     var drag = c.list === 'on' && _draggable(m, key);
-    var pinned = c.list === 'on' && key === ReportOne.PINNED;
+    var pinned = c.list === 'on' && key === ReportOne.PINNED && ReportOne.docks(m);
     var opts = c.list !== 'add' && on && _hasOpts(m, key, api.cid);
     var open = opts && !!_open[key];
     var k = esc(key);

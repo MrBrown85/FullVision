@@ -303,6 +303,7 @@ load('teacher/markup.js');
 load('teacher/report-scores.js');
 load('teacher/drafts-before-print.js');
 load('teacher/report-blocks.js');
+load('teacher/report-response.js');
 load('teacher/report-sheets.js');
 load('teacher/report-issues.js');
 load('shared/comment-bank.js');

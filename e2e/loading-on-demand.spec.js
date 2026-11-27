@@ -55,6 +55,7 @@ const REPORTS = [
   '/teacher/report-one-undo.js',
   '/teacher/report-one-zoom.js',
   '/teacher/report-one-head.js',
+  '/teacher/report-one-opts.js',
   '/teacher/report-print-paper.js',
   '/teacher/page-reports.js',
 ];

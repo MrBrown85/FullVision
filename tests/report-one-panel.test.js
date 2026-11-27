@@ -11,6 +11,7 @@ import { runInThisContext } from 'vm';
 
 runInThisContext(readFileSync('teacher/report-one.js', 'utf-8'), { filename: 'teacher/report-one.js' });
 runInThisContext(readFileSync('teacher/report-one-panel.js', 'utf-8'), { filename: 'teacher/report-one-panel.js' });
+runInThisContext(readFileSync('teacher/report-one-opts.js', 'utf-8'), { filename: 'teacher/report-one-opts.js' });
 
 const CECE = { id: 'st1', firstName: 'Cece', lastName: 'Adeyemi' };
 
