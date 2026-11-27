@@ -7158,6 +7158,7 @@ $function$;
 
 CREATE OR REPLACE PROCEDURE public.grade_return_repair_nightly()
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $procedure$
 declare
     _course uuid;
@@ -8993,6 +8994,7 @@ end; $function$;
 
 CREATE OR REPLACE PROCEDURE public.photo_lifecycle_nightly()
  LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
 AS $procedure$
 declare
     _course uuid;
@@ -11559,6 +11561,12 @@ begin
     _cached := fv_idem_check(p_idempotency_key, 'submit_support_report');
     if _cached is not null then
         return (_cached->>'id')::uuid;
+    end if;
+
+    -- At most 10 reports from one teacher in any hour (2026112701).
+    if (select count(*) from public.support_report r
+         where r.teacher_id = _uid and r.created_at > now() - interval '1 hour') >= 10 then
+        raise exception 'too many reports' using errcode = '54000';
     end if;
 
     insert into public.support_report (teacher_id, page, message, browser, app_version)
