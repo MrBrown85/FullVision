@@ -3,7 +3,7 @@ title: Write Comments
 section: Reporting
 order: 1
 summary: Write Comments shows one student at a time: what happened in class, one box for each part, beside the report comment. Each student's comment is written and approved here.
-checked: 2026-11-05
+checked: 2026-11-26
 pages:
   - /reports
 demo: /reports
