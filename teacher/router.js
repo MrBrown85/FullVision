@@ -74,8 +74,8 @@ window.Router = (function () {
     gradesPrint: { title: 'Print Grades', needs: ['GradesPrint'], scripts: ['/teacher/grades-print.js'] },
     gradingSetupCopy: {
       title: 'Copy Grading Setup',
-      needs: ['GradingSetupCopy'],
-      scripts: ['/teacher/grading-setup-copy.js'],
+      needs: ['GradingSetupCopy', 'GradingSetupCopyDialog'],
+      scripts: ['/teacher/grading-setup-copy.js', '/teacher/grading-setup-copy-dialog.js'],
     },
     // The QR maker every print sheet of slips or cards draws with (teacher/qr-slips.js printSheet).
     qrcode: { title: 'QR Codes', needs: ['qrcode'], scripts: ['/vendor/qrcode.js'] },

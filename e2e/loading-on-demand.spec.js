@@ -223,9 +223,9 @@ test('offline after a first visit that never opened Reports, Reports opens from 
 
 const RUBRIC = ['/teacher/rubric-library.js', '/teacher/rubric-bank.js'];
 const GRADES_PRINT = '/teacher/grades-print.js';
-const SETUP_COPY = '/teacher/grading-setup-copy.js';
+const SETUP_COPY = ['/teacher/grading-setup-copy.js', '/teacher/grading-setup-copy-dialog.js'];
 const QR = '/vendor/qrcode.js';
-const PRINT_QR_RUBRIC = [...RUBRIC, GRADES_PRINT, SETUP_COPY, QR];
+const PRINT_QR_RUBRIC = [...RUBRIC, GRADES_PRINT, ...SETUP_COPY, QR];
 const printAsked = asked => asked.filter(p => PRINT_QR_RUBRIC.includes(p));
 
 // Demo Mode with its sample class seeded.
@@ -281,7 +281,7 @@ async function expectCopySetup(page, button) {
   await page.getByRole('button', { name: button }).click();
   const dialog = page.locator('.copy-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText(button === 'Copy Grading Setup…' ? 'Copy grading setup' : 'Copy categories');
+  await expect(dialog).toContainText(button === 'Copy Grading Setup…' ? 'Copy Grading Setup' : 'Copy Categories');
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(dialog).toHaveCount(0);
 }
@@ -400,7 +400,7 @@ test.describe('Print, QR and the Rubric Bank load where they are used', () => {
     await page.waitForLoadState('networkidle');
     expect(printAsked(asked)).toEqual([]);
     await expectCopySetup(page, 'Copy Grading Setup…');
-    expect(printAsked(asked)).toEqual([SETUP_COPY]);
+    expect(printAsked(asked)).toEqual(SETUP_COPY);
     await expectCopySetup(page, 'Copy From Another Class');
 
     // A reload, then Copy From Another Class first.

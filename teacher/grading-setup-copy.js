@@ -6,8 +6,12 @@
  * beside the categories imports the categories alone.
  *
  * What copies: grading system, categories and weights, calculation method,
- * course % rounding, Rubric Levels (the order of the four levels), late
- * work policy, and (only when ticked) reporting terms. Categories are matched by name: a same-named category keeps its id,
+ * Points and Proficiency (the markers: where each proficiency starts on a
+ * points score and what each step counts as in the course %), course %
+ * rounding, Rubric Levels (the order of the four levels), late work policy,
+ * and (only when ticked) reporting terms. The dialogs are in
+ * grading-setup-copy-dialog.js, which adds openDialog and review to this
+ * module. Categories are matched by name: a same-named category keeps its id,
  * so its assessments stay in it. A category the source doesn't have is
  * removed, and its assessments move to one the teacher picks first.
  * Copies are not linked, and scores are never touched.
@@ -19,6 +23,7 @@ window.GradingSetupCopy = (function () {
     { key: 'gradingSystem', label: 'Grading system', on: true },
     { key: 'categories', label: 'Categories and weights', on: true },
     { key: 'calcMethod', label: 'Calculation method', on: true },
+    { key: 'gradingScale', label: 'Points and Proficiency', on: true },
     { key: 'roundPercent', label: 'Course %', on: true },
     { key: 'levelOrder', label: 'Rubric Levels', on: true },
     { key: 'lateWorkPolicy', label: 'Late work policy', on: true },
@@ -129,6 +134,7 @@ window.GradingSetupCopy = (function () {
             .join(', ')
         : '',
       calcMethod: _calcLabel(_calcOf(cid)),
+      gradingScale: '',
       roundPercent: getRoundWholePercent(cid) ? 'Whole number' : 'One decimal',
       levelOrder: _levelOrderLabel(_levelOrderOf(cid)),
       lateWorkPolicy: late || 'None',
@@ -250,14 +256,54 @@ window.GradingSetupCopy = (function () {
     };
   }
 
+  /* ── Points and Proficiency ────────────────────────────────── */
+  /* The markers copy whole: where each proficiency starts and what each step
+     counts as. plan.scale is the source's; plan.scaleBefore the target's now,
+     for the before and after pictures. When the course % of any student in the
+     target would change and a reporting term there has already ended, the
+     sentence that says every term changes is kept in plan.endedNote. */
+  function planScale(plan, srcCid, dstCid, add) {
+    var from = getGradingScale(dstCid);
+    var to = getGradingScale(srcCid);
+    plan.scaleBefore = structuredClone(from);
+    plan.scale = structuredClone(to);
+    add('gradingScale', CmPtsModel.lines(from, to));
+    var ended = CmGrading._cmEndedTerm(dstCid);
+    if (ended && CmPtsModel.gradeEffects(dstCid, from, to).pctMoves)
+      plan.endedNote =
+        'This changes the course % for every term, including ' +
+        (ended.label || 'Term ' + ended.ordinal) +
+        ', which has already ended. Report cards printed before today won’t match.';
+  }
+
+  // Course % rounding, Rubric Levels and the late work policy: one line each.
+  function planSimple(srcCid, dstCid, groups, add) {
+    if (groups.roundPercent) {
+      var ra = getRoundWholePercent(srcCid);
+      var rb = getRoundWholePercent(dstCid);
+      var rl = function (w) {
+        return w ? 'Whole number' : 'One decimal';
+      };
+      add('roundPercent', ra === rb ? [] : [rl(rb) + ' → ' + rl(ra) + '.']);
+    }
+    if (groups.levelOrder) {
+      var oa = _levelOrderOf(srcCid);
+      var ob = _levelOrderOf(dstCid);
+      add('levelOrder', oa === ob ? [] : [_levelOrderLabel(ob) + ' → ' + _levelOrderLabel(oa) + '.']);
+    }
+    if (groups.lateWorkPolicy) {
+      var la = ((COURSES[srcCid] && COURSES[srcCid].lateWorkPolicy) || '').trim();
+      var lb = ((COURSES[dstCid] && COURSES[dstCid].lateWorkPolicy) || '').trim();
+      add('lateWorkPolicy', la === lb ? [] : [la ? 'Use “' + la + '”.' : 'Clear the late work policy.']);
+    }
+  }
+
   /* ── Planning a whole copy ─────────────────────────────────── */
   /* groups: { key: true } for the ticked groups. Both classes must be
      loaded. Returns { dstCid, dstName, changes: [{ key, label, lines }],
      same: [labels already matching], skipped: [notes], categories }. */
   function planSetup(srcCid, dstCid, groups) {
     var plan = { srcCid: srcCid, dstCid: dstCid, dstName: _className(dstCid), changes: [], same: [], skipped: [] };
-    var srcCourse = COURSES[srcCid] || {};
-    var dstCourse = COURSES[dstCid] || {};
     function add(key, lines) {
       var label = GROUPS.find(function (g) {
         return g.key === key;
@@ -290,24 +336,8 @@ window.GradingSetupCopy = (function () {
         ca.coursesCountEqually === cb.coursesCountEqually;
       add('calcMethod', calcSame ? [] : [_calcLabel(cb) + ' → ' + _calcLabel(ca) + '.']);
     }
-    if (groups.roundPercent) {
-      var ra = getRoundWholePercent(srcCid);
-      var rb = getRoundWholePercent(dstCid);
-      var rl = function (w) {
-        return w ? 'Whole number' : 'One decimal';
-      };
-      add('roundPercent', ra === rb ? [] : [rl(rb) + ' → ' + rl(ra) + '.']);
-    }
-    if (groups.levelOrder) {
-      var oa = _levelOrderOf(srcCid);
-      var ob = _levelOrderOf(dstCid);
-      add('levelOrder', oa === ob ? [] : [_levelOrderLabel(ob) + ' → ' + _levelOrderLabel(oa) + '.']);
-    }
-    if (groups.lateWorkPolicy) {
-      var la = (srcCourse.lateWorkPolicy || '').trim();
-      var lb = (dstCourse.lateWorkPolicy || '').trim();
-      add('lateWorkPolicy', la === lb ? [] : [la ? 'Use “' + la + '”.' : 'Clear the late work policy.']);
-    }
+    if (groups.gradingScale) planScale(plan, srcCid, dstCid, add);
+    planSimple(srcCid, dstCid, groups, add);
     if (groups.reportingTerms) {
       var ta = getReportingTerms(srcCid);
       var tb = getReportingTerms(dstCid);
@@ -446,6 +476,42 @@ window.GradingSetupCopy = (function () {
     });
   }
 
+  /* What a copy sets on the class's course row (courseUpdates) and in its
+     settings (cc, a copy), for the ticked groups. True when cc changed. */
+  function stageSettings(plan, keys, cc, courseUpdates) {
+    var srcCid = plan.srcCid;
+    var changed = false;
+    if (keys.gradingSystem) courseUpdates.gradingSystem = courseGradeMode(srcCid);
+    if (keys.calcMethod) {
+      var calc = _calcOf(srcCid);
+      courseUpdates.calcMethod = calc.method;
+      courseUpdates.decayWeight = calc.decayWeight;
+      cc.calcMethod = calc.method;
+      cc.decayWeight = calc.decayWeight;
+      cc.recentScoreLimit = calc.recentLimit;
+      cc.foldersCountAsOne = calc.foldersCountAsOne;
+      cc.coursesCountEqually = calc.coursesCountEqually;
+      changed = true;
+    }
+    if (keys.gradingScale) {
+      cc.gradingScale = structuredClone(plan.scale);
+      changed = true;
+    }
+    if (keys.roundPercent) {
+      cc.roundPercent = !!getRoundWholePercent(srcCid);
+      changed = true;
+    }
+    if (keys.levelOrder) {
+      cc.levelOrder = _levelOrderOf(srcCid);
+      changed = true;
+    }
+    if (keys.lateWorkPolicy) {
+      var late = ((COURSES[srcCid] && COURSES[srcCid].lateWorkPolicy) || '').trim();
+      courseUpdates.lateWorkPolicy = late || null;
+    }
+    return changed;
+  }
+
   /* Apply one class's plan. Resolves when every write has been handed to the
      data layer (and, for categories, landed in order). */
   function applySetup(plan, moves) {
@@ -457,31 +523,7 @@ window.GradingSetupCopy = (function () {
     });
     var courseUpdates = {};
     var cc = Object.assign({}, getCourseConfig(dstCid) || {});
-    var ccChanged = false;
-    if (keys.gradingSystem) courseUpdates.gradingSystem = courseGradeMode(srcCid);
-    if (keys.calcMethod) {
-      var calc = _calcOf(srcCid);
-      courseUpdates.calcMethod = calc.method;
-      courseUpdates.decayWeight = calc.decayWeight;
-      cc.calcMethod = calc.method;
-      cc.decayWeight = calc.decayWeight;
-      cc.recentScoreLimit = calc.recentLimit;
-      cc.foldersCountAsOne = calc.foldersCountAsOne;
-      cc.coursesCountEqually = calc.coursesCountEqually;
-      ccChanged = true;
-    }
-    if (keys.roundPercent) {
-      cc.roundPercent = !!getRoundWholePercent(srcCid);
-      ccChanged = true;
-    }
-    if (keys.levelOrder) {
-      cc.levelOrder = _levelOrderOf(srcCid);
-      ccChanged = true;
-    }
-    if (keys.lateWorkPolicy) {
-      var late = ((COURSES[srcCid] && COURSES[srcCid].lateWorkPolicy) || '').trim();
-      courseUpdates.lateWorkPolicy = late || null;
-    }
+    var ccChanged = stageSettings(plan, keys, cc, courseUpdates);
     if (Object.keys(courseUpdates).length) updateCourse(dstCid, courseUpdates);
     if (ccChanged) saveCourseConfig(dstCid, cc);
     if (keys.reportingTerms) saveReportingTerms(dstCid, getReportingTerms(srcCid));
@@ -542,192 +584,21 @@ window.GradingSetupCopy = (function () {
     return parts.join(' ');
   }
 
-  /* ── Dialogs ───────────────────────────────────────────────── */
-  // html-safe: group keys and labels are constants; class names and summaries through esc
-  function _groupsHtml(srcCid, only) {
-    if (!srcCid) return '';
-    var src = describeSource(srcCid);
-    return GROUPS.map(function (g) {
-      var noCats = g.key === 'categories' && !src.categories;
-      var checked = only ? g.key === only : g.on;
-      return (
-        '<label class="copy-review-check gsc-group' +
-        (noCats ? ' af-copy-has' : '') +
-        '"><input type="checkbox" data-gsc-group="' +
-        g.key +
-        '"' +
-        (checked && !noCats ? ' checked' : '') +
-        (noCats ? ' disabled' : '') +
-        '> <span><strong>' +
-        esc(g.label) +
-        '</strong> <span class="copy-review-muted">· ' +
-        esc(noCats ? 'none in ' + _className(srcCid) : src[g.key]) +
-        '</span></span></label>'
-      );
-    }).join('');
-  }
-
-  function _readGroups(root) {
-    var groups = {};
-    root.querySelectorAll('[data-gsc-group]:checked').forEach(function (cb) {
-      groups[cb.dataset.gscGroup] = true;
-    });
-    return groups;
-  }
-
-  // html-safe: class ids and names through esc; type and name are fixed strings from callers
-  function _classRows(targets, type, name) {
-    var row = function (c) {
-      return (
-        '<label class="copy-review-check"><input type="' +
-        type +
-        '" name="' +
-        name +
-        '" value="' +
-        esc(c.id) +
-        '"> ' +
-        esc(c.name) +
-        '</label>'
-      );
-    };
-    var parts = targets.sameCourse.map(row);
-    if (targets.sameCourse.length && targets.other.length)
-      parts.push('<div class="rubric-copy-group">Other Classes</div>');
-    return parts.concat(targets.other.map(row)).join('');
-  }
-
-  /* opts: { mode: 'to' | 'from', only: group key, onDone(dstCids) }. */
-  function openDialog(cid, opts) {
-    opts = opts || {};
-    var targets = AssessmentCopy.copyTargets(cid);
-    if (!targets.sameCourse.length && !targets.other.length) {
-      _toast('You have no other classes to copy with.');
-      return;
-    }
-    var mode = opts.mode || 'to';
-    var only = opts.only || null;
-    var title = only === 'categories' ? 'Copy categories' : 'Copy grading setup';
-    var html =
-      '<div class="seg cm-seg gsc-mode" role="radiogroup" aria-label="Direction">' +
-      '<button type="button" class="seg-btn cm-seg-btn" role="radio" data-gsc-mode="to">Copy to other classes</button>' +
-      '<button type="button" class="seg-btn cm-seg-btn" role="radio" data-gsc-mode="from">Import from another class</button>' +
-      '</div>' +
-      '<div id="gsc-classes"></div>' +
-      '<div class="copy-review-note" id="gsc-groups-title"></div>' +
-      '<div id="gsc-groups" class="copy-from-list"></div>';
-
-    function srcOf(root) {
-      if (mode === 'to') return cid;
-      var sel = root.querySelector('#gsc-from');
-      return sel ? sel.value : null;
-    }
-
-    function dstsOf(root) {
-      if (mode === 'from') return [cid];
-      return Array.from(root.querySelectorAll('input[name="gsc-dst"]:checked')).map(function (cb) {
-        return cb.value;
-      });
-    }
-
-    function fillGroups(root) {
-      var srcCid = srcOf(root);
-      var box = root.querySelector('#gsc-groups');
-      var kept = box.querySelector('[data-gsc-group]') ? _readGroups(root) : null;
-      root.querySelector('#gsc-groups-title').textContent = 'What to copy:';
-      box.textContent = 'Loading…';
-      loadClass(srcCid).then(function () {
-        if (srcOf(root) !== srcCid) return;
-        box.innerHTML = _groupsHtml(srcCid, only);
-        if (kept)
-          box.querySelectorAll('[data-gsc-group]:not(:disabled)').forEach(function (cb) {
-            cb.checked = !!kept[cb.dataset.gscGroup];
-          });
-        updateOk(root);
-      });
-    }
-
-    function render(root) {
-      root.querySelectorAll('[data-gsc-mode]').forEach(function (b) {
-        var on = b.dataset.gscMode === mode;
-        b.classList.toggle('active', on);
-        b.setAttribute('aria-checked', String(on));
-      });
-      var classes = root.querySelector('#gsc-classes');
-      if (mode === 'to') {
-        classes.innerHTML =
-          '<div class="copy-review-note">Copy ' +
-          esc(_className(cid)) +
-          '’s setup into:</div><div class="copy-from-list">' +
-          _classRows(targets, 'checkbox', 'gsc-dst') +
-          '</div>';
-      } else {
-        var all = targets.sameCourse.concat(targets.other);
-        classes.innerHTML =
-          '<label class="copy-review-field">Import into ' +
-          esc(_className(cid)) +
-          ' from <select class="af-input" id="gsc-from">' +
-          all
-            .map(function (c) {
-              return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
-            })
-            .join('') +
-          '</select></label>';
-        classes.querySelector('#gsc-from').addEventListener('change', function () {
-          fillGroups(root);
-        });
-      }
-      fillGroups(root);
-      updateOk(root);
-    }
-
-    function updateOk(root) {
-      var ok = root.querySelector('[data-copy-ok]');
-      if (!ok) return;
-      var n = dstsOf(root).length;
-      var g = Object.keys(_readGroups(root)).length;
-      ok.disabled = !n || !g;
-    }
-
-    AssessmentCopy.dialog({
-      title: title,
-      html: html,
-      okLabel: 'Review changes',
-      onOpen: function (root) {
-        render(root);
-        root.addEventListener('click', function (e) {
-          var b = e.target.closest && e.target.closest('[data-gsc-mode]');
-          if (!b || b.dataset.gscMode === mode) return;
-          mode = b.dataset.gscMode;
-          render(root);
-        });
-        root.addEventListener('change', function () {
-          updateOk(root);
-        });
-      },
-      onOk: function (root) {
-        var srcCid = srcOf(root);
-        var dsts = dstsOf(root);
-        var groups = _readGroups(root);
-        if (!srcCid || !dsts.length || !Object.keys(groups).length) return false;
-        Promise.all(dsts.map(loadClass)).then(function () {
-          var plans = dsts.map(function (d) {
-            return planSetup(srcCid, d, groups);
-          });
-          review(plans, opts.onDone);
-        });
-        return true;
-      },
-    });
-  }
-
+  /* ── The check step ────────────────────────────────────────── */
   /* Where a removed category's work most likely belongs: a new category
      sharing its first word ("Quizzes" → "Quizzes & Checks"), else the first. */
-  function _guessRow(name, rows) {
-    var word = _norm(name).split(/[^a-z0-9]+/)[0];
+  function guessRow(name, rows) {
+    var norm = function (s) {
+      return String(s == null ? '' : s)
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+    };
+    var word = norm(name).split(/[^a-z0-9]+/)[0];
     if (!word) return 0;
     var i = rows.findIndex(function (r) {
       return (
-        _norm(r.name)
+        norm(r.name)
           .split(/[^a-z0-9]+/)
           .indexOf(word) >= 0
       );
@@ -738,7 +609,7 @@ window.GradingSetupCopy = (function () {
   /* With allowNone (work with no category), the select starts on "Choose a
      Category" and Copy waits for a choice; leaving the work is one of them
      (Colin, 2026-11-03: "Make me choose"). */
-  function _moveSelect(attr, rows, selected, allowNone) {
+  function moveSelect(attr, rows, selected, allowNone) {
     return (
       '<select class="af-input" ' +
       attr +
@@ -752,6 +623,75 @@ window.GradingSetupCopy = (function () {
       (allowNone ? '<option value="none">Leave them with no category</option>' : '') +
       '</select>'
     );
+  }
+
+  // The category choices a plan asks for: where each removed category's work goes, and work with none.
+  function moveFields(p, pi) {
+    var cats = p.categories;
+    var out = '';
+    cats.removed.forEach(function (d) {
+      if (!d.count) return;
+      out +=
+        '<label class="copy-review-field">Move the ' +
+        _plural(d.count, 'assessment', 'assessments') +
+        ' in ' +
+        esc(d.name) +
+        ' to ' +
+        moveSelect(
+          'data-gsc-move="' + pi + '" data-gsc-cat="' + esc(d.id) + '"',
+          cats.rows,
+          guessRow(d.name, cats.rows),
+          false,
+        ) +
+        '</label>';
+    });
+    if (cats.uncategorized)
+      out +=
+        '<label class="copy-review-field">Put the ' +
+        _plural(cats.uncategorized, 'assessment', 'assessments') +
+        ' with no category in ' +
+        moveSelect('data-gsc-move="' + pi + '" data-gsc-cat="uncategorized"', cats.rows, -1, true) +
+        '</label>';
+    return out;
+  }
+
+  // One class in the check step: its name, its markers before → after, what changes.
+  // html-safe: names and lines through esc
+  function classHtml(p, pi) {
+    var out =
+      '<div class="copy-review-class"><div class="gsc-review-head"><span class="copy-review-name">' +
+      esc(p.dstName) +
+      '</span>';
+    if (p.scale)
+      out +=
+        '<span class="gsc-review-pair">' +
+        mini(p.scaleBefore, p.dstName + '’s markers now') +
+        '<span aria-hidden="true">→</span>' +
+        mini(p.scale, p.dstName + '’s markers after copying') +
+        '</span>';
+    out += '</div>';
+    if (!p.changes.length) out += '<div class="copy-review-note copy-review-muted">Already the same.</div>';
+    p.changes.forEach(function (c) {
+      out +=
+        '<div class="copy-review-note"><strong>' +
+        esc(c.label) +
+        '</strong></div><ul class="copy-change-list">' +
+        c.lines
+          .map(function (l) {
+            return '<li>' + esc(l) + '</li>';
+          })
+          .join('') +
+        '</ul>';
+      if (c.key === 'categories') out += moveFields(p, pi);
+      if (c.key === 'gradingScale' && p.endedNote)
+        out += '<div class="copy-review-note copy-review-muted">' + esc(p.endedNote) + '</div>';
+    });
+    if (p.same.length && p.changes.length)
+      out += '<div class="copy-review-note copy-review-muted">Already the same: ' + esc(p.same.join(', ')) + '.</div>';
+    p.skipped.forEach(function (s) {
+      out += '<div class="copy-review-note copy-review-muted">' + esc(s) + '</div>';
+    });
+    return out + '</div>';
   }
 
   /* Show every class's changes; the teacher picks where moved work goes. */
@@ -771,67 +711,20 @@ window.GradingSetupCopy = (function () {
       );
       return;
     }
+    // html-safe: the source's name through esc; each class through classHtml
     var html =
       '<div class="copy-review-note">From ' +
       esc(_className(plans[0].srcCid)) +
       '. Grades in these classes will follow the new setup. Scores are not changed.</div>' +
-      plans
-        .map(function (p, pi) {
-          var out = '<div class="copy-review-class"><div class="copy-review-name">' + esc(p.dstName) + '</div>';
-          if (!p.changes.length) out += '<div class="copy-review-note copy-review-muted">Already the same.</div>';
-          p.changes.forEach(function (c) {
-            out +=
-              '<div class="copy-review-note"><strong>' +
-              esc(c.label) +
-              '</strong></div><ul class="copy-change-list">' +
-              c.lines
-                .map(function (l) {
-                  return '<li>' + esc(l) + '</li>';
-                })
-                .join('') +
-              '</ul>';
-            if (c.key !== 'categories') return;
-            var cats = p.categories;
-            cats.removed.forEach(function (d) {
-              if (!d.count) return;
-              out +=
-                '<label class="copy-review-field">Move the ' +
-                _plural(d.count, 'assessment', 'assessments') +
-                ' in ' +
-                esc(d.name) +
-                ' to ' +
-                _moveSelect(
-                  'data-gsc-move="' + pi + '" data-gsc-cat="' + esc(d.id) + '"',
-                  cats.rows,
-                  _guessRow(d.name, cats.rows),
-                  false,
-                ) +
-                '</label>';
-            });
-            if (cats.uncategorized)
-              out +=
-                '<label class="copy-review-field">Put the ' +
-                _plural(cats.uncategorized, 'assessment', 'assessments') +
-                ' with no category in ' +
-                _moveSelect('data-gsc-move="' + pi + '" data-gsc-cat="uncategorized"', cats.rows, -1, true) +
-                '</label>';
-          });
-          if (p.same.length && p.changes.length)
-            out +=
-              '<div class="copy-review-note copy-review-muted">Already the same: ' + esc(p.same.join(', ')) + '.</div>';
-          p.skipped.forEach(function (s) {
-            out += '<div class="copy-review-note copy-review-muted">' + esc(s) + '</div>';
-          });
-          return out + '</div>';
-        })
-        .join('');
+      plans.map(classHtml).join('');
     var n = changing.length;
-    AssessmentCopy.dialog({
-      title: 'Check before copying',
+    var overlay = AssessmentCopy.dialog({
+      title: 'Check Before Copying',
       html: html,
-      okLabel: n === 1 ? 'Copy setup' : 'Copy to ' + _plural(n, 'class', 'classes'),
-      cancelLabel: 'Don’t copy',
+      okLabel: n === 1 ? 'Copy Setup' : 'Copy to ' + _plural(n, 'Class', 'Classes'),
+      cancelLabel: 'Don’t Copy',
       onOpen: function (root) {
+        root.classList.add('gsc-dialog');
         // A choice clears the outline a stopped Copy left.
         root.addEventListener('change', function (e) {
           var sel = e.target.closest('[data-gsc-move]');
@@ -875,6 +768,12 @@ window.GradingSetupCopy = (function () {
         return true;
       },
     });
+    return overlay;
+  }
+
+  // The small picture of a class's markers (grading-setup-copy-dialog.js draws it; both load together).
+  function mini(scale, label) {
+    return /** @type {any} */ (window).GradingSetupCopyDialog.mini(scale, label);
   }
 
   return {
@@ -883,7 +782,12 @@ window.GradingSetupCopy = (function () {
     planSetup: planSetup,
     applySetup: applySetup,
     copiedMessage: copiedMessage,
-    openDialog: openDialog,
     review: review,
+    // For grading-setup-copy-dialog.js, which adds openDialog.
+    GROUPS: GROUPS,
+    loadClass: loadClass,
+    className: _className,
+    plural: _plural,
+    toast: _toast,
   };
 })();

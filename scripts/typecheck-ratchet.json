@@ -60,6 +60,7 @@
     "teacher/cm-pts-edit.js",
     "teacher/cm-pts-save.js",
     "teacher/cm-pts-pointer.js",
+    "teacher/grading-setup-copy-dialog.js",
     "teacher/cm-competency-import.js",
     "teacher/cm-withdrawn.js",
     "teacher/cm-competency-cards.js",
