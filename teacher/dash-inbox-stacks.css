@@ -74,7 +74,7 @@
    side; the tile is as tall as its rows, up to its 60% of the column, and
    Bulletins has the rest (Colin, Nov 26: "One steady size"). */
 .dash-row-left.has-bulletins:has(.dash-inbox-stacks:not(.has-open)) {
-  grid-template-rows: fit-content(60%) minmax(0, 1fr);
+  grid-template-rows: fit-content(calc((100% - 12px) * 0.6)) minmax(0, 1fr);
 }
 /* More rows than show: the bottom edge fades, so the next row reads as more. */
 .dash-inbox-stacks-row.is-more .dash-inbox-stacks-cards {
