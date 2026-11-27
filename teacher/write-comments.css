@@ -270,8 +270,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   min-height: 32px;
   padding: 3px 0;
   border-top: 1px solid var(--wc-line);
@@ -281,7 +281,7 @@
   flex-wrap: wrap;
 }
 .wc-fact-main {
-  flex: 1 1 120px;
+  flex: 1 1 170px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -304,7 +304,7 @@
 }
 .wc-bar {
   flex: 0 1 120px;
-  min-width: 40px;
+  min-width: 0;
   height: 8px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.08);
