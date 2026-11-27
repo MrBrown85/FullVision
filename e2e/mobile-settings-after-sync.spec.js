@@ -23,7 +23,7 @@ test('Settings opens after a sync and says when it last synced', async ({ page }
   await page.locator('[data-action="m-settings"]').first().click();
   const sheet = page.locator('#m-sheet-container .m-sheet.m-sheet-visible');
   await expect(sheet).toBeVisible();
-  await expect(sheet).toContainText('Last synced');
+  await expect(sheet).toContainText('Last Synced');
   await expect(sheet).toContainText('Sign Out');
   expect(errors).toEqual([]);
 });

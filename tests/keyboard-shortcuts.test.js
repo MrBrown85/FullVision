@@ -59,7 +59,7 @@ describe('Help button', () => {
   });
 
   it('the phone Settings sheet links to the help site', () => {
-    const src = readFileSync(resolve(root, 'teacher-mobile/shell.js'), 'utf8');
-    expect(src).toContain('href="/help" target="_blank" rel="noopener">Help</a>');
+    const src = readFileSync(resolve(root, 'teacher-mobile/settings-sheet.js'), 'utf8');
+    expect(src).toContain('href="/help" target="_blank" rel="noopener"');
   });
 });

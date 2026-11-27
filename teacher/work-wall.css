@@ -11,6 +11,12 @@
 .ww-gap {
   flex: 1;
 }
+/* Wrappers the phone lays out as a scrolling row and a form row; the
+   computer sees through them. */
+body:not(.mobile-mode) .ww-pills,
+body:not(.mobile-mode) .ww-by-row {
+  display: contents;
+}
 
 /* The wall over the page, under the grader (3900). */
 .ww-overlay {

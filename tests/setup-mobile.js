@@ -136,6 +136,7 @@ load('teacher-mobile/add-work.js');
 load('teacher-mobile/markup.js');
 load('teacher-mobile/crit-own.js');
 load('teacher-mobile/revision-sheet.js');
+load('teacher-mobile/settings-sheet.js');
 load('teacher-mobile/grade-look.js');
 load('teacher-mobile/grade-reader.js');
 load('teacher-mobile/tab-grade.js');

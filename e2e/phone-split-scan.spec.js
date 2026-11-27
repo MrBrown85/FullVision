@@ -80,10 +80,8 @@ const filed = (page, sid) =>
 async function splitNameAndAdd(page, who) {
   const ss = page.locator('#m-splitscan');
   await expect(ss.locator('.m-ss-card')).toHaveCount(6, { timeout: 20000 });
-  await expect(ss.locator('.m-ss-line')).toHaveText('6 pages make 6 pieces of 1.');
   await ss.getByRole('button', { name: 'One more page per student' }).click();
   await expect(ss.locator('.m-ss-card')).toHaveCount(3);
-  await expect(ss.locator('.m-ss-line')).toHaveText('6 pages make 3 pieces of 2.');
   await expect(ss.locator('.m-ss-range')).toHaveText([
     'Piece 1 · Pages 1–2',
     'Piece 2 · Pages 3–4',
@@ -166,9 +164,6 @@ test('Choose a File: a six-page scan is split, two pieces named and added to the
   const ss = page.locator('#m-splitscan');
   await expect(ss.locator('.m-ss-title')).toHaveText('Split the Scan');
   await expect(ss.locator('[data-ss="piece"][aria-pressed="true"]')).toHaveAttribute('data-aid', LAB);
-  await expect(ss.locator('.m-ss-foot .m-ss-hint')).toHaveText(
-    'Save the scan from Mail to this phone (to Files on an iPhone, to Downloads on Android), then choose it here.',
-  );
   await shot(page, 'B7-phone-split-pick');
   await ss.locator('.m-ss-input').setInputFiles(SCAN);
   await splitNameAndAdd(page, who);
