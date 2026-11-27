@@ -153,11 +153,11 @@
 
   function closeClassManager() {
     state.classManagerOpen = false;
-    // A student's panel on the Student Page tab closes with Class Settings.
+    // A student's panel closes with Class Settings; so do the Done panel and its New marks.
     if (typeof StudentPageStudents !== 'undefined') StudentPageStudents.closeAll();
-    // The Done panel and its New marks last until Class Settings closes.
     state.cmImportDone = null;
     state.cmRosterOnly = null;
+    CmPtsEdit.drop(); // an unsaved Points and Proficiency draft goes with Class Settings
     closeColorPop();
     if (typeof Router !== 'undefined' && Router.setUrl && location.pathname === '/dashboard') {
       Router.setUrl('/dashboard');

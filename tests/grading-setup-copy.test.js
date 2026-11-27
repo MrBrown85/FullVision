@@ -236,4 +236,186 @@ describe('grading setup copies across classes', () => {
     await GradingSetupCopy.applySetup(GradingSetupCopy.planSetup(A, B, ALL), { 'b-quiz': 0 });
     expect(JSON.stringify(_cache.scores[B])).toBe(before);
   });
+
+  describe('Points and Proficiency copies whole', () => {
+    // A's markers: Proficient counts as 80% and starts at 70%.
+    const MARKERS = {
+      boundaries: [
+        { min: 86, proficiency: 4 },
+        { min: 70, proficiency: 3 },
+        { min: 50, proficiency: 2 },
+        { min: 0, proficiency: 1 },
+      ],
+      percents: { 4: 100, 3: 80, 2: 50, 1: 25 },
+      labels: null,
+    };
+
+    it('lists each step and band start that differs, in the words of the other lines', () => {
+      _cache.courseConfigs[A].gradingScale = structuredClone(MARKERS);
+      const plan = GradingSetupCopy.planSetup(A, B, { gradingScale: true });
+      expect(plan.changes).toHaveLength(1);
+      expect(plan.changes[0].key).toBe('gradingScale');
+      expect(plan.changes[0].label).toBe('Points and Proficiency');
+      expect(plan.changes[0].lines).toContain('3: 75% → 80%.');
+      expect(plan.changes[0].lines).toContain('Proficient starts at 73% → 70%.');
+    });
+
+    it('copies the scale to the other class, as a copy, and leaves the source and the scores alone', async () => {
+      _cache.courseConfigs[A].gradingScale = structuredClone(MARKERS);
+      await GradingSetupCopy.applySetup(GradingSetupCopy.planSetup(A, B, { gradingScale: true }), {});
+      expect(getGradingScale(B)).toEqual(MARKERS);
+      expect(getGradingScale(A)).toEqual(MARKERS);
+      // Not linked: a later change in A does not reach B.
+      _cache.courseConfigs[A].gradingScale.percents[3] = 85;
+      expect(getGradingScale(B).percents[3]).toBe(80);
+      expect(GradingSetupCopy.planSetup(A, B, { gradingScale: true }).changes).toHaveLength(1);
+    });
+
+    it('is already the same when the markers match, even if one class has none saved', () => {
+      expect(GradingSetupCopy.planSetup(A, B, { gradingScale: true })).toMatchObject({
+        changes: [],
+        same: ['Points and Proficiency'],
+      });
+    });
+
+    it('is ticked by default and has a picture, not a line, in the dialog', () => {
+      expect(GradingSetupCopy.GROUPS.map(g => g.label)).toEqual([
+        'Grading System',
+        'Categories and Weights',
+        'Calculation Method',
+        'Points and Proficiency',
+        'Course %',
+        'Rubric Levels',
+        'Late Work Policy',
+        'Reporting Terms',
+      ]);
+      expect(GradingSetupCopy.GROUPS.find(g => g.key === 'gradingScale').on).toBe(true);
+      expect(GradingSetupCopy.describeSource(A).gradingScale).toBe('');
+      expect(GradingSetupCopy.describeSource(A).roundPercent).toBe('One Decimal');
+    });
+
+    describe('when a reporting term has ended', () => {
+      // B is a Letter class with scores, so a Proficient of 80% moves its course %.
+      beforeEach(() => {
+        _cache.courseConfigs[A].gradingScale = structuredClone(MARKERS);
+        COURSES[B].gradingSystem = 'letter';
+        _cache.courseConfigs[B].reportingTerms = [
+          { ordinal: 1, label: 'Term 1', starts_on: '2020-09-01', ends_on: '2020-11-30' },
+        ];
+        _cache.learningMaps[B] = { subjects: [], sections: [{ id: 's', name: 'I', tags: [{ id: 't', label: 'I' }] }] };
+        _cache.categories[B] = [];
+        _cache.assessments[B] = [
+          { id: 'a1', title: 'Lab', scoreMode: 'proficiency', tagIds: ['t'], type: 'summative', date: '2026-10-01' },
+        ];
+        saveStudents(B, [{ id: 'p1', firstName: 'Amara', lastName: 'Osei', enrolledDate: '2026-09-01' }]);
+        _cache.scores[B] = { p1: [{ assessmentId: 'a1', tagId: 't', score: 3, date: '2026-10-01' }] };
+        _cache.statuses[B] = {};
+        clearProfCache();
+      });
+
+      it('keeps the sentence that says every term changes, for that class', () => {
+        const plan = GradingSetupCopy.planSetup(A, B, { gradingScale: true });
+        expect(plan.endedNote).toBe(
+          'This changes the course % for every term, including Term 1, which has already ended. Report cards printed before today won’t match.',
+        );
+        // The grades were read under A's scale and put back: B still reads its own.
+        expect(getGradingScale(B)).toEqual(DEFAULT_GRADING_SCALE);
+      });
+
+      it('leaves it out when the course % would not change, or no term has ended', () => {
+        _cache.courseConfigs[B].reportingTerms = [];
+        expect(GradingSetupCopy.planSetup(A, B, { gradingScale: true }).endedNote).toBeUndefined();
+      });
+
+      it('shows it in the check step, with the markers before and after as pictures', () => {
+        const stub = globalThis.document;
+        const doc = parseHTML('<!DOCTYPE html><html><body></body></html>').document;
+        globalThis.document = doc;
+        try {
+          GradingSetupCopy.review([GradingSetupCopy.planSetup(A, B, { gradingScale: true })], () => {});
+          const dialog = doc.querySelector('.copy-dialog');
+          expect(dialog.classList.contains('gsc-dialog')).toBe(true);
+          expect(doc.querySelector('#copy-dialog-title').textContent).toBe('Check Before Copying');
+          expect(dialog.textContent).toContain('3: 75% → 80%.');
+          expect(dialog.textContent).toContain('which has already ended');
+          const pics = [...doc.querySelectorAll('.gsc-mini')].map(m => [
+            m.getAttribute('role'),
+            m.getAttribute('aria-label'),
+          ]);
+          expect(pics).toEqual([
+            ['img', 'Science 8 B’s markers now'],
+            ['img', 'Science 8 B’s markers after copying'],
+          ]);
+          expect(doc.querySelector('[data-copy-ok]').textContent).toBe('Copy Setup');
+          expect(doc.querySelector('[data-copy-cancel]').textContent).toBe('Don’t Copy');
+        } finally {
+          globalThis.document = stub;
+        }
+      });
+    });
+  });
+
+  describe('the dialog', () => {
+    let doc;
+    let stub;
+    let stubCss;
+    beforeEach(() => {
+      stub = globalThis.document;
+      stubCss = globalThis.CSS;
+      doc = parseHTML('<!DOCTYPE html><html><body></body></html>').document;
+      globalThis.document = doc;
+      globalThis.CSS = { escape: x => String(x) };
+    });
+    afterEach(() => {
+      globalThis.document = stub;
+      globalThis.CSS = stubCss;
+    });
+    const settle = () => new Promise(r => setTimeout(r, 20));
+
+    it('opens with only Points and Proficiency on for Use in Other Classes, and rows with named switches', async () => {
+      GradingSetupCopy.openDialog(A, { only: 'gradingScale' });
+      await settle();
+      expect(doc.querySelector('#copy-dialog-title').textContent).toBe('Copy Grading Setup');
+      expect(doc.querySelector('.copy-dialog').classList.contains('gsc-dialog')).toBe(true);
+      const on = [...doc.querySelectorAll('[data-gsc-group][aria-checked="true"]')].map(b => b.dataset.gscGroup);
+      expect(on).toEqual(['gradingScale']);
+      const switches = [...doc.querySelectorAll('.rb-switch')];
+      expect(switches.length).toBeGreaterThan(8);
+      switches.forEach(b => {
+        expect(b.getAttribute('role')).toBe('switch');
+        expect(b.getAttribute('aria-label')).toBeTruthy();
+      });
+      expect(doc.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+      // A picture of this class's markers on its row, named.
+      expect(doc.querySelector('[data-gsc-mini="scale"]').getAttribute('aria-label')).toBe('This class’s markers');
+      // No class is picked yet, so Review Changes waits.
+      expect(doc.querySelector('[data-copy-ok]').disabled).toBe(true);
+      expect(doc.querySelector('[data-copy-ok]').textContent).toBe('Review Changes');
+    });
+
+    it('lists the same course first, ticks with a press on the row, and Import picks one source', async () => {
+      GradingSetupCopy.openDialog(A, {});
+      await settle();
+      const classes = [...doc.querySelectorAll('[data-gsc-dst]')].map(b => b.getAttribute('aria-label'));
+      expect(classes).toEqual(['Science 8 B', 'Science 8 C']);
+      // Every group but Reporting Terms starts on.
+      expect([...doc.querySelectorAll('[data-gsc-group][aria-checked="true"]')]).toHaveLength(7);
+      doc.querySelector('[data-gsc-dst]').click();
+      expect(doc.querySelector('[data-gsc-dst]').getAttribute('aria-checked')).toBe('true');
+      expect(doc.querySelector('[data-copy-ok]').disabled).toBe(false);
+      doc.querySelector('[data-gsc-mode="from"]').click();
+      await settle();
+      expect([...doc.querySelectorAll('[data-gsc-from]')].map(b => b.getAttribute('role'))).toEqual(['radio', 'radio']);
+      expect(doc.querySelector('[data-gsc-from]').getAttribute('aria-checked')).toBe('true');
+    });
+
+    it('greys Categories and Weights when the source has none', async () => {
+      GradingSetupCopy.openDialog(C, {});
+      await settle();
+      const cats = doc.querySelector('[data-gsc-group="categories"]');
+      expect(cats.disabled).toBe(true);
+      expect(cats.getAttribute('aria-checked')).toBe('false');
+      expect(cats.closest('.gsc-row').textContent).toContain('none in Science 8 C');
+    });
+  });
 });

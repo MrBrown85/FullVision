@@ -20,15 +20,15 @@ window.GradingSetupCopy = (function () {
   'use strict';
 
   var GROUPS = [
-    { key: 'gradingSystem', label: 'Grading system', on: true },
-    { key: 'categories', label: 'Categories and weights', on: true },
-    { key: 'calcMethod', label: 'Calculation method', on: true },
+    { key: 'gradingSystem', label: 'Grading System', on: true },
+    { key: 'categories', label: 'Categories and Weights', on: true },
+    { key: 'calcMethod', label: 'Calculation Method', on: true },
     { key: 'gradingScale', label: 'Points and Proficiency', on: true },
     { key: 'roundPercent', label: 'Course %', on: true },
     { key: 'levelOrder', label: 'Rubric Levels', on: true },
-    { key: 'lateWorkPolicy', label: 'Late work policy', on: true },
+    { key: 'lateWorkPolicy', label: 'Late Work Policy', on: true },
     // Dates belong to one school year (docs/DECISIONS.md, Reporting periods 6).
-    { key: 'reportingTerms', label: 'Reporting terms', on: false },
+    { key: 'reportingTerms', label: 'Reporting Terms', on: false },
   ];
 
   var SYSTEM_LABELS = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
@@ -135,7 +135,7 @@ window.GradingSetupCopy = (function () {
         : '',
       calcMethod: _calcLabel(_calcOf(cid)),
       gradingScale: '',
-      roundPercent: getRoundWholePercent(cid) ? 'Whole number' : 'One decimal',
+      roundPercent: getRoundWholePercent(cid) ? 'Whole Number' : 'One Decimal',
       levelOrder: _levelOrderLabel(_levelOrderOf(cid)),
       lateWorkPolicy: late || 'None',
       reportingTerms: terms.length

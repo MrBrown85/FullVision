@@ -303,6 +303,11 @@
 .gsc-label {
   margin: 6px 0 -4px;
 }
+.gsc-dialog #gsc-classes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 /* One-line rows with a switch at the right; tinted when on. */
 .gsc-row {
   min-height: 40px;
