@@ -520,7 +520,7 @@ test.describe('A Page Studio form, read as parts', () => {
     );
     await dialog.locator('[data-issue="attendance"]').click();
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole('tab', { name: 'Term Questionnaire' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Write Comments' })).toHaveAttribute('aria-selected', 'true');
   });
 
   test('Print Reports sets the name on the reports: preferred or first, always the last name', async ({ page }) => {

@@ -935,7 +935,7 @@ window.ReportQuestionnaire = (function () {
       return b === 'language_goals' ? 'ELL' : 'IEP';
     });
     var link = `<a role="link" tabindex="0" data-href="/student?id=${esc(sid)}&course=${esc(cid)}" class="qn-head-link" title="${esc(
-      'Opens ' + first + '’s Student Dashboard. Its Term Questionnaire button returns here, to the same student.',
+      'Opens ' + first + '’s Student Dashboard. Its Write Comments button returns here, to the same student.',
     )}">Student Dashboard ›</a>`;
     return `<div class="qn-head">
       <span class="qn-avatar" style="background:${_avatarColor(sid)}" aria-hidden="true">${esc(initials(student))}</span>

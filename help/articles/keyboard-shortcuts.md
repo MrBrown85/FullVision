@@ -41,7 +41,7 @@ These keys are shown as hints on the screens where they work.
 - Move down a column, move across: Enter or ↓, Tab (the student table on the **Students** tab)
 - Close the **Add Student** form: Esc
 - Add the typed I Can statement: Enter (**Competencies** tab)
-- Save the comment and open the next student, as **Approve and Next** does: Ctrl+Enter (Term Questionnaire)
-- Copy the comment as plain text, as **Copy** does: Ctrl+Shift+C (Term Questionnaire)
-- Put back a sentence taken out with **Remove From Comment**: Ctrl+Z (Term Questionnaire)
-- Close a student's Skills or Observations panel: Esc (Term Questionnaire)
+- Save the comment and open the next student, as **Approve and Next** does: Ctrl+Enter (Write Comments)
+- Copy the comment as plain text, as **Copy** does: Ctrl+Shift+C (Write Comments)
+- Put back a sentence taken out with **Remove From Comment**: Ctrl+Z (Write Comments)
+- Close a student's Skills or Observations panel: Esc (Write Comments)

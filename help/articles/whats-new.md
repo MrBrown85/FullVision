@@ -7,6 +7,7 @@ keywords:
   - Class Management
 checked: 2026-11-24
 labels:
+  - Write Comments
   - Print
   - Save to Phone
   - They Answer a Quiz
@@ -63,6 +64,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 26, 2026: Write Comments
+
+The Term Questionnaire tab on the Reporting page is now **Write Comments**. Nothing else about it has changed: it opens on the same page, with the same students, comments and approvals.
 
 ## Nov 24, 2026: The Inbox, Redrawn
 
