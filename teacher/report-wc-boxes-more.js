@@ -140,5 +140,73 @@ window.ReportWcBoxesMore = (function () {
     return { facts: [], head: '', foot: [], top: mine.map(env.line) };
   }
 
-  return { att: att, voice: voice, obs: obs, missing: missing, next: next, cls: cls, yours: yours };
+  /* Which line goes where in a box (docs/plans/write-comments-plan.md). A box that lists skills or
+     pieces puts the ones that hold a sentence first, in the comment's order, so moving a sentence
+     moves its row; a sentence on no skill is a row of its own, and the rest keep their order. Every
+     other box lists its sentences in the comment's order. A line has a handle only where it can move:
+     another line in its list to pass, or, in a box of skills, another row that holds a sentence. */
+  var FLOAT = { best: true, strength: true, voice: true, next: true };
+  var firstRow = function (f) {
+    return f.lines.reduce(function (m, l) {
+      return Math.min(m, l.ri);
+    }, Infinity);
+  };
+
+  /* Puts the model's facts in order, loose lines among them; returns whether the box floats. */
+  function arrange(key, model) {
+    if (!FLOAT[key]) return false;
+    var all = (model.top || [])
+      .map(function (l) {
+        return fact({ id: 'loose:' + l.rk, loose: l, lines: [l] });
+      })
+      .concat(model.facts)
+      .map(function (f, i) {
+        return { f: f, at: firstRow(f), i: i };
+      });
+    all.sort(function (a, b) {
+      return a.at === b.at ? a.i - b.i : a.at < b.at ? -1 : 1;
+    });
+    model.facts = all.map(function (x) {
+      return x.f;
+    });
+    model.top = [];
+    return true;
+  }
+
+  function markMovable(facts, top, float) {
+    if (float) {
+      var held = facts.filter(function (f) {
+        return f.lines.length;
+      });
+      held.forEach(function (f) {
+        f.lines.forEach(function (l) {
+          l.move = held.length > 1 || f.lines.length > 1;
+        });
+      });
+      return;
+    }
+    [top]
+      .concat(
+        facts.map(function (f) {
+          return f.lines;
+        }),
+      )
+      .forEach(function (list) {
+        list.forEach(function (l) {
+          l.move = list.length > 1;
+        });
+      });
+  }
+
+  return {
+    arrange: arrange,
+    markMovable: markMovable,
+    att: att,
+    voice: voice,
+    obs: obs,
+    missing: missing,
+    next: next,
+    cls: cls,
+    yours: yours,
+  };
 })();

@@ -26,7 +26,14 @@ window.ReportWcHost = (function () {
     h.insertRow = rq.insertRow;
     h.typedRow = rq.typedRow;
     h.snapshot = rq.snapshot;
+    h.restore = rq.restore;
     h.undoToast = rq.undoToast;
+    // A sentence moved: the order is the teacher's now (Generate keeps it), written and saved.
+    h.moveRows = function (st, rows) {
+      rq.saveNow();
+      rq.setRows(st, rows, true);
+      rq.writeRows(st);
+    };
     h.saveNarrative = rq.saveNarrative;
     h.openBrowse = rq.openBrowse;
     h.claimHtml = rq.claimHtml;

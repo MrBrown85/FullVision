@@ -148,10 +148,10 @@ test('the drag handle moves a sentence in front of another; the arrow keys move 
   const texts = () => page.locator('#tq-read .wc-sent').allTextContents();
   // The name moves to whichever sentence comes first, so a sentence is known by its words after the first.
   const tail = t => t.trim().split(' ').slice(1).join(' ');
-  const first = (await texts())[0];
-  const grips = page.locator('.wc-grip');
-  const n = await grips.count();
-  expect(n).toBeGreaterThan(2);
+  // A sentence with none to pass has no grip; two more give the Strength box three.
+  await expect(page.locator('.wc-box[data-part="strength"] .wc-grip')).toHaveCount(0);
+  for (let i = 0; i < 2; i++) await page.locator('.wc-box[data-part="strength"] [data-do="wcSay"]').first().click();
+  await expect(page.locator('.wc-box[data-part="strength"] .wc-grip')).toHaveCount(3);
   // Arrow keys: the last sentence of the Strength box moves one place earlier.
   const grip = page.locator('.wc-box[data-part="strength"] .wc-grip').last();
   const was = await texts();
@@ -164,13 +164,19 @@ test('the drag handle moves a sentence in front of another; the arrow keys move 
   await grip.focus();
   await page.keyboard.press('ArrowUp');
   await expect.poll(async () => (await texts()).findIndex(t => tail(t) === tail(strengthText))).toBe(at - 1);
-  // Drag: the same sentence onto the first one goes in front of it.
-  await page.locator('.wc-box[data-part="strength"] .wc-grip').last().dragTo(page.locator('.wc-line').first());
-  await expect.poll(async () => tail((await texts())[0])).toBe(tail(strengthText));
-  expect(tail((await texts())[1])).toBe(tail(first));
+  // Drag: the last Strength sentence onto the first one goes in front of it (the drag itself is in
+  // write-comments-drag.spec.js).
+  const strengthLines = () => page.locator('.wc-box[data-part="strength"] .wc-line .wc-text');
+  const firstNow = tail((await strengthLines().first().textContent()) || '');
+  const lastNow = tail((await strengthLines().last().textContent()) || '');
+  await page
+    .locator('.wc-box[data-part="strength"] .wc-grip')
+    .last()
+    .dragTo(page.locator('.wc-box[data-part="strength"] .wc-line').first());
+  await expect.poll(async () => tail((await strengthLines().first().textContent()) || '')).toBe(lastNow);
   // Undo puts it back.
   await page.locator('#undo-toast button', { hasText: 'Undo' }).click();
-  await expect.poll(async () => tail((await texts())[0])).toBe(tail(first));
+  await expect.poll(async () => tail((await strengthLines().first().textContent()) || '')).toBe(firstNow);
 });
 
 test('typing in the comment is read back into sentences, with Undo', async ({ page }) => {
