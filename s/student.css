@@ -67,6 +67,23 @@ html.sp-size-larger {
 * {
   box-sizing: border-box;
 }
+/* App, not website (Colin, Nov 27 2026): no grey flash on a tap, and holding a button, tab or icon neither
+   selects its words nor opens the iPhone's Copy / Share menu. Writing, the page's text and handouts stay
+   selectable. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+[role='button'],
+[role='tab'],
+[role='radio'],
+.sp-tab,
+svg,
+img {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 html,
 body {
   margin: 0;
