@@ -172,14 +172,17 @@ window.ReportWcDraw = (function () {
       ${head}
       <div class="wc-body">
         ${b.required || ''}${b.top.map(line).join('')}${b.facts
-          .map(function (f) {
-            return factHtml(f, b);
+          .map(function (f, i) {
+            return (i === 0 && b.float && f.lines.length ? GROUP : '') + factHtml(f, b);
           })
           .join('')}${write}
         ${foot.length ? `<div class="wc-foot">${foot.join('')}</div>` : ''}
       </div>
     </section>`;
   }
+
+  /* In a box of skills, the rows that hold a sentence come first; this names them. */
+  var GROUP = '<h3 class="wc-group">In the Comment</h3>';
 
   function boxes(list, ui) {
     return list

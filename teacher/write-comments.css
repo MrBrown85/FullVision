@@ -81,6 +81,11 @@
   max-height: none;
   margin: 0;
 }
+.wc-boxes,
+.wc-boxes * {
+  /* The page keeps the teacher's place itself (report-wc.js, holdPlace). */
+  overflow-anchor: none;
+}
 .wc-boxes {
   position: relative;
   display: flex;
@@ -215,6 +220,12 @@
 }
 .wc-body {
   margin-top: 4px;
+}
+/* Names the skill rows that hold a sentence, in a box of skills. */
+.wc-group {
+  margin: 4px 0 2px;
+  font-size: 14.5px;
+  font-weight: 600;
 }
 
 /* Chips and buttons */
