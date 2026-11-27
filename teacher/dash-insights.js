@@ -313,8 +313,8 @@ window.DashInsights = (function () {
       .join(' · ');
   }
 
-  /* The top bar's Missing and Late cell. Zero says so in a line; otherwise
-     the two counts, and a click opens the class's gradebook (plan F.8). */
+  /* The top bar's Missing and Late cell: the two counts (or that nothing is
+     missing), and a click opens the class's gradebook (plan F.8). */
   function missingGlanceHtml(items, cid) {
     var c = missingCounts(items);
     var inner =
@@ -322,12 +322,6 @@ window.DashInsights = (function () {
       '<span class="dash-glance-value">' +
       c.total +
       '</span>';
-    if (!c.total)
-      return (
-        '<div class="dash-glance-cell dash-glance-missing">' +
-        inner +
-        '<span class="dash-glance-sub">Nothing is missing or late.</span></div>'
-      );
     return (
       '<a class="dash-glance-cell dash-glance-missing" role="link" tabindex="0" data-href="' +
       esc('/gradebook?course=' + (cid || '')) +
@@ -336,7 +330,7 @@ window.DashInsights = (function () {
       '">' +
       inner +
       '<span class="dash-glance-sub">' +
-      missingSubLine(c) +
+      (c.total ? missingSubLine(c) : 'Nothing is missing or late.') +
       '</span></a>'
     );
   }
