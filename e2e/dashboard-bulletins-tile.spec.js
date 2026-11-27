@@ -1,11 +1,12 @@
 /**
  * The Bulletins tile on the Dashboard (slice B1e; on since B1g), Demo Mode: it sits under the Inbox in 40% of the left column, shows the
  * sample class's three bulletins in whole rows that share its height (two lines of words each), and its links open the
- * Bulletins page at that bulletin, at its Seen by list, or with the box open.
+ * Bulletins page at that bulletin, at its Seen by list, or with the box open. Since Nov 26 the tile is notes from 580 px
+ * across (Colin: "always notes"), so the rows are tested in a 1100 px window, where the tile is narrower than that.
  */
 import { test, expect } from '@playwright/test';
 
-test.use({ viewport: { width: 1280, height: 800 } });
+test.use({ viewport: { width: 1100, height: 800 } });
 
 async function open(page, { oldBulletins = null, oldDashRow = null, questions = true } = {}) {
   await page.addInitScript(
@@ -184,8 +185,8 @@ test('empty: Nothing Posted Yet at the same height', async ({ page }) => {
   expect(Math.abs(tile.height - 199)).toBeLessThanOrEqual(1);
 });
 
-test('at 1440 x 900 the Inbox slot is 359 px and the tile 239 px, three whole rows', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+test('at 1100 x 900 the Inbox slot is 359 px and the tile 239 px, three whole rows', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 900 });
   await open(page, { questions: false });
   expect(Math.round((await box(page, '.dash-row')).height)).toBe(610);
   expect(Math.abs((await box(page, '.dash-row-inbox')).height - 359)).toBeLessThanOrEqual(1);
@@ -279,13 +280,13 @@ const WIDE =
   '.dash-bulletins-tile, .dash-bulletins-tile * { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.04em !important; }';
 
 for (const [w, h, rowsShown] of [
-  [1280, 800, 3],
-  [1440, 900, 3],
+  [1100, 800, 3],
+  [1100, 900, 3],
 ]) {
   for (const wide of [false, true]) {
     test(`at ${w} x ${h} the rows are whole and fill the tile${wide ? ' in a wide font' : ''}`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
-      await open(page, { questions: w === 1280 });
+      await open(page, { questions: h === 800 });
       if (wide) await page.addStyleTag({ content: WIDE });
       const f = await fit(page);
       expect(f.shown).toBe(rowsShown);
@@ -473,12 +474,13 @@ test('a bulletin that is a photo and no words shows the photo on its note', asyn
   await expect(page.locator('.dash-bulletins-words.has-pic')).toHaveAttribute('aria-label', /A photo/);
 });
 
-test('at 1280 x 800 the tile is rows, with no class name in the subtitle', async ({ page }) => {
+test('at 1100 x 800 the tile is rows, with no class name in the subtitle', async ({ page }) => {
   await open(page);
   const c = await cards(page);
-  expect(c.width).toBeLessThan(900);
+  expect(c.width).toBeLessThan(600);
   expect(c.notes).toBe(false);
-  expect(c.sub).toMatch(/^\d+ can see it/);
+  // This narrow, the subtitle is left out; it never names the class.
+  expect(c.sub).not.toContain('Science 8');
   // Rows keep Write a Bulletin as a button in the header; the blank note is the notes' own.
   expect(c.writeButton).toBe(true);
   expect(c.blank).toBe(false);
@@ -531,18 +533,40 @@ test('rows: Write a Bulletin and Open Bulletins come first, as on screen; the fo
   expect(await tabOrder(page, 4, '.dash-bulletins-write')).toEqual(['write', 'open', 'words', 'seen']);
   await page.setViewportSize({ width: 1680, height: 1050 });
   await expect(tile).toHaveClass(/is-notes/);
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize({ width: 1100, height: 800 });
   await expect(tile).not.toHaveClass(/is-notes/);
 });
 
-test('the tile crossing 860 px without a window resize changes its form, and back', async ({ page }) => {
+/* Narrower than three notes need: two notes and the blank one, at 1280 x 800 and 1440 x 900. */
+for (const [w, h] of [
+  [1280, 800],
+  [1440, 900],
+]) {
+  test(`at ${w} x ${h} the tile is two notes and a blank one`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await open(page);
+    await expect(page.locator('.dash-bulletins-tile')).toHaveClass(/is-notes/);
+    const c = await cards(page);
+    expect(c.width).toBeGreaterThanOrEqual(580);
+    expect(c.count).toBe(2);
+    expect(new Set(c.tops).size).toBe(1);
+    expect(c.inside).toBe(true);
+    expect(c.uncut.every(Boolean)).toBe(true);
+    expect(c.blank).toBe(true);
+    expect(c.blankInside).toBe(true);
+    expect(c.writeButton).toBe(false);
+    expect(c.tileScroll).toEqual([0, 0]);
+  });
+}
+
+test('the tile crossing 580 px without a window resize changes its form, and back', async ({ page }) => {
   await page.setViewportSize({ width: 1680, height: 1050 });
   await open(page);
   const tile = page.locator('.dash-bulletins-tile');
   await expect(tile).toHaveClass(/is-notes/);
-  // The tile's parent shrinks to 700 px: the window does not change.
+  // The tile's parent shrinks to 540 px: the window does not change.
   await page.evaluate(() => {
-    document.querySelector('.dash-row-bulletins').style.width = '700px';
+    document.querySelector('.dash-row-bulletins').style.width = '540px';
   });
   await expect(tile).not.toHaveClass(/is-notes/);
   await expect(page.locator('.dash-bulletins-write')).toBeVisible();
