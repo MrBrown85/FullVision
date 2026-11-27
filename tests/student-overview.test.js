@@ -374,6 +374,16 @@ describe('Your Competencies at a glance', () => {
     expect([all.getAttribute('data-action'), all.getAttribute('data-tab')]).toEqual(['stuTab', 'comps']);
   });
 
+  it('in a Letter class, shows the % and no proficiency word', () => {
+    const pct = (name, v, dir) => comp(name, v, 4, { text: v + '%', word: '', lv: v >= 90 ? 4 : 3, dir });
+    const card = draw([pct('Evidence', 90, 'up'), pct('Perspective', 89, 'none'), pct('Inquiry', 83, 'down')]);
+    expect(bars(group(card, 'Strongest'))).toEqual(['Evidence']);
+    expect(bars(group(card, 'Next to Work On'))).toEqual(['Inquiry']);
+    expect(card.querySelector('.stu-gp-tile[data-sec="Evidence"] .stu-gp-val').textContent).toBe('90%↑');
+    expect(card.querySelector('.stu-gp-tile[data-sec="Inquiry"]').getAttribute('aria-label')).toBe('Inquiry: 83%');
+    expect(card.querySelector('.stu-gp-seg')).toBeNull();
+  });
+
   it('marks the competency All Your Work is narrowed to', () => {
     const items = [3.5, 3.0, 2.1].map((v, i) => comp('C' + i, v, 4));
     const card = draw(items, { compFilter: 'C0' });
