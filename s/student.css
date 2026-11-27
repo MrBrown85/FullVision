@@ -54,14 +54,12 @@ html.sp-size-larger {
   --sp-zoom: 1.3;
 }
 
-/* Opened from the Home Screen (s/manifest.json) the page is an app: no
-   Safari bars to slide, and the page itself never bounces, so the header and
-   the tabs along the bottom stay on the screen's edges. In Safari the page
-   keeps its bounce and pull to refresh. */
-@media (display-mode: standalone) {
-  html {
-    overscroll-behavior: none;
-  }
+/* The page never bounces, in Safari or opened from the Home Screen: apps don't (Colin, Nov 27 2026; until
+   then Safari kept the bounce and pull to refresh). The header and the tabs along the bottom stay on the
+   screen's edges. */
+html,
+body {
+  overscroll-behavior: none;
 }
 
 * {
