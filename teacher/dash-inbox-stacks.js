@@ -288,7 +288,7 @@ window.DashInboxStacks = (function () {
       '<div class="dash-inbox-stacks' +
       (open ? ' has-open' : '') +
       '" id="dash-inbox-stacks"><div class="dash-inbox-stacks-row" id="dash-inbox-stacks-row">' +
-      cards +
+      ('<div class="dash-inbox-stacks-cards">' + cards + '</div>') +
       returns +
       '</div></div>'
     );
@@ -300,27 +300,27 @@ window.DashInboxStacks = (function () {
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
 
-  /** Closed stacks one size (150 px at most) in a grid that wraps; opened, the row as tall as the tile allows.
-   * @param {HTMLElement} el */
+  /** Closed: one steady size, one row in the tile's share of the column, whatever the count (Colin, Nov 26). Opened: as tall as the tile allows, shrinking to fit across. @param {HTMLElement} el */
   function _size(el) {
     var avail = el.clientHeight;
     if (!avail) return;
     var solo = !!el.querySelector('.dash-inbox-returns.is-solo'),
       open = el.classList.contains('has-open');
-    // Under a stack: its layers (12), the title (two lines) and the gap.
-    var sh = avail - 76;
-    if (el.querySelector('.dash-inbox-return')) sh = Math.min(sh, (avail - (solo ? 120 : 140)) / (solo ? 0.9 : 0.8));
-    sh = Math.max(MIN_SH, Math.min(open ? STACK_H : 150, Math.floor(sh)));
-    // The opened box: its title, the pages, a name and a time, and its padding.
+    var col = /** @type {HTMLElement} */ (el.closest('.dash-row-left') || el);
+    var sh = open ? avail - 76 : col.clientHeight * (col.classList.contains('has-bulletins') ? 0.6 : 1) - 192;
+    if (open && el.querySelector('.dash-inbox-return'))
+      sh = Math.min(sh, (avail - (solo ? 120 : 140)) / (solo ? 0.9 : 0.8));
+    sh = Math.max(MIN_SH, Math.min(STACK_H, Math.floor(sh)));
     var ph = Math.max(MIN_PH, Math.min(Math.round(STACK_H * 0.8), Math.floor(avail - 140)));
     el.style.setProperty('--dash-inbox-ph', ph + 'px');
     el.style.setProperty('--dash-inbox-sh', sh + 'px');
-    // Stacks that do not all fit shrink before they scroll: down the grid, or across the opened row.
     var row = /** @type {HTMLElement} */ (el.querySelector('#dash-inbox-stacks-row'));
-    while (row && sh > MIN_SH && (open ? row.scrollWidth - row.clientWidth : row.scrollHeight - row.clientHeight) > 1) {
+    while (open && row && sh > MIN_SH && row.scrollWidth - row.clientWidth > 1) {
       sh = Math.max(MIN_SH, sh - 8);
       el.style.setProperty('--dash-inbox-sh', sh + 'px');
     }
+    var cards = row && row.firstElementChild; // closed, the stacks scroll by themselves; Return stays put
+    if (cards) row.classList.toggle('is-more', !open && cards.scrollHeight - cards.clientHeight > 12);
   }
 
   /** Whether a picture is wanted now: a stack's top page, or an opened page
@@ -470,7 +470,7 @@ window.DashInboxStacks = (function () {
     /** @type {ResizeObserver | null} */
     var watch = null;
     if (typeof ResizeObserver !== 'undefined') {
-      var was = tiles.clientHeight;
+      var was = -1; // the first report sizes it again once it is on the page and the column can be measured
       watch = new ResizeObserver(function () {
         if (Math.abs(tiles.clientHeight - was) < 1) return;
         was = tiles.clientHeight;
