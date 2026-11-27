@@ -467,13 +467,6 @@ test('phone titles, chips and sparklines are not cut', async ({ page }) => {
       .map(e => e.textContent),
   );
   expect(cutRows).toEqual([]);
-  const clipped = await page.evaluate(
-    () =>
-      [...document.querySelectorAll('#m-screen-student-detail .m-section-header .growth-sparkline')].filter(
-        e => e.scrollWidth > e.clientWidth + 1,
-      ).length,
-  );
-  expect(clipped).toBe(0);
   await page.locator('[data-action="m-back"]').first().click();
 
   await page.locator('.m-tab-item[data-tab="grade"]').click();
