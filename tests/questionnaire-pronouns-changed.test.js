@@ -117,7 +117,7 @@ describe('pronouns changed after the comment was written (Demo Mode, Science 8, 
       // The note sits on the typed sentence's row only, its Dismiss set apart.
       expect((html.match(/class="qn-pron-note"/g) || []).length).toBe(1);
       const at = html.indexOf('class="qn-pron-note"');
-      expect(html.slice(html.lastIndexOf('<div class="qn-req-row', at), at)).toContain(mine);
+      expect(html.slice(html.lastIndexOf('<div class="wc-line"', at), at)).toContain(mine);
       expect(html).toContain('>Pronouns changed · <button');
       // Use the New Sentence puts in every sentence the pronouns changed and
       // clears the approval.
@@ -319,7 +319,7 @@ describe('pronouns changed after the comment was written (Demo Mode, Science 8, 
       const text = comment();
       expect(/\b(she|her|herself|he|him|himself)\b/i.test(text.replace(mine, '').replace(hers, ''))).toBe(false);
       const noted = [...html.matchAll(/class="qn-pron-note"/g)].map(m => {
-        const row = html.slice(html.lastIndexOf('<div class="qn-req-row', m.index), m.index);
+        const row = html.slice(html.lastIndexOf('<div class="wc-line"', m.index), m.index);
         return row.includes(hers) ? 'hers' : row.includes(mine) ? 'mine' : 'other';
       });
       expect(noted.sort()).toEqual(['hers', 'mine']);

@@ -485,66 +485,16 @@ window.ReportQuestionnaire = (function () {
     return !!(r && r.approvedAt);
   }
 
-  /* ── In-place updates (no redraw while the teacher types) ─── */
-  var _quotedTimer = null;
-  function _syncQuotedSoon() {
-    clearTimeout(_quotedTimer);
-    _quotedTimer = setTimeout(function () {
-      _syncQuoted();
-    }, 300);
-  }
   function _syncNote() {
     _fitBox();
     _syncEmpty();
     _syncCount();
     _syncMarks();
-    _syncQuotedSoon();
     _syncWarnSoon();
   }
 
-  /* ── In-text marks (the LayoutE mockup) ──────────────────── */
-
-  /* The best-piece sentence tinted and the missing-work sentence ringed
-     inside the comment: a layer behind the box carrying the same text,
-     invisible except for the marks, so typing, undo and the count are the
-     box's own. */
-  function _marksHtml(rows, text) {
-    var t = String(text || '');
-    var spans = [];
-    (rows || []).forEach(function (r) {
-      var kind = _justAdded(r)
-        ? 'added'
-        : _isBestRow(r)
-          ? 'best'
-          : r.step === 'notHandedIn' || r.step === 'ieProblem'
-            ? 'missing'
-            : '';
-      var s = String(r.text || '').trim();
-      if (!kind || !s) return;
-      var at = t.indexOf(s);
-      if (at < 0) return;
-      spans.push({ at: at, end: at + s.length, kind: kind });
-    });
-    spans.sort(function (a, b) {
-      return a.at - b.at;
-    });
-    var out = '';
-    var from = 0;
-    spans.forEach(function (sp) {
-      if (sp.at < from) return;
-      out += esc(t.slice(from, sp.at)) + `<span class="qn-mark ${sp.kind}">${esc(t.slice(sp.at, sp.end))}</span>`;
-      from = sp.end;
-    });
-    out += esc(t.slice(from));
-    // A trailing line break needs a character after it to take height.
-    return out + '​';
-  }
   function _syncMarks() {
-    var st = _current();
-    var el = _box();
-    var layer = document.getElementById('tq-marks');
-    if (!st || !el || !layer || String(el.dataset.sid) !== String(st.id)) return;
-    layer.innerHTML = _marksHtml(_rows[_rowKey(st)] || [], el.value);
+    ReportWc.syncReading();
   }
 
   /* The Ready count and the roster. */
@@ -606,6 +556,10 @@ window.ReportQuestionnaire = (function () {
     var foot = document.getElementById('tq-comment-foot');
     if (el && foot) foot.hidden = !el.value.trim();
     if (el && box) box.hidden = !!el.value.trim();
+    var first = document.getElementById('tq-generate-first');
+    if (el && first) first.hidden = !!el.value.trim();
+    var read = document.getElementById('tq-read');
+    if (el && read && !ReportWc.typing()) read.hidden = !el.value.trim();
   }
 
   /* ── Marks changed after approval (plan PR 12) ───────────── */
@@ -770,7 +724,7 @@ window.ReportQuestionnaire = (function () {
       })
       .join('');
     return `<div class="qn-stale" id="tq-stale">
-        <div class="qn-stale-note">${esc(ReportQnBoxes.staleNote(stale, day))}</div>
+        <div class="qn-stale-note">${esc(ReportWcComment.staleNote(stale, day))}</div>
         ${boxes}
         ${rating.approvedAt ? '<span class="qn-stale-hint">Using the new sentence clears the approval until you approve again. In the roster, flagged students show an orange dot instead of a ✓.</span>' : ''}
       </div>`;
@@ -861,28 +815,31 @@ window.ReportQuestionnaire = (function () {
     }).length;
     ReportToolbar.setReady(ready, students.length);
     var cur = _current();
-    var termId = getTermId();
+    var why = {};
+    students.forEach(function (s) {
+      why[s.id] = ReportWcLook.reason(s);
+    });
+    var looks = students.filter(function (s) {
+      return !!why[s.id];
+    }).length;
     var annotate = function (sid) {
       var ok = _approved(sid);
       var flag = ok && _flagged(sid);
-      // A student with no comment yet has nothing to approve.
-      var r = getStudentTermRating(_activeCourse, sid, termId) || {};
-      var empty = !plainComment(r.narrative || '').trim();
       return {
-        sub: ok ? '' : empty ? 'No Comment' : 'Needs Approval',
+        sub: why[sid] || ReportWcLook.basic(sid),
         mark: flag
           ? '<span class="student-row-mark flag" role="img" aria-label="Approved, Something Changed" title="Approved, but a sentence no longer matches the gradebook or your class settings. Open the student to see what changed.">●</span>'
           : ok
             ? '<span class="student-row-mark ok" aria-label="Ready">✓</span>'
             : '',
-        hidden: _notReadyOnly && ok && !(cur && cur.id === sid),
+        hidden: _notReadyOnly && !why[sid] && !(cur && cur.id === sid),
       };
     };
     annotate.top = function () {
       var btn = function (filter, label, on) {
         return `<button type="button" class="seg-btn${on ? ' active' : ''}" data-action="tqRosterFilter" data-filter="${filter}" aria-pressed="${on}">${label}</button>`;
       };
-      return `<div class="seg qn-roster-filter" role="group" aria-label="Show Students">${btn('all', 'All ' + students.length, !_notReadyOnly)}${btn('not-ready', 'Not Ready ' + (students.length - ready), _notReadyOnly)}</div>`;
+      return `<div class="seg qn-roster-filter" role="group" aria-label="Show Students">${btn('all', 'All ' + students.length, !_notReadyOnly)}${btn('not-ready', 'Needs a Look ' + looks, _notReadyOnly)}</div>`;
     };
     if (typeof setSidebarAnnotator === 'function') setSidebarAnnotator(annotate);
     document.querySelectorAll('#gb-sidebar .student-row[data-sid]').forEach(function (row) {
@@ -924,32 +881,6 @@ window.ReportQuestionnaire = (function () {
     };
   }
 
-  // html-safe: name, initials, pronouns, designations, ids and grade esc()'d; avatar colour from a fixed palette
-  function _headerHtml(cid, student, f) {
-    var sid = student.id;
-    var first = student.firstName || displayNameFirst(student);
-    var g = headerGrade(cid, sid, f, getTermId());
-    // The designations that offer language or IEP goals, as the goals mockup
-    // shows them beside the pronouns.
-    var des = CommentBank.goalsOffered(f).map(function (b) {
-      return b === 'language_goals' ? 'ELL' : 'IEP';
-    });
-    var link = `<a role="link" tabindex="0" data-href="/student?id=${esc(sid)}&course=${esc(cid)}" class="qn-head-link" title="${esc(
-      'Opens ' + first + '’s Student Dashboard. Its Write Comments button returns here, to the same student.',
-    )}">Student Dashboard ›</a>`;
-    return `<div class="qn-head">
-      <span class="qn-avatar" style="background:${_avatarColor(sid)}" aria-hidden="true">${esc(initials(student))}</span>
-      <div class="qn-who">
-        <span class="qn-name">${esc(displayName(student))}</span>
-        <span class="qn-head-sub">${student.pronouns ? esc(student.pronouns) + ' · ' : ''}${des.map(d => esc(d) + ' · ').join('')}${link}</span>
-      </div>
-      <div class="qn-grade" data-lit="grade">
-        <span class="qn-grade-big">${esc(g.big)}</span>
-        <span class="qn-grade-sub">${esc(g.small)}</span>
-      </div>
-    </div>`;
-  }
-
   /* ── Work Habits ─────────────────────────────────────────── */
 
   /* Work Habits: each habit's name and what it means, always in view, and
@@ -975,42 +906,6 @@ window.ReportQuestionnaire = (function () {
   }
   function _sliderText(v) {
     return v ? CommentBank.SCALE[v - 1] : 'Not rated';
-  }
-
-  // html-safe: habit names, descriptions and scale headings esc()'d; keys and values are fixed
-  function _habitsHtml(cid, f) {
-    var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
-    var rows = CommentBank.HABITS.map(function (h) {
-      var cur = _sliderValue(stored, h.key);
-      var dots = '';
-      // A dot under each column of the scale, and over each column a clear
-      // stop that takes the click (the pointer handler snaps to the
-      // nearest stop wherever the press lands).
-      var stops = '';
-      for (var i = 0; i < HS_STOPS; i++) {
-        dots += `<span class="qn-hs-dot" style="--i:${i}"></span>`;
-        stops += `<span class="qn-hs-stop" style="--i:${i}" data-habit="${h.key}" data-value="${i + 1}"></span>`;
-      }
-      return `<div class="qn-habit-row" data-habit-row="${h.key}">
-        <span class="qn-habit-name" id="tq-habit-${h.key}" title="${esc(h.name)}">${esc(h.name)}</span>
-        <div class="qn-hs${cur ? ' set' : ''}" role="slider" tabindex="0" data-habit="${h.key}" data-value="${cur}" style="--at:${Math.max(0, cur - 1)}" aria-labelledby="tq-habit-${h.key}" aria-describedby="tq-habit-desc-${h.key}" aria-valuemin="1" aria-valuemax="${HS_STOPS}"${cur ? ` aria-valuenow="${cur}"` : ''} aria-valuetext="${esc(_sliderText(cur))}">
-          <div class="qn-hs-track" aria-hidden="true"><span class="qn-hs-rail"></span>${dots}<span class="qn-hs-fill"></span><span class="qn-hs-thumb"></span>${stops}</div>
-        </div>
-        <span class="qn-habit-desc" id="tq-habit-desc-${h.key}" title="${esc(h.desc || h.hint)}">${esc(h.desc || h.hint)}</span>
-      </div>`;
-    }).join('');
-    return `<div class="qn-card qn-habits" data-lit="habits">
-      ${ReportQnBoxes.head('habits', '', `<span class="qn-ev-text" id="tq-rated">${_ratedCount(stored)} of 6 rated</span>`)}
-      <div class="qn-habit-head" aria-hidden="true"><span></span><span class="qn-habit-scale">${CommentBank.SCALE.slice(
-        0,
-        HS_STOPS,
-      )
-        .map(function (label) {
-          return `<span>${esc(label)}</span>`;
-        })
-        .join('')}</span></div>
-      ${rows}
-    </div>`;
   }
 
   /* A slider drawn at a stop (1 to 4) or blank (0), without saving: while
@@ -1191,19 +1086,6 @@ window.ReportQuestionnaire = (function () {
     return text.replace(before, '');
   }
 
-  /* ── At a Glance ─────────────────────────────────────────── */
-
-  /* Under the best piece: its Note for the Report, or when it has none
-     a link to add one, which opens the grader on that piece for this
-     student. */
-  function _reportNoteNudge(best) {
-    if (!best || !best.id) return '';
-    var note = String(best.note || '').trim();
-    // With a note: "Note for the report: “…”" (the LayoutE mockup).
-    if (note) return `<span class="qn-muted qn-note-line">Note for the report: “${esc(note)}”</span>`;
-    return `<button type="button" class="qn-card-link qn-note-add" data-action="tqAddReportNote" data-aid="${esc(best.id)}" title="Opens the grader on this piece. Write one line about what the student did, for the comment.">Add a note for the report ›</button>`;
-  }
-
   /* The grader on one piece, this student only. Closing it reads the
      facts again, so a new mark or note shows here and in the comment. */
   function tqOpenGrader(aid) {
@@ -1220,19 +1102,6 @@ window.ReportQuestionnaire = (function () {
   /* Add a note for the report: the grader on the best piece. */
   function tqAddReportNote(aid) {
     tqOpenGrader(aid);
-  }
-
-  /* Which At a Glance rows are open (Strength, Next Step, Biggest
-     Change, Missing Work), kept as the teacher moves between
-     students. */
-  var _glanceOpen = {};
-  /* A row opened or closed in place; nothing else redraws. */
-  function tqGlanceToggle(row) {
-    _glanceOpen[row] = !_glanceOpen[row];
-    var btn = document.querySelector('.qn-glance-toggle[data-row="' + row + '"]');
-    var list = document.getElementById('tq-glance-' + row);
-    if (btn) btn.setAttribute('aria-expanded', String(!!_glanceOpen[row]));
-    if (list) list.hidden = !_glanceOpen[row];
   }
 
   /* The best piece in the year to date, by the comment's rule (CommentBank.bestPieceOf),
@@ -1278,10 +1147,6 @@ window.ReportQuestionnaire = (function () {
     if (low) out[low.id] = 'Next step';
     return out;
   }
-
-  /* ── At a Glance (Questionnaire glance plan, step 2) ─────────
-     Sets up the comment: the year so far, and the change since the
-     earlier report. */
 
   /* A competency's colour step for .qn-level, 1 to 4. */
   function _levelStep(v) {
@@ -1347,66 +1212,13 @@ window.ReportQuestionnaire = (function () {
     };
   }
 
-  /* The pieces under an opened row: each title opens the grader on it, and
-     its mark or status sits on the right. */
-  // html-safe: ids, titles and marks esc()'d
-  function _glanceListHtml(row, items) {
-    return `<ul class="qn-glance-list" id="tq-glance-${row}"${_glanceOpen[row] ? '' : ' hidden'}>${items
-      .map(function (it) {
-        return `<li><button type="button" class="qn-card-link qn-glance-piece" data-action="tqOpenGrader" data-aid="${esc(it.id)}" title="Opens the grader on this piece.">${esc(it.title || 'Untitled')}</button><span class="qn-glance-mark${it.cls ? ' ' + it.cls : ''}">${esc(it.mark)}</span></li>`;
-      })
-      .join('')}</ul>`;
-  }
-
-  /* Each At a Glance row's part: the tile and colour (ReportQnBoxes.LOOK)
-     and the Sentences box it lights (data-lit; Biggest Change has none). */
-  var _GLANCE_KIND = { strongest: 'strengths', next: 'nextStep', change: 'change', missing: 'notHandedIn' };
-  var _GLANCE_PART = { strongest: 'strengths', next: 'nextStep', change: '', missing: 'notHandedIn' };
-
-  /* A row that opens in place: the label, the body, the figure on the
-     right and a chevron; under it the pieces. */
-  // html-safe: the body, figure and list are built escaped by the callers; row and label are fixed words
-  function _glanceRowHtml(row, label, body, fig, list, chip) {
-    var open = !!_glanceOpen[row];
-    var kind = _GLANCE_KIND[row];
-    return `<div class="qn-fact qn-glance-row" data-lit="${_GLANCE_PART[row] || ''}" data-tone="${_GLANCE_KIND[row]}">
-        <button type="button" class="qn-glance-toggle" data-action="tqGlanceToggle" data-row="${row}" aria-expanded="${open}" aria-controls="tq-glance-${row}">
-          ${ReportQnBoxes.tile(kind)}
-          <span class="qn-fact-body"><span class="qn-fact-label">${label}</span>${body}</span>
-          ${
-            chip
-              ? `<span class="qn-glance-chip">${fig}<span class="qn-chev" aria-hidden="true"></span></span>`
-              : `<span class="qn-glance-fig">${fig}</span><span class="qn-chev" aria-hidden="true"></span>`
-          }
-        </button>
-        ${list}
-      </div>`;
-  }
-
-  /* A skill row: the competency's name (no wording: the teacher knows it;
-     Colin, Nov 4), its figure and piece count on the right (with the
-     change since the earlier report under them), and the pieces behind
-     the figure (compsOf's scores, calc.js), each with the competency's
-     mark on it. */
-  // html-safe: competency names, figures, titles and marks esc()'d; row and label are fixed words
-  function _glanceSkillHtml(cid, f, row, label, c, extra) {
-    // The name, then a detail line (the pieces and the change); the figure
-    // at the right.
-    var body = `<span class="qn-glance-name">${esc(c.name)}</span><span class="qn-glance-detail">${esc(_pieces(c) + (extra ? ' · ' + extra : ''))}</span>`;
-    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level))}</span>`;
-    var items = (c.scores || []).map(function (sc) {
-      return { id: sc.id, title: sc.title, mark: formatLevel(cid, sc.v) };
-    });
-    return _glanceRowHtml(row, label, body, fig, _glanceListHtml(row, items));
-  }
-
-  function _dateOf(a) {
-    return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
-  }
   /* The work labelled Missing and the work handed in late, in the year to
      date as of the report's end, by the comment's record's rule
      (CommentBank.facts: Missing is status NS; Late is a scored or marked
      piece with status LATE), oldest first. */
+  function _dateOf(a) {
+    return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
+  }
   function missingAndLate(cid, sid) {
     var out = [];
     (getAssignedAssessments(cid) || []).forEach(function (a) {
@@ -1421,109 +1233,13 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
-  // html-safe: competency names, titles, notes, marks and figures esc()'d; labels are fixed words
-  function _glanceHtml(cid, student, f) {
-    var best = bestPiece(f);
-    // The best piece's mark as the comment prints it: in a Letter class,
-    // points work's own % (CommentBank.workMark, calc.js), never its level
-    // as a %. The best piece is the comment's, from the same work.
-    var bestMark = best
-      ? courseGradeMode(cid) === 'letter'
-        ? CommentBank.workMark(f, best)
-        : formatLevel(cid, best.v)
-      : '';
-    var rows = glanceRows(f);
-    // Under the figure: the proficiency word outside a Letter class, and
-    // the change since the earlier report.
-    var extra = function (c) {
-      return [courseGradeMode(cid) === 'letter' ? '' : f.levelText(c.level), glanceChange(cid, f, c)]
-        .filter(Boolean)
-        .join(' · ');
-    };
-    var skills = '';
-    if (rows.strongest)
-      skills += _glanceSkillHtml(cid, f, 'strongest', 'Strength', rows.strongest, extra(rows.strongest));
-    if (rows.next) skills += _glanceSkillHtml(cid, f, 'next', 'Next Step', rows.next, extra(rows.next));
-    if (rows.change)
-      skills += _glanceSkillHtml(
-        cid,
-        f,
-        'change',
-        'Biggest Change',
-        rows.change,
-        formatLevel(cid, _levelThen(f, rows.change)) + ' → ' + formatLevel(cid, rows.change.level),
-      );
-    // Missing and Late: the comment's record, the year to date as of the
-    // report's end (facts().notHandedIn and facts().record, the Missing
-    // Work block's rule).
-    var ml = missingAndLate(cid, student.id);
-    var nMissing = ml.filter(function (x) {
-      return x.missing;
-    }).length;
-    var nLate = ml.length - nMissing;
-    var mlCount = [nMissing ? nMissing + ' missing' : '', nLate ? nLate + ' late' : ''].filter(Boolean).join(' · ');
-    var mlRow = ml.length
-      ? _glanceRowHtml(
-          'missing',
-          'Missing Work',
-          `<span class="qn-glance-name">${esc(mlCount)}</span>`,
-          `<span class="qn-count">${ml.length}</span>`,
-          _glanceListHtml(
-            'missing',
-            ml.map(function (x) {
-              return {
-                id: x.id,
-                title: x.title,
-                mark: x.missing ? 'Missing' : 'Late',
-                cls: x.missing ? 'missing' : 'late',
-              };
-            }),
-          ),
-          true,
-        )
-      : `<div class="qn-fact qn-glance-row" data-lit="notHandedIn">
-        <div class="qn-glance-toggle static">${ReportQnBoxes.tile('notHandedIn')}
-        <div class="qn-fact-body"><span class="qn-fact-label">Missing Work</span><span class="qn-glance-name">None so far this year</span></div></div>
-      </div>`;
-    var sub = f.lastReport
-      ? 'So far this year · change since the ' + f.lastReport.label + ' report'
-      : 'So far this year';
-    var n = rows.comps.length;
-    return `<div class="qn-card qn-glance qno-glance">
-      ${ReportQnBoxes.head('glance', '', `<span class="qn-ev-text">${esc(sub)}</span>`)}
-      <div class="qn-band">Skills</div>
-      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
-      <div class="qn-band">Work</div>
-      <div class="qn-fact qn-best" data-lit="bestPiece">
-        ${ReportQnBoxes.tile('bestPiece')}
-        ${
-          best
-            ? `<div class="qn-fact-body"><span class="qn-fact-label">Best Piece</span><span class="qn-glance-name">${esc(best.title)}</span><span class="qn-best-links"><button type="button" class="qn-card-link" data-action="tqOpenGrader" data-aid="${esc(best.id)}" title="Opens the grader on this piece.">Open in Grader ›</button>${_reportNoteNudge(best)}</span></div>
-        <span class="qn-glance-fig"><span class="qn-best-mark">${esc(bestMark)}</span></span>`
-            : '<div class="qn-fact-body"><span class="qn-fact-label">Best Piece</span><span class="qn-glance-name">No marked work yet</span></div>'
-        }
-      </div>
-      ${mlRow}
-      ${
-        n
-          ? `<div class="qno-foot qno-glance-foot">
-        <button type="button" class="qn-card-link qno-view-all" data-action="tqOpenSkills" aria-haspopup="dialog">View All ${n} Skills ›</button>
-      </div>`
-          : ''
-      }
-    </div>`;
-  }
-
   /* ── Observations, the student's Voice and the class's report (teacher/report-qn-voice-observations.js) ── */
   ReportQnVoiceObservations.configure({ box: _box });
   var studentObs = ReportQnVoiceObservations.studentObs;
   var obsCounts = ReportQnVoiceObservations.obsCounts;
   var _obsStripHtml = ReportQnVoiceObservations._obsStripHtml;
-  var _obsHtml = ReportQnVoiceObservations._obsHtml;
   var _answer = ReportQnVoiceObservations._answer;
   var voiceRows = ReportQnVoiceObservations.voiceRows;
-  var _voiceHtml = ReportQnVoiceObservations._voiceHtml;
-  var _syncQuoted = ReportQnVoiceObservations._syncQuoted;
   var _partLabel = ReportQnVoiceObservations._partLabel;
   var _parts = ReportQnVoiceObservations._parts;
 
@@ -1555,21 +1271,6 @@ window.ReportQuestionnaire = (function () {
     }
     var entered = att.absences != null || att.lates != null;
     return entered ? 'Added to the comment.' : 'Optional. Left out until entered.';
-  }
-
-  // html-safe: totals are whole numbers or empty (_attendanceCount); note from _attendanceNoteHtml
-  function _attendanceHtml(cid, student) {
-    var sid = student.id;
-    var att = getTermAttendance(cid, sid, getTermId());
-    var warn = function (k, p) {
-      return att[k] != null && att[p] != null && att[k] < att[p] ? ' warn' : '';
-    };
-    return `<div class="qn-card qn-att" data-lit="attendance">
-      <span class="qn-att-head">${ReportQnBoxes.tile('attendance')}<span class="qn-box-name qn-att-title">Attendance</span></span>
-      <label class="qn-att-field">Classes Absent<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
-      <label class="qn-att-field">Times Late<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
-      <span class="qn-att-note" id="tq-att-note" aria-live="polite">${_attendanceNoteHtml(att)}</span>
-    </div>`;
   }
 
   /* A box's total: a whole number from 0 to 200, '' for an empty box, or
@@ -1993,7 +1694,6 @@ window.ReportQuestionnaire = (function () {
     // known to be theirs (the Earlier Comment: saved before the app
     // recorded what they typed, or from the old generator) is replaced,
     // with Undo (Nov 3: such sentences stuck through every Generate).
-    var wrote = !!_lastDraft[key];
     // The rows follow the box first, so a sentence just deleted (⌘A,
     // Delete, Generate at once) never comes back.
     clearTimeout(_alignTimer);
@@ -2035,7 +1735,6 @@ window.ReportQuestionnaire = (function () {
           return x.step;
         })
         .filter(Boolean);
-    _wording = null;
     _writeRows(st);
     // Each press replaces the draft: Undo brings the last one back (⌘ Z
     // still works in the box too).
@@ -2097,66 +1796,6 @@ window.ReportQuestionnaire = (function () {
 
   var COPY_ICON =
     '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="7.5" height="7.5" rx="1.5"></rect><path d="M8.5 4 V2.5 A1 1 0 0 0 7.5 1.5 H2.5 A1 1 0 0 0 1.5 2.5 V7.5 A1 1 0 0 0 2.5 8.5 H4"></path></svg>';
-
-  // html-safe: comment text, earlier comments, labels, ids and every sub-card (stale, basis, warn, count, marks) esc()'d
-  function _commentHtml(cid, student) {
-    var sid = student.id;
-    var termId = getTermId();
-    var rating = getStudentTermRating(cid, sid, termId) || {};
-    var text = _shownText(rating);
-    var earlier = _earlierReports(cid, sid, termId);
-    if (_commentTab !== 'this' && earlier.indexOf(_commentTab) < 0) _commentTab = 'this';
-    var thisTab = _commentTab === 'this';
-    var tabs = earlier.length
-      ? `<div class="seg seg-sm qn-comment-tabs" role="group" aria-label="Report">${[['this', 'This Report']]
-          .concat(
-            earlier.map(function (k) {
-              return [k, _reportLabel(k)];
-            }),
-          )
-          .map(function (t) {
-            var pressed = _commentTab === t[0];
-            var tip =
-              t[0] === 'this'
-                ? 'The comment for this report.'
-                : 'The comment that went home in ' + t[1] + '. Read only.';
-            return `<button type="button" class="seg-btn${pressed ? ' active' : ''}" data-action="tqCommentTab" data-tab="${esc(t[0])}" aria-pressed="${pressed}" title="${esc(tip)}">${esc(t[1])}</button>`;
-          })
-          .join('')}</div>`
-      : '';
-    var body;
-    if (thisTab) {
-      body = `${_noDraftHtml(student, _facts(student))}${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
-        <div class="qn-comment-foot" id="tq-comment-foot"${text.trim() ? '' : ' hidden'}>
-          ${_countHtml(cid, text)}
-          <button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button>
-          <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
-        </div>`;
-    } else {
-      var old = (getStudentTermRating(cid, sid, _commentTab) || {}).narrative;
-      body = `<div class="qn-hint">Went home in ${esc(_reportLabel(_commentTab))} · read only</div>
-        <div class="qn-earlier">${plainComment(old)
-          .split(/\n\s*\n/)
-          .map(function (p) {
-            return '<p>' + esc(p.trim()) + '</p>';
-          })
-          .join('')}</div>`;
-    }
-    var stale = thisTab ? staleFor(cid, student) : null;
-    return `<div class="qn-comment" id="tq-comment-card">
-        <div class="qn-comment-top">
-          <span class="qn-comment-title">Teacher Comment</span>
-          ${thisTab && rating.approvedAt ? `<span class="qn-approved-chip" id="tq-approved-chip" title="You approved this comment. Changing it takes the approval off until you approve it again.">Approved ${esc(_shortDay(rating.approvedAt))}</span>` : ''}
-          ${tabs}
-          ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you typed or edited and your order stay.">Generate Comment</button>' : ''}
-        </div>
-        ${stale ? _staleHtml(cid, student, rating, stale) : ''}
-        ${thisTab ? _pronounNoticeHtml(rating, _facts(student)) : ''}
-        ${thisTab ? _basisHtml(cid, student, _facts(student)) : ''}
-        ${thisTab ? '<div id="tq-warn-wrap">' + _warnHtml(cid, student, text) + '</div>' : ''}
-        ${body}
-      </div>`;
-  }
 
   function tqCommentTab(tab) {
     tqSaveCurrentIfNeeded();
@@ -2998,44 +2637,12 @@ window.ReportQuestionnaire = (function () {
     var ctrl = date
       ? `<button type="button" class="qn-req-ctrl" id="tq-deadline-btn" data-action="tqOpenDeadline" aria-haspopup="dialog" aria-expanded="${!!_cal}" title="Pick the date by which the IE must become a grade.">${CAL_ICON}${picked ? esc(_longDay(picked)) : 'Pick a Date'}</button>`
       : '';
-    return `<div class="qn-req-row${flag ? ' flag' : ''}${path !== 'ie' ? ' statement' : ''}${date ? ' has-cal' : ''}"${_rowAttr(i)}>
+    return `<div class="qn-req-row${flag ? ' flag' : ''}${path !== 'ie' ? ' statement' : ''}${date ? ' has-cal' : ''}"${i != null && i >= 0 ? ' data-row="' + i + '"' : ''}>
           ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">${esc(p.label)}</span></div>
           <div class="qn-req-body">${p.text ? `<span class="qn-req-text" title="${esc(source)}">${esc(p.text)}</span>` : ''}${sourceHtml}${emptyHtml}</div>
           ${ctrl}
           ${date ? _calendarHtml(picked) : ''}
         </div>`;
-  }
-
-  /* The Required parts of an IE or goals comment as rows, before Generate
-     has written the comment; on the IE path the Support row follows the
-     Deadline (the IEPath mockup). Nothing on the grade path. */
-  function _requiredRows(cid, student, f) {
-    var path = CommentBank.reportPath(f);
-    if (!path) return [];
-    var next = _previewSteps(cid, student, f);
-    var out = [];
-    CommentBank.requiredParts(_bankContext(cid, student, f)).forEach(function (p) {
-      // The sentence Generate Comment will write for the part, so the row
-      // and the comment agree once it is pressed (Nov 3 sweep).
-      if (p.text && next[p.key]) p = Object.assign({}, p, { text: next[p.key] });
-      var kind = p.key === 'grade' ? (path === 'ie' ? 'grade' : 'statement') : p.key;
-      _emptyGap = 0;
-      out.push({
-        kind: kind,
-        html: _requiredRowHtml(cid, student, f, p, path),
-        row: { step: p.key },
-        label: p.label,
-        required: true,
-      });
-      if (p.key === 'ieDeadline')
-        out.push({
-          kind: 'support',
-          html: _supportRowHtml(cid, student, f),
-          row: { step: 'support' },
-          label: 'Support',
-        });
-    });
-    return out;
   }
 
   /* The sentence per step of the draft the next Generate Comment press
@@ -3186,7 +2793,6 @@ window.ReportQuestionnaire = (function () {
   var _rows = {};
   var _ordered = {}; // key: true once the teacher moved a row
   var _original = {}; // key: the step order Generate gave, for Reset Order
-  var _wording = null; // { index } while a row's Other Wording menu is open
   function _rowKey(st) {
     return _activeCourse + '|' + st.id + '|' + getTermId();
   }
@@ -3350,19 +2956,21 @@ window.ReportQuestionnaire = (function () {
       })
     );
   }
-  function alignRows(rows, text, earlierTexts) {
-    var ss = sentencesOf(text);
-    var units = rows.map(function (r) {
-      var k = sentencesOf(r.text).length || 1;
-      return { len: k, text: sentencesOf(r.text).join(' ') };
-    });
-    var n = rows.length;
-    var m = ss.length;
-    var hit = function (i, j) {
-      var u = units[i];
-      return j + u.len <= m && ss.slice(j, j + u.len).join(' ') === u.text;
+  function _typedFrom(t, n) {
+    return {
+      id: 'text:' + n,
+      step: null,
+      text: t,
+      drafted: null,
+      edited: true,
+      raw: null,
+      prov: null,
+      s: null,
+      classLine: false,
     };
-    // The most rows kept in place, as a longest common subsequence.
+  }
+  /* The most rows kept in place, as a longest common subsequence. */
+  function _lcs(units, n, m, hit) {
     var L = [];
     for (var i = n; i >= 0; i--) {
       L[i] = [];
@@ -3375,6 +2983,21 @@ window.ReportQuestionnaire = (function () {
         }
       }
     }
+    return L;
+  }
+  function alignRows(rows, text, earlierTexts, strict) {
+    var ss = sentencesOf(text);
+    var units = rows.map(function (r) {
+      var k = sentencesOf(r.text).length || 1;
+      return { len: k, text: sentencesOf(r.text).join(' ') };
+    });
+    var n = rows.length;
+    var m = ss.length;
+    var hit = function (i, j) {
+      var u = units[i];
+      return j + u.len <= m && ss.slice(j, j + u.len).join(' ') === u.text;
+    };
+    var L = _lcs(units, n, m, hit);
     var out = [];
     var pendR = [];
     var pendS = [];
@@ -3385,6 +3008,13 @@ window.ReportQuestionnaire = (function () {
         // An Earlier Comment sentence put back (⌘Z after Generate), or a
         // run of them taken by one row.
         if (_wasEarlier(earlierTexts, t)) return out.push(earlierRow(t, out.length));
+        // Typed in the comment: a sentence takes the old one's place only when half its words are the old one's.
+        if (strict && !ReportWcParts.isReword(t, r.text)) {
+          sentencesOf(t).forEach(function (x) {
+            out.push(_typedFrom(x, out.length));
+          });
+          return;
+        }
         var c = Object.assign({}, r, { text: t });
         c.edited = c.drafted == null || t !== c.drafted;
         // An Earlier Comment sentence the teacher changed is theirs now.
@@ -3397,17 +3027,7 @@ window.ReportQuestionnaire = (function () {
       if (!pendR.length)
         pendS.forEach(function (t) {
           if (_wasEarlier(earlierTexts, t)) return out.push(earlierRow(t, out.length));
-          out.push({
-            id: 'text:' + out.length,
-            step: null,
-            text: t,
-            drafted: null,
-            edited: true,
-            raw: null,
-            prov: null,
-            s: null,
-            classLine: false,
-          });
+          out.push(_typedFrom(t, out.length));
         });
       pendR = [];
       pendS = [];
@@ -3429,7 +3049,22 @@ window.ReportQuestionnaire = (function () {
       }
     }
     flush();
-    return out;
+    return _movedBack(rows, out);
+  }
+  /* A sentence cut and pasted elsewhere in the box reads as a new sentence
+     where it lands and a gone one where it was: it is the same row again,
+     with its fact. */
+  function _movedBack(rows, out) {
+    var gone = rows.filter(function (r) {
+      return out.indexOf(r) < 0 && r.step;
+    });
+    return out.map(function (r) {
+      if (r.step || !r.edited || !/^text:/.test(String(r.id))) return r;
+      var at = gone.findIndex(function (g) {
+        return g.text === r.text;
+      });
+      return at < 0 ? r : gone.splice(at, 1)[0];
+    });
   }
 
   /* A class line's row: the support line, the closing sentence or the
@@ -3640,7 +3275,6 @@ window.ReportQuestionnaire = (function () {
   function _resync(st) {
     if (!st || _rowsCurrent(st)) return false;
     delete _rows[_rowKey(st)];
-    _wording = null;
     _own = null;
     rerender();
     return true;
@@ -4079,6 +3713,10 @@ window.ReportQuestionnaire = (function () {
   /* Text into the box as typing would (one ⌘ Z step brings the old text
      back). */
   function _putText(el, text) {
+    if (el.hidden) {
+      el.value = text;
+      return;
+    }
     el.focus();
     el.select();
     var ok = false;
@@ -4122,7 +3760,6 @@ window.ReportQuestionnaire = (function () {
         else delete _lastDraft[snap.key];
         if (snap.seed != null) _lastSeed[snap.key] = snap.seed;
         else delete _lastSeed[snap.key];
-        _wording = null;
         _writeRows(st, snap.text);
         if (_browse) _syncBrowse();
       },
@@ -4166,13 +3803,14 @@ window.ReportQuestionnaire = (function () {
     clearTimeout(_alignTimer);
     _alignTimer = setTimeout(_alignNow, 300);
   }
+  var _strictAlign = false;
   function _alignNow() {
     var st = _current();
     var el = _box();
     if (!st || !el || String(el.dataset.sid) !== String(st.id)) return;
     var key = _rowKey(st);
     var rows = _rows[key] || _rowsFor(st, _facts(st));
-    var next = alignRows(rows, el.value, _replacedEarlier[key]);
+    var next = alignRows(rows, el.value, _replacedEarlier[key], _strictAlign);
     var mark = function (xs) {
       return JSON.stringify(
         xs.map(function (r) {
@@ -4276,166 +3914,8 @@ window.ReportQuestionnaire = (function () {
       });
   }
 
-  function _moveRow(i, dir) {
-    var st = _current();
-    if (!st || _resync(st)) return;
-    var key = _rowKey(st);
-    var rows = _rows[key] || [];
-    var next = moveRow(rows, i, dir);
-    if (!next) return;
-    _rows[key] = next;
-    _ordered[key] = true;
-    _wording = null;
-    _writeRows(st);
-    _focusRow(next.indexOf(rows[i]));
-  }
-  function _resetOrder() {
-    var st = _current();
-    if (!st) return;
-    var key = _rowKey(st);
-    _rows[key] = resetOrder(_rows[key] || [], _original[key] || []);
-    _ordered[key] = false;
-    _wording = null;
-    _writeRows(st);
-    _focusSel('#tq-browse-btn');
-  }
-  function _focusRow(i) {
-    _focusSel('#tq-sentences [data-row="' + i + '"] .qn-srow-handle[tabindex]');
-  }
+  // the rows as they were when the drag began
 
-  /* Dragging by the six-dot handle (pointer events, teacher/report-qn-motion.js),
-     wired once on the document. The order changes live in memory as the
-     lifted sentence passes its neighbours; letting go saves it, Escape
-     puts it back. */
-  var _dnd = false;
-  var _dragFrom = null; // the rows as they were when the drag began
-  function _wireDrag() {
-    if (_dnd || typeof document === 'undefined' || !document.addEventListener) return;
-    _dnd = true;
-    ReportQnMotion.configure({
-      card: function () {
-        return document.getElementById('tq-sentences');
-      },
-      neighbors: function (i) {
-        var st = _current();
-        var rows = (st && _rows[_rowKey(st)]) || [];
-        var us = _units(rows);
-        var u = _unitOf(us, rows[i]);
-        return {
-          prev: u > 0 ? rows.indexOf(us[u - 1][0]) : -1,
-          next: u >= 0 && u < us.length - 1 ? rows.indexOf(us[u + 1][0]) : -1,
-        };
-      },
-      step: function (i, dir) {
-        var st = _current();
-        if (!st) return -1;
-        var key = _rowKey(st);
-        var rows = _rows[key] || [];
-        var next = moveRow(rows, i, dir);
-        if (!next) return -1;
-        if (!_dragFrom) _dragFrom = rows.slice();
-        _rows[key] = next;
-        _wording = null;
-        _syncRequired();
-        return next.indexOf(rows[i]);
-      },
-      commit: function () {
-        var st = _current();
-        var from = _dragFrom;
-        _dragFrom = null;
-        if (!st || !from) return;
-        _ordered[_rowKey(st)] = true;
-        _writeRows(st);
-      },
-      cancel: function () {
-        var st = _current();
-        var from = _dragFrom;
-        _dragFrom = null;
-        if (!st || !from) return;
-        _rows[_rowKey(st)] = from;
-        _syncRequired();
-      },
-    });
-    document.addEventListener('pointerdown', function (e) {
-      var t = /** @type {Element | null} */ (e.target);
-      var h = t && t.closest && t.closest('#tq-sentences .qn-srow-handle:not(.qn-srow-spacer)');
-      if (h) ReportQnMotion.begin(e, h);
-    });
-  }
-
-  /* ── Click a sentence to edit it in place (slice 4) ──────────
-     The sentence becomes a field. Return or a click away keeps it, Esc
-     puts it back. A kept change goes into the Teacher Comment box and
-     through the same input path typing there takes, so the rows follow
-     and an edited bank sentence is "edited" as ever. */
-  var _cardWired = false;
-  function _wireCard() {
-    if (_cardWired || typeof document === 'undefined' || !document.addEventListener) return;
-    _cardWired = true;
-    document.addEventListener('click', function (e) {
-      var t = e.target;
-      var txt = t && t.closest && t.closest('#tq-sentences .qn-req-text');
-      if (!txt || t.closest('button, a, input, textarea') || txt.tagName === 'BUTTON') return;
-      var row = txt.closest('.qn-req-row');
-      if (!row) return;
-      // The support sentence is the class's line: its menu opens.
-      if (row.id === 'tq-row-support') {
-        tqLine('supportMenu');
-        return;
-      }
-      if (!row.classList.contains('qn-srow') || row.classList.contains('qn-own-row') || row.dataset.row == null) return;
-      _editStart(txt);
-    });
-  }
-  function _editStart(txt) {
-    var st = _current();
-    var box = _box();
-    if (!st || !box || String(box.dataset.sid) !== String(st.id) || _commentTab !== 'this') return;
-    var field = document.createElement('textarea');
-    var orig = txt.textContent;
-    var done = false;
-    field.className = 'qn-edit-field';
-    field.rows = 1;
-    field.value = orig;
-    field.setAttribute('aria-label', 'Edit this sentence');
-    field.setAttribute('spellcheck', 'true');
-    var fit = function () {
-      field.style.height = 'auto';
-      field.style.height = field.scrollHeight + 'px';
-    };
-    var close = function (keep) {
-      if (done) return;
-      done = true;
-      var next = field.value.replace(/\s+/g, ' ').trim();
-      var row = txt.closest('.qn-req-row');
-      field.remove();
-      txt.hidden = false;
-      if (row) row.classList.remove('editing');
-      if (keep && next && next !== orig) _applyEdit(st, orig, next);
-    };
-    field.addEventListener('input', fit);
-    field.addEventListener('blur', function () {
-      close(true);
-    });
-    field.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        close(true);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        close(false);
-      } else e.stopPropagation();
-    });
-    txt.hidden = true;
-    txt.after(field);
-    var row = txt.closest('.qn-req-row');
-    if (row) row.classList.add('editing');
-    fit();
-    field.focus();
-    field.setSelectionRange(field.value.length, field.value.length);
-  }
   /* The sentence changed in the comment box as if typed there. */
   function _applyEdit(st, orig, next) {
     var box = _box();
@@ -4455,9 +3935,6 @@ window.ReportQuestionnaire = (function () {
   function _usage(cid, student) {
     return CommentBank.classUsage(COMMENT_BANK, _classmateComments(cid, student.id, getTermId()), cid, student.id);
   }
-  function _usedMeta(n) {
-    return n ? 'Used for ' + _plural(n, 'classmate', 'classmates') : 'Not used yet in this class';
-  }
 
   /* Up to two other sentences that fit the same facts as a row's: the
      same step, fitting the student, claiming the same things, not in the
@@ -4466,7 +3943,7 @@ window.ReportQuestionnaire = (function () {
      other frames; on the summary row, the summary's frames and any cell
      frame whose rating matches. */
   var FAMILY_HABIT_GROUPS = { 'Habits in Class': 1, 'More Habits in Class': 1, 'Habits That Would Help': 1 };
-  function alternatives(row, ctx, usage, taken, bank) {
+  function alternatives(row, ctx, usage, taken, bank, limit) {
     var step = row.step ? _stepDef(row.step) : null;
     if (!step || step.line || !row.s) return [];
     var claims = function (s) {
@@ -4499,7 +3976,7 @@ window.ReportQuestionnaire = (function () {
       .sort(function (a, b) {
         return (usage[a.id] || 0) - (usage[b.id] || 0) || at[a.id] - at[b.id];
       })
-      .slice(0, 2);
+      .slice(0, limit || 2);
   }
 
   /* How many bank sentences of a part fit the student. */
@@ -4542,116 +4019,10 @@ window.ReportQuestionnaire = (function () {
     }</div>`;
   }
 
-  function _wordingMenuHtml(cid, student, ctx, rows, i) {
-    var row = rows[i];
-    var first = _first(student);
-    var usage = _usage(cid, student);
-    var taken = {};
-    rows.forEach(function (r) {
-      taken[r.id] = true;
-    });
-    var part = partOf(row.step);
-    var item = function (id, text, meta, on) {
-      return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-menu-item${on ? ' on' : ''}" data-action="tqSentences" data-do="pick" data-row="${i}" data-sentence="${esc(id)}" title="${on ? 'The sentence in use.' : 'Use this wording instead.'}"><span class="qn-menu-mark" aria-hidden="true">${on ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span><span class="qn-menu-meta">${esc(meta)}</span></span></button>`;
-    };
-    var n = usage[row.id] || 0;
-    var mine = item(
-      // An edited sentence in use is the teacher's text, not the bank's.
-      row.edited ? '' : row.id,
-      row.text,
-      'In use' + (n ? ' · used for ' + _plural(n, 'classmate', 'classmates') : ''),
-      true,
-    );
-    // An edited sentence: the bank's own wording of it comes first.
-    if (row.edited && row.s)
-      mine += item(
-        row.id,
-        CommentBank.fill(row.s, ctx, { first: i === 0 }),
-        'The bank’s wording, before your edit',
-        false,
-      );
-    var others = alternatives(row, ctx, usage, taken)
-      .map(function (s) {
-        return item(s.id, CommentBank.fill(s, ctx, { first: i === 0 }), _usedMeta(usage[s.id] || 0), false);
-      })
-      .join('');
-    var low = part.label.toLowerCase();
-    return `<div class="qn-menu qn-wording" role="menu" aria-label="Other ways to say the ${esc(low)} sentence" id="tq-wording-menu">
-      ${_pickHtml(cid, student, row, i)}<span class="qn-menu-head">Other ways to say this</span>
-      ${mine}${others}
-      <div class="qn-menu-sep" role="separator"></div>
-      <button type="button" role="menuitem" class="qn-menu-add qn-menu-all" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}: every sentence that fits ${esc(first)}.">All ${_plural(_fitCount(part, ctx), esc(low) + ' sentence', esc(low) + ' sentences')}…</button>
-      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="remove" data-row="${i}" title="Takes this sentence out of the comment. Undo puts it back.">Remove From Comment</button>
-      ${
-        window.PersonalBank && PersonalBank.stepAllowed(row.step)
-          ? `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="ownOpen" data-where="row" data-mode="write" data-row="${i}" title="Write a sentence of your own for this part. It goes in your bank and into ${esc(first)}’s comment here.">+ Write Your Own</button>`
-          : ''
-      }
-    </div>`;
-  }
-
   /* Pick the Piece (Best Piece) and Pick the Skill (Strength), above Other
      Ways to Say This. The pick is saved with the term rating: the first
      assessment the report mentions is the best piece, the first strength
      tag the skill named as the strength. */
-  var _piecesAll = false;
-  var _habMenu = false; // the six ratings open under the Work Habits bars
-  // html-safe: titles, names, marks and ids esc()'d; indexes are numbers
-  function _pickHtml(cid, student, row, i) {
-    var f = _facts(student);
-    var first = _first(student);
-    var item = function (action, attr, text, right, on, tip) {
-      return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-menu-item${on ? ' on' : ''}" data-action="tqSentences" data-do="${action}" data-row="${i}" ${attr} title="${esc(tip)}"><span class="qn-menu-mark" aria-hidden="true">${on ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span></span><span class="qn-menu-right">${esc(right)}</span></button>`;
-    };
-    if (_isBestRow(row)) {
-      var order = CommentBank.bestOrderOf(f);
-      if (!order.length) return '';
-      var shown = _piecesAll ? order : order.slice(0, 4);
-      var links = `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqOpenGrader" data-aid="${esc(order[0].id)}" title="Opens the grader on this piece.">Open in Grader ›</button><button type="button" role="menuitem" class="qn-menu-add" data-action="tqAddReportNote" data-aid="${esc(order[0].id)}" title="Opens the grader on this piece. Write one line about what the student did, for the comment.">Add a Note for the Report ›</button>`;
-      return `<span class="qn-menu-head">Pick the Piece</span>${shown
-        .map(function (w) {
-          return item(
-            'pickPiece',
-            'data-aid="' + esc(w.id) + '"',
-            w.title || 'Untitled',
-            _pieceMark(cid, f, w),
-            w === order[0],
-            'Makes this ' + first + '’s best piece for this report.',
-          );
-        })
-        .join('')}${
-        !_piecesAll && order.length > 4
-          ? `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="piecesAll" data-row="${i}" title="Lists every piece with a mark.">All ${order.length} Assignments…</button>`
-          : ''
-      }${links}<div class="qn-menu-sep" role="separator"></div>`;
-    }
-    var part = row.step ? partOf(row.step) : null;
-    if (part && part.id === 'strengths') {
-      var keys = (row.prov && row.prov.factKeys) || [];
-      var comps = (f.comps || [])
-        .filter(function (c) {
-          return c.level > 0 && !!CommentBank.skillFor(f, c);
-        })
-        .sort(function (a, b) {
-          return b.level - a.level;
-        })
-        .slice(0, 8);
-      if (!comps.length) return '';
-      return `<span class="qn-menu-head">Pick the Skill</span>${comps
-        .map(function (c) {
-          return item(
-            'pickSkill',
-            'data-comp="' + esc(c.id) + '"',
-            c.name,
-            formatLevel(cid, c.level),
-            keys.indexOf('comp:' + c.id) >= 0,
-            'Names this skill as ' + first + '’s strength in the comment.',
-          );
-        })
-        .join('')}<div class="qn-menu-sep" role="separator"></div>`;
-    }
-    return '';
-  }
   /* A pick saved, and the row's sentence written again for it: the same
      bank sentence when it still fits, else the first other one that does. */
   function _repick(st, i, patch) {
@@ -4676,26 +4047,9 @@ window.ReportQuestionnaire = (function () {
       if (alt) sentence = alt;
     }
     rows[i] = rowFromSentence(sentence, ctx, row.step, i === 0);
-    _wording = null;
-    _piecesAll = false;
     _writeRows(st);
     // The left column (At a Glance) reads the pick too.
     rerender();
-  }
-
-  function _pickWording(st, i, id) {
-    var key = _rowKey(st);
-    var rows = _rows[key] || [];
-    var s = _bankById(id);
-    _wording = null;
-    if (!rows[i] || !s || (rows[i].id === id && !rows[i].edited)) {
-      _syncRequired();
-      _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
-      return;
-    }
-    rows[i] = rowFromSentence(s, _bankContext(_activeCourse, st, _facts(st)), rows[i].step, i === 0);
-    _writeRows(st);
-    _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
   }
 
   /* ── Where each sentence's fact came from ────────────────── */
@@ -4802,20 +4156,6 @@ window.ReportQuestionnaire = (function () {
     return '';
   }
 
-  /* One source line for a row of several sentences: each sentence's
-     source once, the "general sentence" note only when no sentence states
-     a fact. */
-  function _unitSource(unit, cid, student, f, ctx) {
-    var out = [];
-    var general = '';
-    unit.forEach(function (r) {
-      var src = rowSource(r, cid, student, f, ctx);
-      if (/^A general sentence\./.test(src)) general = src;
-      else if (out.indexOf(src) < 0) out.push(src);
-    });
-    return out.join(' · ') || general;
-  }
-
   /* Where a row's fact came from, in plain words: the grade and its
      distance from the next band, the piece and its mark, the ratings, the
      weakest skill. An edited sentence says so instead. */
@@ -4869,125 +4209,6 @@ window.ReportQuestionnaire = (function () {
     return bits.join(' · ') || 'A general sentence. It states no fact about ' + first + '.';
   }
 
-  /* ── The card ────────────────────────────────────────────── */
-
-  var DOTS_ICON =
-    '<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="2.5" r="1.3"></circle><circle cx="7.5" cy="2.5" r="1.3"></circle><circle cx="2.5" cy="7" r="1.3"></circle><circle cx="7.5" cy="7" r="1.3"></circle><circle cx="2.5" cy="11.5" r="1.3"></circle><circle cx="7.5" cy="11.5" r="1.3"></circle></svg>';
-  var HANDLE = `<span role="button" tabindex="0" class="qn-srow-handle" aria-label="Move this sentence" title="Drag to move this sentence. ⌥↑ and ⌥↓ move it too.">${DOTS_ICON}</span>`;
-  var SPACER = '<span class="qn-srow-handle qn-srow-spacer" aria-hidden="true"></span>';
-
-  /* A row's place on the card (data-row) and its key (data-rk: the
-     sentence's id and which of that id it is), which stays the same when
-     the row moves, so the card can glide it from where it was. */
-  function _rowAttr(i) {
-    if (i == null || i < 0) return '';
-    var st = _current();
-    var rows = (st && _rows[_rowKey(st)]) || [];
-    var r = rows[i];
-    var n = 0;
-    for (var k = 0; r && k < i; k++) if (rows[k].id === r.id) n++;
-    return ' data-row="' + i + '"' + (r ? ' data-rk="' + esc(String(r.id)) + '#' + n + '"' : '');
-  }
-
-  /* One row of the card. unit: its rows (_units), the first leading; i:
-     the first's index among the rows (none for a class row the comment has
-     no sentence for yet). */
-  function _rowHtml(cid, student, f, ctx, rows, unit, i, path) {
-    var row = unit[0];
-    var fixed = i < 0 || _isRequired(row.step, path);
-    var handle = fixed ? SPACER : HANDLE;
-    // The teacher's own meeting sentence, typed or kept by Generate.
-    if (
-      path === 'ie' &&
-      i >= 0 &&
-      (i === meetingRowAt(rows, path) || (row.step === 'ieMeeting' && !row.s && row.edited))
-    )
-      return _requiredRowHtml(
-        cid,
-        student,
-        f,
-        {
-          key: 'ieMeeting',
-          label: 'Meeting',
-          text: unit
-            .map(function (r) {
-              return r.text;
-            })
-            .join(' '),
-          source: 'Written by you',
-        },
-        path,
-        i,
-        handle,
-      );
-    if (row.step === 'notHandedIn') return _missingRowHtml(cid, f, handle, i, row.text);
-    if (row.step === 'support') return _supportRowHtml(cid, student, f, handle, i);
-    if (row.step === 'languageGoals') return _langRowHtml(cid, student, f, handle, i);
-    if (row.step === 'closer') return _closingRowHtml(cid, handle, i);
-    if (_isRequired(row.step, path))
-      return _requiredRowHtml(
-        cid,
-        student,
-        f,
-        { key: row.step, label: rowLabel(row, path, student), text: row.text },
-        path,
-        i,
-        handle,
-      );
-    var open = !!_wording && _wording.index === i;
-    var typed = isTyped(row) || !!row.derived;
-    var edited =
-      !typed &&
-      unit.some(function (r) {
-        return r.edited;
-      });
-    // A sentence the teacher changed can go to their bank.
-    var addBank =
-      i >= 0 && window.PersonalBank && !row.classLine && !row.placeholder && edited
-        ? `<button type="button" class="qn-own-add" data-action="tqSentences" data-do="ownAdd" data-row="${i}" title="Adds this sentence to your bank, for other students it fits.">Add to My Bank</button>`
-        : '';
-    // A sentence the teacher typed: Options (Add to My Bank, Remove From
-    // Comment), the InsertRows mockup.
-    var from = _sourceOf(row);
-    var wordingBtn = from
-      ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="${edited ? 'Go back to the bank’s wording, pick another, or remove the sentence.' : 'Other ways to say this sentence, every sentence for this part, or remove it.'}">Options ▾</button>`
-      : '';
-    // An edited bank sentence keeps Other Wording, so it can go back to a
-    // bank wording (Nov 3 sweep).
-    var earlier = !!row.earlier;
-    var act = typed
-      ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="options" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Add this sentence to your bank, or remove it.">Options ▾</button>`
-      : earlier
-        ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="options" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Keep this sentence as yours, or remove it.">Options ▾</button>`
-        : edited
-          ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>' +
-            addBank +
-            (unit.length === 1 ? wordingBtn : '')
-          : wordingBtn || addBank;
-    var ownBox = _own && _own.where === 'row' && _own.index === i ? _ownBoxHtml(student) : '';
-    var added = _justAdded(row);
-    var tint = added ? ' added' : _isBestRow(row) ? ' best' : row.step === 'attendance' ? ' attendance' : '';
-    var text = unit
-      .map(function (r) {
-        return r.text;
-      })
-      .join(' ');
-    var source = _unitSource(unit, cid, student, f, ctx) + (added ? ' · added just now' : '');
-    var pron = _pronounCheckFor(student, f);
-    return `<div class="qn-req-row qn-srow${tint}${open ? ' has-menu' : ''}"${_rowAttr(i)}>
-      ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path, student))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text" title="${esc(source)}">${esc(text)}</span>${
-        unit.some(function (r) {
-          return pronounNote(r, pron);
-        })
-          ? `<span class="qn-pron-note" title="The student’s pronouns changed after you wrote this sentence. Check its pronouns.">Pronouns changed · <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="pronounOk" data-row="${i}" title="Keeps this sentence as written and takes this note away.">Dismiss</button></span>`
-          : ''
-      }${ownBox}</div>
-      ${act}
-      ${open ? (typed || earlier ? _optionsMenuHtml(i, earlier) : (from || BANK_SOURCE).optionsMenu(cid, student, ctx, rows, i)) : ''}
-    </div>`;
-  }
-
   /* ── Typed rows and adding between rows (the InsertRows mockup) ── */
 
   /* The row put in just now, tinted for a few seconds with "added just
@@ -5014,21 +4235,6 @@ window.ReportQuestionnaire = (function () {
       });
       _syncMarks();
     }, ADDED_FOR);
-  }
-
-  /* The Options menu of a Your Sentence row, or of an Earlier Comment row
-     (Keep This Sentence makes it the teacher's, so Generate keeps it). */
-  function _optionsMenuHtml(i, earlier) {
-    var bank = earlier
-      ? `<button type="button" role="menuitem" class="qn-menu-item" data-action="tqSentences" data-do="keepEarlier" data-row="${i}" title="Makes this sentence yours. Generate Comment keeps it."><span class="qn-menu-body"><span class="qn-menu-text">Keep This Sentence</span><span class="qn-menu-meta">Generate Comment keeps it</span></span></button>`
-      : window.PersonalBank
-        ? `<button type="button" role="menuitem" class="qn-menu-item" data-action="tqSentences" data-do="ownAdd" data-row="${i}" title="Adds this sentence to your bank, for other students it fits."><span class="qn-menu-body"><span class="qn-menu-text">Add to My Bank</span><span class="qn-menu-meta">For other students it fits</span></span></button>`
-        : '';
-    return `<div class="qn-menu qn-options" role="menu" aria-label="${earlier ? 'Earlier comment sentence' : 'Your sentence'}" id="tq-options-menu">
-      <span class="qn-menu-head">${earlier ? 'Earlier Comment' : 'Your Sentence'}</span>
-      ${bank}
-      <button type="button" role="menuitem" class="qn-menu-item" data-action="tqSentences" data-do="remove" data-row="${i}" title="Takes this sentence out of the comment. ⌘Z puts it back."><span class="qn-menu-body"><span class="qn-menu-text">Remove From Comment</span></span></button>
-    </div>`;
   }
 
   /* The sentences the + menu offers at a gap: one for each part missing
@@ -5085,11 +4291,6 @@ window.ReportQuestionnaire = (function () {
     });
     return out;
   }
-  /* A row for a choice, filled for the student. */
-  function _choiceRow(c, ctx) {
-    if (c.classLine) return _classRow(c.step, c.text);
-    return rowFromSentence(c.s, ctx, c.step);
-  }
   function _insertOpts(cid, st) {
     var termId = getTermId();
     var key = _rowKey(st);
@@ -5099,88 +4300,6 @@ window.ReportQuestionnaire = (function () {
       exclude: lastTermIds(cid, st.id, termId),
     };
   }
-
-  /* ── Sentence sources (S18-T1) ───────────────────────────────
-     Where a sentence put in from the + menu comes from. A source is
-     registered once (registerSource) as:
-       id           its name.
-       label        the heading of its group in the Add Here menu, drawn
-                    only when more than one source has a sentence to
-                    offer.
-       list         (at) → the sentences it offers this student at this
-                    gap, each a choice { step, part, label, id, text, … }
-                    with an id no other source uses. at: { cid, student,
-                    f, ctx, rows, gap, opts } (opts: what the bank drafts
-                    with, _insertOpts).
-       row          (choice, ctx) → the comment's row for a choice.
-       owns         (row) → whether a row of the comment is one of its
-                    sentences: the row then has Options, with its menu.
-       optionsMenu  (cid, student, ctx, rows, i) → the open Options menu
-                    of row i.
-       pick         (st, i, id) → a pick in that menu: its sentence `id`
-                    in the row's place.
-     The comment bank is the one source today. */
-  var _sources = [];
-  /* Adds a source after the ones there (before them with opts.first);
-     returns a function that takes it out again. */
-  function registerSource(src, opts) {
-    if (opts && opts.first) _sources.unshift(src);
-    else _sources.push(src);
-    return function () {
-      var at = _sources.indexOf(src);
-      if (at >= 0) _sources.splice(at, 1);
-    };
-  }
-  /* The source a row's sentence came from, null when it has none (a typed
-     sentence, a class line, the Earlier Comment). */
-  function _sourceOf(row) {
-    return (
-      (row &&
-        _sources.find(function (src) {
-          return src.owns(row);
-        })) ||
-      null
-    );
-  }
-  /* What the + menu offers at a gap: a group for each source with a
-     sentence to offer, in the order registered. Each: { source, choices }. */
-  function sourceChoices(at) {
-    return _sources
-      .map(function (src) {
-        return { source: src, choices: src.list(at) };
-      })
-      .filter(function (grp) {
-        return grp.choices.length > 0;
-      });
-  }
-  function _gapChoices(cid, student, f, ctx, rows, g) {
-    return sourceChoices({
-      cid: cid,
-      student: student,
-      f: f,
-      ctx: ctx,
-      rows: rows,
-      gap: g,
-      opts: _insertOpts(cid, student),
-    });
-  }
-  /* The comment bank: the draft's sentence for each part the comment has
-     none for (insertChoices); its Options menu is "Other ways to say
-     this" (_wordingMenuHtml, _pickWording). */
-  var BANK_SOURCE = {
-    id: 'bank',
-    label: 'Sentence Bank',
-    list: function (at) {
-      return insertChoices(at.rows, at.ctx, at.opts);
-    },
-    row: _choiceRow,
-    owns: function (row) {
-      return !!row.step && !!row.s;
-    },
-    optionsMenu: _wordingMenuHtml,
-    pick: _pickWording,
-  };
-  registerSource(BANK_SOURCE);
 
   /* ── In Their Words (S18-F1) ─────────────────────────────────
      A Next Step sentence that quotes what the student wrote on the
@@ -5257,13 +4376,28 @@ window.ReportQuestionnaire = (function () {
       return m;
     });
   }
+  /* One frame filled for the student: the answer inside “ ”, unchanged. A
+     full stop follows the closing mark only when the answer has no ending
+     of its own. */
+  function wordsSentence(student, answer, frame) {
+    var p = ReportBlocks.getPronouns(student);
+    var they = p.subj === 'they';
+    var q = '“' + answer.text + '”' + (/[.!?…]$/.test(answer.text) ? '' : '.');
+    return WORDS_FRAMES[answer.key][frame || 0].replace(/\{(\w+)\}/g, function (m, k) {
+      if (k === 'N') return _first(student);
+      if (k === 's') return p.subj;
+      if (k === 'O') return p.obj;
+      if (k === 'P') return p.poss;
+      if (k === 'V') return they ? '' : 's';
+      if (k === 'IS') return they ? 'are' : 'is';
+      if (k === 'Q') return q;
+      return m;
+    });
+  }
   function _wordsId(key, frame) {
     return 'words:' + key + ':' + (frame || 0);
   }
-  function _wordsParse(id) {
-    var m = /^words:(\w+):([01])$/.exec(String(id || ''));
-    return m ? { key: m[1], frame: Number(m[2]) } : null;
-  }
+
   function wordsRow(student, answer, frame) {
     var text = wordsSentence(student, answer, frame);
     return {
@@ -5320,183 +4454,6 @@ window.ReportQuestionnaire = (function () {
       ? poss + ' goal, from ' + p.poss + ' Goal Check-In'
       : poss + ' words, from ' + p.poss + ' questionnaire';
   }
-  // html-safe: every answer, question, sentence and name through esc
-  function _wordsMenuHtml(cid, student, ctx, rows, i) {
-    var row = rows[i];
-    var answers = wordsAnswers(_facts(student));
-    var first = _first(student);
-    var mine = _wordsParse(row.id) || { key: row.words, frame: 0 };
-    var item = function (id, text, meta, on) {
-      return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-menu-item${on ? ' on' : ''}" data-action="tqSentences" data-do="pick" data-row="${i}" data-sentence="${esc(id)}" title="${on ? 'The sentence in use.' : 'Use this instead.'}"><span class="qn-menu-mark" aria-hidden="true">${on ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span>${meta ? `<span class="qn-menu-meta">${esc(meta)}</span>` : ''}</span></button>`;
-    };
-    var cur = answers.find(function (a) {
-      return a.key === mine.key;
-    });
-    var ways = cur
-      ? [0, 1]
-          .map(function (k) {
-            return item(
-              _wordsId(cur.key, k),
-              wordsSentence(student, cur, k),
-              k === mine.frame ? 'In use' : '',
-              k === mine.frame,
-            );
-          })
-          .join('')
-      : '';
-    var others = answers
-      .filter(function (a) {
-        return a.key !== mine.key;
-      })
-      .map(function (a) {
-        return item(
-          _wordsId(a.key, 0),
-          wordsSentence(student, a, 0),
-          a.question + (a.status ? ' · ' + a.status : ''),
-          false,
-        );
-      })
-      .join('');
-    var part = partOf('nextStep');
-    var low = part.label.toLowerCase();
-    return `<div class="qn-menu qn-wording" role="menu" aria-label="Other ways to say ${esc(first)}’s words" id="tq-wording-menu">
-      <span class="qn-menu-head">Other ways to say this</span>
-      ${ways}
-      ${others ? `<span class="qn-menu-head">Quote another answer</span>${others}` : ''}
-      <span class="qn-menu-meta qn-menu-note">Answers marked To You Only are never listed.</span>
-      <div class="qn-menu-sep" role="separator"></div>
-      <button type="button" role="menuitem" class="qn-menu-add qn-menu-all" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}: every sentence that fits ${esc(first)}.">All ${_plural(_fitCount(part, ctx), esc(low) + ' sentence', esc(low) + ' sentences')}…</button>
-      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="remove" data-row="${i}" title="Takes this sentence out of the comment. Undo puts it back.">Remove From Comment</button>
-      ${
-        window.PersonalBank && PersonalBank.stepAllowed('nextStep')
-          ? `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="ownOpen" data-where="row" data-mode="write" data-row="${i}" title="Write a sentence of your own for this part. It goes in your bank and into ${esc(first)}’s comment here.">+ Write Your Own</button>`
-          : ''
-      }
-    </div>`;
-  }
-  function _pickWords(st, i, id) {
-    var rows = _rows[_rowKey(st)] || [];
-    var want = _wordsParse(id);
-    var a = want
-      ? wordsAnswers(_facts(st)).find(function (x) {
-          return x.key === want.key;
-        })
-      : null;
-    _wording = null;
-    if (rows[i] && a && rows[i].id !== id) {
-      rows[i] = wordsRow(st, a, want.frame);
-      _writeRows(st);
-    } else _syncRequired();
-    _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
-  }
-  var WORDS_SOURCE = {
-    id: 'words',
-    label: 'In Their Words',
-    list: function (at) {
-      if (
-        (at.rows || []).some(function (r) {
-          return r && r.words;
-        })
-      )
-        return [];
-      var a = wordsAnswers(at.f)[0];
-      if (!a) return [];
-      return [
-        {
-          step: 'nextStep',
-          part: 'nextStep',
-          label: 'Next Step',
-          id: _wordsId(a.key, 0),
-          text: wordsSentence(at.student, a, 0),
-          words: a.key,
-          answer: a,
-          student: at.student,
-        },
-      ];
-    },
-    row: function (c) {
-      return wordsRow(c.student, c.answer, 0);
-    },
-    owns: function (row) {
-      return !!row && !!row.words;
-    },
-    optionsMenu: _wordsMenuHtml,
-    pick: _pickWords,
-  };
-  // Offered first in Add Here (the board: "With her answer on file, it offers this one first").
-  registerSource(WORDS_SOURCE, { first: true });
-
-  /* A choice put in at a gap: the row there with a brief tint, the
-     sentence at the same place in the comment (the realiser moves the name
-     to the first sentence), the count, the checks and Approve following
-     (_writeRows), and the Options or Other Wording of the new row focused. */
-  function _insertAt(st, g, step, id) {
-    var f = _facts(st);
-    var ctx = _bankContext(_activeCourse, st, f);
-    var key = _rowKey(st);
-    var rows = _rows[key] || _rowsFor(st, f);
-    var c = null;
-    var from = null;
-    _gapChoices(_activeCourse, st, f, ctx, rows, g).forEach(function (grp) {
-      if (c) return;
-      c =
-        grp.choices.find(function (x) {
-          return x.id === id && (!step || x.step === step);
-        }) || null;
-      if (c) from = grp.source;
-    });
-    if (!c) {
-      _syncRequired();
-      _focusGap(g);
-      return;
-    }
-    var row = from.row(c, ctx);
-    _rows[key] = insertRow(rows, row, g);
-    _markAdded(st, row);
-    _wording = null;
-    _writeRows(st);
-    _focusAny([
-      '#tq-sentences [data-row="' + Math.min(g, _rows[key].length - 1) + '"] .qn-line-menu',
-      '#tq-browse-btn',
-    ]);
-  }
-  /* A sentence of the teacher's own, typed at a gap (Write Your Own…):
-     a Your Sentence row there. Its Options menu offers Add to My Bank. */
-  function _insertTyped(st, g, text, step) {
-    var t = String(text || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!t) return false;
-    if (!/[.!?…]["”]?$/.test(t)) t += '.';
-    var key = _rowKey(st);
-    var rows = _rows[key] || _rowsFor(st, _facts(st));
-    var row = typedRow(t);
-    // Written in a Required part's box: it is that part's sentence.
-    if (step) row.step = step;
-    _rows[key] = insertRow(rows, row, g);
-    _markAdded(st, row);
-    _wording = null;
-    _writeRows(st);
-    _focusSel('#tq-sentences [data-row="' + Math.min(g, _rows[key].length - 1) + '"] [data-do="options"]');
-    return true;
-  }
-  /* The gap after a row: a 2px line and a pill drawn over it after the
-     pointer rests there (or at once on keyboard focus); nothing moves when
-     they show. The pill opens the writing box at this place. */
-  function _gapHtml(cid, student, f, ctx, rows, g) {
-    return `<div class="qn-gap" data-gap="${g}">
-      <span class="qn-gap-line" aria-hidden="true"></span>
-      <button type="button" class="qn-gap-add" data-action="tqSentences" data-do="ownOpen" data-where="gap" data-gap="${g}" aria-label="Add a sentence here" aria-haspopup="dialog">+ Add a Sentence Here</button>
-    </div>`;
-  }
-  /* The box for a sentence of the teacher's own at a gap, drawn as the
-     row it will be. */
-  function _gapOwnHtml(student) {
-    return `<div class="qn-req-row qn-srow qn-own-row">
-      ${SPACER}<div class="qn-req-part"><span class="qn-req-label">Your Sentence</span></div>
-      <div class="qn-req-body">${_ownBoxHtml(student)}</div>
-    </div>`;
-  }
 
   /* A sentence of the teacher's own asking the family to get in touch or
      meet: on the IE path it is the comment's Meeting part, as Written by
@@ -5527,81 +4484,6 @@ window.ReportQuestionnaire = (function () {
         });
   }
 
-  /* ── One box per part (term-questionnaire-redesign-plan, slice 1) ── */
-
-  /* The box a row belongs to: its part, or on the IE path Problem, Plan,
-     Deadline and Meeting, and Statement for the goals sentence, as
-     rowLabel names them. Rows of one kind that sit together share a box. */
-  function _boxKind(row, path) {
-    if (!row.step) return isTyped(row) ? 'yours' : row.earlier ? 'earlier' : '';
-    if (_isRequired(row.step, path)) return row.step === 'grade' ? (path === 'ie' ? 'grade' : 'statement') : row.step;
-    if (row.step === 'example' && !_isBestRow(row))
-      return row.s && row.s.group === "In the Student's Words" ? 'voice' : 'example';
-    if (row.step === 'attendance') return 'attendance';
-    if (row.step === 'languageGoals') return 'languageGoals';
-    var p = partOf(row.step);
-    return p ? p.id : '';
-  }
-
-  /* The facts a part's evidence is drawn from, worded by calc.js and its
-     helpers (headerGrade, formatLevel, _pieceMark), for ReportQnBoxes. */
-  function _boxFacts(kind, cid, student, f, row) {
-    var keys = (row && row.prov && row.prov.factKeys) || [];
-    var pick = function (xs, re) {
-      var hit = null;
-      keys.some(function (k) {
-        var m = k.match(re);
-        hit = m && (xs || []).find(x => String(x.id) === m[1]);
-        return !!hit;
-      });
-      return hit;
-    };
-    if (kind === 'grade') return { grade: headerGrade(cid, student.id, f, getTermId()).big };
-    if (kind === 'bestPiece') {
-      var w = pick(f.work, /^work:(.+)$/) || bestPiece(f);
-      return { piece: w ? { title: w.title || '', mark: _pieceMark(cid, f, w) } : null };
-    }
-    if (kind === 'strengths' || kind === 'nextStep') {
-      var c = pick(f.comps, /^comp:(.+)$/);
-      if (!c && kind === 'nextStep') c = (CommentBank.nextSkillOf(f) || {}).comp;
-      return { comp: c ? { name: c.name, level: c.level > 0 ? formatLevel(cid, c.level) : '' } : null };
-    }
-    if (kind === 'habits') {
-      var habits = _habitsOf(cid, student, f);
-      return {
-        habits: CommentBank.HABITS.map(function (h) {
-          var v = Number(habits[h.key]);
-          return { key: h.key, name: h.name, v: v >= 1 && v <= HS_STOPS ? v : 0 };
-        }),
-        scale: CommentBank.SCALE,
-        open: _habMenu,
-      };
-    }
-    if (kind === 'attendance') return { absent: f.absent || 0, late: f.late || 0 };
-    if (kind === 'voice') return { goal: (row && row.words === 'goal') || keys.indexOf('voice.goal') >= 0 };
-    if (kind === 'notHandedIn') {
-      var n = (f.notHandedIn && f.notHandedIn.count) || 0;
-      return { missing: n, total: (f.record && f.record.total) || n };
-    }
-    return {};
-  }
-
-  function _wrapBoxes(cid, student, f, entries) {
-    return ReportQnBoxes.wrap(entries, {
-      first: _first(student),
-      requiredTip:
-        CommentBank.reportPath(f) === 'ie'
-          ? 'An IE comment needs every part marked Required.'
-          : 'The grade sentence is replaced by the required statement.',
-      facts: function (kind, row) {
-        return _boxFacts(kind, cid, student, f, row);
-      },
-    });
-  }
-
-  /* ── The amber note and + Close to (slice 8) ─────────────────── */
-
-  var _HABIT_STEPS = /^(habits|habitsMore|habitsBuild|strongHabits)$/;
   var _habKept = {};
   var _HAB_KEEP_STORE = 'fv-tq-habit-keep';
   function _habKeepKey(st) {
@@ -5654,19 +4536,6 @@ window.ReportQuestionnaire = (function () {
       CommentBank.notHandedInSentence(nh)
     );
   }
-  // html-safe: the sentence's words are esc()'d; the rating is a number
-  function _habitNoteHtml(cid, st, f, rows) {
-    var v = _habitsOf(cid, st, f).completes;
-    var nh = f.notHandedIn;
-    if (!(v >= 3 && v <= HS_STOPS) || !nh || !(nh.count > 0) || _habitKept(st)) return '';
-    var said = rows.find(function (r) {
-      return _HABIT_STEPS.test(r.step || '') && ((r.prov && r.prov.factKeys) || []).indexOf('habit:completes') >= 0;
-    });
-    if (!said) return '';
-    var p = ReportBlocks.getPronouns(st);
-    var text = habitNoteText(said.text, p, nh);
-    return `<div class="qn-habit-note" role="status"><span class="qn-habit-note-text">${esc(text)}</span><button type="button" class="qn-habit-note-fix" data-action="tqSentences" data-do="habitNoteRate" data-to="${v - 1}" title="Lowers the Completes Work rating one step. The habit sentence follows.">Rate It ${esc(CommentBank.SCALE[v - 2])}</button><button type="button" class="qn-habit-note-keep" data-action="tqSentences" data-do="habitNoteKeep" title="Leaves the sentence and the rating as they are, and hides this note for ${esc(_first(st))} in this report.">Keep It</button></div>`;
-  }
   /* "+ Close to a C+" on the Grade box, only where the comment already says
      a student is close to the next band (CommentBank.closeTo, from
      calc.js's band): a letter grade within reach, no sentence about it yet.
@@ -5678,10 +4547,6 @@ window.ReportQuestionnaire = (function () {
       return /\bclose to\b/i.test(r.text || '');
     });
     return said ? null : c;
-  }
-  // html-safe: the letter comes from the band table and is esc()'d
-  function _closeBtnHtml(c) {
-    return `<div class="qn-extra-row"><button type="button" class="qn-add-btn" data-action="tqSentences" data-do="closeAdd" title="Adds one sentence under the grade saying the student is close to the next band.">+ Close to ${esc(CommentBank.aOrAn(c.letter))}</button></div>`;
   }
   function _addClose(st) {
     tqSaveCurrentIfNeeded();
@@ -5701,179 +4566,12 @@ window.ReportQuestionnaire = (function () {
     _writeRows(st);
   }
 
-  /* The IE comment's parts in its order (the IEPath mockup): where a
-     Required row the comment has no sentence for goes. */
-  var IE_ORDER = [
-    'grade',
-    'ieProblem',
-    'habits',
-    'strongHabits',
-    'attendance',
-    'iePlan',
-    'ieDeadline',
-    'support',
-    'ieMeeting',
-    'closer',
-  ];
-
-  /* The rows in order (as units), with a class row (Not Handed In,
-     Support, Language Goals, Closing) the comment has no sentence for where
-     its step would fall; on the IE path the Support row sits before Meeting
-     (the IEPath mockup), and each Required row the comment has no sentence
-     for (a comment written without Generate) stays where its sentence
-     would go. */
-  function _rowListHtml(cid, student, f, rows, path) {
-    var ctx = _bankContext(cid, student, f);
-    var claims = claimChanges(student);
-    var ie = path === 'ie';
-    var has = {};
-    rows.forEach(function (r) {
-      has[r.step] = true;
-    });
-    // The teacher's own meeting sentence is the Meeting part.
-    var meetAt = meetingRowAt(rows, path);
-    if (meetAt >= 0) has.ieMeeting = true;
-    var leadOf = function (it) {
-      return it.i >= 0 && it.i === meetAt ? 'ieMeeting' : it.unit[0].step;
-    };
-    var items = _units(rows).map(function (u) {
-      return { unit: u, i: rows.indexOf(u[0]) };
-    });
-    // An IE comment has no Deadline sentence until a date is picked: its
-    // Required row stays, with Pick a Date, where the sentence will go.
-    if (ie && !has.ieDeadline) {
-      var at = deadlineAt(_asParts(rows, path));
-      var pos =
-        at < rows.length
-          ? items.findIndex(function (it) {
-              return it.unit.indexOf(rows[at]) >= 0;
-            })
-          : -1;
-      items.splice(pos < 0 ? items.length : pos, 0, {
-        unit: [{ step: 'ieDeadline', placeholder: true, text: '' }],
-        i: -1,
-      });
-    }
-    if (ie)
-      ['grade', 'ieProblem', 'iePlan', 'ieMeeting'].forEach(function (step) {
-        if (has[step]) return;
-        var si = IE_ORDER.indexOf(step);
-        var next = items.findIndex(function (it) {
-          return IE_ORDER.indexOf(leadOf(it)) > si;
-        });
-        items.splice(next < 0 ? items.length : next, 0, {
-          unit: [{ step: step, placeholder: true, text: '' }],
-          i: -1,
-        });
-      });
-    var extra = [];
-    if (!ie && f.notHandedIn && f.notHandedIn.count > 0 && !has.notHandedIn) extra.push('notHandedIn');
-    if (path === 'language_goals' && !has.languageGoals) extra.push('languageGoals');
-    if (!has.support) extra.push('support');
-    if (!has.closer) extra.push('closer');
-    extra.forEach(function (step) {
-      var si = _stepAt(step);
-      // Closing last; on the IE path Support before Meeting; else before
-      // the first row of a later step (Language Goals before the Next Step
-      // row, never between it and its family line), or last.
-      var pos =
-        step === 'closer'
-          ? -1
-          : items.findIndex(function (it) {
-              var lead = leadOf(it);
-              if (ie && step === 'support') return lead === 'ieMeeting';
-              return !!lead && _stepAt(lead) > si;
-            });
-      items.splice(pos < 0 ? items.length : pos, 0, { unit: [{ step: step, placeholder: true }], i: -1 });
-    });
-    // After each row of the comment, the gap where a sentence can be put in
-    // (the InsertRows mockup): its index is how many rows come before it.
-    var placed = 0;
-    var habNote = _habitNoteHtml(cid, student, f, rows);
-    var close = _closeNext(f, rows);
-    var kindAt = function (it) {
-      return it.i >= 0 && it.i === meetAt ? 'ieMeeting' : _boxKind(it.unit[0], path);
-    };
-    var lastHab = -1;
-    var gradeAt = -1;
-    items.forEach(function (it, k) {
-      if (kindAt(it) === 'habits') lastHab = k;
-      if (gradeAt < 0 && kindAt(it) === 'grade') gradeAt = k;
-    });
-    return _wrapBoxes(
-      cid,
-      student,
-      f,
-      items.reduce(function (out, it, k) {
-        var row = it.unit[0];
-        _emptyGap = placed;
-        var html = _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
-        var kind = it.i >= 0 && it.i === meetAt ? 'ieMeeting' : _boxKind(row, path);
-        var ownGap = '';
-        if (it.i >= 0) {
-          if (k === lastHab && habNote) html += habNote;
-          if (k === gradeAt && close) html += _closeBtnHtml(close);
-          claims.forEach(function (c) {
-            if (it.unit.indexOf(rows[c.row]) >= 0) html += _claimHtml(c);
-          });
-          var g = rows.indexOf(it.unit[it.unit.length - 1]) + 1;
-          placed = g;
-          html += _gapHtml(cid, student, f, ctx, rows, g);
-          if (_own && _own.where === 'gap' && _own.gap === g && !_own.step) ownGap = _gapOwnHtml(student);
-        }
-        out.push({
-          kind: kind,
-          html: html,
-          row: row,
-          label: rowLabel(row, path, student),
-          required: _isRequired(row.step, path),
-        });
-        // The sentence being typed at a gap is its own Your Sentence box.
-        if (ownGap) out.push({ kind: 'yours', html: ownGap, row: { step: null }, label: 'Your Sentence' });
-        return out;
-      }, []),
-    );
-  }
-
-  /* The Sentences card: one row per sentence of the comment, its part, its
-     source line, a drag handle and Other Wording; Edited on a sentence the
-     teacher changed; Reset Order once the teacher moved one; Browse
-     Sentences… opens the bank. Before Generate has written anything, an IE
-     or goals comment's Required rows and the class's rows (plan PR 8). */
-  // html-safe: every row, sentence, source, label, class line and teacher-typed text esc()'d; row and gap indexes are numbers
-  function _sentencesHtml(cid, student, f) {
-    var path = CommentBank.reportPath(f);
-    var key = _rowKey(student);
-    var rows = _rowsFor(student, f);
-    var ordered = !!_ordered[key];
-    var reset = ordered
-      ? '<button type="button" class="qn-card-link qn-reset" data-action="tqSentences" data-do="reset" title="Puts the sentences back in the order Generate Comment gave them. Your order is kept when you generate again.">Reset Order</button>'
-      : '';
-    var browse =
-      '<button type="button" class="qn-card-link" id="tq-browse-btn" data-action="tqSentences" data-do="browse" aria-haspopup="dialog" title="Opens the full sentence bank so you can pick a sentence yourself.">Browse Sentences…</button>';
-    var add = rows.length
-      ? '<button type="button" class="qn-add-sentence" id="tq-add-sentence" data-action="tqSentences" data-do="addEnd" aria-haspopup="dialog" title="Writes a sentence of your own at the end of the comment."><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 1v8M1 5h8"></path></svg>Add a Sentence</button>'
-      : '';
-    var body = rows.length
-      ? _rowListHtml(cid, student, f, rows, path)
-      : _wrapBoxes(cid, student, f, _requiredRows(cid, student, f).concat(_classRowsHtml(cid, student, f)));
-    return `<div class="qn-card qn-sentences${path ? ' qn-required' : ''}" id="tq-sentences">
-      <div class="qn-req-top"><span class="qn-card-title">Sentences</span><span class="qn-req-top-end">${reset}${browse}${add}</span></div>
-      ${body}
-    </div>`;
-  }
-
   /* The card redrawn in place (a row moved, a menu opened, the calendar
      opened or moved a month). */
   function _syncRequired() {
-    var st = _current();
-    var card = document.getElementById('tq-sentences');
-    if (!st || !card) return;
-    var before = ReportQnMotion.measure(card);
-    card.outerHTML = _sentencesHtml(_activeCourse, st, _facts(st));
+    ReportWc.redraw();
     _syncStale();
     _fitMenus();
-    ReportQnMotion.play(document.getElementById('tq-sentences'), before, ReportQnMotion.dragKey());
   }
 
   /* An open menu or calendar on the Sentences card kept inside the window
@@ -5886,7 +4584,7 @@ window.ReportQuestionnaire = (function () {
     var box = pane && pane.getBoundingClientRect ? pane.getBoundingClientRect() : null;
     var top = (box ? Math.max(0, box.top) : 0) + 12;
     var bottom = (box ? Math.min(window.innerHeight, box.bottom) : window.innerHeight) - 12;
-    document.querySelectorAll('#tq-sentences .qn-menu, #tq-sentences .qn-cal').forEach(function (m) {
+    document.querySelectorAll('.wc .qn-menu, .wc .qn-cal').forEach(function (m) {
       if (!m.getBoundingClientRect || !m.parentElement) return;
       m.classList.remove('up');
       m.style.maxHeight = '';
@@ -6285,7 +4983,6 @@ window.ReportQuestionnaire = (function () {
     if (!st) return;
     tqSaveCurrentIfNeeded();
     _closeBrowse(true);
-    _wording = null;
     // open: the groups opened by hand per part and case; openQ: the same
     // while a search is typed; init: the parts whose own cases were opened.
     _browse = {
@@ -6340,7 +5037,7 @@ window.ReportQuestionnaire = (function () {
     o.remove();
     if (quiet) return;
     if (gap != null) _focusGap(gap);
-    else _focusSel('#tq-browse-btn');
+    else _focusSel('.wc-box [data-do="wcBrowse"]');
   }
   function _focusGap(g) {
     _focusSel('#tq-sentences .qn-gap[data-gap="' + g + '"] .qn-gap-add');
@@ -6458,6 +5155,7 @@ window.ReportQuestionnaire = (function () {
     var ds = (el && el.dataset) || {};
     var key = _rowKey(st);
     var i = Number(ds.row);
+    if (/^wc/.test(what)) return ReportWc.act(what, el);
     switch (what) {
       case 'pronounOk': {
         tqSaveCurrentIfNeeded();
@@ -6469,22 +5167,6 @@ window.ReportQuestionnaire = (function () {
         _syncRequired();
         return;
       }
-      case 'wording':
-      case 'options': {
-        var open = !!_wording && _wording.index === i;
-        _wording = open ? null : { index: i };
-        _piecesAll = false;
-        _habMenu = false;
-        _miss = null;
-        _supportMenu = false;
-        _langMenu = false;
-        _limitOpen = false;
-        _syncRequired();
-        if (!open)
-          _focusSel(what === 'options' ? '#tq-options-menu .qn-menu-item' : '#tq-wording-menu .qn-menu-item.on');
-        else _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="' + what + '"]');
-        return;
-      }
       case 'keepEarlier': {
         tqSaveCurrentIfNeeded();
         var keep = (_rows[key] || [])[i];
@@ -6492,7 +5174,6 @@ window.ReportQuestionnaire = (function () {
         _rows[key] = (_rows[key] || []).map(function (r) {
           return r === keep ? Object.assign({}, r, { earlier: false, edited: true, drafted: null }) : r;
         });
-        _wording = null;
         // Saved with the comment's record, so it stays the teacher's.
         _writeRows(st);
         _focusAny(['#tq-sentences [data-row="' + i + '"] [data-do="options"]', '#tq-generate']);
@@ -6506,28 +5187,13 @@ window.ReportQuestionnaire = (function () {
         _rows[key] = (_rows[key] || []).filter(function (r) {
           return r !== gone;
         });
-        _wording = null;
         _writeRows(st);
         // A typed sentence was never in a bank: Undo is the way back.
         _undoToast(st, 'Removed from the comment.', removed);
         _focusAny([
           '#tq-sentences [data-row="' + Math.min(i, _rows[key].length - 1) + '"] .qn-srow-handle[tabindex]',
-          '#tq-browse-btn',
+          '.wc-box [data-do="wcBrowse"]',
         ]);
-        return;
-      }
-      case 'insert': {
-        tqSaveCurrentIfNeeded();
-        _own = null;
-        _insertAt(st, Number(ds.gap), ds.step, ds.sentence);
-        return;
-      }
-      case 'addEnd': {
-        // At the end of the movable sentences: before the class's closing.
-        var all = _rows[key] || [];
-        var end = all.length;
-        if (end && all[end - 1].step === 'closer') end--;
-        _ownOpen('gap', 'write', { gap: end });
         return;
       }
       case 'browseAt': {
@@ -6537,19 +5203,6 @@ window.ReportQuestionnaire = (function () {
         _openBrowse(_gapPart(rowsNow, _bankContext(_activeCourse, st, _facts(st)), _insertOpts(_activeCourse, st)), at);
         return;
       }
-      case 'habitsMenu':
-        _habMenu = !_habMenu;
-        _wording = null;
-        _miss = null;
-        _syncRequired();
-        if (_habMenu) _focusSel('#tq-habits-menu [aria-checked="true"], #tq-habits-menu .qn-hm-step');
-        else _focusSel('#tq-sentences [data-do="habitsMenu"]');
-        return;
-      case 'rateHabit':
-        tqRate(ds.habit, Number(ds.value));
-        _syncRequired();
-        _focusSel('#tq-habits-menu [data-habit="' + ds.habit + '"][data-value="' + ds.value + '"]');
-        return;
       case 'habitNoteRate': {
         var low = Number(ds.to);
         if (low >= 1) tqRate('completes', low);
@@ -6569,18 +5222,6 @@ window.ReportQuestionnaire = (function () {
       case 'pickSkill':
         _repick(st, i, { strengths: [ds.comp] });
         return;
-      case 'piecesAll':
-        _piecesAll = true;
-        _syncRequired();
-        _focusSel('#tq-wording-menu .qn-menu-item.on');
-        return;
-      case 'missOpen':
-        _missAction(st, what);
-        return;
-      case 'pick':
-        tqSaveCurrentIfNeeded();
-        (_sourceOf((_rows[key] || [])[i]) || BANK_SOURCE).pick(st, i, ds.sentence);
-        return;
       case 'all': {
         var row = (_rows[key] || [])[i];
         var p = row && row.step ? partOf(row.step) : null;
@@ -6592,10 +5233,6 @@ window.ReportQuestionnaire = (function () {
         return;
       case 'close':
         _closeBrowse();
-        return;
-      case 'reset':
-        tqSaveCurrentIfNeeded();
-        _resetOrder();
         return;
       case 'part':
         if (!_browse) return;
@@ -6652,12 +5289,6 @@ window.ReportQuestionnaire = (function () {
         _syncBrowse();
         _focusSel('#tq-browse-list .qn-browse-row.on');
         return;
-      case 'up':
-        _moveRow(i, -1);
-        return;
-      case 'down':
-        _moveRow(i, 1);
-        return;
       case 'ownPart':
         _ownOpen('gap', 'write', { gap: ds.gap, step: ds.step });
         return;
@@ -6674,6 +5305,9 @@ window.ReportQuestionnaire = (function () {
         return;
       }
       case 'ownFromBox': {
+        // The typed text is read back into sentences first, so the box opens under its line.
+        ReportWc.endTyping();
+        st = _current();
         var at = Number(ds.row);
         var sel = (_rows[key] || [])[at];
         if (!(at >= 0) || !sel) return;
@@ -6902,6 +5536,26 @@ window.ReportQuestionnaire = (function () {
     var label = (PARTS.find(x => x.id === o.part) || {}).label || 'My Bank';
     return `<div class="qn-line-actions"><button type="button" class="${top ? 'btn btn-ghost' : 'qn-line-cancel'}" data-action="tqSentences" data-do="ownCancel" title="Closes without saving.">Cancel</button><button type="button" class="${top ? 'btn btn-primary' : 'qn-line-save'}" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${ok ? '' : ' disabled'} title="Adds this sentence to your bank.">${top ? 'Add to ' + esc(label) : 'Save'}</button></div>`;
   }
+  /* A sentence of the teacher's own, typed at a gap (Write Your Own…):
+     a Your Sentence row there. Its Options menu offers Add to My Bank. */
+  function _insertTyped(st, g, text, step) {
+    var t = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!t) return false;
+    if (!/[.!?…]["”]?$/.test(t)) t += '.';
+    var key = _rowKey(st);
+    var rows = _rows[key] || _rowsFor(st, _facts(st));
+    var row = typedRow(t);
+    // Written in a Required part's box: it is that part's sentence.
+    if (step) row.step = step;
+    _rows[key] = insertRow(rows, row, g);
+    _markAdded(st, row);
+    _writeRows(st);
+    _focusSel('#tq-sentences [data-row="' + Math.min(g, _rows[key].length - 1) + '"] [data-do="options"]');
+    return true;
+  }
+
   // html-safe: the sentence, names, part labels, ids and titles esc()'d; gap and row indexes are numbers; the choice buttons are drawn above with esc()
   function _ownBoxHtml(st) {
     var o = _own;
@@ -6909,21 +5563,9 @@ window.ReportQuestionnaire = (function () {
     if (o.where === 'gap') {
       // At a gap: the sentence goes into the comment there, not the bank.
       // Under it, everything the Add Here menu offered, as buttons.
-      var gf = _facts(st);
-      var gctx = _bankContext(_activeCourse, st, gf);
-      var picks = _gapChoices(_activeCourse, st, gf, gctx, _rows[_rowKey(st)] || [], o.gap)
-        .map(function (grp) {
-          return grp.choices
-            .map(function (c) {
-              var row = grp.source.row(c, gctx);
-              return `<button type="button" class="qn-own-pick" data-source="${esc(grp.source.id)}" data-action="tqSentences" data-do="insert" data-gap="${o.gap}" data-step="${esc(c.step)}" data-sentence="${esc(c.id)}" title="${esc(row.text + ' · ' + rowSource(row, _activeCourse, st, gf, gctx))}">+ ${esc(c.label)}</button>`;
-            })
-            .join('');
-        })
-        .join('');
       return `<div class="qn-own qn-own-gap" id="tq-own" role="group" aria-label="A sentence of your own">
       <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. It goes into the comment here. Return adds it. Its row’s Options menu can add it to your bank.">${esc(o.text)}</textarea>
-      <div class="qn-own-picks">${picks}<button type="button" class="qn-own-pick" data-action="tqSentences" data-do="browseAt" data-gap="${o.gap}" title="Opens the full sentence bank. The sentence you pick goes here.">Browse Sentences…</button></div>
+      <div class="qn-own-picks"><button type="button" class="qn-own-pick" data-action="tqSentences" data-do="browseAt" data-gap="${o.gap}" title="Opens the full sentence bank. The sentence you pick goes here.">Browse Sentences…</button></div>
       <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqSentences" data-do="ownCancel" title="Closes without adding anything.">Cancel</button><button type="button" class="qn-line-save" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${o.text.trim() ? '' : ' disabled'} title="Puts this sentence in the comment here.">Add Here</button></div>
     </div>`;
     }
@@ -7005,7 +5647,6 @@ window.ReportQuestionnaire = (function () {
     opts = opts || {};
     if (!st || (where !== 'gap' && !window.PersonalBank)) return;
     tqSaveCurrentIfNeeded();
-    _wording = null;
     _supportMenu = false;
     _limitOpen = false;
     if (where === 'gap') {
@@ -7029,7 +5670,7 @@ window.ReportQuestionnaire = (function () {
     var from = part;
     if (where === 'row' && !part) {
       var r = (_rows[_rowKey(st)] || [])[index];
-      var p = r && r.step ? partOf(r.step) : null;
+      var p = r ? partOf(r.step || (ReportWcParts.BOX_STEPS[r.inBox] || [])[0]) : null;
       from = p ? p.id : '';
       part = p && _ownStep(p.id) ? p.id : '';
     }
@@ -7238,83 +5879,6 @@ window.ReportQuestionnaire = (function () {
      A button on the sentence's row opens the list of the work labelled
      Missing; each piece opens in the grader. It only lists and opens: it
      changes no status. */
-  var _miss = null; // { sid, ids: [assessment ids listed] }
-  function _missTitle(cid, aid) {
-    var a = getAssessments(cid).find(function (x) {
-      return x.id === aid;
-    });
-    return (a && a.title) || 'Untitled';
-  }
-  // html-safe: titles esc()'d; ids are esc()'d attributes
-  function _missMenuHtml(cid) {
-    var items = _miss.ids
-      .map(function (aid) {
-        var title = _missTitle(cid, aid);
-        return `<div class="qn-miss-item"><span class="qn-menu-text">${esc(title)}</span><button type="button" role="menuitem" class="qn-card-link qn-miss-open" data-action="tqOpenGrader" data-aid="${esc(aid)}" title="Opens the grader on this piece.">Open in Grader ›</button></div>`;
-      })
-      .join('');
-    return `<div class="qn-menu qn-miss-menu" role="menu" aria-label="Missing work" id="tq-miss-menu"><span class="qn-menu-head">Missing Work</span>${items}</div>`;
-  }
-  function _missAction(st, what) {
-    if (what !== 'missOpen') return;
-    _wording = null;
-    if (_miss && _miss.sid === st.id) _miss = null;
-    else
-      _miss = {
-        sid: st.id,
-        ids: missingAndLate(_activeCourse, st.id)
-          .filter(function (x) {
-            return x.missing;
-          })
-          .map(function (x) {
-            return x.id;
-          }),
-      };
-    _syncRequired();
-    if (_miss) _focusSel('#tq-miss-menu button');
-    else _focusSel('#tq-row-missing [data-do="missOpen"]');
-  }
-
-  function _missingRowHtml(cid, f, handle, i, text) {
-    var course = _courseName(cid);
-    var late = String((COURSES[cid] && COURSES[cid].lateWorkPolicy) || '').trim();
-    // The sentence in the comment (or the one Generate will write), never a
-    // second wording of the same fact.
-    var sentence = text || CommentBank.notHandedInSentence(f.notHandedIn);
-    var line;
-    if (_lineEdit === 'late') {
-      line = `<div class="qn-line-edit">
-          <input type="text" class="qn-line-input" id="tq-line-late" data-tq-line-input="late" aria-label="Late work line for ${esc(course)}" title="Used exactly as you type it, after the missing-work sentence." value="${esc(late)}">
-          <button type="button" class="qn-line-save" data-action="tqLine" data-do="saveLate" title="Saves this as ${esc(course)}’s Late Work Policy.">Save for Class</button>
-        </div>
-        <span class="qn-req-source">This is the class’s Late Work Policy. It follows the missing-work sentence for every student who has some.</span>`;
-    } else if (late) {
-      line = '';
-    } else {
-      line = `<span class="qn-line-empty-row"><button type="button" class="qn-line-choose" data-action="tqLine" data-do="editLate" title="Write the line that follows the missing-work sentence. It is ${esc(course)}’s Late Work Policy.">+ Late Work Line for the Class</button></span>`;
-    }
-    var lateBtn =
-      late && _lineEdit !== 'late'
-        ? ` <button type="button" class="qn-line-text" data-action="tqLine" data-do="editLate" title="Change ${esc(course)}’s late-work line. It is the class’s Late Work Policy.">${esc(late)}</button>`
-        : '';
-    var n = (f.notHandedIn && f.notHandedIn.count) || 0;
-    var cur = _current();
-    var listed = _miss && cur && _miss.sid === cur.id;
-    var seeN = listed ? _miss.ids.length : n;
-    var see =
-      n > 0 || listed
-        ? `<button type="button" class="qn-see-missing" data-action="tqSentences" data-do="missOpen" aria-haspopup="menu" aria-expanded="${!!listed}" title="Lists the missing work. Each piece opens in the grader.">See the ${seeN}</button>`
-        : '';
-    // The count it rests on is the tooltip, not grey text (decision 2).
-    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-missing" title="${esc(_missingSource(f))}"${_rowAttr(i)}>
-      ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">Missing Work</span></div>
-      <div class="qn-req-body">
-        <span class="qn-req-text">${esc(sentence)}${lateBtn}</span>
-        ${line}
-      </div>
-      ${see}${listed ? _missMenuHtml(cid) : ''}
-    </div>`;
-  }
 
   /* What a support line fits, in words: the fit for this student, else the
      first skill or habit it names that this class has. */
@@ -7375,43 +5939,6 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
-  function _supportRowHtml(cid, student, f, handle, i) {
-    var course = _courseName(cid);
-    var first = _first(student);
-    var habits = CommentBank.effectiveHabits(
-      (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
-    );
-    var any = ((f.classLines && f.classLines.support) || []).length > 0;
-    var choice = CommentBank.supportChoice(f, habits);
-    var menu = _supportMenu ? _supportMenuHtml(cid, student, f, choice) : '';
-    var open = ` aria-haspopup="menu" aria-expanded="${_supportMenu}"`;
-    handle = handle || '';
-    // No line chosen for the class, or none for this student (none of the
-    // ticked lines fits, or it was left out): one button opens the menu.
-    if (!any || !choice) {
-      var why = !any
-        ? 'Tick the support lines you will do in ' + course + '. Until you do, the comment leaves this sentence out.'
-        : f.classLines && f.classLines.pick === 'none'
-          ? 'Left out of this comment. Pick a support line for ' + first + '.'
-          : 'None of the ticked lines fits ' +
-            first +
-            ', so the comment leaves this sentence out. Pick one for ' +
-            first +
-            '.';
-      return `<div class="qn-req-row qn-line-row qn-empty-row has-menu" id="tq-row-support"${_rowAttr(i)}>
-        <div class="qn-req-part"><span class="qn-req-label">Support</span></div>
-        <button type="button" class="qn-line-choose${_supportMenu ? ' on' : ''}" data-action="tqLine" data-do="supportMenu"${open} title="${esc(why)}">+ Support Line ▾</button>
-        ${menu}
-      </div>`;
-    }
-    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-support"${_rowAttr(i)}>
-      ${handle}<div class="qn-req-part"><span class="qn-req-label">Support</span></div>
-      <div class="qn-req-body"><span class="qn-req-text" title="${esc('One of your support lines for ' + course)}">${esc(choice.line.text)}</span></div>
-      <button type="button" class="qn-line-menu${_supportMenu ? ' on' : ''}" data-action="tqLine" data-do="supportMenu"${open} title="Pick the support line for ${esc(first)}, or tick the lines you will do in ${esc(course)}.">Support Line ▾</button>
-      ${menu}
-    </div>`;
-  }
-
   /* The Language Goals row (plan PR 3b): only for a student assessed on
      language goals. FullVision has no language-proficiency facts, so the
      teacher ticks the lines used in the class and picks one for each
@@ -7460,32 +5987,6 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
-  function _langRowHtml(cid, student, f, handle, i) {
-    var course = _courseName(cid);
-    var first = _first(student);
-    var any = ((f.classLines && f.classLines.languageGoals) || []).length > 0;
-    var choice = CommentBank.languageGoalChoice(f);
-    var menu = _langMenu ? _langMenuHtml(cid, student, f, choice) : '';
-    var open = ` aria-haspopup="menu" aria-expanded="${_langMenu}"`;
-    handle = handle || '';
-    if (!any || !choice) {
-      var why = any
-        ? 'No language goal picked for ' + first + '. The comment leaves this sentence out.'
-        : 'Tick the language goal lines you use in ' + course + '. Until you do, the comment leaves this sentence out.';
-      return `<div class="qn-req-row qn-line-row qn-empty-row has-menu" id="tq-row-languageGoals"${_rowAttr(i)}>
-        <div class="qn-req-part"><span class="qn-req-label">Language Goals</span></div>
-        <button type="button" class="qn-line-choose${_langMenu ? ' on' : ''}" data-action="tqLine" data-do="langMenu"${open} title="${esc(why)}">+ Language Goal ▾</button>
-        ${menu}
-      </div>`;
-    }
-    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-languageGoals"${_rowAttr(i)}>
-      ${handle}<div class="qn-req-part"><span class="qn-req-label">Language Goals</span></div>
-      <div class="qn-req-body"><span class="qn-req-text" title="${esc('One of your language goal lines for ' + course)}">${esc(CommentBank.fill({ text: choice.line.text }, _bankContext(cid, student, f)))}</span></div>
-      <button type="button" class="qn-line-menu${_langMenu ? ' on' : ''}" data-action="tqLine" data-do="langMenu"${open} title="Pick the language goal for ${esc(first)}, or tick the lines you use in ${esc(course)}.">Language Goal ▾</button>
-      ${menu}
-    </div>`;
-  }
-
   /* The next step most of the class shares (CommentBank.sharedNextStep),
      shown with the Closing row for the teacher's own closing line (Nov 2
      mockup). Worked out once per drawing of the page. */
@@ -7499,56 +6000,6 @@ window.ReportQuestionnaire = (function () {
     if (!r) return '';
     var step = r.text.charAt(0).toUpperCase() + r.text.slice(1).replace(/[.!?]*$/, '.');
     return `<span class="qn-shared-step"><b>Shared next step:</b> ${esc(step)} <span class="qn-shared-count">${r.count} of ${r.total} students</span></span>`;
-  }
-
-  function _closingRowHtml(cid, handle, i) {
-    var course = _courseName(cid);
-    var closing = CommentBank.classSettings(cid).closing;
-    var shared = _sharedStepHtml(cid);
-    handle = handle || '';
-    if (_lineEdit === 'closing')
-      return `<div class="qn-req-row qn-line-row" id="tq-row-closing"${_rowAttr(i)}>
-        ${handle}<div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
-        <div class="qn-req-body qn-line-edit-body">
-          <input type="text" class="qn-line-input" id="tq-line-closing" data-tq-line-input="closing" aria-label="Closing sentence for ${esc(course)}" title="Used exactly as you type it, at the end of each new comment." value="${esc(closing)}">
-          ${shared}
-          <span class="qn-req-source">Ends every new comment in ${esc(course)}. Approved comments are flagged so you can update or keep each one. Leave it empty to end without one.</span>
-          <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqLine" data-do="cancel" title="Keeps the closing sentence as it was.">Cancel</button><button type="button" class="qn-line-save" data-action="tqLine" data-do="saveClosing" title="Saves this closing sentence for every comment in ${esc(course)}.">Save for Class</button></div>
-        </div>
-      </div>`;
-    if (!closing)
-      return `<div class="qn-req-row qn-line-row qn-empty-row qn-closing-empty" id="tq-row-closing"${_rowAttr(i)}>
-        <div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
-        <button type="button" class="qn-line-choose" data-action="tqLine" data-do="editClosing" title="Write a sentence to end every comment in ${esc(course)}.">+ Closing Sentence for the Class</button>
-      </div>`;
-    return `<div class="qn-req-row qn-line-row" id="tq-row-closing"${_rowAttr(i)}>
-      ${handle}<div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
-      <div class="qn-req-body">
-        <button type="button" class="qn-line-text qn-req-text" data-action="tqLine" data-do="editClosing" title="Change the closing sentence for ${esc(course)}. From your class settings.">${esc(closing)}</button>
-      </div>
-    </div>`;
-  }
-
-  /* The rows for the class's lines, in the comment's order. On the IE
-     path the Support row is drawn among the Required rows (_requiredRows),
-     so only the closing row is added here. */
-  function _classRowsHtml(cid, student, f) {
-    var ie = CommentBank.reportPath(f) === 'ie';
-    var rows = [];
-    var add = function (kind, html, label) {
-      rows.push({ kind: kind, html: html, row: { step: kind }, label: label });
-    };
-    if (!ie && f.notHandedIn && f.notHandedIn.count > 0)
-      add(
-        'notHandedIn',
-        _missingRowHtml(cid, f, '', undefined, _previewSteps(cid, student, f).notHandedIn),
-        'Missing Work',
-      );
-    if (CommentBank.reportPath(f) === 'language_goals')
-      add('languageGoals', _langRowHtml(cid, student, f), 'Language Goals');
-    if (!ie) add('support', _supportRowHtml(cid, student, f), 'Support');
-    add('closing', _closingRowHtml(cid), 'Closing');
-    return rows;
   }
 
   /* After a class line changes: the comment on screen, when it is still
@@ -7672,7 +6123,7 @@ window.ReportQuestionnaire = (function () {
         _langMenu = false;
         _limitOpen = false;
         if (_lineEdit === 'own') _lineEdit = null;
-        _redrawLines(_supportMenu ? null : 'tq-row-support');
+        _redrawLines(_supportMenu ? null : 'tq-support-btn');
         _focusMenu();
         return;
       case 'pickSupport': {
@@ -7683,7 +6134,7 @@ window.ReportQuestionnaire = (function () {
         _supportMenu = false;
         _afterLine(before, 'supportLine', false);
         _redrawLines(null);
-        _focusSel('#tq-row-support .qn-line-menu');
+        _focusSel('#tq-support-btn');
         return;
       }
       case 'writeOwn':
@@ -7695,7 +6146,7 @@ window.ReportQuestionnaire = (function () {
         _supportMenu = false;
         _limitOpen = false;
         if (_lineEdit === 'ownLang') _lineEdit = null;
-        _redrawLines(_langMenu ? null : 'tq-row-languageGoals');
+        _redrawLines(_langMenu ? null : 'tq-lang-btn');
         _focusSel('#tq-lang-menu .qn-menu-item.on, #tq-lang-menu .qn-menu-item, #tq-lang-menu input');
         return;
       case 'pickLang': {
@@ -7707,7 +6158,7 @@ window.ReportQuestionnaire = (function () {
         _langMenu = false;
         _afterLine(before, 'languageGoalLine', false);
         _redrawLines(null);
-        _focusSel('#tq-row-languageGoals .qn-line-menu');
+        _focusSel('#tq-lang-btn');
         return;
       }
       case 'writeOwnLang':
@@ -7753,7 +6204,7 @@ window.ReportQuestionnaire = (function () {
         _lineEdit = null;
         _afterLine(before, 'closingLine', true);
         _redrawLines(null);
-        _focusSel('#tq-row-closing button');
+        _focusSel('#tq-closing-btn');
         return;
       case 'editLate':
         _lineEdit = 'late';
@@ -7768,7 +6219,7 @@ window.ReportQuestionnaire = (function () {
         _lineEdit = null;
         _afterLine(before, 'lateLine', true);
         _redrawLines(null);
-        _focusSel('#tq-row-missing button');
+        _focusSel('#tq-late-btn');
         return;
       }
       case 'cancel': {
@@ -7781,7 +6232,7 @@ window.ReportQuestionnaire = (function () {
             : was === 'ownLang'
               ? '#tq-lang-menu .qn-menu-add'
               : was === 'closing'
-                ? '#tq-row-closing button'
+                ? '#tq-closing-btn'
                 : null,
         );
         return;
@@ -7894,19 +6345,19 @@ window.ReportQuestionnaire = (function () {
 
   /* Whether a popover or a line's box is open. */
   function linesOpen() {
-    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_wording || !!_own || !!_miss || _habMenu;
+    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_own || ReportWc.ways() != null;
   }
   /* A click outside an open menu or the limit closes it; a box being
      edited stays until Cancel, Save for Class or Escape. */
   function clickOutside(target) {
     if (!target || !target.closest) return;
     var redraw = false;
-    if (_supportMenu && !target.closest('#tq-support-menu, #tq-row-support [data-do="supportMenu"]')) {
+    if (_supportMenu && !target.closest('#tq-support-menu, #tq-support-btn')) {
       _supportMenu = false;
       if (_lineEdit === 'own') _lineEdit = null;
       redraw = true;
     }
-    if (_langMenu && !target.closest('#tq-lang-menu, #tq-row-languageGoals [data-do="langMenu"]')) {
+    if (_langMenu && !target.closest('#tq-lang-menu, #tq-lang-btn')) {
       _langMenu = false;
       if (_lineEdit === 'ownLang') _lineEdit = null;
       redraw = true;
@@ -7919,18 +6370,6 @@ window.ReportQuestionnaire = (function () {
         redraw = true;
       }
     }
-    if (_wording && !target.closest('#tq-wording-menu, #tq-options-menu, [data-do="wording"], [data-do="options"]')) {
-      _wording = null;
-      _syncRequired();
-    }
-    if (_habMenu && !target.closest('#tq-habits-menu, [data-do="habitsMenu"]')) {
-      _habMenu = false;
-      _syncRequired();
-    }
-    if (_miss && !target.closest('#tq-miss-menu, [data-do="missOpen"], #undo-toast')) {
-      _miss = null;
-      _syncRequired();
-    }
     if (redraw) _redrawLines(null);
   }
   /* Escape: the open menu, the limit or the box being edited closes. */
@@ -7940,31 +6379,7 @@ window.ReportQuestionnaire = (function () {
       _ownCancel();
       return true;
     }
-    if (_habMenu) {
-      _habMenu = false;
-      _syncRequired();
-      _focusSel('#tq-sentences [data-do="habitsMenu"]');
-      return true;
-    }
-    if (_miss) {
-      _miss = null;
-      _syncRequired();
-      _focusSel('#tq-row-missing [data-do="missOpen"]');
-      return true;
-    }
-    if (_wording) {
-      var at = _wording.index;
-      _wording = null;
-      _syncRequired();
-      _focusSel(
-        '#tq-sentences [data-row="' +
-          at +
-          '"] [data-do="wording"], #tq-sentences [data-row="' +
-          at +
-          '"] [data-do="options"]',
-      );
-      return true;
-    }
+    if (ReportWc.closeWays()) return true;
     // Escape in the limit cancels: the limit stays as saved, and the blur
     // as the box closes saves nothing (_limitCancelled).
     var limit = _limitOpen;
@@ -7982,12 +6397,12 @@ window.ReportQuestionnaire = (function () {
         ? '#tq-count-btn'
         : menu
           ? langWas
-            ? '#tq-row-languageGoals [data-do="langMenu"]'
-            : '#tq-row-support [data-do="supportMenu"]'
+            ? '#tq-lang-btn'
+            : '#tq-support-btn'
           : was === 'closing'
-            ? '#tq-row-closing button'
+            ? '#tq-closing-btn'
             : was === 'late'
-              ? '#tq-row-missing button'
+              ? '#tq-late-btn'
               : null,
     );
     return true;
@@ -8319,8 +6734,8 @@ window.ReportQuestionnaire = (function () {
   function _fitDrawer() {
     var el = document.getElementById(DRAWER_ID);
     var out = document.getElementById('report-output');
-    var left = document.querySelector('.qn-left');
-    var right = document.querySelector('.qn-right');
+    var left = document.querySelector('.wc-left');
+    var right = document.querySelector('.wc-right');
     if (!el || !out || !left || !right || !el.getBoundingClientRect) return;
     var l = left.getBoundingClientRect();
     var r = right.getBoundingClientRect();
@@ -8415,7 +6830,6 @@ window.ReportQuestionnaire = (function () {
     _screen = key;
     _drawer = null;
     _own = null;
-    _wording = null;
     _cal = null;
     _iePending = null;
     _supportMenu = false;
@@ -8439,22 +6853,7 @@ window.ReportQuestionnaire = (function () {
     _shared = null;
     _staleCache = {};
     _claimCache = {};
-    var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
-    return `<div class="qn" data-sid="${student.id}">
-      <div class="qn-left">
-        ${_headerHtml(cid, student, f)}
-        ${_habitsHtml(cid, f)}
-        ${_glanceHtml(cid, student, f)}
-        ${_obsHtml(cid, student, f)}
-        ${_voiceHtml(cid, student, f, comment)}
-      </div>
-      <div class="qn-right">
-        ${_commentHtml(cid, student)}
-        ${_attendanceHtml(cid, student)}
-        ${_commentTab === 'this' ? _sentencesHtml(cid, student, f) : ''}
-        <!-- The rest of the Sentences card (PR 11b) goes here. -->
-      </div>
-    </div>${_drawerHtml(cid, student, f)}`;
+    return ReportWc.render(cid, student, f) + _drawerHtml(cid, student, f);
   }
 
   /* After the page is drawn: the roster, the box's height, and drag and
@@ -8465,11 +6864,9 @@ window.ReportQuestionnaire = (function () {
     _fitDrawer();
     _measureObs();
     syncApprove();
-    _wireDrag();
-    _wireCard();
     _wireSliders();
-    ReportQnBoxes.wireLight();
     _wireSelAdd();
+    ReportWc.after();
     // The teacher's own sentences in the bank (plan PR 10), and the
     // suggestions again after Later.
     if (window.PersonalBank) {
@@ -8538,15 +6935,6 @@ window.ReportQuestionnaire = (function () {
         _setHeight(h + (e.key === 'ArrowDown' ? 24 : -24), true);
       }
       return;
-    }
-    // ⌥↑ and ⌥↓ move the sentence whose row has the focus.
-    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.altKey && !e.metaKey && !e.ctrlKey) {
-      var row = t && t.closest && t.closest('#tq-sentences [data-row]');
-      if (row && row.querySelector('.qn-srow-handle[tabindex]')) {
-        e.preventDefault();
-        _moveRow(Number(row.dataset.row), e.key === 'ArrowUp' ? -1 : 1);
-        return;
-      }
     }
     // Return in a class line's box saves it; in the limit, closes it.
     var lineBox = (e.target && e.target.dataset && e.target.dataset.tqLineInput) || '';
@@ -8629,6 +7017,142 @@ window.ReportQuestionnaire = (function () {
     if (at < 0) next = key === 'ArrowUp' || key === 'End' ? items.length - 1 : 0;
     items[next].focus();
   }
+  /* ── Write Comments (teacher/report-wc*.js) ──────────────────
+     The page's modules are handed the few things of this file they work
+     with: the rows of the comment and how they are saved, checked and
+     undone, and the pieces of the old screen that stay (the class lines'
+     menus, the Required rows, the stale card, the basis switch). */
+  var _wcHost = ReportWcHost.make({
+    cid: function () {
+      return _activeCourse;
+    },
+    termId: getTermId,
+    current: _current,
+    facts: _facts,
+    box: _box,
+    fitBox: _fitBox,
+    rowsFor: _rowsFor,
+    ctx: _bankContext,
+    picks: _picksFor,
+    usage: _usage,
+    lastTermIds: lastTermIds,
+    alternatives: alternatives,
+    rowFromSentence: rowFromSentence,
+    insertRow: insertRow,
+    typedRow: typedRow,
+    classRow: _classRow,
+    isBest: _isBestRow,
+    isRequired: _isRequired,
+    justAdded: _justAdded,
+    markAdded: _markAdded,
+    closeNext: _closeNext,
+    addClose: _addClose,
+    pieceMark: function (f, w) {
+      return _pieceMark(_activeCourse, f, w);
+    },
+    pieces: _pieces,
+    glanceChange: glanceChange,
+    glanceRows: glanceRows,
+    habitValue: _savedRating,
+    voiceRows: voiceRows,
+    wordsAnswers: wordsAnswers,
+    wordsSentence: wordsSentence,
+    wordsRow: wordsRow,
+    studentObs: studentObs,
+    missingAndLate: missingAndLate,
+    PARTS: PARTS,
+    fitCount: _fitCount,
+    sentencesOf: sentencesOf,
+    headerGrade: headerGrade,
+    first: _first,
+    own: function () {
+      return _own;
+    },
+    ownBoxHtml: _ownBoxHtml,
+    pronounNote: pronounNote,
+    pronounCheckFor: _pronounCheckFor,
+    claimChanges: claimChanges,
+    claimHtml: _claimHtml,
+    setRows: function (st, rows, ordered) {
+      var key = _rowKey(st);
+      _rows[key] = rows;
+      if (ordered) _ordered[key] = true;
+    },
+    saveNow: tqSaveCurrentIfNeeded,
+    saveNarrative: tqSaveNarrative,
+    writeRows: _writeRows,
+    snapshot: _snapshot,
+    undoToast: _undoToast,
+    repick: _repick,
+    bankById: _bankById,
+    applyEdit: _applyEdit,
+    alignNow: function (strict) {
+      clearTimeout(_alignTimer);
+      _strictAlign = !!strict;
+      _alignNow();
+      _strictAlign = false;
+    },
+    openBrowse: _openBrowse,
+    courseName: _courseName,
+    habitsOf: _habitsOf,
+    supportMenu: function () {
+      return _supportMenu;
+    },
+    langMenu: function () {
+      return _langMenu;
+    },
+    lineEdit: function () {
+      return _lineEdit;
+    },
+    supportMenuHtml: _supportMenuHtml,
+    langMenuHtml: _langMenuHtml,
+    previewSteps: _previewSteps,
+    meetingRowAt: meetingRowAt,
+    requiredRowHtml: _requiredRowHtml,
+    attendanceNoteHtml: _attendanceNoteHtml,
+    earlierReports: _earlierReports,
+    commentTab: function () {
+      return _commentTab;
+    },
+    reportLabel: _reportLabel,
+    shownText: _shownText,
+    staleFor: staleFor,
+    staleHtml: _staleHtml,
+    shortDay: _shortDay,
+    plainComment: plainComment,
+    pronounNoticeHtml: _pronounNoticeHtml,
+    basisHtml: _basisHtml,
+    warnHtml: _warnHtml,
+    noDraftHtml: _noDraftHtml,
+    emptyHtml: _emptyHtml,
+    countHtml: _countHtml,
+    copyIcon: COPY_ICON,
+    habitKept: _habitKept,
+    habitNoteText: habitNoteText,
+    scoreKey: _scoreSetKey,
+    sharedStepHtml: _sharedStepHtml,
+    keepHabitNote: _keepHabitNote,
+    setNeedsLook: function (on) {
+      _notReadyOnly = !!on;
+      syncRoster();
+    },
+  });
+  ReportWc.configure(_wcHost);
+  ReportWcLook.configure({
+    cid: function () {
+      return _activeCourse;
+    },
+    termId: getTermId,
+    students: getTqStudents,
+    plainComment: plainComment,
+    namesOf: _namesOf,
+    firstName: _first,
+    today: _today,
+    flagged: _flagged,
+    scoreKey: _scoreSetKey,
+    syncRoster: syncRoster,
+  });
+
   /* ── Namespace ──────────────────────────────────────────── */
   return {
     configure: configure,
@@ -8652,7 +7176,6 @@ window.ReportQuestionnaire = (function () {
     attendanceValue: attendanceValue,
     tqAddReportNote: tqAddReportNote,
     tqOpenGrader: tqOpenGrader,
-    tqGlanceToggle: tqGlanceToggle,
     missingAndLate: missingAndLate,
     tqSelectStudent: tqSelectStudent,
     tqSetBasis: tqSetBasis,
@@ -8677,7 +7200,7 @@ window.ReportQuestionnaire = (function () {
     tqClaim: tqClaim,
     claimChanges: claimChanges,
     staleFor: staleFor,
-    staleNote: ReportQnBoxes.staleNote,
+    staleNote: ReportWcComment.staleNote,
     metaFor: metaFor,
     lastTermIds: lastTermIds,
     browseOpen: browseOpen,
@@ -8699,11 +7222,9 @@ window.ReportQuestionnaire = (function () {
     gradeClaimWrong: gradeClaimWrong,
     insertRow: insertRow,
     insertChoices: insertChoices,
-    registerSource: registerSource,
     wordsAnswers: wordsAnswers,
     wordsSentence: wordsSentence,
     markWords: markWords,
-    sourceChoices: sourceChoices,
     gapPart: _gapPart,
     recoverRows: recoverRows,
     composeRows: composeRows,

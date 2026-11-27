@@ -126,7 +126,7 @@ test('every grade the Reports page draws, from a click, a timer or a promise, is
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   await expect(page.locator('.qn')).toBeVisible();
   await forget(page);
-  await page.locator('[data-action="tqGenerate"]').first().click();
+  await page.locator('[data-action="tqGenerate"]:visible').first().click();
   await expect(page.locator('#tq-narrative')).not.toHaveValue('');
   await forget(page);
   await page.locator('#gb-sidebar .student-row[data-sid]').nth(3).click();
@@ -135,7 +135,7 @@ test('every grade the Reports page draws, from a click, a timer or a promise, is
   await page.selectOption('#report-period', 'Report 1');
   await expect(page.locator('.qn')).toBeVisible();
   await forget(page);
-  await page.locator('[data-action="tqGenerate"]').first().click();
+  await page.locator('[data-action="tqGenerate"]:visible').first().click();
   // Typing saves on a timer.
   await page.locator('#tq-narrative').press('End');
   await forget(page);

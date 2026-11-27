@@ -1,0 +1,643 @@
+/* ── Write Comments (docs/plans/write-comments-plan.md) ────────────
+   Left, what happened in class, one box per part; right, the Teacher
+   Comment, which stays in view. Sizes and colours follow the approved
+   artboard (Term Questionnaire · The Ideal). The app's own controls and
+   tokens: 32 px controls, 8 px corners, the .seg slider. Motion is 150 to
+   250 ms and Reduce Motion turns it off. */
+.qn.wc {
+  --wc-card: var(--surface);
+  --wc-line: rgba(0, 0, 0, 0.06);
+  --wc-hover: rgba(0, 0, 0, 0.035);
+  --wc-btn: rgba(0, 0, 0, 0.05);
+  --wc-say-bg: rgba(0, 102, 204, 0.1);
+  --wc-say-ink: #0b5bb5;
+  --wc-sent-bg: #f5f9ff;
+  --wc-warn-bg: #fff4dc;
+  --wc-warn-ink: #5c3b00;
+  --wc-up-bg: #dff3e4;
+  --wc-up-ink: #1e6b3a;
+  --wc-amber-bg: #fbefd6;
+  --wc-amber-ink: #7a4a00;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  padding: 0 24px 0 0;
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .qn.wc {
+    --wc-line: rgba(255, 255, 255, 0.1);
+    --wc-hover: rgba(255, 255, 255, 0.06);
+    --wc-btn: rgba(255, 255, 255, 0.1);
+    --wc-say-bg: rgba(92, 169, 255, 0.18);
+    --wc-say-ink: #8ec5ff;
+    --wc-sent-bg: rgba(92, 169, 255, 0.12);
+    --wc-warn-bg: rgba(255, 179, 64, 0.16);
+    --wc-warn-ink: #ffcf7a;
+    --wc-up-bg: rgba(48, 209, 88, 0.18);
+    --wc-up-ink: #4ade80;
+    --wc-amber-bg: rgba(255, 159, 10, 0.16);
+    --wc-amber-ink: #ffb340;
+  }
+}
+:root[data-theme='dark'] .qn.wc {
+  --wc-line: rgba(255, 255, 255, 0.1);
+  --wc-hover: rgba(255, 255, 255, 0.06);
+  --wc-btn: rgba(255, 255, 255, 0.1);
+  --wc-say-bg: rgba(92, 169, 255, 0.18);
+  --wc-say-ink: #8ec5ff;
+  --wc-sent-bg: rgba(92, 169, 255, 0.12);
+  --wc-warn-bg: rgba(255, 179, 64, 0.16);
+  --wc-warn-ink: #ffcf7a;
+  --wc-up-bg: rgba(48, 209, 88, 0.18);
+  --wc-up-ink: #4ade80;
+  --wc-amber-bg: rgba(255, 159, 10, 0.16);
+  --wc-amber-ink: #ffb340;
+}
+.wc-left {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 4px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wc-right {
+  flex: 0 0 540px;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: static;
+  max-height: none;
+  margin: 0;
+}
+.wc-boxes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+@media (max-width: 1280px) {
+  .qn.wc {
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 0;
+    padding: 0;
+  }
+  .wc-left,
+  .wc-right {
+    flex: none;
+    overflow: visible;
+    padding: 16px;
+  }
+}
+
+/* The student at the top of the left column */
+.wc-head-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 4px 4px;
+  flex-shrink: 0;
+}
+.wc-head-card .qn-who {
+  flex: 1 1 auto;
+}
+.wc-search {
+  width: 240px;
+  max-width: 40%;
+  height: 32px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 8px;
+  background: var(--wc-btn);
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* A box: one row closed, every fact open */
+.wc-box {
+  flex-shrink: 0;
+  background: var(--wc-card);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 8px 16px;
+  transition: box-shadow 0.15s;
+}
+.wc-box.open {
+  padding-bottom: 2px;
+}
+.wc-box.lit {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 2px color-mix(in srgb, var(--tint) 33%, transparent);
+}
+.wc-h {
+  margin: -8px -16px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.wc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.wc-head:hover {
+  background: var(--wc-hover);
+}
+.wc-head:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.wc-tile {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.wc-head-name {
+  flex-grow: 1;
+}
+.wc-head-fact {
+  font-size: 14px;
+  font-weight: 600;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wc-chev {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--wc-btn);
+  color: var(--text);
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1),
+    background-color 0.15s;
+}
+.wc-head:hover .wc-chev {
+  background: var(--wc-btn);
+}
+.wc-chev.open {
+  transform: rotate(180deg);
+}
+.wc-body {
+  margin-top: 4px;
+}
+
+/* Chips and buttons */
+.wc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--wc-btn);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.wc-chip.own {
+  background: var(--wc-say-bg);
+  color: var(--wc-say-ink);
+}
+.wc-chip.up {
+  background: var(--wc-up-bg);
+  color: var(--wc-up-ink);
+}
+.wc-chip.warn {
+  background: var(--wc-amber-bg);
+  color: var(--wc-amber-ink);
+}
+.wc-btn {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--wc-btn);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.12s;
+}
+.wc-btn:hover {
+  filter: brightness(0.93);
+}
+.wc-btn.say {
+  background: var(--wc-say-bg);
+  color: var(--wc-say-ink);
+}
+.wc-btn.on {
+  background: var(--wc-say-bg);
+  color: var(--wc-say-ink);
+}
+.wc-btn-main {
+  background: var(--active-fill);
+  color: #fff;
+}
+.wc-x {
+  width: 26px;
+  padding: 0;
+}
+.wc-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.wc-btn:focus-visible,
+.wc-link:focus-visible,
+.wc-text:focus-visible,
+.wc-grip:focus-visible,
+.wc-read:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* A fact and the sentences the comment says about it */
+.wc-fact {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-height: 32px;
+  padding: 3px 0;
+  border-top: 1px solid var(--wc-line);
+}
+.wc-fact:has(.qn-att-field),
+.wc-fact:has(.wc-line-edit) {
+  flex-wrap: wrap;
+}
+.wc-fact-main {
+  flex: 1 1 170px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.wc-fact-name {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.wc-fact-quote {
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+.wc-val {
+  flex: 0 0 auto;
+  min-width: 60px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+}
+.wc-bar {
+  flex: 0 1 120px;
+  min-width: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--wc-btn);
+  display: flex;
+  overflow: hidden;
+}
+.wc-bar > span {
+  background: var(--tint);
+}
+.wc-tag {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+.wc-fact .qn-hs {
+  flex: 0 0 150px;
+  width: 150px;
+  --hs-w: 150px;
+}
+.wc-fact .qn-att-field {
+  flex: 0 0 auto;
+}
+.wc-fact .qn-att-note {
+  flex: 1 1 100%;
+}
+.wc-fact .qn-menu.up {
+  top: auto;
+  bottom: 100%;
+}
+.wc-fact .qn-menu {
+  top: 100%;
+  right: 0;
+  left: auto;
+}
+
+.wc-line {
+  margin: 0 0 6px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 9px;
+  background: var(--wc-sent-bg);
+  transition:
+    box-shadow 0.15s,
+    background-color 0.15s;
+}
+.wc-line.hot {
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.45);
+}
+.wc-line.added {
+  box-shadow: 0 0 0 2px rgba(46, 125, 79, 0.5);
+}
+.wc-line.flag {
+  background: var(--wc-warn-bg);
+}
+.wc-line.lift {
+  opacity: 0.45;
+}
+.wc-line.drop {
+  box-shadow: inset 0 3px 0 var(--link);
+}
+.wc-line-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.wc-grip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 30px;
+  margin-left: -8px;
+  border-radius: 6px;
+  color: var(--text-3);
+  cursor: grab;
+  touch-action: none;
+}
+.wc-grip:hover {
+  background: var(--wc-btn);
+  color: var(--text);
+}
+.wc-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 3px 0;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  text-align: left;
+  cursor: text;
+}
+.wc-line .wc-chip {
+  margin-top: 4px;
+}
+.wc-line .wc-btn {
+  margin-top: 2px;
+}
+.wc-edit {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--active-fill);
+  padding: 0 8px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+}
+.wc-ways {
+  margin: 2px 0 2px 12px;
+}
+.wc-way {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 6px 12px;
+  border-top: 1px solid var(--wc-line);
+}
+.wc-way-text {
+  flex: 1 1 auto;
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+.wc-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 4px 16px;
+  border-top: 1px solid var(--wc-line);
+}
+.wc-sub-name {
+  flex: 1 1 auto;
+  font-size: 14px;
+}
+.wc-write {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0 8px;
+}
+.wc-write-input {
+  flex: 1 1 auto;
+  height: 32px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px var(--active-fill);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+}
+.wc-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 5px 0 7px;
+  border-top: 1px solid var(--wc-line);
+}
+.wc-line-edit {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 8px;
+  align-items: center;
+}
+.wc-line-edit .qn-line-input {
+  flex: 1 1 auto;
+}
+.wc-box .qn-obs {
+  display: block;
+}
+
+/* The Teacher Comment */
+.wc-comment {
+  background: var(--wc-card);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 16px 18px;
+}
+.wc-comment-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.wc-comment-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  flex-grow: 1;
+}
+.wc-textwrap {
+  position: relative;
+}
+.wc-read {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: text;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.wc-read[hidden] {
+  display: none;
+}
+.wc-sent {
+  border-radius: 4px;
+  padding: 2px 1px;
+  transition: background-color 0.15s;
+}
+.wc-sent.hot {
+  background: rgba(0, 102, 204, 0.14);
+}
+.wc-sent.last {
+  box-shadow: inset 0 -2px 0 #d39a2b;
+}
+.wc-textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 2px var(--active-fill);
+  resize: none;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--wc-card);
+  overflow: hidden;
+}
+.wc-textarea[hidden] {
+  display: none;
+}
+.wc-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--wc-warn-bg);
+  border-radius: 9px;
+  padding: 8px 12px;
+  margin-top: 12px;
+}
+.wc-note-text {
+  flex: 1 1 auto;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--wc-warn-ink);
+}
+.wc-note .wc-link {
+  color: var(--wc-amber-ink);
+  white-space: nowrap;
+}
+.wc-foot-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.wc-foot-row[hidden] {
+  display: none;
+}
+.wc-foot-row .wc-chip {
+  height: 26px;
+  border-radius: 7px;
+}
+.wc-foot-row .qn-count-btn,
+.wc-foot-row .qn-count-wrap {
+  white-space: nowrap;
+}
+.wc-foot-row .qn-count-btn {
+  height: 26px;
+  border-radius: 7px;
+}
+.wc-spacer {
+  flex-grow: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wc-box,
+  .wc-head,
+  .wc-chev,
+  .wc-line,
+  .wc-sent,
+  .wc-btn {
+    transition: none;
+  }
+}
+
+/* The student list: why a student needs a look */
+body.qn-roster #gb-sidebar .student-row-note {
+  color: var(--score-2-text);
+  font-weight: 600;
+}

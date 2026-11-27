@@ -79,21 +79,13 @@ window.ReportQnVoiceObservations = (function () {
       .join('');
   }
 
-  // html-safe: observation cards from ObsCard.html (escapes every value); names, pronouns and the sub-line esc()'d
-  function _obsHtml(cid, student, f) {
+  // html-safe: observation cards from ObsCard.html (escapes every value); names and pronouns esc()'d
+  function _obsBody(cid, student, f) {
     var first = student.firstName || displayNameFirst(student);
     var list = studentObs(cid, student.id);
-    var since = obsSinceReport(list, f);
-    var sub =
-      list.length && since != null
-        ? 'So far this year · ' + since + ' since the ' + f.lastReport.label + ' report'
-        : 'So far this year';
-    var top = window.ReportQnBoxes.head('observations', '', `<span class="qn-ev-text">${esc(sub)}</span>`);
     if (!list.length) {
       var her = (f.pronouns && f.pronouns.obj) || 'them';
-      return `<div class="qn-card qn-obs">${top}
-        <div class="qno-empty">No observations for ${esc(first)} yet. Observations you record for ${esc(her)} this year show here.</div>
-      </div>`;
+      return `<div class="qno-empty">No observations for ${esc(first)} yet. Observations you record for ${esc(her)} this year show here.</div>`;
     }
     var ctx = ObsCard.context(cid);
     var cards = list
@@ -108,7 +100,7 @@ window.ReportQnVoiceObservations = (function () {
         });
       })
       .join('');
-    return `<div class="qn-card qn-obs">${top}
+    return `<div class="qn-obs">
       <div class="qno-strip" role="group" aria-label="Open observations by type">${_obsStripHtml(obsCounts(list))}</div>
       <div class="qno-recent">${cards}</div>
       <div class="qno-foot">
@@ -151,53 +143,6 @@ window.ReportQnVoiceObservations = (function () {
     return rows;
   }
 
-  // html-safe: student answers, goal, labels and name esc()'d, in attributes too
-  function _voiceHtml(cid, student, f, comment) {
-    var first = student.firstName || displayNameFirst(student);
-    var rows = voiceRows(f)
-      .map(function (r) {
-        var quoted = r.quote && r.text && _quotes(comment, r.text);
-        var chip = r.priv
-          ? '<span class="qn-chip-private" title="Only you see this. It is never printed and never used in the comment.">Private</span>'
-          : r.quote
-            ? `<span class="qn-chip-quoted" data-answer="${esc(r.text)}" title="Generate can quote this in the comment."${quoted ? '' : ' hidden'}>In the comment</span>`
-            : '';
-        return `<div class="qn-voice-row">
-          <div class="qn-voice-main"><span class="qn-fact-label">${esc(r.label)}</span>
-          <span class="qn-voice-text${r.text ? '' : ' qn-muted'}">${esc(r.text || r.empty)}</span></div>
-          ${chip}
-        </div>`;
-      })
-      .join('');
-    return `<div class="qn-card qn-voice" data-lit="voice">
-      ${window.ReportQnBoxes.head(
-        'voice',
-        first + '’s Voice',
-        `<a role="link" tabindex="0" data-href="/dashboard?course=${esc(cid)}&manage=questionnaires" class="qn-card-link" title="Opens this class’s Questionnaires in Class Settings, where you choose and send the questions students answer.">Questionnaires ›</a>`,
-      )}
-      ${rows}
-    </div>`;
-  }
-
-  /* Whether the comment quotes an answer (its words, without a closing
-     full stop). */
-  function _quotes(comment, text) {
-    var t = String(text || '')
-      .replace(/[“”"]/g, '')
-      .replace(/[.\s]+$/, '');
-    return !!t && String(comment || '').indexOf(t) >= 0;
-  }
-
-  /* After the comment changes: which answers it quotes. */
-  function _syncQuoted() {
-    var el = _box();
-    if (!el) return;
-    var comment = el.value;
-    document.querySelectorAll('.qn-chip-quoted[data-answer]').forEach(function (/** @type {HTMLElement} */ chip) {
-      chip.hidden = !_quotes(comment, chip.dataset.answer);
-    });
-  }
-
   /* ── The class's report ─────────────────────────────────── */
 
   /* What Progress Reports prints for the class: One Report's model, read
@@ -235,12 +180,9 @@ window.ReportQnVoiceObservations = (function () {
     obsCounts: obsCounts,
     obsSinceReport: obsSinceReport,
     _obsStripHtml: _obsStripHtml,
-    _obsHtml: _obsHtml,
+    _obsBody: _obsBody,
     _answer: _answer,
     voiceRows: voiceRows,
-    _voiceHtml: _voiceHtml,
-    _quotes: _quotes,
-    _syncQuoted: _syncQuoted,
     _model: _model,
     _partLabel: _partLabel,
     _parts: _parts,

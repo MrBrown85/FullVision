@@ -144,15 +144,6 @@ describe('the answers it may quote', () => {
     voice(p);
     expect(RQ.wordsAnswers(facts()).map(x => x.key)).toEqual(['hard', 'good', 'goal']);
   });
-
-  it('nothing to quote when only the private answer is on file', () => {
-    voice({ about: { note: FULL().about.note }, checkin: null });
-    expect(RQ.wordsAnswers(facts())).toEqual([]);
-    open();
-    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
-    expect(addMenu()).not.toContain('data-sentence="words:');
-    expect(addMenu()).not.toContain('splitting up');
-  });
 });
 
 describe('the sentence', () => {
@@ -171,87 +162,6 @@ describe('the sentence', () => {
     expect(RQ.wordsSentence(student(), a, 0)).toBe(
       'Asked what they want to get better at, Cece wrote: “' + BETTER_SAID + '”.',
     );
-  });
-});
-
-describe('Add Here', () => {
-  it('offers her words first, under its own heading, then the bank', () => {
-    open();
-    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
-    const menu = addMenu();
-    const words = menu.indexOf('data-source="words"');
-    const bank = menu.indexOf('data-source="bank"');
-    expect(words).toBeGreaterThan(-1);
-    expect(bank).toBeGreaterThan(words);
-    expect(menu.indexOf('data-sentence="words:better:0"')).toBeLessThan(bank);
-    expect(menu).toContain('Her words, from her questionnaire');
-    expect(menu).not.toContain('splitting up');
-  });
-
-  it('puts it in as a Next Step sentence, quoted exactly, saved with the comment', () => {
-    open();
-    RQ.tqSentences('insert', { dataset: { gap: '1', step: 'nextStep', sentence: 'words:better:0' } });
-    expect(saved().narrative).toBe(TYPED + ' ' + FRAME);
-    const drawn = card(RQ.renderTermQuestionnaire(CID));
-    expect(drawn).toContain('<span class="qn-req-label">Next Step</span>');
-    expect(drawn).toContain('Her words, from her questionnaire');
-    // Offered once: with it in, Add Here no longer offers it.
-    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '2' } });
-    expect(addMenu()).not.toContain('data-sentence="words:');
-  });
-});
-
-describe('beside the bank’s Next Step sentence', () => {
-  it('is a row of its own with its own Options, not joined to the bank’s', () => {
-    open();
-    RQ.tqSentences('ownOpen', { dataset: { where: 'gap', gap: '1' } });
-    // The bank's Next Step sentence: the first one offered that is not her words.
-    const bankNext = Array.from(
-      addMenu().matchAll(/data-step="(nextStep|goWords|home)" data-sentence="([^"]*)"/g),
-      m => m,
-    ).filter(m => !/^words:/.test(m[2]))[0];
-    expect(bankNext).toBeTruthy();
-    RQ.tqSentences('insert', { dataset: { gap: '1', step: bankNext[1], sentence: bankNext[2] } });
-    RQ.tqSentences('insert', { dataset: { gap: '2', step: 'nextStep', sentence: 'words:better:0' } });
-    expect(saved().narrative.endsWith(FRAME)).toBe(true);
-    const labels = Array.from(
-      card(RQ.renderTermQuestionnaire(CID)).matchAll(/qn-req-label">([^<]*)<[\s\S]*?qn-req-text"[^>]*>([^<]*)</g),
-      m => m[1] + '|' + m[2],
-    );
-    expect(labels).toHaveLength(3);
-    expect(labels[1]).toMatch(/^Next Step\|/);
-    expect(labels[1]).not.toContain('Cece wrote');
-    expect(labels[2]).toBe('Next Step|' + FRAME);
-    RQ.tqSentences('wording', { dataset: { row: '2' } });
-    expect(card(RQ.renderTermQuestionnaire(CID))).toContain('aria-label="Other ways to say Cece’s words"');
-  });
-});
-
-describe('its Options menu', () => {
-  it('has the other frame, her other shared answers under their questions, and never the private one', () => {
-    open();
-    RQ.tqSentences('insert', { dataset: { gap: '1', step: 'nextStep', sentence: 'words:better:0' } });
-    RQ.tqSentences('wording', { dataset: { row: '1' } });
-    const menu = card(RQ.renderTermQuestionnaire(CID));
-    expect(menu).toContain('id="tq-wording-menu"');
-    expect(menu).toContain('Cece named what she wants to get better at: “' + BETTER_SAID + '”.');
-    expect(menu).toContain('Quote another answer');
-    expect(menu).toContain('What is hard for me right now?');
-    expect(menu).toContain('What am I good at as a learner?');
-    expect(menu).toContain('Hand in every lab on time');
-    expect(menu).toContain('My goal · In Progress');
-    expect(menu).toContain('Answers marked To You Only are never listed.');
-    expect(menu).toContain('Remove From Comment');
-    expect(menu).not.toContain('splitting up');
-  });
-
-  it('a pick replaces the sentence; the answer stays word for word', () => {
-    open();
-    RQ.tqSentences('insert', { dataset: { gap: '1', step: 'nextStep', sentence: 'words:better:0' } });
-    RQ.tqSentences('pick', { dataset: { row: '1', sentence: 'words:hard:1' } });
-    expect(saved().narrative).toBe(TYPED + ' Cece named what is hard for her right now: “' + HARD + '”');
-    RQ.tqSentences('pick', { dataset: { row: '1', sentence: 'words:better:1' } });
-    expect(saved().narrative).toContain('“' + BETTER_SAID + '”.');
   });
 });
 

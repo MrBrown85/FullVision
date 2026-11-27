@@ -1,0 +1,35 @@
+# Write Comments: the page rebuilt from its intention
+
+Colin, Nov 26, 2026: "build it", after the board "Teacher Comment Board", artboard **Term Questionnaire · The Ideal** (https://claude.ai/artifact/DKrmmQUAJndT3xiaEcGGKo#artboard-Ideal). The artboard's source is the design to match. It follows the intention in `docs/ROADMAP.md` §2.1 ("Write comments from the evidence… FullVision starts from what happened in class") and `docs/DECISIONS.md` 14 ("rebuilt around the comment").
+
+This plan supersedes the layout of `docs/plans/term-questionnaire-redesign-plan.md` (the boxed Sentences card beside the left cards). Its other decisions still hold unless a line below says otherwise: one name per thing (4), no superfluous grey text (3), Approve and Next always on (6), the missing-work wordings (7), year to date (8), motion (11), the projected grade never prints (12), a competency's name is never the next step (13), comments only: this page never changes a gradebook status (14).
+
+## What Colin decided (Nov 26)
+
+1. **The name is Write Comments** (PR #1893): the tabs read Write Comments | Print Reports.
+2. **Two things on the page, no more.** Left: what happened in class, one box per part. Right: the Teacher Comment. The left side scrolls; the comment stays in view (DECISIONS 21). Under 1281 px the columns stack, as today.
+3. **One box per part, in this order:** Grade, Best Piece, Strength, Work Habits, Attendance, the student's Voice, Missing Work, Next Step, For the Class (support line, closing, late work line), and Your Sentences (only when the comment holds sentences typed in it). The Observations box is drawn but its sentences wait (below).
+4. **Every box starts closed except Work Habits**, which starts open. A closed box is one row: the part's tile and name, its main fact (the grade, the piece, the skill, "Six Ratings", "2 Absent · 0 Late", "10 Missing"), a blue chip "N in the Comment" when it has sentences in the comment, and a round chevron. **The whole row is the button** (hover shades it, the chevron darkens and turns when open, Enter and Space open it). A search opens the boxes that match.
+5. **An open box shows every fact of that part** (each skill with its mark, pieces and "Up From N" since the last report; each piece; each rating; each of the student's answers; the missing count with See the N). Under each fact the comment already says, its sentence; on a fact it does not say, **Say This** (Best Piece: **Name This One**, which changes which piece is named). Say This adds a sentence after the last one of its part and never takes another's place (DECISIONS 16).
+6. **A sentence in a box** has, left to right: the drag handle, its text (click to edit in place; Enter keeps, Esc cancels; an edited sentence is marked Yours), **Other Ways ▾** (the bank's other wordings for that fact, each with Use, and the count of classmates who have it), and ✕ Remove From Comment (with Undo).
+7. **The drag handle is back** on every sentence: drag onto another sentence to put it in front of it in the comment (Undo); Up and Down arrows on the focused handle move it one place earlier or later.
+8. **The Teacher Comment is a box you type in**, as it is today. When it loses focus, the text is read back into sentences: a sentence left as it was keeps its fact; one reworded (half or more of its words shared with an old sentence) stays in its box, marked Yours; a new one goes into Your Sentences; cut and paste reorder. Undo puts the comment back. Pointing at a sentence in the comment lights its line in its box, and the reverse.
+9. **The comment is checked as a whole**, under it, as amber notes with one action each: three or more sentences in a row with the same opening (Vary Them, which picks other wordings and can be undone); the habit sentence that disagrees with the missing work (as today, Keep It); a sentence that was in the student's last report (it is marked in its box). Under the comment: the character count, **Reads at Grade N** (Flesch–Kincaid grade of the comment's text, 3 to 12), Generate Again, Copy. This Report | Term 1 stays.
+10. **The student list says who needs a look and why**, under the name in amber, and an **All N | Needs a Look N** switch at its top. The reasons come only from what the page already knows: the approve checks (an IE with no deadline, a sentence that no longer matches the gradebook), the habit-and-missing disagreement, four or more sentences shared with a classmate's comment, no next step in the comment, and Needs Approval. A tick for an approved comment, as today.
+11. **Nothing is lost.** What the Options menus, the Sentences card and the About column did is now in the boxes: Other Ways (8), Pick the Piece (Name This One), Pick the Skill (Say This on a skill), See the N with Open in Grader, Remove From Comment, + Write Your Own (each open box's foot), Add to My Bank (on a Yours sentence), the class's support line, closing and late work line (For the Class box, edited for the class as today), attendance inputs (Attendance box), the six ratings (Work Habits box), Show Both (the duplicate note), Keep as Approved / Use the New Sentence when the gradebook moves under an approved comment (as today). **Browse Sentences stays** as the full bank: each open box's foot has "All N [Part] Sentences…", which opens the Sentences sheet (PR #1889) on that part.
+
+## Not in this build (waiting on Colin)
+
+- **Sentences from observations** (Say This on an observation). The Observations box shows them for reading only, as the Nov 3 rule says, until Colin decides: a Concern or a note naming another student would go into a family's report.
+- **If Handed In**, the teacher-only projected grade (new grade math), and **Grade So Far This Year**, the line of the grade since September (reads calc.js at earlier dates).
+- **+ What You Wrote on It** (quoting the teacher's feedback on the best piece) and **+ His Next Chance** (naming the next assessment of the same skill).
+- Skills | Topics (no sentence is tagged to a unit yet), the next-step bank by subject and grade (decision 13).
+
+## Rules for the build
+
+- Grades and levels show only through `calc.js` and its helpers (CLAUDE.md rule 3): a Proficiency class (Humanities 8) shows levels, not percents; Both shows both. Test in a Proficiency class and a Letter class.
+- No grade math changes, no migration, no change to what is saved: a comment's text, its `draft_meta` (sentences, steps, sources) and approvals are saved as today.
+- Text into HTML only through `esc`; the innerHTML audit must pass.
+- Demo Mode works (`/login.html?demo=1`, then `/reports?tab=questionnaire&student=st1`).
+- No grey helper text; Title Case labels; the app's own buttons (32 px controls, 8 px corners), sliders (`.seg`) and tokens.
+- Least code: build this as the page and delete the old layout it replaces (the separate left cards and the Sentences card's markup and CSS); do not lay it over the old one. `teacher/report-questionnaire.js` is at its size limit: new code goes in new files.

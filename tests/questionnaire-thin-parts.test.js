@@ -49,14 +49,14 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) });
     upsertTermRating(cid, st.id, termId, { narrative: edit ? edit(d.text, d) : d.text });
     const html = RQ.renderTermQuestionnaire(cid);
-    return { html: html.slice(html.indexOf('id="tq-sentences"')), d, students, st, termId };
+    return { html, d, students, st, termId };
   }
 
   it('says nothing under a row whose part is thin for the class', () => {
     const { html, d, st, termId, students } = card('Noor');
     const strength = CommentBank.bankStrength(cid, { termId, students });
     expect(d.sentences.some(x => (strength.byStudent[st.id][x.step] || {}).thin)).toBe(true);
-    expect(html).toContain('class="qn-req-row');
+    expect(html).toContain('class="wc-line');
     expect(html).not.toContain('some will repeat');
     expect(html).not.toContain('Write one of your own');
   });

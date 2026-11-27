@@ -13,15 +13,15 @@ labels:
   - Generate Comment
   - Teacher Comment
   - Undo
-  - Sentences
-  - Options
+  - Say This
+  - Other Ways
   - Remove From Comment
   - Browse Sentences…
   - Use
   - + Write Your Own
-  - Support
+  - For the Class
   - + Support Line
-  - Closing
+  - Closing Sentence
   - + Closing Sentence for the Class
   - Save for Class
   - Approve and Next
@@ -49,14 +49,14 @@ shots:
 2. Choose **Generate Comment**. The draft replaces the text under **Teacher Comment**. It opens with the student's grade, then adds sentences on the best piece, strengths, habits, missing work and a next step when the record supports them.
 3. Choose **Generate Comment** again for another version. Sentences the teacher typed or edited stay as written, in the order set. **Undo** brings back the text that was replaced.
 
-![The Teacher Comment with a generated draft and its rows under Sentences](img/generate-report-comments.jpg 'A draft for Cece Adeyemi after all six work habits are rated.')
+![The Teacher Comment with a generated draft](img/generate-report-comments.jpg 'A draft for Cece Adeyemi after all six work habits are rated.')
 
-4. Under **Sentences**, each row shows one sentence. Hover over it to see what it comes from. **Options** offers other bank sentences for the same part and **Remove From Comment**. Drag a row by its handle to move it.
-5. To add a sentence, choose the plus button between two rows, or open **Browse Sentences…** and choose **Use** beside a sentence. Browse Sentences lists the sentences that fit the student, least used in the class first. **+ Write Your Own** adds a sentence in the teacher's own words.
+4. Each sentence of the draft sits in the box of its part. Open a box to see it. **Other Ways** offers other bank sentences for the same fact and how many classmates have each. Click a sentence to edit it in place. The ✕ removes it, and **Undo** brings it back. Drag a sentence by its handle onto another to put it in front, or use the up and down arrow keys on the handle.
+5. To add a sentence, choose **Say This** beside a fact the comment does not say yet, or open the box's All N Sentences… link to choose from every sentence that fits the student and choose **Use**. **+ Write Your Own** adds a sentence in the teacher's own words.
 6. Choose **Approve and Next**.
 
 If the student has no marked work in the report period, nothing is drafted. If a sentence is also in a classmate's comment, a note under the comment says so.
 
 ## Class Lines
 
-**Support** and **Closing** are set once for the whole class. Under **Support**, choose **+ Support Line** and pick the lines that say what the teacher will do in class. Under **Closing**, choose **+ Closing Sentence for the Class**, type a sentence and choose **Save for Class**. It ends every new comment in the class.
+The support line, the late work line and the closing sentence are set once for the whole class, in the **For the Class** box. Choose **+ Support Line** and pick the lines that say what the teacher will do in class. Under **Closing Sentence**, choose **+ Closing Sentence for the Class**, type a sentence and choose **Save for Class**. It ends every new comment in the class.
