@@ -297,13 +297,14 @@
 }
 .wc-val {
   flex: 0 0 auto;
-  min-width: 88px;
+  min-width: 60px;
   text-align: right;
   font-size: 14px;
   font-weight: 700;
 }
 .wc-bar {
-  flex: 0 0 120px;
+  flex: 0 1 120px;
+  min-width: 40px;
   height: 8px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.08);

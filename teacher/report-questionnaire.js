@@ -1694,7 +1694,6 @@ window.ReportQuestionnaire = (function () {
     // known to be theirs (the Earlier Comment: saved before the app
     // recorded what they typed, or from the old generator) is replaced,
     // with Undo (Nov 3: such sentences stuck through every Generate).
-    var wrote = !!_lastDraft[key];
     // The rows follow the box first, so a sentence just deleted (⌘A,
     // Delete, Generate at once) never comes back.
     clearTimeout(_alignTimer);
@@ -1736,7 +1735,6 @@ window.ReportQuestionnaire = (function () {
           return x.step;
         })
         .filter(Boolean);
-    _wording = null;
     _writeRows(st);
     // Each press replaces the draft: Undo brings the last one back (⌘ Z
     // still works in the box too).
@@ -2795,7 +2793,6 @@ window.ReportQuestionnaire = (function () {
   var _rows = {};
   var _ordered = {}; // key: true once the teacher moved a row
   var _original = {}; // key: the step order Generate gave, for Reset Order
-  var _wording = null; // { index } while a row's Other Wording menu is open
   function _rowKey(st) {
     return _activeCourse + '|' + st.id + '|' + getTermId();
   }
@@ -2972,19 +2969,8 @@ window.ReportQuestionnaire = (function () {
       classLine: false,
     };
   }
-  function alignRows(rows, text, earlierTexts, strict) {
-    var ss = sentencesOf(text);
-    var units = rows.map(function (r) {
-      var k = sentencesOf(r.text).length || 1;
-      return { len: k, text: sentencesOf(r.text).join(' ') };
-    });
-    var n = rows.length;
-    var m = ss.length;
-    var hit = function (i, j) {
-      var u = units[i];
-      return j + u.len <= m && ss.slice(j, j + u.len).join(' ') === u.text;
-    };
-    // The most rows kept in place, as a longest common subsequence.
+  /* The most rows kept in place, as a longest common subsequence. */
+  function _lcs(units, n, m, hit) {
     var L = [];
     for (var i = n; i >= 0; i--) {
       L[i] = [];
@@ -2997,6 +2983,21 @@ window.ReportQuestionnaire = (function () {
         }
       }
     }
+    return L;
+  }
+  function alignRows(rows, text, earlierTexts, strict) {
+    var ss = sentencesOf(text);
+    var units = rows.map(function (r) {
+      var k = sentencesOf(r.text).length || 1;
+      return { len: k, text: sentencesOf(r.text).join(' ') };
+    });
+    var n = rows.length;
+    var m = ss.length;
+    var hit = function (i, j) {
+      var u = units[i];
+      return j + u.len <= m && ss.slice(j, j + u.len).join(' ') === u.text;
+    };
+    var L = _lcs(units, n, m, hit);
     var out = [];
     var pendR = [];
     var pendS = [];
@@ -3008,7 +3009,12 @@ window.ReportQuestionnaire = (function () {
         // run of them taken by one row.
         if (_wasEarlier(earlierTexts, t)) return out.push(earlierRow(t, out.length));
         // Typed in the comment: a sentence takes the old one's place only when half its words are the old one's.
-        if (strict && !ReportWcParts.isReword(t, r.text)) return out.push(_typedFrom(t, out.length));
+        if (strict && !ReportWcParts.isReword(t, r.text)) {
+          sentencesOf(t).forEach(function (x) {
+            out.push(_typedFrom(x, out.length));
+          });
+          return;
+        }
         var c = Object.assign({}, r, { text: t });
         c.edited = c.drafted == null || t !== c.drafted;
         // An Earlier Comment sentence the teacher changed is theirs now.
@@ -3269,7 +3275,6 @@ window.ReportQuestionnaire = (function () {
   function _resync(st) {
     if (!st || _rowsCurrent(st)) return false;
     delete _rows[_rowKey(st)];
-    _wording = null;
     _own = null;
     rerender();
     return true;
@@ -3755,7 +3760,6 @@ window.ReportQuestionnaire = (function () {
         else delete _lastDraft[snap.key];
         if (snap.seed != null) _lastSeed[snap.key] = snap.seed;
         else delete _lastSeed[snap.key];
-        _wording = null;
         _writeRows(st, snap.text);
         if (_browse) _syncBrowse();
       },
@@ -4019,7 +4023,6 @@ window.ReportQuestionnaire = (function () {
      Ways to Say This. The pick is saved with the term rating: the first
      assessment the report mentions is the best piece, the first strength
      tag the skill named as the strength. */
-  var _habMenu = false; // the six ratings open under the Work Habits bars
   /* A pick saved, and the row's sentence written again for it: the same
      bank sentence when it still fits, else the first other one that does. */
   function _repick(st, i, patch) {
@@ -4044,7 +4047,6 @@ window.ReportQuestionnaire = (function () {
       if (alt) sentence = alt;
     }
     rows[i] = rowFromSentence(sentence, ctx, row.step, i === 0);
-    _wording = null;
     _writeRows(st);
     // The left column (At a Glance) reads the pick too.
     rerender();
@@ -4981,7 +4983,6 @@ window.ReportQuestionnaire = (function () {
     if (!st) return;
     tqSaveCurrentIfNeeded();
     _closeBrowse(true);
-    _wording = null;
     // open: the groups opened by hand per part and case; openQ: the same
     // while a search is typed; init: the parts whose own cases were opened.
     _browse = {
@@ -5166,21 +5167,6 @@ window.ReportQuestionnaire = (function () {
         _syncRequired();
         return;
       }
-      case 'wording':
-      case 'options': {
-        var open = !!_wording && _wording.index === i;
-        _wording = open ? null : { index: i };
-        _habMenu = false;
-        _miss = null;
-        _supportMenu = false;
-        _langMenu = false;
-        _limitOpen = false;
-        _syncRequired();
-        if (!open)
-          _focusSel(what === 'options' ? '#tq-options-menu .qn-menu-item' : '#tq-wording-menu .qn-menu-item.on');
-        else _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="' + what + '"]');
-        return;
-      }
       case 'keepEarlier': {
         tqSaveCurrentIfNeeded();
         var keep = (_rows[key] || [])[i];
@@ -5188,7 +5174,6 @@ window.ReportQuestionnaire = (function () {
         _rows[key] = (_rows[key] || []).map(function (r) {
           return r === keep ? Object.assign({}, r, { earlier: false, edited: true, drafted: null }) : r;
         });
-        _wording = null;
         // Saved with the comment's record, so it stays the teacher's.
         _writeRows(st);
         _focusAny(['#tq-sentences [data-row="' + i + '"] [data-do="options"]', '#tq-generate']);
@@ -5202,7 +5187,6 @@ window.ReportQuestionnaire = (function () {
         _rows[key] = (_rows[key] || []).filter(function (r) {
           return r !== gone;
         });
-        _wording = null;
         _writeRows(st);
         // A typed sentence was never in a bank: Undo is the way back.
         _undoToast(st, 'Removed from the comment.', removed);
@@ -5227,19 +5211,6 @@ window.ReportQuestionnaire = (function () {
         _openBrowse(_gapPart(rowsNow, _bankContext(_activeCourse, st, _facts(st)), _insertOpts(_activeCourse, st)), at);
         return;
       }
-      case 'habitsMenu':
-        _habMenu = !_habMenu;
-        _wording = null;
-        _miss = null;
-        _syncRequired();
-        if (_habMenu) _focusSel('#tq-habits-menu [aria-checked="true"], #tq-habits-menu .qn-hm-step');
-        else _focusSel('#tq-sentences [data-do="habitsMenu"]');
-        return;
-      case 'rateHabit':
-        tqRate(ds.habit, Number(ds.value));
-        _syncRequired();
-        _focusSel('#tq-habits-menu [data-habit="' + ds.habit + '"][data-value="' + ds.value + '"]');
-        return;
       case 'habitNoteRate': {
         var low = Number(ds.to);
         if (low >= 1) tqRate('completes', low);
@@ -5585,7 +5556,6 @@ window.ReportQuestionnaire = (function () {
     if (step) row.step = step;
     _rows[key] = insertRow(rows, row, g);
     _markAdded(st, row);
-    _wording = null;
     _writeRows(st);
     _focusSel('#tq-sentences [data-row="' + Math.min(g, _rows[key].length - 1) + '"] [data-do="options"]');
     return true;
@@ -5682,7 +5652,6 @@ window.ReportQuestionnaire = (function () {
     opts = opts || {};
     if (!st || (where !== 'gap' && !window.PersonalBank)) return;
     tqSaveCurrentIfNeeded();
-    _wording = null;
     _supportMenu = false;
     _limitOpen = false;
     if (where === 'gap') {
@@ -5915,7 +5884,6 @@ window.ReportQuestionnaire = (function () {
      A button on the sentence's row opens the list of the work labelled
      Missing; each piece opens in the grader. It only lists and opens: it
      changes no status. */
-  var _miss = null; // { sid, ids: [assessment ids listed] }
 
   /* What a support line fits, in words: the fit for this student, else the
      first skill or habit it names that this class has. */
@@ -6382,7 +6350,7 @@ window.ReportQuestionnaire = (function () {
 
   /* Whether a popover or a line's box is open. */
   function linesOpen() {
-    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_wording || !!_own || !!_miss || _habMenu;
+    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_own || ReportWc.ways() != null;
   }
   /* A click outside an open menu or the limit closes it; a box being
      edited stays until Cancel, Save for Class or Escape. */
@@ -6407,18 +6375,6 @@ window.ReportQuestionnaire = (function () {
         redraw = true;
       }
     }
-    if (_wording && !target.closest('#tq-wording-menu, #tq-options-menu, [data-do="wording"], [data-do="options"]')) {
-      _wording = null;
-      _syncRequired();
-    }
-    if (_habMenu && !target.closest('#tq-habits-menu, [data-do="habitsMenu"]')) {
-      _habMenu = false;
-      _syncRequired();
-    }
-    if (_miss && !target.closest('#tq-miss-menu, [data-do="missOpen"], #undo-toast')) {
-      _miss = null;
-      _syncRequired();
-    }
     if (redraw) _redrawLines(null);
   }
   /* Escape: the open menu, the limit or the box being edited closes. */
@@ -6428,31 +6384,7 @@ window.ReportQuestionnaire = (function () {
       _ownCancel();
       return true;
     }
-    if (_habMenu) {
-      _habMenu = false;
-      _syncRequired();
-      _focusSel('#tq-sentences [data-do="habitsMenu"]');
-      return true;
-    }
-    if (_miss) {
-      _miss = null;
-      _syncRequired();
-      _focusSel('#tq-row-missing [data-do="missOpen"]');
-      return true;
-    }
-    if (_wording) {
-      var at = _wording.index;
-      _wording = null;
-      _syncRequired();
-      _focusSel(
-        '#tq-sentences [data-row="' +
-          at +
-          '"] [data-do="wording"], #tq-sentences [data-row="' +
-          at +
-          '"] [data-do="options"]',
-      );
-      return true;
-    }
+    if (ReportWc.closeWays()) return true;
     // Escape in the limit cancels: the limit stays as saved, and the blur
     // as the box closes saves nothing (_limitCancelled).
     var limit = _limitOpen;
@@ -6903,7 +6835,6 @@ window.ReportQuestionnaire = (function () {
     _screen = key;
     _drawer = null;
     _own = null;
-    _wording = null;
     _cal = null;
     _iePending = null;
     _supportMenu = false;
@@ -7151,7 +7082,6 @@ window.ReportQuestionnaire = (function () {
       var key = _rowKey(st);
       _rows[key] = rows;
       if (ordered) _ordered[key] = true;
-      _wording = null;
     },
     saveNow: tqSaveCurrentIfNeeded,
     saveNarrative: tqSaveNarrative,

@@ -72,7 +72,8 @@ describe('ReportWcParts', () => {
   it('gives a reading grade between 3 and 12', () => {
     expect(P.readingGrade('', 1)).toBe(0);
     expect(P.readingGrade('It is a cat. It is a dog.', 2)).toBe(3);
-    const hard = 'Considerably interdisciplinary understanding demonstrates extraordinarily sophisticated communication.';
+    const hard =
+      'Considerably interdisciplinary understanding demonstrates extraordinarily sophisticated communication.';
     expect(P.readingGrade(hard, 1)).toBe(12);
   });
 });
@@ -108,7 +109,9 @@ describe('the boxes drawn for a Demo Mode student', () => {
   it('starts every box closed but Work Habits, and a closed box is its row alone', () => {
     ReportWc.ui.open = { habits: true };
     const html = draw();
-    const open = [...html.matchAll(/<section class="wc-box( open)?" data-bk="(\w+)"/g)].filter(m => m[1]).map(m => m[2]);
+    const open = [...html.matchAll(/<section class="wc-box( open)?" data-bk="(\w+)"/g)]
+      .filter(m => m[1])
+      .map(m => m[2]);
     expect(open).toEqual(['habits']);
     expect((html.match(/<section class="wc-box"/g) || []).length).toBeGreaterThan(8);
     expect(html).toContain('aria-expanded="false"');

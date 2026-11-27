@@ -17,7 +17,14 @@ describe('a typed comment read back into sentences', () => {
   ];
 
   it('keeps a sentence left as it was, with its fact', () => {
-    const out = RQ.alignRows(rows(), rows().map(r => r.text).join(' '), null, true);
+    const out = RQ.alignRows(
+      rows(),
+      rows()
+        .map(r => r.text)
+        .join(' '),
+      null,
+      true,
+    );
     expect(out.map(r => r.id)).toEqual(['g1', 's1', 'n1']);
     expect(out.every(r => !r.edited)).toBe(true);
   });
