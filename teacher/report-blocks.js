@@ -256,6 +256,13 @@ window.ReportBlocks = (function () {
       .map(([k, v]) => `<span class="report-header-k">${k}</span><span>${v}</span>`)
       .join('');
 
+    // The Student Page's code, beside the details (report-student-page.js).
+    if (options.studentPage && window.ReportStudentPage.on(cid))
+      return window.ReportStudentPage.header(
+        titleParts.join(' \u00B7 '),
+        printedStudentName(student, options.name),
+        meta,
+      );
     return `<div class="report-header">
     <div class="report-header-main">
       <div class="report-course-title">${esc(titleParts.join(' \u00B7 '))}</div>
@@ -1384,41 +1391,9 @@ window.ReportBlocks = (function () {
   </div>`;
   }
 
-  /* The BC Proficiency Scale as one strip: the figure and the word for
-     each level, with a few words of what it means. Two by two at Side by
-     Side width. No dots. */
-  const LEGEND_LEVELS = [
-    [1, PROF_LABELS[1], 'Initial understanding'],
-    [2, PROF_LABELS[2], 'Partial understanding'],
-    [3, PROF_LABELS[3], 'Complete understanding'],
-    [4, PROF_LABELS[4], 'Sophisticated understanding'],
-  ];
-  /* A Letter class prints its levels as percents, so its legend gives
-     the % each level counts as (formatLevel) and no "out of 4" (step 4
-     group 2 #2). A Proficiency or Both class prints each level by its name
-     alone: students and families read proficiencies, not numbers
-     (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12). */
-  /* options.descriptors (One Report): each level's full Ministry statement
-     in place of its few words, in a Proficiency or Both class. A Letter
-     class prints its legend as before. */
-  const LEGEND_MINISTRY = {
-    1: 'Initial understanding of the concepts and competencies relevant to the expected learning',
-    2: 'Partial understanding of the concepts and competencies relevant to the expected learning',
-    3: 'Complete understanding of the concepts and competencies relevant to the expected learning',
-    4: 'Sophisticated understanding of the concepts and competencies relevant to the expected learning',
-  };
+  /* The BC Proficiency Scale: report-legend.js draws it. */
   function renderBlockLegend(options, cid) {
-    const half = options && options.size === 'half';
-    const asPct = cid != null && courseGradeMode(cid) === 'letter';
-    const ministry = !!(options && options.descriptors === true) && !asPct;
-    const items = LEGEND_LEVELS.map(
-      ([n, word, what]) =>
-        `<div class="report-legend-item"><div class="report-legend-word">${asPct ? esc(formatLevel(cid, n)) + ' \u00B7 ' : ''}${word}</div><div class="report-legend-desc">${ministry ? LEGEND_MINISTRY[n] : what}</div></div>`,
-    ).join('');
-    return `<div class="report-block-box report-legend${half ? ' report-legend-half' : ''}">
-    <div class="report-legend-title">BC Proficiency Scale</div>
-    <div class="report-legend-items">${items}</div>
-  </div>`;
+    return window.ReportLegend.html(options, cid);
   }
 
   /* ── Reworded questions (One Report) ─────────────────────────────
@@ -2300,9 +2275,20 @@ window.ReportBlocks = (function () {
     return `<div class="report-block-box report-text-block">${title ? `<div class="report-block-title">${esc(title)}</div>` : ''}<div class="report-text-body">${body}</div></div>`;
   }
 
+  /* The blocks drawn from the class and the student alone. */
+  const BY_STUDENT = {
+    'section-chart': renderBlockSectionChart,
+    'score-distribution': renderBlockScoreDistribution,
+    'section-outcomes': renderBlockSectionOutcomes,
+    observations: renderBlockObservations,
+    'term-glance': renderBlockTermGlance,
+    growth: renderBlockGrowth,
+    'student-page': (cid, student) => window.ReportStudentPage.box(cid, student),
+  };
   /* options: the cell's options from the form (report-sheets.js), read by
      the renderers that offer choices; the rest ignore it. */
   function renderReportBlock(blockId, cid, student, ctx, options) {
+    if (BY_STUDENT[blockId]) return BY_STUDENT[blockId](cid, student);
     ctx = ctx || reportContext();
     options = options || {};
     switch (blockId) {
@@ -2312,12 +2298,6 @@ window.ReportBlocks = (function () {
         return renderBlockHeader(cid, student, ctx, options);
       case 'academic-summary':
         return renderBlockAcademicSummary(cid, student, ctx);
-      case 'section-chart':
-        return renderBlockSectionChart(cid, student);
-      case 'score-distribution':
-        return renderBlockScoreDistribution(cid, student);
-      case 'section-outcomes':
-        return renderBlockSectionOutcomes(cid, student);
       case 'core-competencies':
         return renderBlockCoreCompetencies(cid, student, options);
       case 'competency-table':
@@ -2326,8 +2306,6 @@ window.ReportBlocks = (function () {
         return renderBlockLearnerDimensions(cid, student, ctx, options);
       case 'teacher-narrative':
         return renderBlockTeacherNarrative(cid, student, ctx);
-      case 'observations':
-        return renderBlockObservations(cid, student);
       case 'next-steps':
         return renderBlockNextSteps(cid, student, ctx, options);
       case 'progress':
@@ -2342,10 +2320,6 @@ window.ReportBlocks = (function () {
         return renderBlockStudentReflectionLearning(cid, student, options);
       case 'student-reflection-habits':
         return renderBlockStudentReflectionHabits(cid, student, options);
-      case 'term-glance':
-        return renderBlockTermGlance(cid, student);
-      case 'growth':
-        return renderBlockGrowth(cid, student);
       case 'self-assessment':
         return renderBlockSelfAssessment(cid, student, ctx, options);
       case 'term-attendance':

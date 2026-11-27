@@ -660,7 +660,6 @@
   "teacher/report-blocks.js :: renderBlockSectionOutcomes > forEach callback 1": 94,
   "teacher/report-blocks.js :: renderBlockSectionOutcomes > forEach callback 1 > forEach callback 1": 68,
   "teacher/report-blocks.js :: renderBlockSelfAssessment": 59,
-  "teacher/report-blocks.js :: renderReportBlock": 52,
   "teacher/report-feedback.js :: _item": 53,
   "teacher/report-issues.js :: issue": 80,
   "teacher/report-one-comment.js :: openEditor": 67,

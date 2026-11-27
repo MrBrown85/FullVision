@@ -89,9 +89,11 @@ describe('One Report block options', { timeout: 60000 }, () => {
     const plain = draw('legend', students[0], {});
     const full = draw('legend', students[0], { descriptors: true });
     expect(plain).not.toContain('concepts and competencies');
-    expect(full).toContain('Initial understanding of the concepts and competencies relevant to the expected learning');
-    expect(full).toContain('Sophisticated understanding of the concepts and competencies');
-    expect(plain).toContain('Initial understanding');
+    expect(full).toContain(
+      '<strong class="report-legend-key">Initial</strong> understanding of the concepts and competencies relevant to the expected learning',
+    );
+    expect(full).toContain('<strong class="report-legend-key">Sophisticated</strong> understanding of the concepts');
+    expect(plain).toContain('<strong class="report-legend-key">Initial</strong> understanding');
   });
 
   it('prints family wording on Proficiency only when asked', () => {
