@@ -54,6 +54,8 @@ async function openInbox(page, { view = null, caughtUp = false, stack = false } 
     saveDemoStudentWork(cid, work);
     localStorage.setItem('fv-dash-inbox-seen:' + cid, '2000-01-01T00:00:00.000Z');
     if (caughtUp) {
+      // Nothing waiting includes no question (a question is a line in the Inbox, Nov 27).
+      setCourseFeedbackOptions(cid, { reflect_on_feedback: false }, _newEntryId());
       const ids = getStudents(cid).map(s => s.id);
       getAssessments(cid).forEach(a => {
         GraderWork.workCounts(cid, a.id, ids).ids.tograde.forEach(sid =>
@@ -125,16 +127,16 @@ const DESKTOP = [
     },
   },
   /* The tinted and outlined blue buttons that went out under 4.5:1 in
-     #1602: Answer in the Grader (Questions From Students), and on an open
+     #1602: Answer on a student's question (now a line in the Inbox), and on an open
      card with work to grade, Grade Submissions and Return N Graded, then
      the grader's Return All and Return for Revision. */
   {
-    name: 'dashboard, Questions From Students',
+    name: 'dashboard, a question in the Inbox',
     hash: '/dashboard',
     ready: '.dash-card',
     open: async page => {
       await sendWorkOn(page, '/dashboard');
-      await expect(page.locator('.dash-questions-answer').first()).toBeVisible();
+      await expect(page.locator('.dash-inbox-q-answer').first()).toBeVisible();
     },
   },
   {

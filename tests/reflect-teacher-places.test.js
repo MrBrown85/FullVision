@@ -252,6 +252,26 @@ describe('the dashboard: Questions From Students', () => {
     });
   });
 
+  it('with the Inbox on (Send Work on), the question is a line in the Inbox and the card is not drawn (Nov 27)', () => {
+    dashboardHtml(
+      () => {
+        on();
+        sendWorkOn();
+      },
+      doc => {
+        expect($(doc, '#dash-questions')).toBeNull();
+        const line = $(doc, '#dash-inbox .dash-inbox-q');
+        const st = getStudents(CID).find(s => s.id === JORDAN);
+        expect(text(line.querySelector('.dash-inbox-q-text'))).toBe(
+          displayNameWithLast(st) + ' asked on Cell Microscope Lab: “' + jordansQuestion().question + '”',
+        );
+        click(doc, line.querySelector('.dash-inbox-q-answer'));
+        const [cid, aid, sid] = PageAssignments.openGrader.mock.calls[0];
+        expect([cid, aid, sid]).toEqual([CID, LAB, JORDAN]);
+      },
+    );
+  });
+
   it('the To Grade cell carries "· 1 Question" when Send Work is on', () => {
     dashboardHtml(
       () => {

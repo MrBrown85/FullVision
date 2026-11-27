@@ -76,6 +76,14 @@
 .dash-row-left.has-bulletins:has(.dash-inbox-stacks:not(.has-open)) {
   grid-template-rows: fit-content(calc((100% - 12px) * 0.6)) minmax(0, 1fr);
 }
+/* A question waiting takes a line above the stacks: the Inbox may then have
+   70%, closed or opened. */
+.dash-row-left.has-bulletins:has(.dash-inbox-qs) {
+  grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
+}
+.dash-row-left.has-bulletins:has(.dash-inbox-qs):has(.dash-inbox-stacks:not(.has-open)) {
+  grid-template-rows: fit-content(calc((100% - 12px) * 0.7)) minmax(0, 1fr);
+}
 /* More rows than show: the bottom edge fades, so the next row reads as more. */
 .dash-inbox-stacks-row.is-more .dash-inbox-stacks-cards {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);

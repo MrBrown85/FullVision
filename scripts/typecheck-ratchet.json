@@ -55,6 +55,7 @@
     "teacher/dash-inbox-targets.js",
     "teacher/dash-tile-redraw.js",
     "teacher/dash-next-report.js",
+    "teacher/dash-inbox-questions.js",
     "teacher/cm-grading-bars.js",
     "teacher/cm-pts-model.js",
     "teacher/cm-pts-ruler.js",

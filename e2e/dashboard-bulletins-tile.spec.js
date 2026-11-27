@@ -8,7 +8,8 @@ import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 1100, height: 800 } });
 
-async function open(page, { oldBulletins = null, oldDashRow = null, questions = true } = {}) {
+// With no question waiting by default: a question takes a line in the Inbox and gives it 70% of the column (Nov 27).
+async function open(page, { oldBulletins = null, oldDashRow = null, questions = false } = {}) {
   await page.addInitScript(
     ([oldBulletins, oldDashRow]) => {
       // What a browser that saw the row before D9, or Bulletins before B1g, may still have kept.
@@ -47,13 +48,20 @@ test('the Inbox slot is as tall as its stacks (60% at most), the tile has the re
 }) => {
   await open(page);
   await expect(page.locator('.dash-bulletins-tile')).toBeVisible();
+  // The stacks size themselves once the tile is drawn again without the question.
+  await expect
+    .poll(
+      async () => (await box(page, '.dash-row-inbox')).height - ((await box(page, '.dash-row-left')).height - 12) * 0.6,
+    )
+    .toBeLessThanOrEqual(1);
   const inbox = await box(page, '.dash-row-inbox');
   const slot = await box(page, '.dash-row-bulletins');
   const tile = await box(page, '.dash-bulletins-tile');
-  // The Inbox is as tall as its row of stacks, never over its 60% (299 of 510); Bulletins has the rest (Colin, Nov 26).
-  expect(inbox.height).toBeLessThanOrEqual(300);
-  expect(Math.abs(inbox.height + 12 + slot.height - 510)).toBeLessThanOrEqual(1);
-  expect(slot.height).toBeGreaterThanOrEqual(198);
+  // The Inbox is as tall as its row of stacks, never over its 60%; Bulletins has the rest (Colin, Nov 26).
+  const col = (await box(page, '.dash-row-left')).height;
+  expect(inbox.height).toBeLessThanOrEqual((col - 12) * 0.6 + 1);
+  expect(Math.abs(inbox.height + 12 + slot.height - col)).toBeLessThanOrEqual(1);
+  expect(slot.height).toBeGreaterThanOrEqual((col - 12) * 0.4 - 1);
   expect(Math.abs(tile.height - slot.height)).toBeLessThanOrEqual(1);
   expect(Math.round(slot.top - inbox.bottom)).toBe(12);
 
@@ -189,15 +197,15 @@ test('empty: Nothing Posted Yet at the same height', async ({ page }) => {
   expect(tile.height).toBeGreaterThanOrEqual(198);
 });
 
-test('at 1100 x 900 the Inbox slot is at most 359 px and the tile at least 239 px, three whole rows', async ({
-  page,
-}) => {
+test('at 1100 x 900 the Inbox slot is at most 60% and the tile at least 239 px, three whole rows', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 900 });
   await open(page, { questions: false });
   expect(Math.round((await box(page, '.dash-row')).height)).toBe(629);
   // The stacks size themselves once the row has its height, so the tiles settle a moment after the draw.
   await expect.poll(async () => (await box(page, '.dash-bulletins-tile')).height).toBeGreaterThanOrEqual(238);
-  expect((await box(page, '.dash-row-inbox')).height).toBeLessThanOrEqual(360);
+  expect((await box(page, '.dash-row-inbox')).height).toBeLessThanOrEqual(
+    ((await box(page, '.dash-row-left')).height - 12) * 0.6 + 1,
+  );
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
 });
 
@@ -246,11 +254,15 @@ test('stacked on an iPad the tile is 300 px', async ({ page }) => {
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
 });
 
-test("an old 'fv-build-bulletins' of 0 changes nothing: the Inbox slot is at most 299 px and the tile has its rows (B1g)", async ({
+test("an old 'fv-build-bulletins' of 0 changes nothing: the Inbox slot is at most 60% and the tile has its rows (B1g)", async ({
   page,
 }) => {
   await open(page, { oldBulletins: '0' });
-  expect(Math.round((await box(page, '.dash-row-inbox')).height)).toBeLessThanOrEqual(300);
+  await expect
+    .poll(
+      async () => (await box(page, '.dash-row-inbox')).height - ((await box(page, '.dash-row-left')).height - 12) * 0.6,
+    )
+    .toBeLessThanOrEqual(1);
   await expect(page.locator('.dash-bulletins-tile')).toHaveCount(1);
   await expect(page.locator('.dash-bulletins-row')).toHaveCount(3);
 });
@@ -293,7 +305,13 @@ for (const [w, h, rowsShown] of [
   for (const wide of [false, true]) {
     test(`at ${w} x ${h} the rows are whole and fill the tile${wide ? ' in a wide font' : ''}`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
-      await open(page, { questions: h === 800 });
+      await open(page);
+      await expect
+        .poll(
+          async () =>
+            (await box(page, '.dash-row-inbox')).height - ((await box(page, '.dash-row-left')).height - 12) * 0.6,
+        )
+        .toBeLessThanOrEqual(1);
       if (wide) await page.addStyleTag({ content: WIDE });
       const f = await fit(page);
       expect(f.shown).toBe(rowsShown);
