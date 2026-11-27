@@ -345,7 +345,7 @@ test("the Work tab: one student's work, thumbnails only", async ({ page }) => {
   await shot(page, 'S14-F2-work-tab-1366');
   await page.locator('[data-sw="full"]').click();
   const viewer = page.locator('#work-viewer-overlay');
-  await expect(viewer.locator('.wv-at')).toHaveText('1 of 2');
+  await expect(viewer.locator('.wv-at')).toHaveText('Page 1 of 2');
   await viewer.locator('[data-wv="grade"]').click();
   await expect(page.locator('#grader-overlay .grader-dialog')).toBeVisible();
   await page.locator('#grader-overlay [data-grader="close"]').first().click();

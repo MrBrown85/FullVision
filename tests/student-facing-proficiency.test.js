@@ -54,6 +54,8 @@ const WORD = /Emerging|Developing|Proficient|Extending/;
 
 const STUDENT_FACING = [
   'teacher/report-blocks.js',
+  'teacher/report-legend.js',
+  'teacher/report-student-page.js',
   'teacher/grade-report.js',
   'teacher/report-feedback.js',
   'teacher/report-feedback-cards.js',
@@ -83,9 +85,10 @@ const ALLOWED = {
   "teacher/report-blocks.js ' / 4'": [2, 'Assignment Grades in a Letter class (_rowMarks), as before'],
   'teacher/report-blocks.js levelFigure(': [2, 'the same two Letter-class marks'],
   'teacher/report-blocks.js formatLevel(': [
-    5,
-    'a Letter class only (_levelHtml, the override note, the Proficiency block, the legend), or the % of a Both class (_levelHtml)',
+    4,
+    'a Letter class only (_levelHtml, the override note, the Proficiency block), or the % of a Both class (_levelHtml)',
   ],
+  'teacher/report-legend.js formatLevel(': [1, 'the legend in a Letter class only: the % each level counts as'],
   'teacher/report-blocks.js formatLevelAs(': [4, "always 'percent': a piece's % in a Letter or Both class"],
   'teacher/grade-report.js levelFigure(': [
     2,

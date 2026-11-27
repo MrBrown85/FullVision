@@ -126,6 +126,8 @@
     "teacher/report-one-head.js",
     "teacher/report-one-opts.js",
     "teacher/report-response.js",
+    "teacher/report-legend.js",
+    "teacher/report-student-page.js",
     "teacher/work-rubric-card.js",
     "teacher/assign-show.js",
     "teacher/keep-dom.js",
@@ -219,6 +221,7 @@
     "teacher/add-work-split-model.js",
     "teacher/add-work-split.js",
     "teacher/add-work-page-view.js",
+    "shared/work-viewer.js",
     "teacher/add-work-split-setup.js",
     "teacher/add-work-split-move.js",
     "teacher/add-work-split-turn.js",
@@ -235,6 +238,7 @@
     "teacher-mobile/split-scan-model.js",
     "teacher-mobile/split-scan.js",
     "teacher/rubric-words.js",
+    "teacher/rubric-print-controls.js",
     "teacher/bulletin-share.js",
     "teacher/bulletin-seen.js"
   ]

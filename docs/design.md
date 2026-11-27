@@ -17,6 +17,7 @@ A classroom teacher who is not a software user. They know their rubric and the p
   - buttons: radius 10–14; secondary buttons blue-tinted; a filled primary uses `--active-fill` (#0066cc, 5.57:1 under white words), never `--active` (#007aff, 4.02:1), which is for links, focus rings and switches;
   - toolbar controls 32 px high and chips 24 px (`e2e/toolbar-consistency.spec.js` holds this);
   - no thin outlined capsules. A cloud of chips reads as early design: use short labelled checklists.
+- **Printed pages are black and white, always.** Reports, rubrics and handouts print in black and greys, never colour (Colin, 2026-11-27: "it can never be colour, ever"). Tell things apart by weight, shade, shape or a count, never by hue.
 - **Fixed sizes.** Controls keep their size so rows line up; a control's width never follows its text.
 - **Rows, not stray boxes.** A lone checkbox at the left of its own row reads as broken: make it a row with the label on the left and a switch on the right. A state must not look like a button.
 - **Never cover the next step.** Anything that appears while a teacher works (a toast, an Undo bar) sits where it does not cover what they do next.

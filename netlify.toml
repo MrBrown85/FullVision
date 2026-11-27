@@ -147,6 +147,14 @@
   to = "/login.html"
   status = 200
 
+# The Student Page's code on a printed report (teacher/report-student-page.js)
+# reads HTTPS://FULLVISION.CA/S: in capitals the code is an inch square. /s/
+# itself is a folder with a page, so this rule never shadows it.
+[[redirects]]
+  from = "/S"
+  to = "/s/"
+  status = 301
+
 # Desktop app pages. Each address serves the app shell; teacher/router.js
 # draws the page. Keep this list in step with _routes in teacher/router.js
 # (tests/app-routes.test.js checks). Netlify matches these with or without

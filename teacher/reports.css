@@ -5838,3 +5838,155 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 @media (prefers-color-scheme: dark) {
 }
+
+/* ── The BC Proficiency Scale as steps (report-legend.js) ──────────
+   A bar from light grey to black, Emerging to Extending, over the four
+   levels, and the word that tells them apart in bold. Black and grey
+   only: a printed report is never in colour. Older printed copies have
+   none of these classes and print as they went home. Emerging's grey is
+   dark enough to survive a photocopier. */
+.report-legend-steps .report-legend-items {
+  column-gap: 3px;
+}
+.report-legend-steps.report-legend-half .report-legend-items {
+  row-gap: 10px;
+}
+.report-legend-step {
+  height: 8px;
+  margin-bottom: 7px;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.report-legend-step-1 {
+  background: #b3b3b3;
+}
+.report-legend-step-2 {
+  background: #858585;
+}
+.report-legend-step-3 {
+  background: #4d4d4d;
+}
+.report-legend-step-4 {
+  background: #000;
+}
+.report-legend-steps:not(.report-legend-half) .report-legend-step-1 {
+  border-radius: 999px 0 0 999px;
+}
+.report-legend-steps:not(.report-legend-half) .report-legend-step-4 {
+  border-radius: 0 999px 999px 0;
+}
+.report-sheet .report-legend-steps .report-legend-word {
+  font-size: 10.5pt !important;
+  margin-bottom: 2px;
+}
+.report-legend-steps .report-legend-desc {
+  padding-right: 8px;
+}
+.report-legend-key {
+  font-weight: 700;
+  color: #000;
+}
+
+/* ── The Student Page on a report (report-student-page.js) ─────────
+   The code is a little over an inch square: each of its squares is at
+   least the printed card's (0.045 in), and white space round it at least
+   the card's (0.14 in) once its own one-square margin is counted. */
+.report-code-qr {
+  width: 1.04in;
+  height: 1.04in;
+  flex-shrink: 0;
+  background: #fff;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.report-code-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* The letterhead with the code: the class on the code's top line, the
+   details down to its foot. */
+.report-header.report-header-code {
+  align-items: stretch;
+  gap: 20px;
+}
+.report-header-code .report-header-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.report-sheet .report-header-code .report-student-name {
+  margin-top: 0;
+}
+.report-header-code-meta {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  gap: 1px 10px;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--text);
+}
+.report-header-code-meta .report-header-k {
+  color: #636366;
+}
+.report-header-code-qr {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.report-header-code-qr .report-code-qr {
+  margin-bottom: 0.06in;
+}
+.report-header-code-label {
+  text-align: right;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: #636366;
+  padding-bottom: calc(0.06in + 2px);
+}
+.report-header-code-k {
+  font-weight: 700;
+  color: var(--text);
+}
+/* The part: the code, the steps, and the card beside them. */
+.report-sp-body {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-top: 12px;
+}
+.report-sp-steps {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 10pt;
+  line-height: 1.45;
+  color: var(--text);
+}
+.report-sp-card {
+  flex: 0 0 190px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding-left: 14px;
+  border-left: 1px solid #bbb;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text);
+}
+.report-sp-card-k {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #000;
+}
+.report-sp-lost {
+  margin-top: 6px;
+}

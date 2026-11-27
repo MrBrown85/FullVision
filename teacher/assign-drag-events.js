@@ -50,11 +50,34 @@
   }
 
   /* ── Drag event handlers (delegated) ────────────────────── */
+  /* A card or a folder moves only from its grip (⠿). The whole card and folder were draggable, so a drag that
+     began in a score box, a comment or between rows picked the card up mid-typing (Colin and a teacher,
+     Nov 26, 2026). Pressing a grip makes its card or folder draggable until the pointer goes down anywhere
+     else or the drag ends; nothing else on them is. */
+  /** @type {HTMLElement | null} */
+  var _gripped = null;
+  function _letGo() {
+    if (_gripped) _gripped.draggable = false;
+    _gripped = null;
+  }
+  function _grip(e) {
+    _letGo();
+    var grip = e.target.closest && e.target.closest('.assess-grip, .mod-folder-grip');
+    var item = grip && grip.closest('[data-assess-drag], [data-module-drag]');
+    if (!item) return;
+    item.draggable = true;
+    _gripped = item;
+  }
   function _handleDragStart(e) {
     // Collab drag must be checked FIRST — members are nested inside assess cards
     var collabDrag = e.target.closest('[data-collab-drag-sid]');
     if (collabDrag) {
       collabDragStart(e, collabDrag.dataset.collabDragSid, parseInt(collabDrag.dataset.collabDragGroup, 10));
+      return;
+    }
+    var moved = e.target.closest('[data-assess-drag], [data-module-drag]');
+    if (moved && moved !== _gripped) {
+      e.preventDefault(); // not from its grip
       return;
     }
     var assessDrag = e.target.closest('[data-assess-drag]');
@@ -69,6 +92,7 @@
     }
   }
   function _handleDragEnd(e) {
+    _letGo();
     // A student dropped nowhere, or back where they were, comes back into view.
     AC.collabDragEnd();
     if (pageState._dragAssessId) {
@@ -251,6 +275,7 @@
   }
 
   function _handlePointerDown(e) {
+    _grip(e);
     var nameLabel = e.target.closest && e.target.closest('.rsg-criterion-label');
     if (pageState._chipTipSource && pageState._chipTipSource.classList.contains('rsg-criterion-label')) _hideChipTip();
     else if (nameLabel && e.pointerType === 'touch' && _hasNameTip(nameLabel)) _showChipTip(nameLabel);

@@ -2050,6 +2050,35 @@ describe('rubric-print', () => {
       expect(html).toContain('rubric-lines');
     });
 
+    it('prints the Assignment Description under the name, above the rubric, only when included', () => {
+      const a = getAssessments(CID).find(x => x.id === AID);
+      saveAssessments(CID, [Object.assign({}, a, { description: '  Plan a fair test.\nUse <b>two</b> trials.  ' })]);
+      expect(RubricPrint.DEFAULT_OPTIONS.include.description).toBe(false);
+      const data = RubricPrint.sheetData(CID, AID, SID);
+      expect(data.description).toBe('Plan a fair test.\nUse <b>two</b> trials.');
+      expect(RubricPrint.renderSheet(data, { include })).not.toContain('rubric-desc');
+      const html = RubricPrint.renderSheet(data, { include: Object.assign({}, include, { description: true }) });
+      // Escaped, its line break kept for white-space: pre-line.
+      expect(html).toContain('<div class="rubric-desc">Plan a fair test.\nUse &lt;b&gt;two&lt;/b&gt; trials.</div>');
+      expect(html.indexOf('rubric-desc')).toBeGreaterThan(html.indexOf('rubric-head'));
+      expect(html.indexOf('rubric-desc')).toBeLessThan(html.indexOf('rubric-table'));
+      // A blank copy prints it too.
+      const blank = RubricPrint.renderPages(CID, AID, {
+        mode: 'blank',
+        copies: 1,
+        layout: 'full',
+        include: { description: true },
+      });
+      expect(blank.html).toContain('Plan a fair test.');
+    });
+
+    it('prints as before when the assessment has no description, whatever Include says', () => {
+      const data = RubricPrint.sheetData(CID, AID, SID);
+      expect(data.description).toBe('');
+      const on = RubricPrint.renderSheet(data, { include: Object.assign({}, include, { description: true }) });
+      expect(on).toBe(RubricPrint.renderSheet(data, { include }));
+    });
+
     it('lets a long rubric shrink further on half and quarter sheets, never below the layout floor', () => {
       const full = RubricPrint.shrinkSteps(RubricPrint.LAYOUTS.full);
       const half = RubricPrint.shrinkSteps(RubricPrint.LAYOUTS.half);

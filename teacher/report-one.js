@@ -58,7 +58,7 @@ window.ReportOne = (function () {
      'table' rows of the block's one table, 'grades' Assignment Grades).
      rows: the selector of a row a teacher can remove and of its name. */
   var PARTS = {
-    header: { label: 'Letterhead', group: 0, locked: true },
+    header: { label: 'Letterhead', group: 0, locked: true, options: window.ReportStudentPage.HEADER_OPTIONS },
     proficiency: {
       label: 'Proficiency',
       group: 1,
@@ -180,8 +180,8 @@ window.ReportOne = (function () {
     'student-reflection-learning': { label: 'Reflection: My Learning', group: 2, wording: true, split: 'table' },
     'student-reflection-habits': { label: 'Reflection: My Habits', group: 2, wording: true, split: 'table' },
     'text-block': { label: 'Your Own Text', group: 3 },
-    // At the bottom of the last page, or after the part above it
-    // (report-response.js).
+    'student-page': window.ReportStudentPage.PART,
+    // At the bottom of the last page, or after the part above it (report-response.js).
     'parent-response': {
       label: 'Parent / Guardian Response',
       group: 3,
@@ -481,7 +481,7 @@ window.ReportOne = (function () {
   }
   function available(key, cid) {
     var d = _def(key);
-    return !!d && !(d.notIn && d.notIn.indexOf(_mode(cid)) >= 0);
+    return !!d && !(d.notIn && d.notIn.indexOf(_mode(cid)) >= 0) && (!d.offered || d.offered(cid));
   }
   /* Is the part on: for the class, or with sid for that student. */
   function isOn(m, key, sid) {
@@ -583,7 +583,7 @@ window.ReportOne = (function () {
     var all = (b && b.options ? b.options : []).concat(d.options || []);
     var defs = all.filter(function (o) {
       if (d.hide && d.hide.indexOf(o.key) >= 0) return false;
-      if (o.hideIn && o.hideIn.indexOf(mode) >= 0) return false;
+      if ((o.hideIn && o.hideIn.indexOf(mode) >= 0) || (o.offered && !o.offered(cid))) return false;
       if (o.showIf) {
         var v = saved[o.showIf.key] != null ? saved[o.showIf.key] : _defOf(all, o.showIf.key);
         if ('not' in o.showIf ? v === o.showIf.not : v !== o.showIf.v) return false;

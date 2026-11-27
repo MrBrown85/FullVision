@@ -34,6 +34,8 @@ labels:
   - Blank Attendance
   - Print Rubrics
   - Print Scores
+  - Include
+  - Assignment Description
 next:
   - read-the-gradebook
   - print-report-cards
@@ -71,3 +73,5 @@ Turn on **Blank Gradebook** to print the same grid with every score box empty. T
 ## Sheets for One Assessment
 
 The grader prints a sheet per student for one assessment, to hand back with the work. **Print Rubrics** prints the graded rubric for rubric and level work. **Print Scores** prints the points or Complete/Incomplete mark for points work.
+
+To hand out the task and its rubric on one sheet, turn on **Assignment Description** under **Include**. It prints the assessment's Description under the name and above the rubric, on blank and completed rubrics alike. It appears only when the assessment has a description.
