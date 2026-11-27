@@ -227,25 +227,6 @@
 .m-sc-work {
   margin-top: 14px;
 }
-.m-sc-unopened {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 6px;
-  padding: 5px 12px;
-  border-radius: 14px;
-  background: var(--active-light);
-  color: var(--link);
-  font-size: 14px;
-  font-weight: 600;
-}
-.m-sc-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--active);
-}
 .m-sc-row {
   display: flex;
   align-items: center;
