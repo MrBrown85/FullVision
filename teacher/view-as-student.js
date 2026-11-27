@@ -5,8 +5,9 @@
    Class Settings › Student Page keeps its own Open Preview.
 
    It shows only where the preview can work: a class whose Student Page is
-   on. The student is the one Class Settings would preview (the one chosen
-   there, else the first on the roster). From an assignment card the preview
+   on. The student is the one picked in the left roster (the sidebar's
+   selected row, which Assignments' focused student sets), else the first on
+   the roster. Class Settings' Preview as Student choice is neither read nor changed here. From an assignment card the preview
    opens with that piece showing, where the student page itself would show it
    (Assignments, or My Learning once it is handed in); from Bulletins, on the
    Bulletins tab. Nothing is sent. Escape gives the focus back to the control.
@@ -50,7 +51,7 @@
 
   // The Bulletins page's, at the right end of its header: the preview opens on the Bulletins tab.
   function bulletinsButtonHtml(cid) {
-    if (!offered(cid) || !CmStudentPage.previewStudent(cid)) return '';
+    if (!offered(cid) || !_student(cid)) return '';
     return buttonHtml(cid, 'btn sp-tint-btn bulletin-view-as', ' data-tab="bulletins"');
   }
 
@@ -80,9 +81,24 @@
     return out ? out.ui : ui;
   }
 
+  // The student selected in the roster now, if this class has them.
+  function _student(cid) {
+    var row = /** @type {HTMLElement | null} */ (document.querySelector('#gb-roster-list .student-row.selected'));
+    var picked = row && row.dataset ? row.dataset.sid : '';
+    var known =
+      picked &&
+      (getStudents(cid) || []).some(function (/** @type {any} */ s) {
+        return s.id === picked;
+      });
+    if (known) return picked;
+    // None selected here: the first on the roster. Class Settings' own remembered choice is never read.
+    var all = typeof sortStudents === 'function' ? sortStudents(getStudents(cid) || [], 'lastName') : [];
+    return all.length ? all[0].id : null;
+  }
+
   function open(cid, trigger, opts) {
     if (!offered(cid)) return false;
-    var sid = CmStudentPage.previewStudent(cid);
+    var sid = _student(cid);
     if (!sid) return false;
     var o = opts || {};
     var ui = o.tab ? { tab: o.tab } : _uiFor(cid, sid, o.aid);

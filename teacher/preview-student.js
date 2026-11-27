@@ -335,11 +335,12 @@ window.PreviewStudent = (function () {
     };
   }
 
-  // The device's screen: the page, or the quiz open on it.
+  // The device's screen: the page, the quiz open on it, or Send My Work's own screens (preview-send.js).
   function _screenHtml(built) {
-    return _open.quiz && (_open.quiz.m || _open.quiz.back)
-      ? StudentQuizView.html(_quizCtx(built.view, _open.quiz))
-      : drawPage(built.view, _open.ui);
+    var quiz = _open.quiz && (_open.quiz.m || _open.quiz.back);
+    if (quiz) return StudentQuizView.html(_quizCtx(built.view, _open.quiz));
+    if (PreviewSend.showing()) return PreviewSend.screenHtml(built.view);
+    return drawPage(built.view, _open.ui) + PreviewSend.dialogHtml(built.view);
   }
 
   // A press inside an open quiz. Nothing is sent.
@@ -602,7 +603,8 @@ window.PreviewStudent = (function () {
   /* Opens the preview of student `sid` in class `cid`. `trigger` is the
      control that opened it; the focus goes back to `returnFocusId` (or the
      trigger) when it closes. `opts.tab` is the tab it opens on;
-     `opts.learning` shows My Learning before the class turns it on (S13-F1); `opts.ui` is the page's whole start. */
+     `opts.learning` shows My Learning before the class turns it on (S13-F1); `opts.ui` is the page's whole start
+     (as on the phone, it opens on Assignments, Outstanding). */
   function open(cid, sid, trigger, returnFocusId, opts) {
     if (!cid || !sid || !_student(cid, sid)) return false;
     close();
@@ -612,7 +614,6 @@ window.PreviewStudent = (function () {
       device: 'phone',
       trigger: trigger || null,
       returnTo: returnFocusId || null,
-      // What the student looks at, as on the phone: the page opens on Assignments, Outstanding.
       ui: opts && opts.ui ? opts.ui : opts && opts.tab ? { tab: opts.tab } : {},
       learning: !!(opts && opts.learning),
     };
@@ -636,6 +637,7 @@ window.PreviewStudent = (function () {
       var t = e.target && e.target.closest ? e.target.closest('.ps-screen [data-q]') : null;
       if (t) _typedQuiz(t);
     });
+    PreviewSend.listen(el, sid, _drawScreen);
     _onKey = function (e) {
       if (!_open) return;
       if (e.key === 'Escape') {
@@ -740,6 +742,7 @@ window.PreviewStudent = (function () {
     var el = _overlay();
     var was = _open;
     _open = null;
+    PreviewSend.end();
     if (typeof HandoutViewer !== 'undefined') HandoutViewer.close();
     if (typeof WebsiteAsk !== 'undefined') WebsiteAsk.close();
     if (was) {
@@ -768,14 +771,8 @@ window.PreviewStudent = (function () {
     if (!_open) return;
     var built = _fromCache(_open.cid, _open.sid);
     if (!built.ready) return;
-    if (act === 'work-retry') {
-      if (_open.ui.work) _loadWork(_open.ui.work);
-      return;
-    }
-    if (act === 'handout-retry') {
-      if (_open.ui.handout) _loadHandout(_open.ui.handout);
-      return;
-    }
+    if (act === 'work-retry') return _open.ui.work && _loadWork(_open.ui.work);
+    if (act === 'handout-retry') return _open.ui.handout && _loadHandout(_open.ui.handout);
     if (act === 'handout-file') return _openFile(el);
     if (act === 'handout-out-open' || act === 'handout-out-close') {
       var opening = act === 'handout-out-open';
@@ -789,6 +786,7 @@ window.PreviewStudent = (function () {
       return;
     }
     if (act === 'handout-print' || act === 'handout-save') return _handoutOut(act === 'handout-print');
+    if (PreviewSend.press(act, el, built.view)) return;
     if (act === 'quiz-open') return _openQuiz(el && el.getAttribute('data-piece'));
     if (_open.quiz && /^quiz-/.test(act)) return _pressQuiz(act, el, built);
     // A bulletin's link asks first, as on the student's phone (shared/website-ask.js); a reaction sends nothing here.

@@ -202,8 +202,8 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     const box = drawn(view, UIS[0]);
     expect(words(box.querySelector('.sp-flag-revise'))).toBe('Revise by Tue, Nov 10');
     expect(words(box.querySelector('.sp-revise-fix'))).toBe(FIX);
-    // Preview has no `work` reply: no Send My Revision there, as there is no Send My Work.
-    expect(box.querySelector('[data-act="revise-open"]')).toBeNull();
+    // Preview reads the piece's Student Work setting, so it shows Send My Revision as the student's page does.
+    expect(box.querySelector('[data-act="revise-open"]')).not.toBeNull();
     expect(box.innerHTML).not.toMatch(/Colin|Brown/);
   });
 
