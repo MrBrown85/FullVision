@@ -1791,9 +1791,6 @@ window.PageReports = (function () {
       tqOpenGrader: function () {
         RQ.tqOpenGrader(el.dataset.aid);
       },
-      tqGlanceToggle: function () {
-        RQ.tqGlanceToggle(el.dataset.row);
-      },
       // At a Glance's View All Skills, and the drawer's ✕.
       tqOpenSkills: function () {
         RQ.tqOpenSkills(el);
@@ -1960,6 +1957,7 @@ window.PageReports = (function () {
     else if (e.target && e.target.id === 'tq-browse-search') RQ.tqSentences('search', e.target);
     else if (e.target && e.target.id === 'tq-own-input') RQ.tqSentences('ownInput', e.target);
     else if (e.target && e.target.id === 'tq-obs-search') RQ.tqObsSearch(e.target.value);
+    else if (e.target && e.target.id === 'wc-search') ReportWc.search(e.target.value);
   }
 
   /* Escape on Progress Reports closes the Parts panel opened over the pages

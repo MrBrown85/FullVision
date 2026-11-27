@@ -33,7 +33,6 @@
     "shared/build-flags.js",
     "teacher/report-qn-browse-cases.js",
     "teacher/report-qn-voice-observations.js",
-    "teacher/report-qn-boxes.js",
     "teacher/report-qn-motion.js",
     "teacher/cm-std-help.js",
     "teacher/cm-keep-draw.js",
@@ -199,7 +198,19 @@
     "teacher/page-bulletins.js",
     "teacher/rubric-words.js",
     "teacher/bulletin-share.js",
-    "teacher/bulletin-seen.js"
+    "teacher/bulletin-seen.js",
+    "teacher/report-wc-act.js",
+    "teacher/report-wc-boxes-more.js",
+    "teacher/report-wc-boxes.js",
+    "teacher/report-wc-card.js",
+    "teacher/report-wc-class.js",
+    "teacher/report-wc-comment.js",
+    "teacher/report-wc-draw.js",
+    "teacher/report-wc-env.js",
+    "teacher/report-wc-host.js",
+    "teacher/report-wc-look.js",
+    "teacher/report-wc-parts.js",
+    "teacher/report-wc.js"
   ],
   "notYetChecked": [
     "s/app.js",
