@@ -184,6 +184,14 @@ function useDevice(image) {
 
 /* ── Class Settings, as the teacher's clicks reach it ───────────────────── */
 const act = (action, dataset) => DashClassManager.handleAction(action, { dataset: dataset || {} });
+// Points and Proficiency is locked until Edit and saves with Save: edit, press a preset, save.
+const pointsScale = name => {
+  act('cmSetTab', { tab: 'grading' });
+  act('cmPtsEdit');
+  act(name);
+  act('cmPtsSave');
+  act('cmPtsCancel');
+};
 const input = (action, dataset, value) =>
   DashClassManager.handleInput({ dataset: Object.assign({ actionInput: action }, dataset), value: String(value) });
 const change = (action, props) =>
@@ -280,8 +288,13 @@ const SETTINGS = [
     harm: true,
     was: BC_SCALE(),
     now: clone(DEFAULT_GRADING_SCALE),
-    // The two scales Class Settings has a button for.
-    set: v => act(v.percents['4-'] != null ? 'cmPointsScaleBc' : 'cmPointsScaleReset'),
+    // The two scales Class Settings has a button for. Save waits for a change, so the
+    // defaults are set from the BC scale (as Reset to Defaults is pressed on a changed class).
+    set: v => {
+      if (v.percents['4-'] != null) return pointsScale('cmPointsScaleBc');
+      pointsScale('cmPointsScaleBc');
+      pointsScale('cmPointsScaleReset');
+    },
     held: () => clone(getGradingScale(CID)),
   },
   {
@@ -387,6 +400,8 @@ beforeEach(() => {
     quiet: _REFRESH_QUIET_MS,
     bundle: globalThis.__FV_CLASS_BUNDLE,
     confirm: globalThis.showConfirm,
+    undo: globalThis.showUndoToast,
+    dismiss: globalThis.dismissUndoToast,
     queue: window.v2Queue,
     store: localStorage._store,
   };
@@ -395,6 +410,9 @@ beforeEach(() => {
   globalThis.__FV_CLASS_BUNDLE = true;
   // Every "this changes grades for N students" question is answered Change.
   globalThis.showConfirm = (title, message, ok, style, onConfirm) => onConfirm();
+  // Points and Proficiency offers Undo after Save; nothing here presses it.
+  globalThis.showUndoToast = () => {};
+  globalThis.dismissUndoToast = () => {};
   localStorage._store = {};
   server = classSettingsServer();
   globalThis.getSupabase = () => server.fake;
@@ -412,6 +430,8 @@ afterEach(() => {
   if (original.queue && typeof original.queue.claim === 'function') original.queue.claim();
   globalThis.getSupabase = original.getSupabase;
   globalThis.showConfirm = original.confirm;
+  globalThis.showUndoToast = original.undo;
+  globalThis.dismissUndoToast = original.dismiss;
   globalThis.__FV_CLASS_BUNDLE = original.bundle;
   _useSupabase = original.useSupabase;
   _teacherId = original.teacher;

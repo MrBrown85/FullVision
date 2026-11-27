@@ -1,0 +1,477 @@
+/* Class Settings › Grading › Points and Proficiency, locked until Edit
+   (teacher/cm-pts-ruler.js, cm-pts-edit.js; docs/DECISIONS.md, "Points and
+   Proficiency locks until Edit"), and the redrawn Copy Grading Setup dialog
+   (teacher/grading-setup-copy-dialog.js). The ruler's own shapes are in
+   dashboard.css (.cm-pts-*); this file holds what locking and editing add.
+   Built from the approved board "Points and Proficiency, Locked Until Edit". */
+
+/* ── The header: the label, and the buttons for the state ── */
+.cm-pts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+.cm-pts-head .cm-label {
+  margin: 0;
+}
+.cm-pts-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cm-pts-head .cm-action-btn {
+  min-height: 32px;
+  box-sizing: border-box;
+}
+/* The one strong control: blue-tinted at rest, filled when it saves. */
+.cm-pts-btn-tint,
+.cm-pts-btn-fill {
+  min-width: 68px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cm-pts-btn-tint {
+  color: var(--active-fill);
+  background: color-mix(in srgb, var(--active) 10%, transparent);
+}
+.cm-pts-btn-tint:hover {
+  background: color-mix(in srgb, var(--active) 16%, transparent);
+}
+.cm-pts-btn-fill {
+  color: #fff;
+  background: var(--active-fill);
+}
+.cm-pts-btn-fill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.cm-pts-btn-tint:focus-visible,
+.cm-pts-btn-fill:focus-visible,
+.cm-pts-head .cm-action-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+/* Pressing a locked marker pulses Edit twice. */
+@keyframes cm-pts-nudge {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--active) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--active) 0%, transparent);
+  }
+}
+.cm-pts-btn-tint.is-nudge {
+  animation: cm-pts-nudge 0.42s ease-out 2;
+}
+
+/* ── At rest: labels, not handles ── */
+.cm-pts-scroll {
+  border-radius: var(--radius);
+  transition:
+    box-shadow 0.18s ease,
+    padding 0.18s ease;
+}
+.cm-pts-scroll.is-rest .cm-pts-pill,
+.cm-pts-scroll.is-rest .cm-pts-handle {
+  cursor: default;
+}
+.cm-pts-scroll.is-rest .cm-pts-handle {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+}
+.cm-pts-scroll.is-rest .cm-pts-edge-line {
+  width: 2px;
+}
+/* A marker is a span at rest: it centres its own text. */
+.cm-pts-pill,
+.cm-pts-handle {
+  box-sizing: border-box;
+  text-align: center;
+}
+/* A pull gives up to 8px, then springs back. */
+.cm-pts-scroll.is-rest .cm-pts-pill {
+  transition: transform 0.26s cubic-bezier(0.3, 1.7, 0.5, 1);
+}
+.cm-pts-scroll.is-rest .cm-pts-pill.is-pulling {
+  transition: none;
+}
+
+/* The row is as tall as the box, so picking a marker does not move what is below. */
+.cm-pts-edit {
+  min-height: 34px;
+}
+
+/* ── The grade preview beside the box: two short lines in the row's own height ── */
+.cm-pts-preview {
+  margin-left: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: var(--text-xs);
+  line-height: 15px;
+  color: var(--text-2);
+}
+.cm-pts-preview span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Editing: the ruler is a field in focus, and the markers lift ── */
+.cm-pts-scroll.is-editing {
+  box-shadow:
+    0 0 0 1.5px var(--active),
+    0 0 0 5px color-mix(in srgb, var(--active) 12%, transparent);
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+.cm-pts-scroll.is-editing .cm-pts-pill {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.cm-pts-scroll.is-editing .cm-pts-pill.is-on {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--text);
+}
+/* Pointing at a preset: the markers glide to where it would put them. */
+.cm-pts-ruler.is-gliding .cm-pts-marker,
+.cm-pts-ruler.is-gliding .cm-pts-edge {
+  transition: left 0.2s ease;
+}
+.cm-pts-ruler.is-gliding .cm-pts-band {
+  transition: width 0.2s ease;
+}
+.cm-pts-marks {
+  display: contents;
+}
+
+/* ── A ghost stays where the marker was saved; click it to put it back ── */
+.cm-pts-marker.cm-pts-ghost {
+  z-index: 1;
+}
+.cm-pts-ghost.lv-1 {
+  --ghost-fg: var(--score-1-text);
+}
+.cm-pts-ghost.lv-2 {
+  --ghost-fg: var(--score-2-text);
+}
+.cm-pts-ghost.lv-3 {
+  --ghost-fg: var(--score-3-text);
+}
+.cm-pts-ghost.lv-4 {
+  --ghost-fg: var(--score-4-text);
+}
+.cm-pts-ghost .cm-pts-pill {
+  position: relative;
+  background: var(--surface);
+  color: var(--ghost-fg);
+  border: 1.5px dashed var(--chip-bg);
+  line-height: 17px;
+  box-shadow: none;
+  cursor: pointer;
+}
+.cm-pts-ghost .cm-pts-stem {
+  width: 0;
+  background: none;
+  border-left: 1.5px dashed var(--chip-bg);
+  opacity: 0.55;
+}
+/* A marker that only followed its whole level, or has no room: a small ring. */
+.cm-pts-ghost.is-ring .cm-pts-pill {
+  width: 10px;
+  min-width: 0;
+  height: 10px;
+  margin: 5px 0;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0;
+  line-height: 0;
+}
+.cm-pts-ghost .cm-pts-pill::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.cm-pts-tether {
+  position: absolute;
+  top: 10px;
+  height: 0;
+  border-top: 1.5px dotted var(--text-2);
+  opacity: 0.7;
+  z-index: 1;
+}
+.cm-pts-tether.is-low {
+  top: 34px;
+}
+.cm-pts-edge.cm-pts-ghost {
+  z-index: 0;
+}
+.cm-pts-ghost .cm-pts-edge-line {
+  width: 0;
+  background: none;
+  border-left: 2px dashed var(--text-3);
+  border-radius: 0;
+}
+.cm-pts-ghost .cm-pts-handle {
+  border-style: dashed;
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+/* ── Check With a Student while editing ── */
+.cm-check-was {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-check-move {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--text-base);
+}
+.cm-check-move-to {
+  white-space: nowrap;
+  font-weight: 600;
+}
+.cm-check-move-more {
+  font-size: var(--text-base);
+  color: var(--text-2);
+}
+
+/* ── Save: what moved ── */
+.confirm-card.cm-pts-ask-card {
+  max-width: 420px;
+}
+.cm-pts-ask-card .confirm-message:empty {
+  display: none;
+}
+.cm-pts-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 4px 0 14px;
+  font-size: var(--text-md);
+}
+.cm-pts-ask-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.cm-pts-ask-row.is-wide {
+  display: block;
+}
+.cm-pts-ask-from {
+  color: var(--text-2);
+}
+.cm-pts-ask-pill {
+  --chip-bg: var(--score-0);
+  --chip-fg: #fff;
+  display: inline-block;
+  box-sizing: border-box;
+  min-width: 28px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  justify-self: start;
+}
+.cm-pts-ask-pill.lv-1 {
+  --chip-bg: var(--score-1);
+}
+.cm-pts-ask-pill.lv-2 {
+  --chip-bg: var(--score-2);
+  --chip-fg: #2b1a00;
+}
+.cm-pts-ask-pill.lv-3 {
+  --chip-bg: var(--score-3);
+}
+.cm-pts-ask-pill.lv-4 {
+  --chip-bg: var(--score-4);
+}
+@media (prefers-color-scheme: dark) {
+  .cm-pts-ask-pill {
+    --chip-fg: #1d1d1f;
+  }
+}
+
+/* ── Copy Grading Setup, redrawn ── */
+.copy-dialog.gsc-dialog .copy-dialog-card {
+  max-width: 600px;
+  width: min(600px, calc(100% - 32px));
+  padding: 24px 28px;
+}
+.gsc-dialog .gsc-mode {
+  align-self: flex-start;
+}
+.gsc-dialog .confirm-ok:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
+.gsc-dialog .copy-dialog-body {
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+.gsc-label {
+  margin: 6px 0 -4px;
+}
+.gsc-dialog #gsc-classes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* One-line rows with a switch at the right; tinted when on. */
+.gsc-row {
+  min-height: 40px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.gsc-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.gsc-row-text .cm-method-name {
+  flex: 0 0 auto;
+}
+.gsc-row-text .cm-method-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gsc-row .rb-switch {
+  flex: 0 0 38px;
+  box-sizing: border-box;
+}
+.gsc-row .rb-switch:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.gsc-row.is-off {
+  cursor: default;
+}
+.gsc-row.is-off .gsc-row-text .cm-method-name,
+.gsc-row.is-off .gsc-row-text .cm-method-desc {
+  color: var(--text-3);
+}
+.gsc-subhead {
+  padding: 6px 14px 2px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  background: var(--surface);
+  border-top: 1px solid var(--divider-subtle);
+}
+/* A small picture of a class's markers: decoration, named by its label. */
+.gsc-mini {
+  position: relative;
+  flex: 0 0 150px;
+  width: 150px;
+  height: 16px;
+}
+.gsc-mini-bands {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 7px;
+  display: flex;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gsc-mini-band.lv-1 {
+  background: var(--score-1-bg);
+}
+.gsc-mini-band.lv-2 {
+  background: var(--score-2-bg);
+}
+.gsc-mini-band.lv-3 {
+  background: var(--score-3-bg);
+}
+.gsc-mini-band.lv-4 {
+  background: var(--score-4-bg);
+}
+.gsc-mini-tick {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 11px;
+  margin-left: -1.5px;
+  border-radius: 1.5px;
+}
+.gsc-mini-tick.lv-1 {
+  background: var(--score-1);
+}
+.gsc-mini-tick.lv-2 {
+  background: var(--score-2);
+}
+.gsc-mini-tick.lv-3 {
+  background: var(--score-3);
+}
+.gsc-mini-tick.lv-4 {
+  background: var(--score-4);
+}
+/* The check step: each class, with its markers before and after. */
+.gsc-dialog .copy-review-class {
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+}
+.gsc-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.gsc-review-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+@media (max-width: 640px) {
+  .gsc-mini {
+    flex-basis: 96px;
+    width: 96px;
+  }
+  .gsc-review-pair .gsc-mini {
+    flex-basis: 72px;
+    width: 72px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-pts-scroll,
+  .cm-pts-ruler.is-gliding .cm-pts-marker,
+  .cm-pts-ruler.is-gliding .cm-pts-edge,
+  .cm-pts-ruler.is-gliding .cm-pts-band,
+  .cm-pts-scroll.is-rest .cm-pts-pill {
+    transition: none;
+  }
+  .cm-pts-btn-tint.is-nudge {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--active) 30%, transparent);
+  }
+}

@@ -141,6 +141,12 @@ interface Window {
   PageDashboard: unknown;
   DashInboxRollCall: unknown;
   CmGradingBars: unknown;
+  CmGrading: unknown;
+  CmPtsModel: unknown;
+  CmPtsRuler: unknown;
+  CmPtsEdit: unknown;
+  CmPtsSave: unknown;
+  CmPtsPointer: unknown;
   ReportOneZoom: unknown;
   ReportOneHead: unknown;
   ReportPrintPaper: unknown;
@@ -464,6 +470,7 @@ declare var StudentView: any;
 declare var PreviewStudent: any;
 declare var Questionnaires: any;
 declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: () => void, durationMs?: number): void;
+declare function dismissUndoToast(): void;
 // The student page's Settings helpers (s/settings.js): Text Size's words and
 // classes, and the keys for Settings and Log Out? over the page.
 interface Window {
@@ -547,6 +554,12 @@ declare var CmKeepMenu: any;
 declare var _avatarColor: any;
 declare var CmQuestionnaires: any;
 declare var CmGradingBars: any;
+declare var CmGrading: any;
+declare var CmPtsModel: any;
+declare var CmPtsRuler: any;
+declare var CmPtsEdit: any;
+declare var CmPtsSave: any;
+declare var CmPtsPointer: any;
 declare var FVBackupRestore: any;
 declare var openColorPop: any;
 declare var CmTerms: any;

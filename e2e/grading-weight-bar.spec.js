@@ -20,7 +20,10 @@ const box = i => `.cm-cat-weight[data-idx="${i}"]`;
 
 test('dragging a line moves weight between two categories and saves', async ({ page }) => {
   await openGrading(page);
+  // The presets and their sentences show once Edit is pressed.
+  await page.locator('[data-action="cmPtsEdit"]').click();
   await expect(page.locator('.cm-pts-preset-text').first()).toContainText('Extending counts as 100% (A)');
+  await page.locator('[data-action="cmPtsCancel"]').click();
   await expect(page.locator(box(0))).toHaveValue('40');
   await expect(page.locator(box(1))).toHaveValue('35');
 

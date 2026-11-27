@@ -60,6 +60,7 @@ const LAZY = {
     // Loaded the first time a button uses them (teacher/router.js withScripts).
     'teacher/grades-print.js',
     'teacher/grading-setup-copy.js',
+    'teacher/grading-setup-copy-dialog.js',
     'vendor/qrcode.js',
   ],
   phone: ['shared/bank-proficiency.js', 'shared/bank-comment.js', 'curriculum_data.js', 'shared/seed-data.js'],

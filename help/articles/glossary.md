@@ -51,7 +51,7 @@ A category calculation that turns each assessment into a percent first, so each 
 
 ### BC Letter Bands
 
-The BC letter grades and the percent each starts at: A 86%, B 73%, C+ 67%, C 60% and C− 50%, with anything under 50% shown as IE until the last reporting term ends, then F. The BC Letter Bands button on the Grading tab sets every Counts As value, with its + and −, to match them.
+The BC letter grades and the percent each starts at: A 86%, B 73%, C+ 67%, C 60% and C− 50%, with anything under 50% shown as IE until the last reporting term ends, then F. Press Edit under Points and Proficiency on the Grading tab, then BC Letter Bands, to set every Counts As value, with its + and −, to match them. Save keeps the change.
 
 ### Calculation Method
 
@@ -71,7 +71,7 @@ A Grading tab setting that counts only each competency's last 3 or 5 scores by d
 
 ### Counts As
 
-The percent each proficiency level, with its + and −, counts as in the course % of a Letter or Both class, set under Points and Proficiency on the Grading tab. The default is the level ÷ 4 (Extending 100%, Proficient 75%, Developing 50%, Emerging 25%); new grade 10–12 classes start on the BC Letter Bands.
+The percent each proficiency level, with its + and −, counts as in the course % of a Letter or Both class, set under Points and Proficiency on the Grading tab (locked until you press Edit). The default is the level ÷ 4 (Extending 100%, Proficient 75%, Developing 50%, Emerging 25%); new grade 10–12 classes start on the BC Letter Bands.
 
 ### Course Percentage
 

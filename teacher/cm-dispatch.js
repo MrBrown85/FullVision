@@ -7,7 +7,6 @@
 
   /* Handed over by DashClassManager (configure). */
   var _cmCloseRosterPicker,
-    _cmPtsKeydown,
     _cmRosterKeydown,
     _cmShownTabs,
     _cmTabShown,
@@ -71,7 +70,6 @@
     cmOpenStudentPage,
     cmPickColor,
     cmPtsLive,
-    cmPtsPick,
     cmRemoveStudent,
     cmResetPointsScale,
     cmRestoreBackup,
@@ -168,7 +166,6 @@
     cwGradeInput;
   function configure(h) {
     if ('_cmCloseRosterPicker' in h) _cmCloseRosterPicker = h._cmCloseRosterPicker;
-    if ('_cmPtsKeydown' in h) _cmPtsKeydown = h._cmPtsKeydown;
     if ('_cmRosterKeydown' in h) _cmRosterKeydown = h._cmRosterKeydown;
     if ('_cmShownTabs' in h) _cmShownTabs = h._cmShownTabs;
     if ('_cmTabShown' in h) _cmTabShown = h._cmTabShown;
@@ -232,7 +229,6 @@
     if ('cmOpenStudentPage' in h) cmOpenStudentPage = h.cmOpenStudentPage;
     if ('cmPickColor' in h) cmPickColor = h.cmPickColor;
     if ('cmPtsLive' in h) cmPtsLive = h.cmPtsLive;
-    if ('cmPtsPick' in h) cmPtsPick = h.cmPtsPick;
     if ('cmRemoveStudent' in h) cmRemoveStudent = h.cmRemoveStudent;
     if ('cmResetPointsScale' in h) cmResetPointsScale = h.cmResetPointsScale;
     if ('cmRestoreBackup' in h) cmRestoreBackup = h.cmRestoreBackup;
@@ -340,6 +336,7 @@
     if (/^sp[A-Z]/.test(action) && _cmTabShown('student-page', state.cmSelectedCourse))
       return CmStudentPage.handleAction(action, el);
     if (/^cmTerm[A-Z]/.test(action) && CmTerms.handleAction(action, el)) return true;
+    if (/^cmPts[A-Z]/.test(action) && CmPtsEdit.handleAction(action, el)) return true;
     var handlers = {
       openClassManager: function () {
         openClassManager();
@@ -467,9 +464,6 @@
       },
       cmPointsScaleBc: function () {
         cmBcPointsScale();
-      },
-      cmPtsPick: function () {
-        cmPtsPick(el);
       },
       cmCatSave: function () {
         cmCatSave();
@@ -900,7 +894,7 @@
       return true;
     }
     if (_cmRosterKeydown(e)) return true;
-    if (_cmPtsKeydown(e) || CmGradingBars.keydown(e)) return true;
+    if (CmPtsEdit.keydown(e) || CmGradingBars.keydown(e)) return true;
     // A course row in New Class or Re-link ticks with Space or Enter, and
     // keeps the focus through the redraw so the next row is one Tab away.
     if (

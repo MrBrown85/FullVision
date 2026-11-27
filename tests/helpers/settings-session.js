@@ -97,6 +97,8 @@ export async function runSession() {
     quiet: _REFRESH_QUIET_MS,
     bundle: globalThis.__FV_CLASS_BUNDLE,
     confirm: globalThis.showConfirm,
+    undo: globalThis.showUndoToast,
+    dismiss: globalThis.dismissUndoToast,
     queue: window.v2Queue,
     store: localStorage._store,
   };
@@ -116,6 +118,9 @@ export async function runSession() {
   _REFRESH_QUIET_MS = 0;
   globalThis.__FV_CLASS_BUNDLE = true;
   globalThis.showConfirm = (title, message, ok, style, onConfirm) => onConfirm();
+  // Points and Proficiency offers Undo after Save; nothing here presses it.
+  globalThis.showUndoToast = () => {};
+  globalThis.dismissUndoToast = () => {};
   localStorage._store = {};
   globalThis.getSupabase = () => server.fake;
   setOnline(true);
@@ -151,6 +156,14 @@ export async function runSession() {
     await quiet();
   }
   const act = (action, dataset) => DashClassManager.handleAction(action, { dataset: dataset || {} });
+  // Points and Proficiency is locked until Edit and saves with Save: edit, press a preset, save.
+  const pointsScale = name => {
+    act('cmSetTab', { tab: 'grading' });
+    act('cmPtsEdit');
+    act(name);
+    act('cmPtsSave');
+    act('cmPtsCancel');
+  };
   const input = (action, dataset, value) =>
     DashClassManager.handleInput({ dataset: Object.assign({ actionInput: action }, dataset), value: String(value) });
   const change = (action, props) =>
@@ -190,7 +203,7 @@ export async function runSession() {
       ['Count Only the Most Recent: 3', () => change('cmRecentLimit', { value: '3' })],
       ['Folders Count as One: off', () => change('cmFoldersCountAsOne', { checked: false })],
       ['Each Course Counts Equally: on', () => change('cmCoursesCountEqually', { checked: true })],
-      ['Grading Scale: BC Letter Bands', () => act('cmPointsScaleBc')],
+      ['Grading Scale: BC Letter Bands', () => pointsScale('cmPointsScaleBc')],
       ['Round to a Whole %: whole', () => act('cmSetRoundPercent', { value: 'whole' })],
       ['Grading Style: Letter', () => act('cmSetGradingSystem', { value: 'letter' })],
       [
@@ -209,7 +222,7 @@ export async function runSession() {
     await each([
       ['Choose what is already chosen: Emerging First', () => act('cmSetLevelOrder', { value: 'asc' })],
       ['Choose what is already chosen: whole %', () => act('cmSetRoundPercent', { value: 'whole' })],
-      ['Choose what is already chosen: BC Letter Bands', () => act('cmPointsScaleBc')],
+      ['Choose what is already chosen: BC Letter Bands', () => pointsScale('cmPointsScaleBc')],
     ]);
 
     await each([
@@ -301,6 +314,8 @@ export async function runSession() {
     if (original.queue && typeof original.queue.claim === 'function') original.queue.claim();
     globalThis.getSupabase = original.getSupabase;
     globalThis.showConfirm = original.confirm;
+    globalThis.showUndoToast = original.undo;
+    globalThis.dismissUndoToast = original.dismiss;
     globalThis.__FV_CLASS_BUNDLE = original.bundle;
     _useSupabase = original.useSupabase;
     _teacherId = original.teacher;
