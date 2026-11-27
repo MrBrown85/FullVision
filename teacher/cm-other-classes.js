@@ -215,9 +215,8 @@
 
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
-    // Class Settings reads the year so far for every class: its previews
-    // (calculation method, Folders Count as One) and Check With a Student
-    // never count as of a report left in view on the Reports page.
+    // Class Settings reads the year so far for every class: its previews and
+    // Check With a Student never count as of a report left in view on Reports.
     if (typeof setActiveTerm === 'function') {
       courseIds.forEach(function (c) {
         setActiveTerm(c, null);
@@ -226,6 +225,7 @@
     var html = '';
     // A remembered tab this class doesn't show opens Details instead.
     if (!_cmTabShown(state.cmTab, state.cmSelectedCourse)) state.cmTab = 'details';
+    CmPtsEdit.keep(state.classManagerOpen && state.cmTab === 'grading' ? state.cmSelectedCourse : null);
     _cmSyncUrl();
 
     var detailTitle =

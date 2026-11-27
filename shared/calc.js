@@ -96,6 +96,12 @@ function withReturnedOnly(fn) {
   return result;
 }
 
+/** @type {{ cid: string, scale: any } | null} */
+var _scaleOverride = null; // a draft scale for one class, while withGradingScale (teacher/calc-scale.js) runs
+function _scaleOf(cid) {
+  return _scaleOverride && _scaleOverride.cid === cid ? _scaleOverride.scale : getGradingScale(cid);
+}
+
 /* ── Missing work left out ─────────────────────────────────────
    The student page's Overview shows a student their grade now and the
    grade if they handed in their missing work. The second is the same
@@ -855,7 +861,7 @@ function _normalizeAssessmentEntryValue(cid, assessment, rawScore) {
   if (!isFinite(num)) return null;
   if (isPointsScored(assessment)) {
     var max = isCompletionScored(assessment) ? COMPLETE_MAX_POINTS : Number(assessment.maxPoints) || 0;
-    if (max > 0) return pointsToProf(Math.max(0, num), max, getGradingScale(cid));
+    if (max > 0) return pointsToProf(Math.max(0, num), max, _scaleOf(cid));
   }
   return num;
 }
@@ -1170,7 +1176,7 @@ function countsAsStepPercents(percents) {
 }
 // The class's steps; with no class, the defaults.
 function _levelPercents(cid) {
-  var scale = cid && typeof getGradingScale === 'function' ? getGradingScale(cid) : null;
+  var scale = cid && typeof getGradingScale === 'function' ? _scaleOf(cid) : null;
   return countsAsStepPercents(scale && scale.percents);
 }
 // Level ÷ 4 at every step, the default.
@@ -2173,7 +2179,7 @@ function wholeRubricLevel(cid, sid, assessment, entries) {
   var average = getRubricAssessmentScore(cid, assessment, entries || _scoreRead.scores(cid)[sid] || []);
   if (average == null) return null;
   return {
-    score: pointsToProf(average, 4, getGradingScale(cid)),
+    score: pointsToProf(average, 4, _scaleOf(cid)),
     mod: 0,
     mixed: false,
     whole: true,
@@ -2355,7 +2361,7 @@ function getTagScores(cid, studentId, tagId) {
     filtered.push(entry);
   });
   // Convert points-mode scores to proficiency
-  const scale = getGradingScale(cid);
+  const scale = _scaleOf(cid);
   var result = filtered.map(s => {
     const assess = assessMap.get(s.assessmentId);
     if (isPointsScored(assess) && assess.maxPoints > 0) {
@@ -3164,7 +3170,7 @@ function assessmentCellValue(cid, sid, assessment) {
   if (val > 0 || pointsVal != null) {
     out.kind = isPoints ? 'points' : 'level';
     out.value = val;
-    out.level = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : roundLevel(val);
+    out.level = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, _scaleOf(cid)) : roundLevel(val);
     out.outOfRange = isScoreOutOfRange(a, val);
     if (isPoints) {
       out.text = formatPoints(val);
@@ -4127,7 +4133,7 @@ function classColumnSpread(cid, students, col) {
 // A counted value's band, 1–4: a level rounded, or points through the
 // class's Points to Proficiency table. A Letter class's Missing (0) is 1.
 function _spreadBand(cid, v, asPoints) {
-  var level = asPoints ? pointsToProf(v.value, v.possible, getGradingScale(cid)) : roundLevel(v.value);
+  var level = asPoints ? pointsToProf(v.value, v.possible, _scaleOf(cid)) : roundLevel(v.value);
   return Math.max(1, Math.min(4, level || 1));
 }
 
@@ -4341,7 +4347,7 @@ function pointsBands(cid, students, assessment, bandSize) {
   if (!(max > 0) || isCompletionScored(assessment)) return null;
   var size = bandSize > 0 ? bandSize : Math.max(1, Math.round(max / 10));
   var count = Math.max(1, Math.floor(max / size));
-  var scale = getGradingScale(cid);
+  var scale = _scaleOf(cid);
   var bands = [];
   for (var i = 0; i < count; i++) {
     bands.push({

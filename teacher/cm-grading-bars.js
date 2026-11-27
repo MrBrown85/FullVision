@@ -125,12 +125,13 @@ window.CmGradingBars = (function () {
     };
   }
 
-  // The line under the Points and Proficiency label.
+  // The line under the Points and Proficiency label; editing adds how to move a marker.
   var SCALE_HINT =
-    'The markers on top are what each score counts as in the course %. The coloured bands are the proficiency a points score shows as. Drag a marker or a % tab, or pick one and type.';
+    'The markers on top are what each score counts as in the course %. The coloured bands are the proficiency a points score shows as.';
+  var SCALE_HINT_EDIT = ' Drag a marker or a % tab, or pick one and type.';
 
-  function renderScaleHint() {
-    return '<div class="cm-hint cm-pts-hint">' + esc(SCALE_HINT) + '</div>';
+  function renderScaleHint(editing) {
+    return '<div class="cm-hint cm-pts-hint">' + esc(SCALE_HINT + (editing ? SCALE_HINT_EDIT : '')) + '</div>';
   }
 
   // The three preset buttons, each with its sentence beside it.

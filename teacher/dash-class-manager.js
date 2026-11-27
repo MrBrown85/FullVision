@@ -168,16 +168,13 @@ window.DashClassManager = (function () {
   var CM_METHOD_TEXT = CmGrading.CM_METHOD_TEXT;
   var _cmEndedTerm = CmGrading._cmEndedTerm;
   var _cmMethodRule = CmGrading._cmMethodRule;
-  var _cmPtsKeydown = CmGrading._cmPtsKeydown;
   var _cmRenderFoldersCountAsOne = CmGrading._cmRenderFoldersCountAsOne;
   var _cmRenderGradingTab = CmGrading._cmRenderGradingTab;
-  var _initCmPtsDrag = CmGrading._initCmPtsDrag;
   var cmBcPointsScale = CmGrading.cmBcPointsScale;
   var cmCheckStudent = CmGrading.cmCheckStudent;
   var cmFolderCountChoice = CmGrading.cmFolderCountChoice;
   var cmMatchPointsScale = CmGrading.cmMatchPointsScale;
   var cmPtsLive = CmGrading.cmPtsLive;
-  var cmPtsPick = CmGrading.cmPtsPick;
   var cmResetPointsScale = CmGrading.cmResetPointsScale;
   var cmRoundPercentSelect = CmGrading.cmRoundPercentSelect;
   var cmSavePointsScale = CmGrading.cmSavePointsScale;
@@ -432,7 +429,6 @@ window.DashClassManager = (function () {
     cmUpdateTagText: cmUpdateTagText,
     cwGradeInput: cwGradeInput,
     _cmCloseRosterPicker: _cmCloseRosterPicker,
-    _cmPtsKeydown: _cmPtsKeydown,
     _cmRosterKeydown: _cmRosterKeydown,
     _cmShownTabs: _cmShownTabs,
     _cmTabShown: _cmTabShown,
@@ -496,7 +492,6 @@ window.DashClassManager = (function () {
     cmOpenStudentPage: cmOpenStudentPage,
     cmPickColor: cmPickColor,
     cmPtsLive: cmPtsLive,
-    cmPtsPick: cmPtsPick,
     cmRemoveStudent: cmRemoveStudent,
     cmResetPointsScale: cmResetPointsScale,
     cmRestoreBackup: cmRestoreBackup,
@@ -742,6 +737,16 @@ window.DashClassManager = (function () {
     },
   });
 
+  CmPtsEdit.configure({
+    state: state,
+    render: function () {
+      renderClassManager();
+    },
+    refreshCheck: CmGrading.refreshCheck,
+    endedTerm: _cmEndedTerm,
+    openCopy: cmOpenSetupCopy,
+  });
+
   // Drag-and-drop for standards between group folders
   state._cmDragStdId = null;
   state._cmMergeTargetId = null;
@@ -848,30 +853,6 @@ window.DashClassManager = (function () {
   ROSTER_IMPORT_FIELDS.forEach(function (f) {
     _CM_FIELD_LABEL[f[0]] = f[1];
   });
-
-  /* Points and Proficiency as one 0–100% ruler (Colin, 2026-11-06: the old
-     two-column grid didn't speak for itself). Behind it, Points to
-     Proficiency: four bands split where each proficiency starts, with a
-     handle at each start. Above it, Counts As: a marker for every step (1 to
-     4 with + and −) at the percent it counts as in the course %
-     (docs/DECISIONS.md, "Proficiency percents" and "Counts As by step"). A
-     step with no value of its own sits a third of the way between its whole
-     levels and is drawn there. Picking a marker or handle opens one line to
-     type its percent; Left and Right nudge it; a drag moves it. */
-  state._cmPtsError = null;
-  // The marker or handle picked: { cid, kind: 'step', key: '3+' } or
-  // { cid, kind: 'edge', level: 2–4 } (where that proficiency starts).
-  state._cmPtsPick = null;
-  // What was typed when it was refused, shown back in the box.
-  state._cmPtsTyped = null;
-
-  // A marker or handle clicked: it is picked, or, picked already, let go.
-  state._cmPtsDragEnd = 0;
-
-  /* Dragging a marker or handle along the ruler: it snaps to 0.1 (a handle
-     to 1), stays between its neighbours, and saves when let go. A press
-     that doesn't move is a click. */
-  state._cmPtsDrag = null;
 
   /* ── CM Actions ─────────────────────────────────────────── */
   function cmSelectClass(cid) {
@@ -1086,7 +1067,7 @@ window.DashClassManager = (function () {
     initDrag: function () {
       _initCmStdDrag();
       _initCmCatDrag();
-      _initCmPtsDrag();
+      CmPtsPointer.init(_addDocListener);
       CmGradingBars.initDrag(_addDocListener);
     },
     destroy: _removeAllListeners,
@@ -1096,9 +1077,7 @@ window.DashClassManager = (function () {
       state.cmTab = 'details';
       state.cmSelectedCourse = state._activeCourse;
       state._activeCourseChanged = false;
-      state._cmPtsPick = null;
-      state._cmPtsError = null;
-      state._cmPtsTyped = null;
+      CmPtsEdit.reset();
       state.cmEditingStudentId = null;
       state.cmRosterQuery = '';
       state._cmGuardiansLoaded = {};

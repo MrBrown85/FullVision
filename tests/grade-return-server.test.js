@@ -373,7 +373,7 @@ describe('every caller of saveCourseConfig and update_course', () => {
       // Reflect on Feedback's and Show My Learning's switches (S10, S13-W2: setCourseFeedbackOptions, Demo Mode only)
       'shared/data-reflect.js': 1,
       'shared/seed-data.js': 1,
-      'teacher/cm-grading.js': 1,
+      'teacher/cm-pts-save.js': 1, // Points and Proficiency's Save and its Undo
       'teacher/cm-wizard.js': 1,
       'teacher/cm-edit-actions.js': 7,
       'teacher/cm-class-actions.js': 1,
