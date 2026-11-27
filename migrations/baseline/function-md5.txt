@@ -210,7 +210,7 @@ public.get_report_issue(p_issue_id uuid) a81afb37f669ca3f3247322aa868e468 1086
 public.get_student_profile(p_enrollment_id uuid) 32fdc89e09de01707c290d60ee3fed64 5257
 public.get_term_rating(p_enrollment_id uuid, p_term integer) a121736eebd08a499bf11341fbd967df 5829
 public.get_withdrawn_student_records(p_enrollment_id uuid) c0938a84a84fbff35e983a2138f69414 2707
-public.grade_return_repair_nightly() 42936da9b8bbf1d25eca30d1267cd099 1452
+public.grade_return_repair_nightly() 6ebe0d37da619948d6a069fd5fbb1175 1492
 public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) 1c23aac8893f1c47a5b8f840f0e4648b 38483
 public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) 58e0720ca12c8f09bbec775496cf67b1 3749
 public.issue_scan_labels(p_course_id uuid, p_idempotency_key uuid) d2d083b6c33a2cf8991ca65234606169 1788
@@ -252,7 +252,7 @@ public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) 2ee
 public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) eb9e161daa032f3b272435ec52a0bc7a 4442
 public.note_course_opened(p_course_id uuid, p_idempotency_key uuid) 0c9431bb6ff130f8de2715f8315838f1 1125
 public.patch_teacher_preferences(p_patch jsonb, p_idempotency_key uuid) 54963eeb8f241b3c902137f8fe02ac51 3067
-public.photo_lifecycle_nightly() 590634077c8115f35e972f1d211e04fc 2901
+public.photo_lifecycle_nightly() 02e987d7a5a8759031be114b90465854 2941
 public.photo_removal_call() 08b22d449cc3312b31b975ee057fbc08 2010
 public.photo_removal_due() 3faf3499da0753407687386407c8b01f 481
 public.post_bulletin(p_course_id uuid, p_bulletin jsonb, p_files jsonb, p_idempotency_key uuid) b383dee60c48bea8edf769bdfd2a4a41 3800
@@ -306,7 +306,7 @@ public.start_handout_file(p_assessment_id uuid, p_title text, p_kind text, p_byt
 public.start_handout_original(p_resource_id uuid, p_bytes bigint, p_idempotency_key uuid) 72fe4a680ef117111f471d6553ae89ad 1855
 public.start_handout_upload(p_assessment_id uuid, p_title text, p_page_count integer, p_idempotency_key uuid) ac3c7d7c3a3f8d30eec287fed2c510ec 2228
 public.start_work_upload(p_assessment_id uuid, p_enrollment_id uuid, p_pages jsonb, p_mode text, p_idempotency_key uuid) 538ffab506d6c20344c07662837fe714 4421
-public.submit_support_report(p_page text, p_message text, p_browser text, p_app_version text, p_idempotency_key uuid) d417bb92da948ecbb0001c33cc18620a 1219
+public.submit_support_report(p_page text, p_message text, p_browser text, p_app_version text, p_idempotency_key uuid) 51db493c342b4242defe092601c43a4a 1514
 public.toggle_report_block(p_course_id uuid, p_block_key text, p_enabled boolean) 3bc4a853c8039ee2ccdad330ba528f18 747
 public.unlock_all_student_cards(p_course_id uuid, p_idempotency_key uuid) 59d2299ae9fe06b7e1015693ba0fa256 1080
 public.unlock_student_card(p_card_id uuid, p_idempotency_key uuid) dcd1eff29a4eff0597c788ae1e940551 901
