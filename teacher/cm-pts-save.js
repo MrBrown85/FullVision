@@ -17,17 +17,18 @@ window.CmPtsSave = (function () {
   var E = CmPtsEdit;
 
   /* The Undo toast goes the moment a different scale is saved (one from another
-     device): Undo is never offered where it could do nothing. The same check
-     guards the button itself, as a backstop. */
-  var _undoWatch = 0;
-  function watchUndo(cid, wrote) {
-    clearInterval(_undoWatch);
-    var until = Date.now() + 6000;
-    _undoWatch = setInterval(function () {
-      var gone = !document.getElementById('undo-toast');
-      if (M.stored(getGradingScale(cid)) !== M.stored(wrote) && !gone) dismissUndoToast();
-      if (gone || Date.now() > until || M.stored(getGradingScale(cid)) !== M.stored(wrote)) clearInterval(_undoWatch);
-    }, 300);
+     device): Undo is never offered where it could do nothing. A class's settings
+     replaced from the server redraw Class Settings, and every redraw asks here
+     (CmPtsEdit.keep). The same check guards the button itself, as a backstop. */
+  /** @type {{ cid: string, wrote: any } | null} */
+  var _pending = null;
+  function undoStillWorks() {
+    return !!_pending && M.stored(getGradingScale(_pending.cid)) === M.stored(_pending.wrote);
+  }
+  function checkUndo() {
+    if (!_pending || undoStillWorks()) return;
+    _pending = null;
+    if (document.getElementById('undo-toast')) dismissUndoToast();
   }
 
   function commit(cid, scale) {
@@ -40,11 +41,13 @@ window.CmPtsSave = (function () {
     E.drop();
     E.focusOn('#cm-pts-edit-btn');
     E.host().render();
-    watchUndo(cid, wrote);
+    _pending = { cid: cid, wrote: wrote };
     showUndoToast('Markers saved', function () {
       // Only while what is saved is still exactly what this Save wrote: a scale
       // that arrived from another device since is never put back over.
-      if (M.stored(getGradingScale(cid)) !== M.stored(wrote)) return;
+      var still = undoStillWorks();
+      _pending = null;
+      if (!still) return;
       // No scale saved before: the defaults, as a copy of their own (the server
       // takes a scale, not "none"; Reset to Defaults saves the same).
       write(cid, before || structuredClone(DEFAULT_GRADING_SCALE));
@@ -197,5 +200,14 @@ window.CmPtsSave = (function () {
     return out;
   }
 
-  return { save: save, checkNotes: checkNotes, previewHtml: previewHtml };
+  return {
+    save: save,
+    checkNotes: checkNotes,
+    previewHtml: previewHtml,
+    checkUndo: checkUndo,
+    // Class Settings closed: nothing is left to watch.
+    clearUndo: function () {
+      _pending = null;
+    },
+  };
 })();

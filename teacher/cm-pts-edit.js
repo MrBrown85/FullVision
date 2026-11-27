@@ -32,8 +32,6 @@ window.CmPtsEdit = (function () {
   var _live = null;
   // A notice has just appeared: bring it into view once it is drawn.
   var _reveal = false;
-  // While a draft is open, a scale arriving from another device is looked for twice a second.
-  var _watch = 0;
   /** @type {{ pick: any, typed: string | null, error: string | null, dragEnd: number }} */
   var _ui = { pick: null, typed: null, error: null, dragEnd: 0 };
 
@@ -104,7 +102,6 @@ window.CmPtsEdit = (function () {
     clearUi();
     _preview = null;
     _notice = null;
-    startWatch();
     _draft = { cid: cid, scale: structuredClone(getGradingScale(cid)), opened: structuredClone(getGradingScale(cid)) };
     focusOn('#cm-pts-step-1');
     _host.render();
@@ -134,21 +131,8 @@ window.CmPtsEdit = (function () {
     d.scale = structuredClone(d.opened);
     return false;
   }
-  function startWatch() {
-    if (_watch) return;
-    _watch = setInterval(function () {
-      var cid = _draft && _draft.cid;
-      if (!cid) return stopWatch();
-      if (reconcile(cid)) _host.render();
-    }, 500);
-  }
-  function stopWatch() {
-    clearInterval(_watch);
-    _watch = 0;
-  }
   // Let the draft go, without a redraw (leaving the tab, or the class).
   function drop() {
-    stopWatch();
     _draft = null;
     _live = null;
     _preview = null;
@@ -156,9 +140,11 @@ window.CmPtsEdit = (function () {
   }
   // The class whose Grading tab is on screen, or null: a draft for any other is dropped.
   function keep(cid) {
+    CmPtsSave.checkUndo();
     if (_draft && _draft.cid !== cid) drop();
   }
   function reset() {
+    CmPtsSave.clearUndo();
     drop();
     _notice = null;
     _ui.dragEnd = 0;

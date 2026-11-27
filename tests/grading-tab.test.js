@@ -4,7 +4,7 @@
  * the method says how many students it moves before it changes anything.
  */
 import './setup.js';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseHTML } from 'linkedom';
 
 const CID = 'e0000000-0000-4000-8000-00000000g7ab';
@@ -730,8 +730,7 @@ describe('Points and Proficiency as one scale on the Grading tab', () => {
       expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
     });
 
-    it("the Undo toast is taken away when another device's scale arrives, and the saved scale is theirs", () => {
-      vi.useFakeTimers();
+    it('the Undo toast is taken away at the redraw an arriving scale causes, and the saved scale is theirs', () => {
       const dismissed = [];
       const was = globalThis.dismissUndoToast;
       globalThis.dismissUndoToast = () => dismissed.push(1);
@@ -742,16 +741,19 @@ describe('Points and Proficiency as one scale on the Grading tab', () => {
         pick('step', '3');
         type('80');
         save();
-        vi.advanceTimersByTime(600);
+        // A redraw with the Save's own scale still saved leaves the toast.
+        redraw();
         expect(dismissed).toHaveLength(0);
         arrives({ '3+': 90 });
-        vi.advanceTimersByTime(600);
+        redraw();
         expect(dismissed).toHaveLength(1);
         expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
+        // Once taken away, nothing asks again.
+        redraw();
+        expect(dismissed).toHaveLength(1);
       } finally {
         globalThis.dismissUndoToast = was;
         document.getElementById = real;
-        vi.useRealTimers();
       }
     });
 

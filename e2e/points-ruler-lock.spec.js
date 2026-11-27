@@ -279,6 +279,8 @@ test.describe('editing', () => {
       };
       _cache.courseConfigs.sci8 = cc;
       clearProfCache();
+      // What a class load does after it replaces the cached settings: the page redraws.
+      _invalidateAndRerender();
     });
     const notice = page.locator('.cm-pts-scale .cm-cat-notice');
     await expect(notice).toContainText('changed on another device, so nothing was saved');

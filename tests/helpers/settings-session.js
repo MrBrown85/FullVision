@@ -98,6 +98,7 @@ export async function runSession() {
     bundle: globalThis.__FV_CLASS_BUNDLE,
     confirm: globalThis.showConfirm,
     undo: globalThis.showUndoToast,
+    dismiss: globalThis.dismissUndoToast,
     queue: window.v2Queue,
     store: localStorage._store,
   };
@@ -119,6 +120,7 @@ export async function runSession() {
   globalThis.showConfirm = (title, message, ok, style, onConfirm) => onConfirm();
   // Points and Proficiency offers Undo after Save; nothing here presses it.
   globalThis.showUndoToast = () => {};
+  globalThis.dismissUndoToast = () => {};
   localStorage._store = {};
   globalThis.getSupabase = () => server.fake;
   setOnline(true);
@@ -313,6 +315,7 @@ export async function runSession() {
     globalThis.getSupabase = original.getSupabase;
     globalThis.showConfirm = original.confirm;
     globalThis.showUndoToast = original.undo;
+    globalThis.dismissUndoToast = original.dismiss;
     globalThis.__FV_CLASS_BUNDLE = original.bundle;
     _useSupabase = original.useSupabase;
     _teacherId = original.teacher;
