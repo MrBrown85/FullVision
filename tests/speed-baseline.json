@@ -1,25 +1,25 @@
 {
   "Assignments: open": {
-    "copied": 1841834,
+    "copied": 1850474,
     "saved": 110,
-    "drawn": 961951,
-    "elements": 3676,
-    "lookups": 18680,
+    "drawn": 986189,
+    "elements": 3984,
+    "lookups": 18789,
     "class": 0
   },
   "Assignments: open one card": {
     "copied": 83036,
     "saved": 0,
-    "drawn": 305132,
-    "elements": 6046,
-    "lookups": 2627,
+    "drawn": 305715,
+    "elements": 6354,
+    "lookups": 2808,
     "class": 0
   },
   "Assignments: click a rubric level": {
     "copied": 466124,
     "saved": 464696,
     "drawn": 690,
-    "elements": 6047,
+    "elements": 6355,
     "lookups": 12,
     "class": 0
   },
@@ -27,7 +27,7 @@
     "copied": 0,
     "saved": 0,
     "drawn": 984,
-    "elements": 6050,
+    "elements": 6361,
     "lookups": 216,
     "class": 0
   },
@@ -35,7 +35,7 @@
     "copied": 0,
     "saved": 0,
     "drawn": 0,
-    "elements": 6050,
+    "elements": 6361,
     "lookups": 0,
     "class": 0
   },
@@ -43,63 +43,63 @@
     "copied": 12816,
     "saved": 0,
     "drawn": 0,
-    "elements": 3685,
-    "lookups": 2162,
+    "elements": 3991,
+    "lookups": 2163,
     "class": 0
   },
   "Gradebook: open": {
     "copied": 1791403,
     "saved": 55,
-    "drawn": 652044,
-    "elements": 5368,
+    "drawn": 652153,
+    "elements": 5370,
     "lookups": 9760,
     "class": 0
   },
   "Gradebook: type a score": {
     "copied": 466181,
     "saved": 464668,
-    "drawn": 3890,
-    "elements": 4966,
+    "drawn": 4064,
+    "elements": 4970,
     "lookups": 285,
     "class": 0
   },
   "Gradebook: Edit Score in the Scores view": {
     "copied": 935333,
     "saved": 929336,
-    "drawn": 3350,
-    "elements": 5370,
+    "drawn": 3564,
+    "elements": 5374,
     "lookups": 260,
     "class": 0
   },
   "Gradebook: type a score with Class Results open": {
     "copied": 466181,
     "saved": 464668,
-    "drawn": 3892,
-    "elements": 5095,
+    "drawn": 4066,
+    "elements": 5099,
     "lookups": 626,
     "class": 0
   },
   "Grader: open on a student": {
     "copied": 1864531,
     "saved": 55,
-    "drawn": 665941,
-    "elements": 5513,
-    "lookups": 10391,
+    "drawn": 666050,
+    "elements": 5515,
+    "lookups": 10393,
     "class": 0
   },
   "Grader: next student": {
     "copied": 73128,
     "saved": 0,
     "drawn": 9690,
-    "elements": 5513,
-    "lookups": 630,
+    "elements": 5515,
+    "lookups": 632,
     "class": 0
   },
   "Grader: close": {
     "copied": 1791348,
     "saved": 0,
     "drawn": 0,
-    "elements": 5368,
+    "elements": 5370,
     "lookups": 9759,
     "class": 0
   },
@@ -107,7 +107,7 @@
     "copied": 1791348,
     "saved": 0,
     "drawn": 51024,
-    "elements": 5552,
+    "elements": 5556,
     "lookups": 9819,
     "class": 0
   },

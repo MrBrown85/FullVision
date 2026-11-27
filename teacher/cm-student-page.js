@@ -562,7 +562,7 @@ var CmStudentPage = (function () {
     sent.then(done, done);
   }
 
-  // The student Preview as Student's list shows: the one chosen there, else the first.
+  // The student Preview as Student's list shows: the one chosen there, else the first (ViewAsStudent uses it too).
   function _previewStudent(cid) {
     var students = typeof sortStudents === 'function' ? sortStudents(getStudents(cid) || [], 'lastName') : [];
     var chosen = _previewFor[cid];
@@ -640,13 +640,7 @@ var CmStudentPage = (function () {
     if (typeof PreviewStudent === 'undefined') return '';
     var students = typeof sortStudents === 'function' ? sortStudents(getStudents(cid) || [], 'lastName') : [];
     if (!students.length) return '';
-    var chosen = _previewFor[cid];
-    if (
-      !students.some(function (s) {
-        return s.id === chosen;
-      })
-    )
-      chosen = students[0].id;
+    var chosen = _previewStudent(cid);
     return (
       '<div class="cm-section sp-preview" data-cid="' +
       esc(cid) +
@@ -844,6 +838,7 @@ var CmStudentPage = (function () {
   }
   return {
     followPreview: followPreview,
+    previewStudent: _previewStudent,
     isShown: isShown,
     render: render,
     workSettings: workSettings,
