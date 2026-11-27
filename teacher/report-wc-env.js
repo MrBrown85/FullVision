@@ -271,7 +271,8 @@ window.ReportWcEnv = (function () {
         env.claims.some(function (c) {
           return c.row === x.ri;
         }) ||
-        !!H.pronounNote(x.row, x.ri)
+        !!H.pronounNote(x.row, x.ri) ||
+        !!H.ownBox(x.ri)
       );
     };
     env.waysFor = function (ri) {

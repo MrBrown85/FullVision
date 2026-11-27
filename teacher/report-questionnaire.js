@@ -5313,6 +5313,9 @@ window.ReportQuestionnaire = (function () {
         return;
       }
       case 'ownFromBox': {
+        // The typed text is read back into sentences first, so the box opens under its line.
+        ReportWc.endTyping();
+        st = _current();
         var at = Number(ds.row);
         var sel = (_rows[key] || [])[at];
         if (!(at >= 0) || !sel) return;

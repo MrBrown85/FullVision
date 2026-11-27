@@ -183,7 +183,15 @@ window.ReportWcBoxes = (function () {
     });
     return {
       facts: facts,
-      head: (named || (mine.length ? top : null) || {}).title || '',
+      head:
+        (
+          named ||
+          order.find(function (w) {
+            return w.id === env.f.bestPickId;
+          }) ||
+          (mine.length ? top : null) ||
+          {}
+        ).title || '',
       foot: foot,
       top: left.map(env.line),
     };

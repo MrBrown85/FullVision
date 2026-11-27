@@ -28,6 +28,20 @@ window.ReportWcBoxesMore = (function () {
     return { facts: [f], head: env.attHead, foot: [], top: [] };
   }
 
+  /* Whether the comment quotes this answer, as a sentence from it or typed. */
+  function said(env, a, lines) {
+    var t = String(a.text || '')
+      .replace(/[“”"]/g, '')
+      .replace(/[.\s]+$/, '');
+    if (!t || a.priv) return false;
+    return (
+      lines.length > 0 ||
+      env.rows.some(function (r) {
+        return String(r.text).indexOf(t) >= 0;
+      })
+    );
+  }
+
   function voice(env, mine) {
     var taken = {};
     var facts = env.voice.map(function (a) {
@@ -38,7 +52,7 @@ window.ReportWcBoxesMore = (function () {
         id: 'voice:' + a.key,
         name: a.label,
         quote: a.text ? '“' + a.text.replace(/[“”"]/g, '') + '”' : a.empty,
-        chip: a.priv ? 'Private' : '',
+        chip: a.priv ? 'Private' : said(env, a, lines) ? 'In the Comment' : '',
         lines: lines,
       });
       if (a.say && !lines.length) {

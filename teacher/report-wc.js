@@ -130,6 +130,10 @@ window.ReportWc = (function () {
       if (t && t.id === 'tq-read' && (e.key === 'Enter' || e.key === ' ')) {
         e.preventDefault();
         A.startTyping();
+      } else if (t && t.id === 'tq-wc-write' && (e.key === 'Enter' || e.key === 'Escape')) {
+        e.preventDefault();
+        if (e.key === 'Enter') A.writeAdd();
+        else write('');
       } else if (t && t.id === 'tq-narrative' && e.key === 'Escape' && ui.typing) {
         e.stopPropagation();
         A.cancelTyping();
@@ -224,6 +228,7 @@ window.ReportWc = (function () {
     act: act,
     search: search,
     closeWays: closeWays,
+    endTyping: A.endTyping,
     ways: function () {
       return ui.ways;
     },
