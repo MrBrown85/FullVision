@@ -468,6 +468,7 @@ declare var StudentView: any;
 declare var PreviewStudent: any;
 declare var Questionnaires: any;
 declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: () => void, durationMs?: number): void;
+declare function dismissUndoToast(): void;
 // The student page's Settings helpers (s/settings.js): Text Size's words and
 // classes, and the keys for Settings and Log Out? over the page.
 interface Window {

@@ -4,7 +4,7 @@
  * the method says how many students it moves before it changes anything.
  */
 import './setup.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
 
 const CID = 'e0000000-0000-4000-8000-00000000g7ab';
@@ -728,6 +728,31 @@ describe('Points and Proficiency as one scale on the Grading tab', () => {
       arrives({ '3+': 90 });
       undos[0].undo();
       expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
+    });
+
+    it("the Undo toast is taken away when another device's scale arrives, and the saved scale is theirs", () => {
+      vi.useFakeTimers();
+      const dismissed = [];
+      const was = globalThis.dismissUndoToast;
+      globalThis.dismissUndoToast = () => dismissed.push(1);
+      const real = document.getElementById;
+      document.getElementById = id => (id === 'undo-toast' ? {} : real.call(document, id));
+      try {
+        edit();
+        pick('step', '3');
+        type('80');
+        save();
+        vi.advanceTimersByTime(600);
+        expect(dismissed).toHaveLength(0);
+        arrives({ '3+': 90 });
+        vi.advanceTimersByTime(600);
+        expect(dismissed).toHaveLength(1);
+        expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
+      } finally {
+        globalThis.dismissUndoToast = was;
+        document.getElementById = real;
+        vi.useRealTimers();
+      }
     });
 
     it('Undo puts the previous scale back while it is still what the Save wrote', () => {

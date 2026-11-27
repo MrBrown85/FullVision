@@ -263,6 +263,38 @@ test.describe('editing', () => {
     expect(await left(page, '3')).toBe('75%');
   });
 
+  test('a scale from another device arriving mid-draft: the notice is in view, with the focus, and says what was typed', async ({
+    page,
+  }) => {
+    await slowed(page);
+    await clickAction(page, 'cmPtsEdit');
+    await drag(page, MARKER_3, 45);
+    await page.locator('#cm-pts-ruler').scrollIntoViewIfNeeded();
+    // Another device saves its own scale; the class loader puts it in the cache.
+    await page.evaluate(() => {
+      const cc = getCourseConfig('sci8');
+      cc.gradingScale = {
+        ...structuredClone(DEFAULT_GRADING_SCALE),
+        percents: { 4: 100, 3: 75, '3+': 90, 2: 50, 1: 25 },
+      };
+      _cache.courseConfigs.sci8 = cc;
+      clearProfCache();
+    });
+    const notice = page.locator('.cm-pts-scale .cm-cat-notice');
+    await expect(notice).toContainText('changed on another device, so nothing was saved');
+    await expect(notice).toContainText('What You Typed');
+    await expect
+      .poll(async () => {
+        const b = await notice.boundingBox();
+        const h = await page.evaluate(() => innerHeight);
+        return !!b && b.y >= 0 && b.y + b.height <= h;
+      })
+      .toBe(true);
+    await expect(notice).toBeFocused();
+    await page.locator('[data-action="cmPtsNoticeDone"]').click();
+    await expect(notice).toHaveCount(0);
+  });
+
   test('leaving the Grading tab drops the draft', async ({ page }) => {
     await clickAction(page, 'cmPtsEdit');
     await page.locator('[data-action="cmPointsScaleBc"]').click();

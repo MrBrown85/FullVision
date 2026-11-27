@@ -340,5 +340,30 @@ window.CmPtsRuler = (function () {
     if (layer) layer.innerHTML = ghostsHtml(plan);
   }
 
-  return { render: render, sync: sync, markerName: markerName };
+  /* Brings the notice into view (smooth; at once with Reduce Motion) and puts the
+     focus on it, so a screen reader reads it once: it has no live-region role. */
+  function revealNotice() {
+    var el = /** @type {HTMLElement | null} */ (document.querySelector('.cm-pts-scale .cm-cat-notice'));
+    if (!el) return;
+    var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+    el.focus({ preventScroll: true });
+  }
+  // The line the categories use, with its What You Typed list and Dismiss (cm-cat-notice).
+  // html-safe: the sentence is a constant; each typed line through esc
+  function noticeHtml(n) {
+    return (
+      '<div class="cm-cat-notice" tabindex="-1"><div class="cm-cat-notice-text">' +
+      'Points and Proficiency changed on another device, so nothing was saved. These are the current ones. What you typed is below.' +
+      '</div><div class="cm-cat-typed"><div class="cm-cat-typed-label">What You Typed</div><ul>' +
+      n.typed
+        .map(function (l) {
+          return '<li>' + esc(l) + '</li>';
+        })
+        .join('') +
+      '</ul></div><button class="cm-add-link" data-action="cmPtsNoticeDone">Dismiss</button></div>'
+    );
+  }
+
+  return { render: render, noticeHtml: noticeHtml, revealNotice: revealNotice, sync: sync, markerName: markerName };
 })();
