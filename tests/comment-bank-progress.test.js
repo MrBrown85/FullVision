@@ -64,7 +64,7 @@ function facts(comps) {
     enrolled: '',
     classStart: '',
     termStart: '',
-    classLines: { support: [], pick: null, closing: '', late: '', charLimit: null },
+    classLines: { support: [], pick: null, closing: '', late: '' },
   };
 }
 const climbing = () => [

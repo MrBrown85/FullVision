@@ -1549,7 +1549,7 @@ window.PageReports = (function () {
 
   /* Saves this page's copy of the report settings, with the comment
      settings the Term Questionnaire saved since the page loaded it (its
-     support lines, closing sentence and character limit), so a change here
+     support lines and closing sentence), so a change here
      never puts back older ones. */
   function _saveReportConfig() {
     var saved = (typeof getReportConfig === 'function' && getReportConfig(activeCourse)) || {};
@@ -1755,7 +1755,7 @@ window.PageReports = (function () {
 
     // A click outside the IE deadline calendar closes it.
     if (RQ.deadlineOpen() && !e.target.closest('#tq-cal, #tq-deadline-btn')) RQ.tqCloseDeadline();
-    // And outside the Support Line menu or the character limit.
+    // And outside the Support Line menu.
     if (RQ.linesOpen()) RQ.clickOutside(e.target);
 
     var el = e.target.closest('[data-action]');
@@ -1815,7 +1815,7 @@ window.PageReports = (function () {
       tqObsShowAll: function () {
         RQ.tqObsShowAll();
       },
-      // The class's lines on the Sentences card and the character limit.
+      // The class's lines.
       tqLine: function () {
         RQ.tqLine(el.dataset.do, el);
       },
@@ -1933,8 +1933,8 @@ window.PageReports = (function () {
       RQ.tqSetAttendance(el.dataset.sid);
       return;
     }
-    // A support or language goal line ticked, or the character limit typed.
-    if (el.dataset.tqSupport || el.dataset.tqLang || el.dataset.tqLimit) {
+    // A support or language goal line ticked.
+    if (el.dataset.tqSupport || el.dataset.tqLang) {
       RQ.tqLineChange(el);
       return;
     }

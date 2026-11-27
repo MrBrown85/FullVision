@@ -80,7 +80,6 @@ function tomas(over) {
         pick: null,
         closing: 'Extra help is at lunch on Tuesdays in [Room].',
         late: 'Late work is accepted until December 4.',
-        charLimit: null,
       },
     },
     over,
@@ -286,7 +285,6 @@ describe('the support line', () => {
         pick: null,
         closing: '',
         late: '',
-        charLimit: null,
       },
     });
     expect(CommentBank.supportChoice(f, f.habits)).toBeNull();
@@ -304,7 +302,6 @@ describe('the support line', () => {
         pick: null,
         closing: '',
         late: '',
-        charLimit: null,
       },
     });
     expect(CommentBank.supportChoice(f, f.habits)).toMatchObject({ line: { id: 'b' }, fit: 'significance' });
@@ -388,7 +385,7 @@ describe('six sentences or more, never trimmed', () => {
       enrolled: '',
       classStart: '',
       termStart: '',
-      classLines: { support: [], pick: null, closing: '', late: '', charLimit: null },
+      classLines: { support: [], pick: null, closing: '', late: '' },
     };
     expect(CommentBank.MIN_SENTENCES).toBe(6);
     const d = draftOf(thin);

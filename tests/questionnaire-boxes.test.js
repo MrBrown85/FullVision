@@ -68,14 +68,6 @@ describe('ReportWcParts', () => {
     expect(P.openingNote(run)).toBe('Three sentences in a row start with He.');
     expect(P.sameOpening(['He is kind.', 'She works hard.', 'He asks questions.'])).toBeNull();
   });
-
-  it('gives a reading grade between 3 and 12', () => {
-    expect(P.readingGrade('', 1)).toBe(0);
-    expect(P.readingGrade('It is a cat. It is a dog.', 2)).toBe(3);
-    const hard =
-      'Considerably interdisciplinary understanding demonstrates extraordinarily sophisticated communication.';
-    expect(P.readingGrade(hard, 1)).toBe(12);
-  });
 });
 
 describe('the boxes drawn for a Demo Mode student', () => {

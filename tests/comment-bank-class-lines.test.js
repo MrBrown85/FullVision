@@ -1,6 +1,6 @@
 /**
  * Generate plan PR 8: the next step, support, closing, late work and the
- * character limit.
+ * count.
  *
  * - The next step names one skill from the competency-to-skill table, tied
  *   to the lowest competency with 3+ scored pieces; never a bare label.
@@ -62,7 +62,7 @@ function facts(over) {
       enrolled: '',
       classStart: '',
       termStart: '',
-      classLines: { support: [], pick: null, closing: '', late: '', charLimit: null },
+      classLines: { support: [], pick: null, closing: '', late: '' },
     },
     over,
   );
@@ -414,19 +414,18 @@ describe('the class settings (report_config) and the review screen', () => {
       languageGoalsOwn: [],
       languageGoalsFor: {},
       closing: '',
-      charLimit: null,
     });
     saveReportConfig(CID, {
       form: { sides: [] },
       commentSettings: {
         supportChosen: ['sl-sources'],
         closing: ' Bye. ',
-        charLimit: '900',
         supportOwn: [{ id: 'own-1', text: 'Mine.' }, { id: 'x' }],
       },
     });
     const cs = CommentBank.classSettings(CID);
-    expect(cs).toMatchObject({ supportChosen: ['sl-sources'], closing: 'Bye.', charLimit: 900 });
+    expect(cs).toMatchObject({ supportChosen: ['sl-sources'], closing: 'Bye.' });
+    expect(cs).not.toHaveProperty('charLimit');
     expect(cs.supportOwn).toEqual([{ id: 'own-1', text: 'Mine.' }]);
     // The class's checklist: the Socials lines, then the teacher's own.
     const list = CommentBank.supportChecklist(CID, 'socials');
@@ -443,7 +442,8 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(html).not.toContain('No support lines chosen');
     expect(html).toContain('>+ Closing Sentence for the Class</button>');
     expect(html).not.toContain('No closing sentence for this class');
-    expect(html).toContain('<span id="tq-limit-text"> · no limit</span> ▾');
+    expect(html).toContain('<span id="tq-count-tail"></span>');
+    expect(html).not.toContain('limit');
     expect(html).not.toContain('qn-required');
   });
 
@@ -623,32 +623,17 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(html).not.toContain('Left out of this comment.');
   });
 
-  it('sets the character limit from the count; past it the count turns orange and Approve stays on', () => {
+  it('has no character limit: a saved one is not read, the count is only the count, Approve stays on', () => {
     seed();
-    upsertTermRating(CID, GAB.id, TERM, { narrative: 'x'.repeat(120) });
-    open();
-    RQ.tqLine('limitMenu');
-    const html = RQ.renderTermQuestionnaire(CID);
-    expect(html).toContain('Character limit for History 12');
-    expect(html).toContain('placeholder="No limit"');
+    saveReportConfig(CID, { form: { sides: [] }, commentSettings: { charLimit: 100 } });
+    upsertTermRating(CID, GAB.id, TERM, { narrative: 'x'.repeat(1200) });
+    const html = open();
     expect(html).toContain(
-      'The longest comment your school’s report card allows. The count turns orange past it; Approve still works.',
+      '<span class="qn-count-text" id="tq-count">1,200 characters</span><span id="tq-count-tail"></span>',
     );
-    RQ.tqLineChange({ dataset: { tqLimit: '1' }, value: '100' });
-    expect(settings().charLimit).toBe(100);
+    expect(html).not.toContain('Character limit');
+    expect(html).not.toContain('class="qn-count over"');
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
     expect(RQ.approveBlockers(st)).toEqual([]);
-    RQ.syncApprove();
-    expect(btn.disabled).toBe(false);
-    expect(btn.title).toBe('Saves this comment to the report card and opens the next student. ⌘ Return');
-    // Over the limit, the count says so.
-    expect(RQ.renderTermQuestionnaire(CID)).toContain(
-      '<span class="qn-count-text" id="tq-count">120 of 100 characters</span><span id="tq-limit-text"> · over the limit</span>',
-    );
-    expect(RQ.renderTermQuestionnaire(CID)).toContain('class="qn-count-btn over"');
-    RQ.tqLineChange({ dataset: { tqLimit: '1' }, value: '' });
-    expect(settings().charLimit).toBeNull();
-    expect(RQ.approveBlockers(st)).toEqual([]);
-    RQ.closeLines();
   });
 });

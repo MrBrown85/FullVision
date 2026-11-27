@@ -72,7 +72,7 @@ function facts(levels, bank = true, over) {
       enrolled: '',
       classStart: '',
       termStart: '',
-      classLines: { support: [], pick: null, closing: '', late: '', charLimit: null },
+      classLines: { support: [], pick: null, closing: '', late: '' },
     },
     over,
   );

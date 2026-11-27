@@ -204,7 +204,6 @@ test('three sentences in a row that open alike are noted, with Vary Them', async
   await page.locator('.wc-head-card').click();
   await expect(page.locator('#wc-notes .wc-note')).toContainText('Three sentences in a row start with She.');
   await expect(page.locator('#wc-notes [data-do="wcVary"]')).toHaveText('Vary Them');
-  await expect(page.locator('#wc-reads')).toContainText('Reads at Grade');
 });
 
 test('the student list says who needs a look and why', async ({ page }) => {

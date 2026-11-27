@@ -184,27 +184,6 @@ window.ReportWcParts = (function () {
     return (NUMBER_WORDS[Math.min(run.n, 10)] || String(run.n)) + ' sentences in a row start with ' + shown + '.';
   }
 
-  /* Flesch-Kincaid grade of a text, rounded and kept between 3 and 12. */
-  function syllables(w) {
-    var m = String(w || '')
-      .toLowerCase()
-      .replace(/[^a-z]/g, '')
-      .match(/[aeiouy]+/g);
-    return Math.max(1, m ? m.length : 0);
-  }
-  function readingGrade(text, sentenceCount) {
-    var ws = String(text || '')
-      .split(/\s+/)
-      .filter(Boolean);
-    if (!ws.length) return 0;
-    var n = Math.max(1, sentenceCount || 1);
-    var syl = ws.reduce(function (t, w) {
-      return t + syllables(w);
-    }, 0);
-    var g = 0.39 * (ws.length / n) + 11.8 * (syl / ws.length) - 15.59;
-    return Math.max(3, Math.min(12, Math.round(g)));
-  }
-
   /* ── Where a new sentence goes ─────────────────────────────── */
 
   /* The place in the comment for a new sentence of a box: after the last
@@ -233,7 +212,6 @@ window.ReportWcParts = (function () {
     firstWord: firstWord,
     sameOpening: sameOpening,
     openingNote: openingNote,
-    readingGrade: readingGrade,
     insertAt: insertAt,
   };
 })();

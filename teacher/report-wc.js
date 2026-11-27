@@ -25,7 +25,10 @@ window.ReportWc = (function () {
     piecesAll: false,
     write: /** @type {{ box: string, text: string } | null} */ (null),
     hot: '', // the data-rk lit in both places
+    pick: '', // the box the teacher is in: its sentences are lit in the comment
+    rkBox: /** @type {Record<string, string>} */ ({}), // each sentence's box
     typing: false,
+    caret: /** @type {number | null} */ (null), // where the teacher last was in the comment
     snap: null,
     dirty: false,
   };
@@ -47,7 +50,7 @@ window.ReportWc = (function () {
   /* The page: the boxes at the left, the comment at the right. */
   // html-safe: the header, the boxes and the comment card are drawn with esc() by their own modules
   function render(cid, student, f) {
-    var boxes = D.boxes(B.build(env(student, f)), ui);
+    var boxes = D.boxes(mapped(B.build(env(student, f))), ui);
     return `<div class="qn wc" data-sid="${esc(student.id)}">
       <div class="qn-left wc-left">
         ${H.headerHtml(student, f, ui.q)}
@@ -72,7 +75,7 @@ window.ReportWc = (function () {
     var grip = active && active.getAttribute ? active.getAttribute('data-wc-grip') : null;
     var before = ReportQnMotion.measure(host);
     // html-safe: boxes drawn by ReportWcDraw with esc()
-    host.innerHTML = D.boxes(B.build(env(st, H.facts(st))), ui);
+    host.innerHTML = D.boxes(mapped(B.build(env(st, H.facts(st)))), ui);
     ReportQnMotion.play(host, before);
     syncReading();
     hot(ui.hot);
@@ -89,6 +92,42 @@ window.ReportWc = (function () {
     // html-safe: ReportWcComment.readingHtml esc()s every sentence
     read.innerHTML = ReportWcComment.readingHtml(H.rows(st, H.facts(st)), H.box() ? H.box().value : '');
     ReportWcComment.syncNotes();
+    pick(ui.pick);
+  }
+
+  /* Which box each sentence of the comment sits in, read from the boxes as
+     they are built (closed boxes too). */
+  function mapped(model) {
+    var map = {};
+    (model || []).forEach(function (/** @type {any} */ b) {
+      var take = function (/** @type {any} */ l) {
+        if (l && l.rk) map[l.rk] = b.key;
+      };
+      (b.top || []).forEach(take);
+      (b.facts || []).forEach(function (/** @type {any} */ f) {
+        (f.lines || []).forEach(take);
+      });
+    });
+    ui.rkBox = map;
+    return model;
+  }
+
+  /* The box the teacher clicks in, or opens, lights its sentences in the
+     comment in the box's own colour, so the comment can be followed from it.
+     Closing that box, or clicking outside the boxes, lets go. */
+  function pick(key) {
+    ui.pick = key || '';
+    var tint = '';
+    document.querySelectorAll('.wc-box').forEach(function (b) {
+      var on = !!ui.pick && b.getAttribute('data-bk') === ui.pick;
+      b.classList.toggle('picked', on);
+      if (on) tint = /** @type {HTMLElement} */ (b).style.getPropertyValue('--tint');
+    });
+    var read = document.getElementById('tq-read');
+    if (read) read.style.setProperty('--wc-pick', tint || 'transparent');
+    document.querySelectorAll('#tq-read .wc-sent').forEach(function (s) {
+      s.classList.toggle('picked', !!ui.pick && ui.rkBox[s.getAttribute('data-rk') || ''] === ui.pick);
+    });
   }
 
   /* A sentence in the comment and its line in its box light together. */
@@ -99,6 +138,23 @@ window.ReportWc = (function () {
     });
     document.querySelectorAll('.wc-box').forEach(function (b) {
       b.classList.toggle('lit', !!rk && !!b.querySelector('.wc-line.hot'));
+    });
+  }
+  /* Clicking or tabbing into a box picks it; a click in the left column
+     outside every box lets go. */
+  function wirePick() {
+    document.addEventListener('focusin', function (e) {
+      var t = /** @type {any} */ (e.target);
+      var box = t && t.closest && t.closest('.wc-box');
+      if (box && box.getAttribute('data-bk') !== ui.pick && !t.closest('.wc-head')) pick(box.getAttribute('data-bk'));
+    });
+    document.addEventListener('click', function (e) {
+      var t = /** @type {any} */ (e.target);
+      if (!t || !t.closest || !t.closest('.wc-left')) return;
+      var inBox = t.closest('.wc-box');
+      if (!inBox && ui.pick) pick('');
+      else if (inBox && !t.closest('.wc-head') && inBox.getAttribute('data-bk') !== ui.pick)
+        pick(inBox.getAttribute('data-bk'));
     });
   }
   function wireHot() {
@@ -150,6 +206,7 @@ window.ReportWc = (function () {
       _wired = true;
       A.wireDrag();
       wireHot();
+      wirePick();
     }
     if (H.current() && !ui.typing) ReportWcComment.syncNotes();
   }
@@ -159,6 +216,8 @@ window.ReportWc = (function () {
   function toggle(key) {
     ui.open[key] = !ui.open[key];
     ui.ways = null;
+    if (ui.open[key]) ui.pick = key;
+    else if (ui.pick === key) ui.pick = '';
     redraw();
     var b = document.getElementById('wc-head-' + key);
     if (b) b.focus();
@@ -195,6 +254,7 @@ window.ReportWc = (function () {
       wcWriteCancel: () => write(''),
       wcWriteAdd: () => A.writeAdd(),
       wcBrowse: () => H.openBrowse(ds.part),
+      wcBank: () => A.bank(),
       wcVary: () => ReportWcComment.vary(),
       wcType: () => A.startTyping(),
     };
@@ -217,6 +277,7 @@ window.ReportWc = (function () {
     ui.write = null;
     ui.q = '';
     ui.typing = false;
+    ui.caret = null;
     ui.snap = null;
     ui.seeMissing = false;
     ui.piecesAll = false;

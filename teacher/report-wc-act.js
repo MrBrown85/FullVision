@@ -256,6 +256,7 @@ window.ReportWcAct = (function () {
     var el = H.box();
     var st = H.current();
     if (!el || !st || ui.typing) return;
+    var at = clickedAt();
     ui.typing = true;
     ui.snap = H.snapshot(st);
     var read = document.getElementById('tq-read');
@@ -263,7 +264,8 @@ window.ReportWcAct = (function () {
     el.hidden = false;
     H.fitBox();
     el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    var c = at == null ? el.value.length : Math.min(at, el.value.length);
+    el.setSelectionRange(c, c);
   }
   /* The text typed is read back into sentences (a sentence left as it was
      keeps its fact, one reworded stays in its box as Yours, a new one goes
@@ -273,6 +275,7 @@ window.ReportWcAct = (function () {
     var st = H.current();
     if (!ui.typing || !el) return;
     ui.typing = false;
+    ui.caret = el.selectionStart;
     el.hidden = true;
     var read = document.getElementById('tq-read');
     if (read) read.hidden = false;
@@ -290,8 +293,49 @@ window.ReportWcAct = (function () {
     endTyping();
   }
 
+  /* ── Comment Bank, at a place in the comment ─────────────── */
+
+  /* Where a click fell in the comment as it reads, in characters, so the
+     box to type in opens with its cursor there. */
+  function clickedAt() {
+    var read = document.getElementById('tq-read');
+    var sel = window.getSelection && window.getSelection();
+    if (!read || read.hidden || !sel || !sel.rangeCount || !read.contains(sel.anchorNode)) return null;
+    var r = document.createRange();
+    r.setStart(read, 0);
+    r.setEnd(/** @type {Node} */ (sel.anchorNode), sel.anchorOffset);
+    return r.toString().length;
+  }
+  /* The gap a place in the text falls at: before the sentence it starts,
+     else after the sentence it is in. */
+  function gapOf(rows, at) {
+    var pos = 0;
+    for (var i = 0; i < rows.length; i++) {
+      if (at <= pos) return i;
+      pos += String(rows[i].text || '').length + 1;
+      if (at < pos) return i + 1;
+    }
+    return rows.length;
+  }
+  /* Comment Bank: the sheet of sentences, each put in where the teacher
+     last clicked in the comment, else at its end; each next one after it.
+     It opens on the box the teacher is in, else on the sentence before. */
+  function bank() {
+    var st = H.current();
+    if (!st) return;
+    if (ui.typing) endTyping();
+    var rows = H.rows(st, H.facts(st));
+    var gap = ui.caret == null ? rows.length : gapOf(rows, ui.caret);
+    ui.caret = null;
+    var near = rows[gap - 1] || rows[gap];
+    var part = B.browsePart(ui.pick) || (near ? B.browsePart(P.boxOf(near)) : '');
+    H.openBrowse(part || 'grade', gap);
+  }
+
   return {
     configure: configure,
+    bank: bank,
+    gapOf: gapOf,
     canSay: canSay,
     say: say,
     sayClass: sayClass,

@@ -244,20 +244,14 @@ window.ReportQuestionnaire = (function () {
     el.style.height = el.scrollHeight + 'px';
   }
 
-  /* "1 character", "2 characters"; `count` when n is the number written
-     out ("1,000"). */
-  function _plural(n, one, many, count) {
-    return n + ' ' + (Number(count == null ? n : count) === 1 ? one : many);
+  /* "1 skill", "2 skills". */
+  function _plural(n, one, many) {
+    return n + ' ' + (Number(n) === 1 ? one : many);
   }
+  /* "1 character", "1,032 characters". */
   function _countText(text) {
     var n = String(text || '').length;
-    var lim = _limit();
-    // Over the limit: "1,032 of 1,000 characters" (the States mockup).
-    if (lim && n > lim) return _thousands(n) + ' of ' + _plural(_thousands(lim), 'character', 'characters', lim);
-    return _plural(n, 'character', 'characters');
-  }
-  function _thousands(n) {
-    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (n === 1 ? ' character' : ' characters');
   }
   /* The sentences of a comment over 20 words, a quoted title counting as
      one (the realiser's rule; a teacher's edit can pass it). */
@@ -266,97 +260,33 @@ window.ReportQuestionnaire = (function () {
     if (text !== _long.text) _long = { text: text, list: sentencesOf(text).filter(CommentRealiser.tooLong) };
     return _long.list.slice();
   }
-  /* After the count: that it is past the class's limit or a sentence is
-     over 20 words (the count turns orange), else the class's limit. Only
-     information: nothing is blocked (Colin, 2026-11-02: "i don't care about
-     comment maximum length for myedbc - don't restrict users"). */
+  /* After the count: that a sentence is over 20 words (the count turns
+     orange). Only information: nothing is blocked, and there is no length
+     limit (Colin, 2026-11-02: "don't restrict users"; 2026-11-26: the
+     character limit box is gone). */
   function _countTail(text) {
-    if (_overLimit(text)) return ' · over the limit';
     var n = longSentences(text).length;
     if (n === 1) return ' · one sentence is over 20 words';
     if (n > 1) return ' · ' + CommentBank.numberWords(n) + ' sentences are over 20 words';
-    return _limitText();
+    return '';
   }
   function _countFlag(text) {
-    return _overLimit(text) || longSentences(text).length > 0;
+    return longSentences(text).length > 0;
   }
   function _syncCount() {
     var el = _box();
     var out = document.getElementById('tq-count');
     if (el && out) out.textContent = _countText(el.value);
-    var tail = document.getElementById('tq-limit-text');
+    var tail = document.getElementById('tq-count-tail');
     if (el && tail) tail.textContent = _countTail(el.value);
-    var btn = document.getElementById('tq-count-btn');
+    var btn = document.getElementById('tq-count-pill');
     if (el && btn) btn.classList.toggle('over', _countFlag(el.value));
     syncApprove();
   }
 
-  /* ── The character limit (plan PR 8) ─────────────────────── */
-
-  /* The class's character limit, or null for no limit. */
-  function _limit() {
-    return CommentBank.classSettings(_activeCourse).charLimit;
-  }
-  function _overLimit(text) {
-    var lim = _limit();
-    return !!lim && String(text || '').length > lim;
-  }
-  /* "· no limit" or "· limit 1000" after the count. */
-  function _limitText() {
-    var lim = _limit();
-    return lim ? ' · limit ' + lim : ' · no limit';
-  }
-  var _limitOpen = false;
-  /* The count as a button that opens the limit, and the limit's popover. */
+  /* The count under the comment. */
   function _countHtml(cid, text) {
-    var course = _courseName(cid);
-    var pop = _limitOpen
-      ? `<div class="qn-limit" role="dialog" aria-label="Character limit" id="tq-limit">
-          <label class="qn-limit-field">Character limit for ${esc(course)}<input type="text" inputmode="numeric" autocomplete="off" placeholder="No limit" aria-label="Character limit" aria-describedby="tq-limit-msg" data-tq-limit="1" id="tq-limit-input" title="Leave it empty for no limit." value="${_limit() || ''}"></label>
-          <span class="qn-limit-msg" id="tq-limit-msg" role="alert" hidden></span>
-          <span class="qn-limit-hint">The longest comment your school’s report card allows. The count turns orange past it; Approve still works.</span>
-        </div>`
-      : '';
-    return `<span class="qn-count-wrap"><button type="button" class="qn-count-btn${_countFlag(text) ? ' over' : ''}" id="tq-count-btn" data-action="tqLine" data-do="limitMenu" aria-haspopup="dialog" aria-expanded="${_limitOpen}" title="The comment’s length. Click to set the longest comment ${esc(course)} allows."><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-limit-text">${esc(_countTail(text))}</span> ▾</button>${pop}</span>`;
-  }
-  /* A limit typed: saved for the class when it is a whole number from 100
-     to 5000, or empty for no limit (CommentBank.parseLimit). Anything else
-     is not saved: the limit stays as it was, the box stays open and says
-     what it takes. Returns whether it was saved. */
-  var LIMIT_MSG =
-    'Enter a whole number from ' +
-    CommentBank.LIMIT_MIN +
-    ' to ' +
-    CommentBank.LIMIT_MAX +
-    ', or leave it empty for no limit.';
-  var _limitCancelled = false;
-  function _setLimit(value) {
-    // The limit as saved, unchanged (one saved by older code below 100
-    // too): kept as is. Only a new entry is held to 100 to 5000.
-    if (String(value == null ? '' : value).trim() === String(_limit() || '')) {
-      _limitMsg(false);
-      _syncCount();
-      return true;
-    }
-    var p = CommentBank.parseLimit(value);
-    _limitMsg(!p.ok);
-    if (!p.ok) return false;
-    _saveSettings({ charLimit: p.limit });
-    _syncCount();
-    return true;
-  }
-  /* The limit's message under its box, shown or hidden. */
-  function _limitMsg(on) {
-    var msg = document.getElementById('tq-limit-msg');
-    var input = document.getElementById('tq-limit-input');
-    if (msg) {
-      msg.textContent = on ? LIMIT_MSG : '';
-      msg.hidden = !on;
-    }
-    if (input) {
-      if (on) input.setAttribute('aria-invalid', 'true');
-      else input.removeAttribute('aria-invalid');
-    }
+    return `<span class="qn-count-wrap"><span class="qn-count${_countFlag(text) ? ' over' : ''}" id="tq-count-pill"><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-count-tail">${esc(_countTail(text))}</span></span></span>`;
   }
 
   /* Copy: the comment as plain text, ready to paste (⌘⇧C too). */
@@ -4957,7 +4887,7 @@ window.ReportQuestionnaire = (function () {
     }).join('');
     return `<div class="qn-browse" role="document">
       <div class="qn-browse-top">
-        <span class="qn-browse-title" id="tq-browse-title">Sentences for ${esc(first)}</span>
+        <span class="qn-browse-title"><span id="tq-browse-title">Comment Bank for ${esc(first)}</span>${b.gap == null ? '' : `<span class="qn-browse-goes">${esc(ReportWcComment.goesText(_rowsFor(student, f), b.gap))}</span>`}</span>
         <input type="search" class="qn-browse-search" id="tq-browse-search" placeholder="Search sentences" aria-label="Search sentences" value="${esc(b.q)}" title="Finds sentences with these words in this part.">
         <button type="button" class="btn btn-primary qn-browse-done" data-action="tqSentences" data-do="close" title="Closes Browse Sentences.">Done</button>
       </div>
@@ -5036,11 +4966,7 @@ window.ReportQuestionnaire = (function () {
     if (!o) return;
     o.remove();
     if (quiet) return;
-    if (gap != null) _focusGap(gap);
-    else _focusSel('.wc-box [data-do="wcBrowse"]');
-  }
-  function _focusGap(g) {
-    _focusSel('#tq-sentences .qn-gap[data-gap="' + g + '"] .qn-gap-add');
+    _focusSel(gap != null ? '#tq-comment-bank' : '.wc-box [data-do="wcBrowse"]');
   }
   /* The sheet redrawn for a new part, filter or comment. */
   function _syncBrowse(focusId) {
@@ -5648,7 +5574,6 @@ window.ReportQuestionnaire = (function () {
     if (!st || (where !== 'gap' && !window.PersonalBank)) return;
     tqSaveCurrentIfNeeded();
     _supportMenu = false;
-    _limitOpen = false;
     if (where === 'gap') {
       _own = {
         where: 'gap',
@@ -5700,7 +5625,7 @@ window.ReportQuestionnaire = (function () {
     if (!was) return;
     if (was.where === 'gap') {
       _syncRequired();
-      _focusGap(was.gap);
+      _focusGap();
       return;
     }
     if (was.where === 'row') {
@@ -6111,17 +6036,9 @@ window.ReportQuestionnaire = (function () {
     // The lines as the comment had them, before a save changes one.
     var before = /^save|^pick/.test(what) ? _bankContext(_activeCourse, st, _facts(st, true)) : null;
     switch (what) {
-      case 'limitMenu':
-        _limitOpen = !_limitOpen;
-        _limitCancelled = false;
-        _supportMenu = false;
-        _langMenu = false;
-        _redrawLines(_limitOpen ? 'tq-limit-input' : 'tq-count-btn');
-        return;
       case 'supportMenu':
         _supportMenu = !_supportMenu;
         _langMenu = false;
-        _limitOpen = false;
         if (_lineEdit === 'own') _lineEdit = null;
         _redrawLines(_supportMenu ? null : 'tq-support-btn');
         _focusMenu();
@@ -6144,7 +6061,6 @@ window.ReportQuestionnaire = (function () {
       case 'langMenu':
         _langMenu = !_langMenu;
         _supportMenu = false;
-        _limitOpen = false;
         if (_lineEdit === 'ownLang') _lineEdit = null;
         _redrawLines(_langMenu ? null : 'tq-lang-btn');
         _focusSel('#tq-lang-menu .qn-menu-item.on, #tq-lang-menu .qn-menu-item, #tq-lang-menu input');
@@ -6287,15 +6203,9 @@ window.ReportQuestionnaire = (function () {
     return true;
   }
 
-  /* A checkbox in the support list, or the character limit, changed. */
+  /* A checkbox in the support list changed. */
   function tqLineChange(el) {
     if (!el || !el.dataset) return;
-    if (el.dataset.tqLimit) {
-      // The box closing on Escape blurs it: that change is not a save.
-      if (_limitCancelled) return;
-      _setLimit(el.value);
-      return;
-    }
     var langId = el.dataset.tqLang;
     if (langId) {
       var stu = _current();
@@ -6345,9 +6255,9 @@ window.ReportQuestionnaire = (function () {
 
   /* Whether a popover or a line's box is open. */
   function linesOpen() {
-    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_own || ReportWc.ways() != null;
+    return _supportMenu || _langMenu || !!_lineEdit || !!_own || ReportWc.ways() != null;
   }
-  /* A click outside an open menu or the limit closes it; a box being
+  /* A click outside an open menu closes it; a box being
      edited stays until Cancel, Save for Class or Escape. */
   function clickOutside(target) {
     if (!target || !target.closest) return;
@@ -6362,17 +6272,9 @@ window.ReportQuestionnaire = (function () {
       if (_lineEdit === 'ownLang') _lineEdit = null;
       redraw = true;
     }
-    if (_limitOpen && !target.closest('#tq-limit, #tq-count-btn')) {
-      // An entry that is not a limit keeps the box open with its message.
-      var input = document.getElementById('tq-limit-input');
-      if (!input || _setLimit(input.value)) {
-        _limitOpen = false;
-        redraw = true;
-      }
-    }
     if (redraw) _redrawLines(null);
   }
-  /* Escape: the open menu, the limit or the box being edited closes. */
+  /* Escape: the open menu or the box being edited closes. */
   function closeLines() {
     if (!linesOpen()) return false;
     if (_own) {
@@ -6380,40 +6282,25 @@ window.ReportQuestionnaire = (function () {
       return true;
     }
     if (ReportWc.closeWays()) return true;
-    // Escape in the limit cancels: the limit stays as saved, and the blur
-    // as the box closes saves nothing (_limitCancelled).
-    var limit = _limitOpen;
-    if (limit) _limitCancelled = true;
     var menu = _supportMenu || _langMenu;
     var langWas = _langMenu;
     var was = _lineEdit;
     _supportMenu = false;
     _langMenu = false;
-    _limitOpen = false;
     _lineEdit = null;
     _redrawLines(null);
     _focusSel(
-      limit
-        ? '#tq-count-btn'
-        : menu
-          ? langWas
-            ? '#tq-lang-btn'
-            : '#tq-support-btn'
-          : was === 'closing'
-            ? '#tq-closing-btn'
-            : was === 'late'
-              ? '#tq-late-btn'
-              : null,
+      menu
+        ? langWas
+          ? '#tq-lang-btn'
+          : '#tq-support-btn'
+        : was === 'closing'
+          ? '#tq-closing-btn'
+          : was === 'late'
+            ? '#tq-late-btn'
+            : null,
     );
     return true;
-  }
-  /* Return in the limit: saved, and only the limit closes; an entry that
-     is not a limit keeps it open with its message. */
-  function closeLimit() {
-    var input = document.getElementById('tq-limit-input');
-    if (input && !_setLimit(input.value)) return;
-    _limitOpen = false;
-    _redrawLines('tq-count-btn');
   }
   /* Return in a line's box saves it. */
   function _saveFromKey(which) {
@@ -6834,7 +6721,6 @@ window.ReportQuestionnaire = (function () {
     _iePending = null;
     _supportMenu = false;
     _langMenu = false;
-    _limitOpen = false;
     if (_lineEdit === 'own' || _lineEdit === 'ownLang') _lineEdit = null;
     if (_browse) _closeBrowse(true);
   }
@@ -6936,17 +6822,11 @@ window.ReportQuestionnaire = (function () {
       }
       return;
     }
-    // Return in a class line's box saves it; in the limit, closes it.
+    // Return in a class line's box saves it.
     var lineBox = (e.target && e.target.dataset && e.target.dataset.tqLineInput) || '';
-    if (
-      e.key === 'Enter' &&
-      !e.metaKey &&
-      !e.ctrlKey &&
-      (lineBox || (e.target && e.target.dataset && e.target.dataset.tqLimit))
-    ) {
+    if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && lineBox) {
       e.preventDefault();
-      if (lineBox) _saveFromKey(lineBox);
-      else closeLimit();
+      _saveFromKey(lineBox);
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
