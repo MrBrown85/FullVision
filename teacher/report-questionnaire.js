@@ -6131,7 +6131,7 @@ window.ReportQuestionnaire = (function () {
         _langMenu = false;
         _limitOpen = false;
         if (_lineEdit === 'own') _lineEdit = null;
-        _redrawLines(_supportMenu ? null : 'tq-row-support');
+        _redrawLines(_supportMenu ? null : 'tq-support-btn');
         _focusMenu();
         return;
       case 'pickSupport': {
@@ -6142,7 +6142,7 @@ window.ReportQuestionnaire = (function () {
         _supportMenu = false;
         _afterLine(before, 'supportLine', false);
         _redrawLines(null);
-        _focusSel('#tq-row-support .qn-line-menu');
+        _focusSel('#tq-support-btn');
         return;
       }
       case 'writeOwn':
@@ -6154,7 +6154,7 @@ window.ReportQuestionnaire = (function () {
         _supportMenu = false;
         _limitOpen = false;
         if (_lineEdit === 'ownLang') _lineEdit = null;
-        _redrawLines(_langMenu ? null : 'tq-row-languageGoals');
+        _redrawLines(_langMenu ? null : 'tq-lang-btn');
         _focusSel('#tq-lang-menu .qn-menu-item.on, #tq-lang-menu .qn-menu-item, #tq-lang-menu input');
         return;
       case 'pickLang': {
@@ -6166,7 +6166,7 @@ window.ReportQuestionnaire = (function () {
         _langMenu = false;
         _afterLine(before, 'languageGoalLine', false);
         _redrawLines(null);
-        _focusSel('#tq-row-languageGoals .qn-line-menu');
+        _focusSel('#tq-lang-btn');
         return;
       }
       case 'writeOwnLang':
@@ -6212,7 +6212,7 @@ window.ReportQuestionnaire = (function () {
         _lineEdit = null;
         _afterLine(before, 'closingLine', true);
         _redrawLines(null);
-        _focusSel('#tq-row-closing button');
+        _focusSel('#tq-closing-btn');
         return;
       case 'editLate':
         _lineEdit = 'late';
@@ -6227,7 +6227,7 @@ window.ReportQuestionnaire = (function () {
         _lineEdit = null;
         _afterLine(before, 'lateLine', true);
         _redrawLines(null);
-        _focusSel('#tq-row-missing button');
+        _focusSel('#tq-late-btn');
         return;
       }
       case 'cancel': {
@@ -6240,7 +6240,7 @@ window.ReportQuestionnaire = (function () {
             : was === 'ownLang'
               ? '#tq-lang-menu .qn-menu-add'
               : was === 'closing'
-                ? '#tq-row-closing button'
+                ? '#tq-closing-btn'
                 : null,
         );
         return;
@@ -6360,12 +6360,12 @@ window.ReportQuestionnaire = (function () {
   function clickOutside(target) {
     if (!target || !target.closest) return;
     var redraw = false;
-    if (_supportMenu && !target.closest('#tq-support-menu, #tq-row-support [data-do="supportMenu"]')) {
+    if (_supportMenu && !target.closest('#tq-support-menu, #tq-support-btn')) {
       _supportMenu = false;
       if (_lineEdit === 'own') _lineEdit = null;
       redraw = true;
     }
-    if (_langMenu && !target.closest('#tq-lang-menu, #tq-row-languageGoals [data-do="langMenu"]')) {
+    if (_langMenu && !target.closest('#tq-lang-menu, #tq-lang-btn')) {
       _langMenu = false;
       if (_lineEdit === 'ownLang') _lineEdit = null;
       redraw = true;
@@ -6405,12 +6405,12 @@ window.ReportQuestionnaire = (function () {
         ? '#tq-count-btn'
         : menu
           ? langWas
-            ? '#tq-row-languageGoals [data-do="langMenu"]'
-            : '#tq-row-support [data-do="supportMenu"]'
+            ? '#tq-lang-btn'
+            : '#tq-support-btn'
           : was === 'closing'
-            ? '#tq-row-closing button'
+            ? '#tq-closing-btn'
             : was === 'late'
-              ? '#tq-row-missing button'
+              ? '#tq-late-btn'
               : null,
     );
     return true;

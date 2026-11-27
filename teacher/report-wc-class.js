@@ -50,7 +50,7 @@ window.ReportWcClass = (function () {
             first +
             '.'
           : 'Pick the support line for ' + first + ', or tick the lines you will do in ' + course + '.';
-    var menuBtn = `<button type="button" class="wc-btn${open ? ' on' : ''}" data-action="tqLine" data-do="supportMenu" aria-haspopup="menu" aria-expanded="${open}" title="${esc(tip)}">${label}</button>`;
+    var menuBtn = `<button type="button" id="tq-support-btn" class="wc-btn${open ? ' on' : ''}" data-action="tqLine" data-do="supportMenu" aria-haspopup="menu" aria-expanded="${open}" title="${esc(tip)}">${label}</button>`;
     return `<span class="wc-fact-main"><span class="wc-fact-name">Support Line</span>${choice ? `<span class="wc-fact-quote">${esc(choice.line.text)}</span>` : ''}</span>${choice && !said ? say('support') : ''}${menuBtn}${menu}`;
   }
 
@@ -59,7 +59,12 @@ window.ReportWcClass = (function () {
     if (rq.lineEdit() === 'closing')
       return `<span class="wc-fact-main"><span class="wc-fact-name">Closing Sentence</span></span>${editBox(rq, 'closing', 'Closing sentence', closing, 'Used exactly as you type it, at the end of each new comment.', 'saveClosing')}${rq.sharedStepHtml(rq.cid())}`;
     var main = `<span class="wc-fact-main"><span class="wc-fact-name">Closing Sentence</span>${closing ? `<span class="wc-fact-quote">${esc(closing)}</span>` : ''}</span>`;
-    var edit = btn(closing ? 'Change' : '+ Closing Sentence for the Class', 'tqLine', { do: 'editClosing' });
+    var edit = btn(
+      closing ? 'Change' : '+ Closing Sentence for the Class',
+      'tqLine',
+      { do: 'editClosing' },
+      { attr: ' id="tq-closing-btn"' },
+    );
     return main + (closing && !said ? say('closing') : '') + edit;
   }
 
@@ -68,7 +73,12 @@ window.ReportWcClass = (function () {
     if (rq.lineEdit() === 'late')
       return `<span class="wc-fact-main"><span class="wc-fact-name">Late Work Line</span></span>${editBox(rq, 'late', 'Late work line', late, 'Used exactly as you type it, after the missing-work sentence.', 'saveLate')}`;
     var main = `<span class="wc-fact-main"><span class="wc-fact-name">Late Work Line</span>${late ? `<span class="wc-fact-quote">${esc(late)}</span>` : ''}</span>`;
-    var edit = btn(late ? 'Change' : '+ Late Work Line for the Class', 'tqLine', { do: 'editLate' });
+    var edit = btn(
+      late ? 'Change' : '+ Late Work Line for the Class',
+      'tqLine',
+      { do: 'editLate' },
+      { attr: ' id="tq-late-btn"' },
+    );
     return main + (late && hasMissing && !said ? say('late') : '') + edit;
   }
 
@@ -84,7 +94,7 @@ window.ReportWcClass = (function () {
       : any
         ? 'No language goal picked for ' + first + '. The comment leaves this sentence out.'
         : 'Tick the language goal lines you use in the class. Until you do, the comment leaves this sentence out.';
-    var b = `<button type="button" class="wc-btn${open ? ' on' : ''}" data-action="tqLine" data-do="langMenu" aria-haspopup="menu" aria-expanded="${open}" title="${esc(why)}">${choice ? 'Language Goal ▾' : '+ Language Goal ▾'}</button>`;
+    var b = `<button type="button" id="tq-lang-btn" class="wc-btn${open ? ' on' : ''}" data-action="tqLine" data-do="langMenu" aria-haspopup="menu" aria-expanded="${open}" title="${esc(why)}">${choice ? 'Language Goal ▾' : '+ Language Goal ▾'}</button>`;
     return `<span class="wc-fact-main"><span class="wc-fact-name">Language Goals</span>${text ? `<span class="wc-fact-quote">${esc(text)}</span>` : ''}</span>${choice && !said ? say('lang') : ''}${b}${menu}`;
   }
 

@@ -333,6 +333,10 @@
 .wc-fact .qn-att-note {
   flex: 1 1 100%;
 }
+.wc-fact .qn-menu.up {
+  top: auto;
+  bottom: 100%;
+}
 .wc-fact .qn-menu {
   top: 100%;
   right: 0;

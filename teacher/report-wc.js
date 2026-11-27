@@ -76,7 +76,10 @@ window.ReportWc = (function () {
     ReportQnMotion.play(host, before);
     syncReading();
     hot(ui.hot);
+    var habit =
+      active && active.classList && active.classList.contains('qn-hs') ? active.getAttribute('data-habit') : null;
     var g = grip != null ? host.querySelector('.wc-grip[data-wc-grip="' + grip + '"]') : null;
+    if (!g && habit) g = host.querySelector('.qn-hs[data-habit="' + habit + '"]');
     if (g) /** @type {HTMLElement} */ (g).focus();
   }
   function syncReading() {
