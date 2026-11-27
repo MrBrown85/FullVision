@@ -23,6 +23,7 @@
   var G = /** @type {any} */ (window).GradingSetupCopy;
   var M = CmPtsModel;
 
+  // html-safe: fixed markup and numbers from the scale
   // A picture of a class's markers: the four bands, a tick for every step.
   function miniHtml(scale) {
     var at = M.starts(scale);

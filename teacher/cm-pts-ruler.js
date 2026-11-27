@@ -121,6 +121,7 @@ window.CmPtsRuler = (function () {
     );
   }
 
+  // html-safe: fixed markup and numbers
   // A dotted line from a ghost to its live marker.
   function tethersHtml(plan) {
     return plan.tethers
@@ -137,6 +138,7 @@ window.CmPtsRuler = (function () {
       })
       .join('');
   }
+  // html-safe: fixed markup, numbers and esc-escaped keys and titles
   // A dashed pill, or a small ring, where a step was saved.
   function stepGhostsHtml(plan) {
     return plan.ghosts
@@ -163,6 +165,7 @@ window.CmPtsRuler = (function () {
       })
       .join('');
   }
+  // html-safe: fixed markup, numbers and esc-escaped titles
   // A dashed line and tab where a band started.
   function edgeGhostsHtml(plan) {
     return plan.edges
@@ -187,6 +190,7 @@ window.CmPtsRuler = (function () {
       .join('');
   }
   /* The marks left behind where the saved scale had them: a dotted tether
+     // html-safe: its parts are fixed markup, numbers and esc-escaped keys and labels
      to the live marker, a dashed pill or ring, a dashed line and tab. */
   function ghostsHtml(plan) {
     return tethersHtml(plan) + stepGhostsHtml(plan) + edgeGhostsHtml(plan);

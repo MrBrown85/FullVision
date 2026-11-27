@@ -3,7 +3,7 @@ title: Set Up Grading
 section: Getting Started
 order: 4
 summary: Grading settings decide how scores become a grade, shown as a proficiency level, a letter grade and percent, or both.
-checked: 2026-11-05
+checked: 2026-11-27
 pages:
   - /dashboard
 demo: /dashboard
@@ -23,6 +23,12 @@ labels:
   - + Add Category
   - Save Categories
   - Copy Grading Setup…
+  - Points and Proficiency
+  - Edit
+  - Cancel
+  - Save
+  - BC Letter Bands
+  - Use in Other Classes…
   - Check With a Student
 next:
   - create-your-first-assessment
@@ -46,6 +52,8 @@ shots:
 
 ![The Grading tab with Proficiency selected and the Calculation Method list](img/set-up-grading.jpg 'The Grading tab.')
 
-**Check With a Student** shows one student's grade with the settings as they stand. It updates when a setting changes.
+**Check With a Student** shows one student's grade with the settings as they stand. It updates when a setting changes. While you edit **Points and Proficiency**, it shows the grade with your changes and what it was before.
 
-To use the settings of another class, choose **Copy Grading Setup…** at the top of the tab.
+**Points and Proficiency** sets what each score counts as in the course % and where each proficiency starts on a points score. It stays locked so a stray drag changes nothing: choose **Edit** to move a marker or a % tab, then **Save**, or **Cancel** to leave everything as it was. A dashed mark stays where a marker was saved; click it to put the marker back. If the change moves any student's course %, FullVision asks first and lists what moved. **BC Letter Bands** puts every marker on the BC letter scale.
+
+To use the settings of another class, choose **Copy Grading Setup…** at the top of the tab. To copy only the markers, choose **Use in Other Classes…** beside **Edit**.

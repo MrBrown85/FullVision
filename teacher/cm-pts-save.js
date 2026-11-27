@@ -34,6 +34,7 @@ window.CmPtsSave = (function () {
     if (typeof clearProfCache === 'function') clearProfCache();
   }
 
+  // html-safe: fixed markup; every step label, level and percent through esc
   // One row for each step that moved and a line for each band start.
   function askRows(c) {
     var rows = c.steps

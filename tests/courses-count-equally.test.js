@@ -183,7 +183,7 @@ describe('Copy Grading Setup', () => {
     expect(plan.changes).toEqual([
       {
         key: 'calcMethod',
-        label: 'Calculation method',
+        label: 'Calculation Method',
         lines: ['Mean → Mean, each course counted equally.'],
       },
     ]);

@@ -8,7 +8,6 @@
   /* Handed over by DashClassManager (configure). */
   var renderClassManager,
     state,
-    _addDocListener,
     _cmDefaultGradingSystem,
     _cmRenderCategoriesField,
     _cmRenderLevelOrderField,
@@ -19,7 +18,6 @@
   function configure(h) {
     if ('renderClassManager' in h) renderClassManager = h.renderClassManager;
     if ('state' in h) state = h.state;
-    if ('_addDocListener' in h) _addDocListener = h._addDocListener;
     if ('_cmDefaultGradingSystem' in h) _cmDefaultGradingSystem = h._cmDefaultGradingSystem;
     if ('_cmRenderCategoriesField' in h) _cmRenderCategoriesField = h._cmRenderCategoriesField;
     if ('_cmRenderLevelOrderField' in h) _cmRenderLevelOrderField = h._cmRenderLevelOrderField;
@@ -436,6 +434,7 @@
 
   /* One student's grade with the settings on the left, from the class's own
      scores: the year so far, as the gradebook shows it, even when Class
+     // html-safe: the card is built by _cmRenderCheckStudentNow, which escapes every name and number
      Management opens over a report (Colin, 2026-11-03). */
   function _cmRenderCheckStudent(cid, gs, method) {
     // Editing Points and Proficiency, the card reads the draft (or the preset pointed at).

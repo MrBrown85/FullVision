@@ -333,7 +333,6 @@ window.DashClassManager = (function () {
   });
   CmGrading.configure({
     state: state,
-    _addDocListener: _addDocListener,
     _cmDefaultGradingSystem: _cmDefaultGradingSystem,
     _cmRenderCategoriesField: _cmRenderCategoriesField,
     _cmRenderLevelOrderField: _cmRenderLevelOrderField,
