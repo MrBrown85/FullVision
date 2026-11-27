@@ -6742,8 +6742,8 @@ window.ReportQuestionnaire = (function () {
   function _fitDrawer() {
     var el = document.getElementById(DRAWER_ID);
     var out = document.getElementById('report-output');
-    var left = document.querySelector('.qn-left');
-    var right = document.querySelector('.qn-right');
+    var left = document.querySelector('.wc-left');
+    var right = document.querySelector('.wc-right');
     if (!el || !out || !left || !right || !el.getBoundingClientRect) return;
     var l = left.getBoundingClientRect();
     var r = right.getBoundingClientRect();
