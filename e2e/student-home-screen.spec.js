@@ -72,3 +72,42 @@ test('the header and the tabs stay on the edges while the page scrolls', async (
     expect(edges.tabs).toBe(edges.h);
   }
 });
+
+const IPHONE_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+async function asIphone(page, standalone) {
+  await page.addInitScript(
+    ([ua, st]) => {
+      Object.defineProperty(navigator, 'userAgent', { get: () => ua });
+      Object.defineProperty(navigator, 'standalone', { get: () => st });
+    },
+    [IPHONE_UA, standalone],
+  );
+}
+
+test('the Add to Home Screen card shows on the sign-in screen until Not Now', async ({ page }) => {
+  await asIphone(page, false);
+  await page.goto('/s/');
+  const card = page.locator('.sp-a2hs');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Add FullVision to Your Home Screen');
+  await page.getByRole('button', { name: 'Not Now' }).click();
+  await expect(card).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('main.sp-main-center')).toBeVisible();
+  await expect(card).toHaveCount(0);
+});
+
+test('the card shows once more after sign-in, with its one line', async ({ page }) => {
+  await asIphone(page, false);
+  await demo(page);
+  await expect(page.locator('.sp-a2hs')).toContainText('You\u2019ll sign in once in the app.');
+});
+
+test('opened from the Home Screen the card never shows', async ({ page }) => {
+  await asIphone(page, true);
+  await page.goto('/s/');
+  await expect(page.locator('main.sp-main-center')).toBeVisible();
+  await expect(page.locator('.sp-a2hs')).toHaveCount(0);
+});

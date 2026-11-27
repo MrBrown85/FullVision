@@ -171,6 +171,7 @@
     "s/quiz.js",
     "s/seen-watch.js",
     "s/keyboard-settle.js",
+    "s/home-screen-card.js",
     "s/send-note.js",
     "s/rubric-whole.js",
     "shared/website-ask.js",
