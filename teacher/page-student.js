@@ -563,13 +563,8 @@ window.PageStudent = (function () {
         };
       });
     };
-    // In curriculum order: each folder's competencies, then the ones in no folder.
-    var grouped = getGroupedSections(cid) || { groups: [], ungrouped: [] };
-    var list = [];
-    (grouped.groups || []).forEach(function (g) {
-      list = list.concat(items(g.sections || []));
-    });
-    list = list.concat(items(grouped.ungrouped || []));
+    // In the Competencies tab's own order, so a tie is broken the same way on both screens.
+    var list = items(ctx.sections);
     var split = [];
     if (mode !== 'letter')
       [4, 3, 2, 1].forEach(function (l) {
@@ -1187,7 +1182,8 @@ window.PageStudent = (function () {
       var v = getSectionProficiency(cid, studentId, sec.id);
       if (!(v > 0)) return;
       var entries = _compEntries(cid, sec);
-      scored.push({ sec: sec, v: v, n: entries.length, enough: _cpTrend(cid, entries).dir !== 'none' });
+      var enough = _cpTrend(cid, entries).dir !== 'none';
+      scored.push({ sec: sec, v: v, n: entries.length, enough: enough, text: formatLevel(cid, v) });
     });
     var parts = [
       '<span class="stu-cp-sum-item"><strong>' +

@@ -356,6 +356,34 @@ describe('Your Competencies at a glance', () => {
     expect(flat.lo).toEqual([]);
   });
 
+  it('never shows one level, as the class shows it, on both sides', () => {
+    // 3.04 and 2.96 both read "3.0": the lower one is not the next to work on.
+    const close = StudentComps.rank([comp('A', 3.04, 4), comp('B', 2.96, 4)]);
+    expect(names(close.hi)).toEqual(['A']);
+    expect(close.lo).toEqual([]);
+    // Six with enough scores, two each way: "3.0" is taken by the strongest, so only "2.0" is next.
+    const r = StudentComps.rank([3.6, 3.04, 3.0, 2.96, 2.95, 2.0].map((v, i) => comp('C' + i, v, 4)));
+    expect(names(r.hi)).toEqual(['C0', 'C1']);
+    expect(names(r.lo)).toEqual(['C5']);
+  });
+
+  it('gives the Competencies tab the first of each, whatever the ties', () => {
+    runInThisContext(readFileSync('teacher/page-student.js', 'utf-8'), { filename: 'teacher/page-student.js' });
+    const lists = [
+      [],
+      [comp('Once', 4, 1)],
+      [comp('Only', 3, 4)],
+      [comp('A', 3, 2), comp('B', 3, 2), comp('C', 3, 2)],
+      [comp('A', 3, 2), comp('B', 3, 5), comp('C', 2, 5), comp('D', 2, 5)],
+      [comp('A', 3.04, 4), comp('B', 2.96, 4)],
+      [3.5, 3.4, 3.1, 3.0, 2.9, 2.8, 2.5, 2.3, 2.1].map((v, i) => comp('C' + i, v, 4)),
+    ];
+    lists.forEach(list => {
+      const r = StudentComps.rank(list);
+      expect(PageStudent._helpers.cpPick(list)).toEqual({ hi: r.hi[0] || null, lo: r.lo[0] || null });
+    });
+  });
+
   it('draws the strongest and the next to work on by name, with the level as the class shows it', () => {
     const items = [3.5, 3.4, 3.1, 3.0, 2.9, 2.8, 2.5, 2.3, 2.1].map((v, i) => comp('Competency ' + i, v, 4));
     items[0] = comp('Data Recording', 3.5, 4, { dir: 'down', trend: '↓ Down from 4.0', pieces: 2, aids: ['a1', 'a2'] });

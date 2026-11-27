@@ -19,7 +19,9 @@ window.StudentComps = (function () {
   /* Strongest and Next to Work On, here and in the Competencies tab's line:
      only competencies with enough scores for Since the Start (x.enough), so
      neither rests on one score. Up to a third of them each way, three at
-     most; on a tie, the one with more scores. No level sits on both sides.
+     most; on a tie, the one with more scores, then the first in the list
+     (both screens pass the class's competencies in one order). No level, as
+     the class shows it, sits on both sides.
        items  [{ v: level, n: scores, enough, text: the level as shown }] */
   function rank(items) {
     var ok = (items || []).filter(function (x) {
@@ -33,12 +35,16 @@ window.StudentComps = (function () {
     var up = by(-1);
     var down = by(1);
     var hi = up.slice(0, 1);
-    var lo = down[0] && down[0] !== up[0] ? [down[0]] : [];
+    // A level that reads the same as the strongest (3.04 beside 2.96) is not the next to work on.
+    var same = function (a, b) {
+      return a.v === b.v || (a.text != null && a.text === b.text);
+    };
+    var lo = down[0] && !same(down[0], up[0]) ? [down[0]] : [];
     var max = Math.max(1, Math.min(3, Math.floor(ok.length / 3)));
     var fill = function (from, side, other) {
       from.forEach(function (x) {
         var apart = other.every(function (y) {
-          return y.v !== x.v && (y.text == null || y.text !== x.text);
+          return !same(x, y);
         });
         if (side.length < max && side.indexOf(x) < 0 && other.indexOf(x) < 0 && apart) side.push(x);
       });
