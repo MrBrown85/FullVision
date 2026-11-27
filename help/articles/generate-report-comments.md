@@ -3,11 +3,12 @@ title: Generate Report Comments
 section: Reporting
 order: 2
 summary: Generate Comment drafts a report comment from the Comment Bank's written sentences, filled in from the student's grades, work habits and Student Voice. No AI writes the text, and a sentence is used only when the student's record supports it.
-checked: 2026-11-05
+checked: 2026-11-26
 pages:
   - /reports
 demo: /reports
 labels:
+  - Generate Again
   - Write Comments
   - Work Habits
   - Generate Comment
@@ -38,7 +39,7 @@ shots:
       - click .qn-hs-stop[data-habit="part"][data-value="4"]
       - click .qn-hs-stop[data-habit="feedback"][data-value="2"]
       - click .qn-hs-stop[data-habit="devices"][data-value="3"]
-      - click role=button[name="Generate Comment"]
+      - click [id="tq-generate"]
       - wait 4500
     clip: 252,104,1176,700
 ---
@@ -46,8 +47,8 @@ shots:
 ## Steps
 
 1. In **Write Comments**, select a student and rate the six **Work Habits**. Habits left blank are left out of the draft.
-2. Choose **Generate Comment**. The draft replaces the text under **Teacher Comment**. It opens with the student's grade, then adds sentences on the best piece, strengths, habits, missing work and a next step when the record supports them.
-3. Choose **Generate Comment** again for another version. Sentences the teacher typed or edited stay as written, in the order set. **Undo** brings back the text that was replaced.
+2. Choose **Generate Comment**, or **Generate Again** when the student already has a comment. The draft replaces the text under **Teacher Comment**. It opens with the student's grade, then adds sentences on the best piece, strengths, habits, missing work and a next step when the record supports them.
+3. Choose **Generate Again** for another version. Sentences the teacher typed or edited stay as written, in the order set. **Undo** brings back the text that was replaced.
 
 ![The Teacher Comment with a generated draft](img/generate-report-comments.jpg 'A draft for Cece Adeyemi after all six work habits are rated.')
 
