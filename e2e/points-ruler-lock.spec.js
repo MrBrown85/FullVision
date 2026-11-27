@@ -148,12 +148,21 @@ test.describe('editing', () => {
     await slowed(page);
     await clickAction(page, 'cmPtsEdit');
     const bc = page.locator('[data-action="cmPointsScaleBc"]');
-    const before = await bc.boundingBox();
+    // Where the button is below the ruler: the page may scroll to it, but nothing may push it.
+    const below = () =>
+      page.evaluate(
+        () =>
+          document.querySelector('[data-action="cmPointsScaleBc"]').getBoundingClientRect().top -
+          document.querySelector('#cm-pts-ruler').getBoundingClientRect().top,
+      );
+    // The ruler's own 0.18 s padding transition on Edit is allowed to finish first.
+    await expect.poll(async () => (await below()) === (await page.waitForTimeout(250), await below())).toBe(true);
+    const before = await below();
     await bc.hover();
     // The preview needs a second row of markers: the room for it was there already.
     await expect.poll(() => left(page, '3')).toBe('80%');
     await expect(page.locator('#cm-pts-ruler')).toHaveClass(/is-two-rows/);
-    expect((await bc.boundingBox()).y).toBe(before.y);
+    expect(await below()).toBe(before);
     // Edit and the preset pressed at once, on a slow computer: the draft takes it, and Save is on.
     await bc.click();
     await expect(page.locator('#cm-pts-save')).toBeEnabled();
