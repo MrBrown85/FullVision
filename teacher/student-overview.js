@@ -5,8 +5,8 @@
    - Over the Year, in Your Grade Right Now: the grade as of each day work was
      assessed, to today, as calc.js's gradeOverYear reads it, and, when
      handing in the missing work would move it, where it would go.
-   - Your Competencies: each competency as a tile in its folder, coloured
-     by its level, with how the levels split above them.
+   - Your Competencies (drawn by teacher/student-comps.js): how the levels
+     split, then the strongest and the next to work on by name.
    Pointing at a day lights the competencies its work counted toward;
    pointing at a competency lights the days it was assessed. A tap on a day
    shows that work below; a tap on a competency shows only its work.
@@ -332,107 +332,6 @@ window.StudentOverview = (function () {
     );
   }
 
-  /* ── Your Competencies ────────────────────────────────────── */
-  function compsHtml(m) {
-    var c = m.comps;
-    if (!c.total) return '';
-    var html =
-      '<section class="stu-gp-card stu-gp-comps" aria-label="Your competencies"><div class="stu-gp-head">' +
-      '<h3 class="stu-ov-h3">Your Competencies</h3><span class="stu-gp-sub">' +
-      c.scored +
-      ' of ' +
-      c.total +
-      ' assessed</span></div>';
-    // How the levels split: a Proficiency or Both class names its levels (a Letter class does not).
-    if (c.counts.length) {
-      html +=
-        '<div class="stu-gp-seg" role="img" aria-label="' +
-        esc(
-          c.counts
-            .map(function (k) {
-              return k.n + ' ' + k.name;
-            })
-            .join(', '),
-        ) +
-        '">';
-      c.counts.forEach(function (k) {
-        html +=
-          '<span class="stu-gp-seg-part stu-gp-lv-' +
-          k.lv +
-          '" style="flex:' +
-          k.n +
-          ' 1 0" data-lv="' +
-          k.lv +
-          '" title="' +
-          esc(k.n + ' ' + k.name) +
-          '">' +
-          k.n +
-          '</span>';
-      });
-      html += '</div><div class="stu-gp-key" aria-hidden="true">';
-      c.counts.forEach(function (k) {
-        html += '<span data-lv="' + k.lv + '"><i class="stu-gp-lv-' + k.lv + '"></i>' + esc(k.name) + '</span>';
-      });
-      html += '</div>';
-    }
-    html += '<div class="stu-gp-folders">';
-    c.groups.forEach(function (g) {
-      html +=
-        '<div class="stu-gp-folder">' +
-        (g.name ? '<span class="stu-gp-folder-name">' + esc(g.name) + '</span>' : '') +
-        '<span class="stu-gp-tiles">';
-      g.items.forEach(function (it, i) {
-        var on = m.compFilter === it.id;
-        var tip = ['<strong>' + esc(it.name) + '</strong>'];
-        tip.push(
-          '<span class="stu-gp-tip-grade">' +
-            esc(it.v > 0 ? it.text + (it.word ? ' ' + it.word : '') : 'Not assessed yet') +
-            '</span>',
-        );
-        if (it.trend) tip.push('<span>' + esc(it.trend) + '</span>');
-        if (it.n)
-          tip.push(
-            '<span class="stu-gp-tip-hint">' +
-              (on ? 'Show all work' : 'Show its ' + it.n + (it.n === 1 ? ' piece' : ' pieces')) +
-              '</span>',
-          );
-        html +=
-          '<button type="button" class="stu-gp-tile stu-gp-lv-' +
-          it.lv +
-          (i > 2 ? ' tip-end' : '') +
-          '" data-action="stuGpComp" data-sec="' +
-          esc(it.id) +
-          '" data-lv="' +
-          it.lv +
-          '" data-aids="' +
-          esc(it.aids.join(' ')) +
-          '" aria-pressed="' +
-          on +
-          '" aria-label="' +
-          esc(
-            it.name +
-              ': ' +
-              (it.v > 0 ? it.text + (it.word ? ' ' + it.word : '') : 'not assessed yet') +
-              (it.trend ? ', ' + it.trend : ''),
-          ) +
-          '"' +
-          (it.n ? '' : ' disabled') +
-          '><span class="stu-gp-code">' +
-          esc(it.tile) +
-          '</span>' +
-          (it.dir === 'up'
-            ? '<span class="stu-gp-arr up">↑</span>'
-            : it.dir === 'down'
-              ? '<span class="stu-gp-arr down">↓</span>'
-              : '') +
-          _tipHtml(tip) +
-          '</button>';
-      });
-      html += '</span></div>';
-    });
-    return html + '</div></section>';
-  }
-
   /* On a screen with no pointer to rest (an iPad), the first tap on a day
      or a competency shows what is behind it; a second tap on the same one
      acts. True when this tap only showed it. */
@@ -515,7 +414,6 @@ window.StudentOverview = (function () {
 
   return {
     lineHtml: lineHtml,
-    compsHtml: compsHtml,
     feedbackHtml: feedbackHtml,
     armFirst: armFirst,
     mount: mount,

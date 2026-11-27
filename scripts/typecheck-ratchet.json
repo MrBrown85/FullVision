@@ -70,6 +70,7 @@
     "teacher/cm-roster-import.js",
     "teacher/cm-students.js",
     "teacher/report-one-zoom.js",
+    "teacher/student-comps.js",
     "teacher/student-overview.js",
     "teacher/student-page-students.js",
     "teacher/report-one-head.js",

@@ -4506,7 +4506,7 @@ details.gl-rest > summary .gl-title {
   color: var(--link);
 }
 
-/* Your Competencies: how the levels split, then each one in its folder. */
+/* Your Competencies (teacher/student-comps.js): how the levels split, then the strongest and the next to work on. */
 .stu-gp-seg {
   display: flex;
   gap: 2px;
@@ -4567,42 +4567,60 @@ details.gl-rest > summary .gl-title {
   border-radius: 2px;
   vertical-align: -1px;
 }
-.stu-gp-folders {
+.stu-gp-head:last-child {
+  margin-bottom: 0;
+}
+/* See All: the Competencies tab lists every one. */
+.stu-gp-all {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.stu-gp-all:hover {
+  text-decoration: underline;
+}
+/* Strongest beside Next to Work On; one under the other where two won't fit. */
+.stu-gp-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px 28px;
 }
-.stu-gp-folder {
+.stu-gp-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
-.stu-gp-folder-name {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--text-2);
+.stu-gp-group > .stu-ov-label {
+  margin-bottom: 2px;
 }
-.stu-gp-tiles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+/* A group with nothing beside it fills both columns. */
+.stu-gp-group.wide {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 6px 28px;
 }
+.stu-gp-group.wide > .stu-ov-label {
+  grid-column: 1 / -1;
+}
+/* One competency: its name, then its level, big enough for two people to read together. */
 .stu-gp-tile {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 46px;
-  height: 30px;
-  padding: 0 6px;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 46px;
+  padding: 8px 16px;
   border: 0;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  border-radius: 8px;
+  text-align: left;
   transition:
     opacity 0.15s,
     box-shadow 0.15s;
@@ -4619,8 +4637,24 @@ details.gl-rest > summary .gl-title {
 .stu-gp-tile:disabled:hover {
   box-shadow: none;
 }
-.stu-gp-arr {
-  font-size: 11px;
+.stu-gp-name {
+  min-width: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.stu-gp-val {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: var(--text-md);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.stu-gp-val b {
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 /* All Your Work: each piece open to read, its pages beside its feedback. */
