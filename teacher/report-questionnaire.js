@@ -5749,7 +5749,7 @@ window.ReportQuestionnaire = (function () {
     var btn = document.getElementById('tq-sel-add');
     if (!st || !btn) return;
     var r = _selRow(st);
-    btn.hidden = r < 0;
+    btn.hidden = r < 0 || ReportWcEnv.rowInBank(st, r);
     btn.dataset.row = String(r);
   }
   function _wireSelAdd() {

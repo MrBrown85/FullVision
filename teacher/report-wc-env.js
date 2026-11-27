@@ -15,6 +15,39 @@ window.ReportWcEnv = (function () {
     ui = state;
   }
 
+  /* Whether a sentence of the teacher's own is already in My Bank: what it
+     would be saved as for this student (the wording PersonalBank.compose
+     keeps, the name and pronouns made slots) is a kept template's text. Each
+     line's answer is kept until the bank or the sentence changes, so a
+     redraw does not word every sentence again. */
+  var _banked = { list: null, seen: {} };
+  function inBank(env, row) {
+    var bank = /** @type {any} */ (window).PersonalBank;
+    if (!bank || !row || !row.text) return false;
+    var kept = bank.list();
+    if (_banked.list !== kept) _banked = { list: kept, seen: {} };
+    var key = (env.student && env.student.id) + '|' + row.text;
+    if (!(key in _banked.seen)) {
+      // The wording as compose saves it: the name and pronouns made slots.
+      var said = String(row.text).replace(/\s+/g, ' ').trim();
+      var e = bank.entities(env.ctx, env.f, env.student, said);
+      e.loose = true;
+      var text = String(bank.slotify(said, e).text || '')
+        .trim()
+        .toLowerCase();
+      _banked.seen[key] =
+        !!text &&
+        kept.some(function (x) {
+          return (
+            String(x.text || '')
+              .trim()
+              .toLowerCase() === text
+          );
+        });
+    }
+    return _banked.seen[key];
+  }
+
   function comp(f, id) {
     return (f.comps || []).find(function (c) {
       return String(c.id) === String(id);
@@ -102,6 +135,7 @@ window.ReportWcEnv = (function () {
       box: P.boxOf(row, env.isBest(row)),
       text: row.text,
       yours: !fixed && (!!row.edited || !row.step) && !row.earlier,
+      inBank: !fixed && (!!row.edited || !row.step) && !row.earlier && !row.classLine && inBank(env, row),
       earlier: !!row.earlier,
       last: !!(row.id && env.lastIds.indexOf(row.id) >= 0 && !row.classLine),
       classLine: !!row.classLine,
@@ -284,5 +318,13 @@ window.ReportWcEnv = (function () {
     return env;
   }
 
-  return { configure: configure, make: make, comp: comp };
+  /* The same, for the comment box's Add to My Bank: row r of the student's
+     comment. */
+  function rowInBank(st, r) {
+    var f = H.facts(st);
+    var row = (H.rows(st, f) || [])[r];
+    return !!row && inBank({ student: st, f: f, ctx: H.ctx(st, f) }, row);
+  }
+
+  return { configure: configure, make: make, comp: comp, rowInBank: rowInBank };
 })();
