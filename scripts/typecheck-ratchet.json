@@ -1,5 +1,6 @@
 {
   "checked": [
+    "teacher/preview-send.js",
     "teacher/obs-roster.js",
     "teacher/obs-toolbar.js",
     "teacher/card-show.js",
