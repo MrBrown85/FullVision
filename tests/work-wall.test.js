@@ -439,19 +439,79 @@ describe('the door into the grader', () => {
     expect(spy.mock.calls[0][3].studentIds).toContain(IDS[3]);
   });
 
-  it('with no grader, a card opens the pages full size to step through', () => {
+  it('with no grader, a card opens the pages full size: a page turns in place, and the arrows by the name go to the next student on the same piece', () => {
     seed();
     window.PageAssignments = {};
     WorkWall.open(CID, PIECE);
     click($('.ww-seg-btn[data-sort="name"]'));
     click($('.ww-card[data-sid="' + IDS[3] + '"]'));
     expect(text($('.wv-title'))).toBe(nameOf(IDS[3]));
-    expect(text($('.wv-at'))).toBe('1 of 2');
+    expect(text($('.wv-sub'))).toBe('Conscription');
+    expect(text($('.wv-at'))).toBe('Page 1 of 2');
+    const shown = () =>
+      $$('.wv-img')
+        .filter(i => !i.hidden)
+        .map(i => i.getAttribute('data-page'));
+    expect(shown()).toEqual(['0']);
+    expect($('[data-wv="page"][data-dir="-1"]').disabled).toBe(true);
+    const page1 = $('.wv-img');
     click($('[data-wv="page"][data-dir="1"]'));
-    expect(text($('.wv-at'))).toBe('2 of 2');
+    expect(text($('.wv-at'))).toBe('Page 2 of 2');
+    expect(shown()).toEqual(['1']);
+    // Turned, not drawn again.
+    expect($('.wv-img')).toBe(page1);
+    expect($('[data-wv="page"][data-dir="1"]').disabled).toBe(true);
     click($('[data-wv="item"][data-dir="1"]'));
     expect(text($('.wv-title'))).toBe(nameOf(IDS[4]));
+    expect(text($('.wv-sub'))).toBe('Conscription');
     expect($('[data-wv="item"][data-dir="1"]').getAttribute('aria-label')).toBe('Next Student');
+    // One page: no arrows beside it and no counter.
+    expect($('[data-wv="page"]')).toBeNull();
+    expect($('.wv-at')).toBeNull();
+  });
+
+  it('the page view: left and right turn the page, Escape closes it and leaves the wall open', () => {
+    seed();
+    window.PageAssignments = {};
+    WorkWall.open(CID, PIECE);
+    click($('.ww-seg-btn[data-sort="name"]'));
+    click($('.ww-card[data-sid="' + IDS[3] + '"]'));
+    const key = k =>
+      $('[data-wv="close"]').dispatchEvent(
+        Object.assign(new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true }), { key: k }),
+      );
+    key('ArrowRight');
+    expect(text($('.wv-at'))).toBe('Page 2 of 2');
+    key('ArrowRight');
+    expect(text($('.wv-at'))).toBe('Page 2 of 2');
+    key('ArrowLeft');
+    expect(text($('.wv-at'))).toBe('Page 1 of 2');
+    key('Escape');
+    expect($('#work-viewer-overlay')).toBeNull();
+    expect(WorkWall.isOpen()).toBe(true);
+  });
+
+  it('a piece of three pages or more has a strip of its pages; only the page shown and those beside it are asked for', async () => {
+    seed();
+    window.PageAssignments = {};
+    const work = getCourseSubmissions(CID);
+    const five = work.submissions.find(x => x.enrollment_id === IDS[3] && x.assessment_id === PIECE);
+    five.files = [1, 2, 3, 4, 5].map(n => file(IDS[3], n));
+    saveDemoStudentWork(CID, work);
+    WorkWall.open(CID, PIECE);
+    click($('.ww-seg-btn[data-sort="name"]'));
+    asked = [];
+    click($('.ww-card[data-sid="' + IDS[3] + '"]'));
+    await settle();
+    const pages = () => asked.filter(a => a.startsWith('page:')).map(a => a.replace(/^.*-(\d)\.jpg$/, '$1'));
+    expect(pages()).toEqual(['1', '2']);
+    expect($$('.wv-thumb').map(b => b.getAttribute('aria-label'))).toEqual([1, 2, 3, 4, 5].map(n => 'Page ' + n));
+    expect($('.wv-thumb.is-on').getAttribute('data-page')).toBe('0');
+    click($$('.wv-thumb')[3]);
+    await settle();
+    expect(text($('.wv-at'))).toBe('Page 4 of 5');
+    expect($('.wv-thumb.is-on').getAttribute('data-page')).toBe('3');
+    expect(pages()).toEqual(['1', '2', '3', '4', '5']);
   });
 
   it('Escape closes the wall; not while the grader is open', () => {
@@ -706,16 +766,22 @@ describe("the Work tab on the teacher's student page", () => {
     expect(spy.mock.calls[0][3].studentIds).toEqual([IDS[0]]);
   });
 
-  it('View Full Size steps through the pieces; Open in Grader opens that piece for this student', () => {
+  it('Flip Through Work goes through the pieces, the arrows by the title; Open in Grader opens that piece for this student', () => {
     seed();
     const spy = PageAssignments.openGrader;
     openStudent(IDS[0]);
-    click($('[data-sw="full"]'));
-    expect(text($('.wv-sub'))).toBe('Conscription');
+    const flip = $('[data-sw="full"]');
+    expect(text(flip)).toBe('Flip Through Work');
+    expect(flip.className).toBe('tb-action-btn tb-action-secondary');
+    click(flip);
+    expect(text($('.wv-title'))).toBe('Conscription');
+    expect(text($('.wv-sub'))).toBe(nameOf(IDS[0]));
     expect($('[data-wv="item"][data-dir="1"]').getAttribute('aria-label')).toBe('Next Piece');
     click($('[data-wv="item"][data-dir="1"]'));
-    expect(text($('.wv-sub'))).toBe('Vimy Ridge');
+    expect(text($('.wv-title'))).toBe('Vimy Ridge');
+    expect(text($('.wv-sub'))).toBe(nameOf(IDS[0]));
     click($('[data-wv="grade"]'));
+    expect($('#work-viewer-overlay')).toBeNull();
     const [cid, aid, sid, opts] = spy.mock.calls[0];
     expect([cid, aid, sid]).toEqual([CID, OTHER, IDS[0]]);
     expect(opts.studentIds).toEqual([IDS[0]]);

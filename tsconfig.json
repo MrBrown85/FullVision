@@ -219,6 +219,7 @@
     "teacher/add-work-split-model.js",
     "teacher/add-work-split.js",
     "teacher/add-work-page-view.js",
+    "shared/work-viewer.js",
     "teacher/add-work-split-setup.js",
     "teacher/add-work-split-move.js",
     "teacher/add-work-split-turn.js",

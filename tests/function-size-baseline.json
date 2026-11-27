@@ -214,7 +214,6 @@
   "shared/supabase.js :: window.signOut": 51,
   "shared/website-ask.js :: open": 77,
   "shared/work-thumbs.js :: holder": 108,
-  "shared/work-wall.js :: _drawViewer": 78,
   "shared/work-wall.js :: _glanceShow": 54,
   "shared/work-wall.js :: _glanceWire": 55,
   "shared/work-wall.js :: _tabControlsHtml": 90,
