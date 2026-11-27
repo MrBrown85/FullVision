@@ -537,8 +537,8 @@ describe('New observation sheet content', () => {
       MObserve.presentNewObsSheet(CID);
       MObserve.openPicker('tags');
       const pick = sheet.querySelector('#m-obs-edit-picker');
-      expect(pick.textContent).toContain('Core competencies');
-      expect(pick.textContent).toContain('Custom tags');
+      expect(pick.textContent).toContain('Core Competencies');
+      expect(pick.textContent).toContain('Custom Tags');
       expect(pick.textContent).toContain('Lab safety');
     });
   });
@@ -704,7 +704,6 @@ describe('Quick menu starters', () => {
     expect(html).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
     expect(html).toMatch(/data-action="m-obs-quick-compose"[^>]*><span class="m-quick-row-text">Write Your Own…</);
     expect(html).not.toContain('Strong collaboration with peers');
-    expect(html).toContain('Most used first.');
     expect(html).not.toContain('Also Save as Starter when you write it');
   });
 

@@ -52,5 +52,6 @@ test('the Assessment picker keeps its header, searches, and dates its rows', asy
   await expectHeaderShowing(page);
   await picker.locator('.m-pick-search').fill('plan');
   await expect(shownRows(page).filter({ hasText: 'Investigation Plans' })).toHaveCount(1);
-  await expect(picker.locator('.m-pick-section:visible')).toHaveCount(1);
+  // A heading that only repeats its one competency's name is not drawn; the others hide with their rows.
+  await expect(picker.locator('.m-pick-section:visible')).toHaveCount(0);
 });

@@ -1,0 +1,333 @@
+/* observe.css — Observe on the phone, in the phone's new look (DECISIONS, "The
+   phone's new look"): the observation sheet, the sweep, the pickers, the quick
+   menu, the follow-up sheet and the observation cards drawn as Write a Bulletin
+   is. Filled shapes, never outlined or dashed; no grey lines of explanation.
+   Only the phone's index.html loads this file, so the shared pieces it
+   restyles (shared/obs-card.js, shared/obs-follow-ups.js) keep the desktop's
+   look. */
+
+/* ── The sheet: Cancel | title | (nothing), the primary button at the foot ── */
+.m-obs-edit .m-edit-top,
+.m-edit-picker .m-edit-top {
+  padding: 0 16px;
+}
+.m-obs-edit .m-edit-cancel,
+.m-obs-edit .m-edit-save,
+.m-edit-picker .m-edit-cancel,
+.m-edit-picker .m-edit-save {
+  padding: 0;
+  font-size: 17px;
+}
+.m-obs-edit .m-edit-title,
+.m-edit-picker .m-edit-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+.m-obs-edit .m-edit-body,
+.m-edit-picker .m-edit-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 20px;
+}
+.m-obs-edit .m-edit-body > *,
+.m-edit-picker .m-edit-body > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.m-obs-edit .m-edit-text,
+.m-edit-picker .obs-fu-textarea {
+  box-sizing: border-box;
+  min-height: 96px;
+  font-size: 17px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--bg);
+}
+.m-obs-edit .m-edit-text:focus,
+.m-edit-picker .obs-fu-textarea:focus {
+  border-color: var(--active);
+  outline: none;
+  box-shadow: none;
+}
+.m-obs-edit .m-edit-label {
+  margin: 8px 0 -2px;
+  color: var(--text-3);
+}
+.m-obs-edit .m-edit-primary,
+.m-edit-picker .m-edit-primary {
+  margin-top: 8px;
+}
+
+/* Strength | Growth | Concern | Note: the segmented control. */
+.m-obs-edit .obs-band {
+  gap: 0;
+  margin: 4px 16px 4px;
+  padding: 2px;
+  border: none;
+  border-radius: 8px;
+  background: var(--overlay-pressed);
+}
+.m-obs-edit .obs-band-tab {
+  flex: 1;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 500;
+}
+.m-obs-edit .obs-band-tab.on[data-sentiment] {
+  border: none;
+  font-weight: 600;
+}
+
+/* Student, Context, Assessment, Competency, Level: a grey row, the value in link blue. */
+.m-obs-edit .m-edit-row {
+  width: 100%;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-edit .m-edit-row-fixed {
+  cursor: default;
+}
+.m-obs-edit .m-edit-row-k {
+  font-weight: 400;
+}
+.m-obs-edit .m-edit-row-v {
+  margin-left: auto;
+  padding-right: 18px;
+  color: var(--link);
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-obs-edit .m-edit-row-fixed .m-edit-row-v {
+  padding-right: 0;
+  color: var(--text-2);
+}
+.m-obs-edit #m-obs-link-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.m-obs-edit .m-edit-switch {
+  min-height: 48px;
+  margin-top: 0;
+  border-bottom: none;
+}
+
+/* Tags: the chips grey, Add Tag a filled button. */
+.m-obs-edit .m-edit-tags .obs-add,
+.m-obs-edit .obs-fu-add {
+  border: none;
+  border-radius: 8px;
+  background: var(--active-light);
+  color: var(--link);
+  font-weight: 600;
+}
+.m-obs-edit .m-edit-tags .obs-add {
+  min-height: 36px;
+  padding: 0 14px;
+}
+.m-obs-edit .obs-fu-none {
+  display: none;
+}
+.m-obs-edit .obs-fu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.m-obs-edit .obs-fu-head .obs-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+/* Delete: plain red text. */
+.m-obs-edit .m-obs-sheet-delete,
+.m-edit-picker .m-obs-sheet-delete {
+  min-height: 44px;
+  margin-top: 4px;
+  border: none;
+  background: none;
+  color: var(--danger);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* ── Pickers: the search box grey-filled like the sheet's text box ── */
+.m-pick-search {
+  box-sizing: border-box;
+  min-height: 44px;
+  margin: 8px 0 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 17px;
+}
+.m-pick-search:focus {
+  border-color: var(--active);
+  outline: none;
+}
+
+/* ── The quick menu: rows padded in from the edge ── */
+.m-quick-row {
+  padding: 6px 12px;
+}
+.m-quick-top {
+  padding: 0 0 8px;
+}
+
+/* ── The Follow Up sheet ── */
+.m-edit-picker .obs-fu-of {
+  margin: 0;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 15px;
+}
+.m-edit-picker .obs-fu-chips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0;
+}
+.m-edit-picker .obs-fu-form .obs-fu-chip {
+  min-height: 48px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+.m-edit-picker .obs-fu-chip.on {
+  background: var(--active-fill);
+  color: #fff;
+}
+.m-edit-picker .obs-fu-chip.on[data-fu-kind='resolved'] {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+
+/* ── Observation cards on the phone ── */
+.obs-private,
+.obs-card-quoted {
+  border: none;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-2);
+  padding: 1px 8px;
+}
+.obs-fu-add {
+  min-height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--active-light);
+  color: var(--link);
+  font-size: 13px;
+  font-weight: 600;
+}
+.obs-fu-closed {
+  border: none;
+  border-radius: 6px;
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+  padding: 1px 8px;
+}
+.obs-card-context {
+  text-transform: capitalize;
+}
+/* On the profile the card is the page's card: no second box, so the text sits on the card's own margin. */
+.m-sp-card .m-obs-card {
+  background: none;
+  box-shadow: none;
+}
+
+/* ── The sweep: filled shapes ── */
+.m-sweep-tile {
+  border: none;
+  background: var(--surface);
+}
+.m-sweep-tile[data-state='done'] {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.m-sweep-tile[data-state='skipped'] {
+  border: none;
+  background: var(--overlay-pressed);
+  color: var(--text-3);
+}
+.m-sweep-tile.m-sweep-current {
+  background: var(--active-light);
+  box-shadow: none;
+  color: var(--link);
+  font-weight: 700;
+}
+.m-sweep-panel .m-sweep-type {
+  border: none;
+  background: var(--bg);
+  color: var(--text-2);
+}
+.m-sweep-type.m-selected[data-sentiment] {
+  border: none;
+}
+.m-sweep-starter {
+  border: none;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.m-sweep-starter.m-selected {
+  border: none;
+  background: var(--active-light);
+}
+.m-sweep-write {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  border-radius: 10px;
+  background: var(--active-light);
+}
+.m-sweep-actions .m-sweep-skip {
+  border: none;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--link);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Fixes after the first look. */
+.m-quick-row {
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+}
+.m-quick-own {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.m-obs-edit .obs-fu-panel {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.m-sweep-panel .m-sheet-textarea {
+  box-sizing: border-box;
+}
+.m-sweep-panel .m-sheet-textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+.m-sweep-panel .m-sheet-label {
+  margin: 12px 0 6px;
+}

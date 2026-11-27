@@ -358,8 +358,7 @@
   function open(cid, obId, sid, fuId, from) {
     var ob = _obOf(cid, obId, sid);
     if (!ob) return;
-    /** @type {any} */
-    var f = null;
+    /** @type {any} */ var f = null;
     if (fuId) {
       f = getObservationFollowUps(cid, obId).find(function (x) {
         return x.id === fuId;
@@ -378,13 +377,14 @@
         '<div class="m-edit-top"><button type="button" class="m-edit-cancel" data-fu-action="cancel">‹ Back</button>' +
         '<div class="m-edit-title">' +
         esc(title) +
-        '</div><button type="button" class="m-edit-save" data-fu-action="save">Save</button></div>' +
+        '</div><span class="m-edit-top-sp" aria-hidden="true"></span></div>' +
         '<div class="m-edit-body obs-fu-form">' +
         _contextHtml(cid, ob) +
         _formHtml(f) +
         (fuId
           ? '<button type="button" class="m-obs-sheet-delete" data-fu-action="delete">Delete Follow-Up</button>'
           : '') +
+        '<button type="button" class="m-btn-primary m-edit-primary" data-fu-action="save">Save</button>' +
         '</div>';
       if (form) form.hidden = true;
       pick.hidden = false;

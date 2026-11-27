@@ -4124,6 +4124,7 @@ window.ReportQuestionnaire = (function () {
         else delete _lastSeed[snap.key];
         _wording = null;
         _writeRows(st, snap.text);
+        if (_browse) _syncBrowse();
       },
       null,
       6000,
@@ -6049,16 +6050,16 @@ window.ReportQuestionnaire = (function () {
           return own.indexOf(c.id) < 0;
         }),
       );
+    // A sentence that reads the same under two cases is listed once, under the first.
+    var seen = {};
     var groups = ordered
       .map(function (c) {
-        return {
-          id: c.id,
-          label: c.label,
-          own: own.indexOf(c.id) >= 0,
-          rows: rows.filter(function (r) {
-            return r.case === c.id;
-          }),
-        };
+        var mine = rows.filter(function (r) {
+          if (r.case !== c.id || seen[r.text]) return false;
+          seen[r.text] = true;
+          return true;
+        });
+        return { id: c.id, label: c.label, own: own.indexOf(c.id) >= 0, rows: mine };
       })
       .filter(function (g) {
         if (g.rows.length) return true;
@@ -6092,15 +6093,11 @@ window.ReportQuestionnaire = (function () {
   var CHEVRON =
     '<svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 1.5 L6 5 L2 8.5"></path></svg>';
   /* A case's heading and its rows: the heading opens and closes the
-     group; the student's own case is marked with the first name. A case
-     with no sentences yet says so. */
-  function _groupHtml(part, id, label, own, first, rowsHtml, n, extra) {
+     group. A case with no sentences yet says so. */
+  function _groupHtml(part, id, label, own, rowsHtml, n) {
     var isOpen = _groupOpen(part, id);
-    var chip = own
-      ? `<span class="qn-chip-own" title="${esc(first)}’s own case, from what FullVision has on file.">${esc(first)}</span>`
-      : '';
-    var body = (n ? rowsHtml : '<div class="qn-browse-none">No sentences yet.</div>') + (extra || '');
-    return `<div class="qn-browse-group${own ? ' own' : ''}" data-case="${esc(id)}"><button type="button" class="qn-browse-head" aria-expanded="${isOpen}" data-action="tqSentences" data-do="group" data-case="${esc(id)}" title="${isOpen ? 'Hides' : 'Shows'} the sentences for this case.">${CHEVRON}<span class="qn-browse-head-label">${esc(label)}</span>${chip}<span class="qn-browse-head-n">${n}</span></button><div class="qn-browse-group-rows"${isOpen ? '' : ' hidden'}>${body}</div></div>`;
+    var body = n ? rowsHtml : '<div class="qn-browse-none">No sentences yet.</div>';
+    return `<div class="qn-browse-group${own ? ' own' : ''}" data-case="${esc(id)}"><button type="button" class="qn-browse-head" aria-expanded="${isOpen}" data-action="tqSentences" data-do="group" data-case="${esc(id)}" title="${isOpen ? 'Hides' : 'Shows'} the sentences for this case.">${CHEVRON}<span class="qn-browse-head-label">${esc(label)}</span><span class="qn-browse-head-n">${n}</span></button><div class="qn-browse-group-rows"${isOpen ? '' : ' hidden'}>${body}</div></div>`;
   }
 
   /* The rows for a part. Support lists the lines ticked for the class and
@@ -6116,31 +6113,29 @@ window.ReportQuestionnaire = (function () {
     };
     // yours: null, or { id, general } for a sentence of the teacher's own:
     // the Yours chip ("Yours · Any Student" when it is bound to no case) and
-    // a × that removes it from their bank, with Undo.
-    var row = function (text, meta, ctrl, on, yours) {
+    // a × that removes it from their bank, with Undo. n: the other students
+    // in the class it is used for, a chip when above 0.
+    var row = function (text, n, ctrl, on, yours) {
       var chip = yours
         ? `<span class="qn-chip-yours" title="${yours.general ? 'A sentence of your own for this part, for any student: Generate uses it when nothing more specific fits.' : 'A sentence of your own.'}">${yours.general ? 'Yours · Any Student' : 'Yours'}</span>`
         : '';
       var del = yours
         ? `<button type="button" class="qn-browse-del" data-action="tqSentences" data-do="ownDelete" data-sentence="${esc(yours.id)}" aria-label="Delete this sentence from your bank" title="Removes this sentence from your bank. Undo for a few seconds.">×</button>`
         : '';
-      return `<div class="qn-browse-row${on ? ' on' : ''}" tabindex="-1"><div class="qn-browse-text"><span class="qn-browse-sentence">${esc(text)}</span><span class="qn-browse-meta">${esc(meta)}</span></div>${chip}${ctrl}${del}</div>`;
+      var shared = n
+        ? `<span class="qn-browse-shared" title="Used for ${_plural(n, 'other student', 'other students')} in this class">${PERSON}${n}</span>`
+        : '';
+      return `<div class="qn-browse-row${on ? ' on' : ''}" tabindex="-1"><span class="qn-browse-sentence">${esc(text)}</span>${chip}${shared}${ctrl}${del}</div>`;
     };
-    // "+ Write Your Own" under each case heading of a part a sentence of
-    // the teacher's own can take, or the box once it is open there, bound
-    // to that case.
-    var addFor = function (caseId) {
-      if (!_ownStep(b.part)) return '';
-      if (_own && _own.where === 'browse' && _own.caseId === caseId)
-        return `<div class="qn-browse-own">${_ownBoxHtml(student)}</div>`;
-      return `<div class="qn-browse-addrow"><button type="button" class="qn-menu-add qn-browse-add" data-action="tqSentences" data-do="ownOpen" data-where="browse" data-mode="write" data-part="${esc(b.part)}" data-case="${esc(caseId)}" title="Write a sentence of your own for this case. It goes in your bank, marked Yours, and is offered here.">+ Write Your Own</button></div>`;
+    // A sentence in the comment: the words, and Remove, which takes it out.
+    var inUse = function (attrs) {
+      return `<span class="qn-browse-inuse">${CHECK}In the Comment</span><button type="button" class="btn btn-ghost qn-browse-unuse" data-action="tqSentences" data-do="unuse" ${attrs} aria-label="Remove From Comment" title="Takes this sentence out of ${esc(first)}’s comment.">Remove</button>`;
     };
-    var inUse = '<span class="qn-browse-inuse">In Use</span>';
     var none = function (text) {
       return `<div class="qn-browse-empty">${esc(text)}</div>`;
     };
-    var group = function (id, label, own, rowsHtml, n, extra) {
-      return _groupHtml(b.part, id, label, own, first, rowsHtml, n, extra);
+    var group = function (id, label, own, rowsHtml, n) {
+      return _groupHtml(b.part, id, label, own, rowsHtml, n);
     };
     if (b.part === 'support') {
       // The class's ticked lines, under the class's name; the checklist is
@@ -6162,10 +6157,10 @@ window.ReportQuestionnaire = (function () {
           var on = !!choice && choice.line.id === l.id && !(f.classLines && f.classLines.pick === 'none');
           return row(
             l.text,
-            on ? 'In use' : 'One of your support lines for ' + course,
+            0,
             on
-              ? inUse
-              : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="useLine" data-line="${esc(l.id)}" title="Uses this line in ${esc(first)}’s comment.">Use</button>`,
+              ? inUse('data-step="support"')
+              : `<button type="button" class="btn btn-ghost qn-browse-use" data-action="tqSentences" data-do="useLine" data-line="${esc(l.id)}" title="Uses this line in ${esc(first)}’s comment.">Use</button>`,
             on,
             null,
           );
@@ -6178,7 +6173,7 @@ window.ReportQuestionnaire = (function () {
       if (!closing) return none('No closing sentence for ' + course + '. Add one in its row on the Sentences card.');
       if (!match(closing)) return none('No sentences match “' + b.q.trim() + '”.');
       _initGroups(b.part, ['class']);
-      return group('class', course, true, row(closing, 'From your class settings', inUse, true, null), 1);
+      return group('class', course, true, row(closing, 0, inUse('data-step="closer"'), true, null), 1);
     }
     var rows = _rowsFor(student, f);
     var used = {};
@@ -6198,11 +6193,9 @@ window.ReportQuestionnaire = (function () {
             : 'No sentences for this part.',
       );
     var rowHtml = function (r) {
-      var n = r.used;
-      var meta = r.inUse ? 'In use' + (n ? ' · used for ' + _plural(n, 'classmate', 'classmates') : '') : _usedMeta(n);
       var ctrl = r.inUse
-        ? inUse
-        : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}" data-case="${esc(r.case)}" title="${esc(
+        ? inUse(`data-sentence="${esc(r.id)}"`)
+        : `<button type="button" class="btn btn-ghost qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}" data-case="${esc(r.case)}" title="${esc(
             !r.fits
               ? 'Puts this sentence in ' +
                   first +
@@ -6213,20 +6206,22 @@ window.ReportQuestionnaire = (function () {
                 ? 'Puts this sentence in ' + first + '’s comment, at the place you chose.'
                 : 'Puts this sentence in ' + first + '’s comment.',
           )}">Use</button>`;
-      return row(r.text, meta, ctrl, r.inUse, r.mine ? { id: r.id, general: r.general } : null);
+      return row(r.text, r.used, ctrl, r.inUse, r.mine ? { id: r.id, general: r.general } : null);
     };
     return list.groups
       .map(function (g) {
-        return group(g.id, g.label, g.own, g.rows.map(rowHtml).join(''), g.rows.length, addFor(g.id));
+        return group(g.id, g.label, g.own, g.rows.map(rowHtml).join(''), g.rows.length);
       })
       .join('');
   }
 
-  var CHEVRONS =
-    '<svg width="10" height="12" viewBox="0 0 10 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4.5 L5 1.8 L8 4.5 M2 7.5 L5 10.2 L8 7.5"></path></svg>';
+  var PERSON =
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5" r="3"></circle><path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5"></path></svg>';
+  var CHECK =
+    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5"></path></svg>';
 
-  /* The Fits pop-up: only the sentences that fit the student, or every
-     sentence for the part, with the counts. */
+  /* The Fits switch: only the sentences that fit the student, or every
+     sentence for the part, each with its count. */
   function _fitsHtml(student, ctx) {
     var b = _browse;
     var first = _first(student);
@@ -6247,15 +6242,10 @@ window.ReportQuestionnaire = (function () {
             : 0;
       list = { fit: n, total: n };
     }
-    var count = b.fits ? list.fit + ' of ' + list.total : String(list.total);
     var opt = function (fits, label, n) {
-      var on = b.fits === fits;
-      return `<button type="button" role="option" aria-selected="${on}" class="qn-menu-item${on ? ' on' : ''}" data-action="tqSentences" data-do="fits" data-fits="${fits ? '1' : '0'}"><span class="qn-menu-mark" aria-hidden="true">${on ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(label)}</span><span class="qn-menu-meta">${n}</span></span></button>`;
+      return `<button type="button" class="seg-btn" id="${fits ? 'tq-browse-fits' : 'tq-browse-all'}" aria-pressed="${b.fits === fits}" data-action="tqSentences" data-do="fits" data-fits="${fits ? '1' : '0'}" title="${fits ? 'Shows only sentences that fit ' + esc(first) + '.' : 'Shows every sentence for this part.'}">${label} · ${n}</button>`;
     };
-    var menu = b.menu
-      ? `<div class="qn-menu qn-fits-menu" role="listbox" aria-label="Which sentences to show" id="tq-fits-menu">${opt(true, 'Fits ' + first, list.fit)}${opt(false, 'Every sentence for this part', list.total)}</div>`
-      : '';
-    return `<span class="qn-browse-fitwrap"><button type="button" class="qn-browse-fits" id="tq-browse-fits" data-action="tqSentences" data-do="fitsMenu" aria-haspopup="listbox" aria-expanded="${b.menu}" title="Show only sentences that fit ${esc(first)}, or every sentence for this part.">${b.fits ? 'Fits ' + esc(first) : 'Every sentence'} <span class="qn-browse-n" id="tq-browse-n">${count}</span>${CHEVRONS}</button>${menu}</span>`;
+    return `<div class="seg qn-browse-fits" role="group" aria-label="Which sentences to show">${opt(true, 'Fits ' + esc(first), list.fit)}${opt(false, 'All', list.total)}</div>`;
   }
 
   // html-safe: first name, search text and part labels esc()'d; rows from _browseRowsHtml
@@ -6265,20 +6255,19 @@ window.ReportQuestionnaire = (function () {
     var ctx = _bankContext(cid, student, f);
     var tabs = PARTS.map(function (p) {
       var on = p.id === b.part;
-      return `<button type="button" role="tab" class="qn-browse-tab" aria-selected="${on}" data-action="tqSentences" data-do="part" data-part="${p.id}" title="${esc(p.label)} sentences.">${esc(p.label)}</button>`;
+      return `<button type="button" role="tab" class="seg-btn qn-browse-tab" aria-selected="${on}" data-action="tqSentences" data-do="part" data-part="${p.id}" title="${esc(p.label)} sentences.">${esc(p.label)}</button>`;
     }).join('');
     return `<div class="qn-browse" role="document">
       <div class="qn-browse-top">
         <span class="qn-browse-title" id="tq-browse-title">Sentences for ${esc(first)}</span>
         <input type="search" class="qn-browse-search" id="tq-browse-search" placeholder="Search sentences" aria-label="Search sentences" value="${esc(b.q)}" title="Finds sentences with these words in this part.">
-        <button type="button" class="qn-browse-done" data-action="tqSentences" data-do="close" title="Closes Browse Sentences.">Done</button>
+        <button type="button" class="btn btn-primary qn-browse-done" data-action="tqSentences" data-do="close" title="Closes Browse Sentences.">Done</button>
       </div>
       <div class="qn-browse-body">
-        <div class="qn-browse-parts" role="tablist" aria-label="Part">${tabs}</div>
-        <div class="qn-browse-bar">${_fitsHtml(student, ctx)}<button type="button" class="qn-browse-add-top" data-action="tqSentences" data-do="ownOpen" data-where="top" data-mode="write" title="Write a sentence of your own and choose the part it belongs under.">+ Add to My Bank</button><span class="qn-browse-order">Least used first</span></div>
+        <div class="seg qn-browse-parts" role="tablist" aria-label="Part">${tabs}</div>
+        <div class="qn-browse-bar">${_fitsHtml(student, ctx)}<button type="button" class="btn btn-ghost qn-browse-write" id="tq-browse-write" data-action="tqSentences" data-do="ownOpen" data-where="top" data-mode="write" title="Write a sentence of your own. It goes in your bank, marked Yours.">+ Write Your Own</button></div>
         ${_own && _own.where === 'top' ? `<div class="qn-browse-ownwrap">${_ownBoxHtml(student)}</div>` : ''}
         <div class="qn-browse-listwrap"><div class="qn-browse-list" id="tq-browse-list" style="max-height:${sheetHeight()}px">${_browseRowsHtml(cid, student, f, ctx)}</div></div>
-        <span class="qn-browse-hint">The list scrolls. Drag the bottom edge to show more at once.</span>
       </div>
       <div class="qn-browse-handle" id="tq-browse-handle" role="separator" aria-orientation="horizontal" aria-label="Resize the sentence list" tabindex="0" title="Drag to make the sheet taller or shorter. It stays that size next time."><span class="qn-browse-grip"></span></div>
     </div>`;
@@ -6303,7 +6292,6 @@ window.ReportQuestionnaire = (function () {
       part: part || 'grade',
       fits: true,
       q: '',
-      menu: false,
       open: {},
       openQ: {},
       init: {},
@@ -6448,6 +6436,18 @@ window.ReportQuestionnaire = (function () {
     _writeRows(st);
     _syncBrowse();
     _focusSel('#tq-browse-list .qn-browse-row.on');
+  }
+
+  /* Remove, on a sentence in the comment: the Sentences card's own remove
+     (with Undo), then the sheet shows it with Use again. */
+  function _unuse(key, ds) {
+    var at = (_rows[key] || []).findIndex(function (r) {
+      return ds.step ? r.step === ds.step : r.id === ds.sentence || r.from === ds.sentence;
+    });
+    if (at < 0) return;
+    tqSentences('remove', { dataset: { row: String(at) } });
+    _syncBrowse();
+    _focusSel('#tq-browse-list [data-do="use"][data-sentence="' + ds.sentence + '"], #tq-browse-list .qn-browse-row');
   }
 
   /* The Sentences card's and Browse Sentences' controls:
@@ -6604,7 +6604,6 @@ window.ReportQuestionnaire = (function () {
         })
           ? ds.part
           : 'grade';
-        _browse.menu = false;
         _syncBrowse();
         _focusSel('#tq-browse-overlay [role="tab"][aria-selected="true"]');
         return;
@@ -6617,21 +6616,16 @@ window.ReportQuestionnaire = (function () {
           ? ds.part
           : _browse.part;
         _browse.fits = false;
-        _browse.menu = false;
         _syncBrowse();
         _focusSel('#tq-browse-overlay [role="tab"][aria-selected="true"]');
-        return;
-      case 'fitsMenu':
-        if (!_browse) return;
-        _browse.menu = !_browse.menu;
-        _syncBrowse(_browse.menu ? null : 'tq-browse-fits');
-        if (_browse.menu) _focusSel('#tq-fits-menu [aria-selected="true"]');
         return;
       case 'fits':
         if (!_browse) return;
         _browse.fits = ds.fits === '1';
-        _browse.menu = false;
-        _syncBrowse('tq-browse-fits');
+        _syncBrowse(_browse.fits ? 'tq-browse-fits' : 'tq-browse-all');
+        return;
+      case 'unuse':
+        _unuse(key, ds);
         return;
       case 'search':
         if (!_browse) return;
@@ -6671,7 +6665,6 @@ window.ReportQuestionnaire = (function () {
         _ownOpen(ds.where, ds.mode || 'write', {
           index: i,
           part: ds.part || '',
-          caseId: ds.case || '',
           gap: ds.gap,
         });
         return;
@@ -6696,7 +6689,7 @@ window.ReportQuestionnaire = (function () {
         if (!_own) return;
         if (ds.tqOwn === 'part') {
           _own.part = String(el.value || '');
-          _own.caseKey = '';
+          _own.caseKey = _own.where === 'top' ? _ownFirstCase(st, _own.part) : '';
           _ownRedraw(st, 'tq-own-part');
         } else {
           _own.caseKey = String(el.value || '');
@@ -6718,17 +6711,17 @@ window.ReportQuestionnaire = (function () {
   /* ── A sentence of the teacher's own (Colin, Nov 1) ──────────
      "Can teachers just write their own and add to a bank easily?" One
      line, written for the student on screen, into the teacher's bank
-     (PersonalBank.compose and keep) from four places: "+ Write Your Own"
-     at the end of a part in Browse Sentences and as the last item of a
-     row's Other Wording menu (bound to that row's case and used in the
-     row); "+ Add to My Bank" at the top of Browse Sentences; and "Add to
+     (PersonalBank.compose and keep) from three places: "+ Write Your Own"
+     in Browse Sentences' bar (the part and the case it goes under are
+     chosen in its box) and as the last item of a row's Other Wording
+     menu (bound to that row's case and used in the row); and "Add to
      My Bank" on a sentence the teacher typed or changed (its row on the
      Sentences card, or the sentence selected in the comment box). A
      sentence with no row's case takes a "Belongs Under" picker: the part,
      and a case or Any Case. The box shows the slotted result in plain
      words ("Saved as: …") and the lint's advice in orange; only a health
      or designation word or a classmate's name stops the save. */
-  var _own = null; // { where: 'browse' | 'top' | 'row', mode: 'write' | 'add', index, text, part, caseId, caseKey }
+  var _own = null; // { where: 'top' | 'row' | 'gap', mode: 'write' | 'add', index, text, part, caseKey }
 
   /* The parts a sentence of the teacher's own can take, and a part's
      first such step. */
@@ -6752,10 +6745,8 @@ window.ReportQuestionnaire = (function () {
     if (!_own || _own.where !== 'row') return null;
     return (_rows[_rowKey(st)] || [])[_own.index] || null;
   }
-  /* Whether the open box is bound already (no picker): to its row's case,
-     or to the case heading it was opened under in Browse Sentences. */
+  /* Whether the open box is bound already (no picker): to its row's case. */
   function _ownBound(st) {
-    if (_own && _own.where === 'browse' && _own.caseId) return true;
     var r = _ownRow(st);
     return !!r && !!r.step && !!r.s && PersonalBank.stepAllowed(r.step);
   }
@@ -6834,13 +6825,18 @@ window.ReportQuestionnaire = (function () {
   /* The cases the "Belongs under" picker offers: the student's own cases
      of the part, as the sheet's headings name them, each one that binds
      to something. */
-  function _ownCases(ctx) {
-    var part = _own.part;
+  function _ownCases(ctx, part, onSheet) {
     var labels = {};
     browseCases(part).forEach(function (c) {
       labels[c.id] = c.label;
     });
-    return browseOwn(part, ctx)
+    // On the sheet: every case the part's list shows, in its order.
+    var ids = onSheet
+      ? browseList(part, ctx, {}).groups.map(function (g) {
+          return g.id;
+        })
+      : browseOwn(part, ctx);
+    return ids
       .filter(function (id) {
         return !!labels[id] && !_ownGeneral(_ownCaseBind(part, id, ctx));
       })
@@ -6848,9 +6844,20 @@ window.ReportQuestionnaire = (function () {
         return { key: id, label: labels[id] };
       });
   }
+  /* The case the sheet's box starts on: the first group the part shows. */
+  function _ownFirstCase(st, part) {
+    if (!_browse) return '';
+    var f = _facts(st);
+    var ctx = _bankContext(_activeCourse, st, f);
+    var g = browseList(part, ctx, { fits: _browse.fits, q: _browse.q }).groups[0];
+    var ok =
+      !!g &&
+      _ownCases(ctx, part, true).some(function (c) {
+        return c.key === g.id;
+      });
+    return ok ? g.id : '';
+  }
   function _ownBind(st, ctx) {
-    if (_own.where === 'browse' && _own.caseId)
-      return _ownCaseBind(_own.part, _own.caseId, ctx) || { step: _ownStep(_own.part) };
     if (_ownBound(st)) return { row: _ownRow(st) };
     if (_own.caseKey) return _ownCaseBind(_own.part, _own.caseKey, ctx) || { step: _ownStep(_own.part) };
     return { step: _ownStep(_own.part) };
@@ -6889,6 +6896,12 @@ window.ReportQuestionnaire = (function () {
         .join('')
     );
   }
+  /* The box's Cancel and Save; on the sheet, the app's ghost and blue buttons. */
+  function _ownActionsHtml(o, ok) {
+    var top = o.where === 'top';
+    var label = (PARTS.find(x => x.id === o.part) || {}).label || 'My Bank';
+    return `<div class="qn-line-actions"><button type="button" class="${top ? 'btn btn-ghost' : 'qn-line-cancel'}" data-action="tqSentences" data-do="ownCancel" title="Closes without saving.">Cancel</button><button type="button" class="${top ? 'btn btn-primary' : 'qn-line-save'}" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${ok ? '' : ' disabled'} title="Adds this sentence to your bank.">${top ? 'Add to ' + esc(label) : 'Save'}</button></div>`;
+  }
   // html-safe: the sentence, names, part labels, ids and titles esc()'d; gap and row indexes are numbers; the choice buttons are drawn above with esc()
   function _ownBoxHtml(st) {
     var o = _own;
@@ -6923,7 +6936,7 @@ window.ReportQuestionnaire = (function () {
           return `<option value="${esc(p.id)}"${p.id === o.part ? ' selected' : ''}>${esc(p.label)}</option>`;
         })
         .join('');
-      var cases = _ownCases(ctx)
+      var cases = _ownCases(ctx, o.part, o.where === 'top')
         .map(function (x) {
           return `<option value="${esc(x.key)}"${x.key === o.caseKey ? ' selected' : ''}>${esc(x.label)}</option>`;
         })
@@ -6944,10 +6957,9 @@ window.ReportQuestionnaire = (function () {
     var ok = !!c && !!c.template && !c.blocked;
     return `<div class="qn-own" id="tq-own" role="group" aria-label="A sentence of your own">
       <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. Return saves it.">${esc(o.text)}</textarea>
-      <span class="qn-own-hint">Write it for this student. In the saved sentence, the words in brackets change for each student.</span>
       ${picker}
       <div class="qn-own-out" id="tq-own-out">${_ownOutHtml(c)}</div>
-      <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqSentences" data-do="ownCancel" title="Closes without saving.">Cancel</button><button type="button" class="qn-line-save" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${ok ? '' : ' disabled'} title="Adds this sentence to your bank.">Save</button></div>
+      ${_ownActionsHtml(o, ok)}
     </div>`;
   }
   /* The preview and advice follow typing in place, so the line keeps its
@@ -6996,7 +7008,6 @@ window.ReportQuestionnaire = (function () {
     _wording = null;
     _supportMenu = false;
     _limitOpen = false;
-    if (_browse) _browse.menu = false;
     if (where === 'gap') {
       _own = {
         where: 'gap',
@@ -7005,7 +7016,6 @@ window.ReportQuestionnaire = (function () {
         step: String(opts.step || ''),
         text: '',
         part: '',
-        caseId: '',
         caseKey: '',
         key: _rowKey(st),
       };
@@ -7028,7 +7038,6 @@ window.ReportQuestionnaire = (function () {
       from = _browse.part || '';
       if (_ownStep(_browse.part)) part = _browse.part;
     }
-    if (where === 'browse' && !_ownStep(part)) part = '';
     if (!part) part = (_ownParts()[0] || {}).id || '';
     _own = {
       where: where,
@@ -7036,8 +7045,7 @@ window.ReportQuestionnaire = (function () {
       index: index,
       text: String(opts.text || ''),
       part: part,
-      caseId: where === 'browse' ? String(opts.caseId || '') : '',
-      caseKey: '',
+      caseKey: where === 'top' ? _ownFirstCase(st, part) : '',
       from: from && !_ownStep(from) ? from : '',
       key: _rowKey(st),
     };
@@ -7065,9 +7073,7 @@ window.ReportQuestionnaire = (function () {
       );
     } else {
       _syncBrowse();
-      _focusSel(
-        was.where === 'top' ? '.qn-browse-add-top' : '.qn-browse-add[data-case="' + was.caseId + '"], .qn-browse-add',
-      );
+      _focusSel('#tq-browse-write');
     }
   }
   /* Save: into the bank now (and to the server through the outbox); from
@@ -7888,17 +7894,7 @@ window.ReportQuestionnaire = (function () {
 
   /* Whether a popover or a line's box is open. */
   function linesOpen() {
-    return (
-      _supportMenu ||
-      _langMenu ||
-      _limitOpen ||
-      !!_lineEdit ||
-      !!_wording ||
-      !!_own ||
-      !!_miss ||
-      _habMenu ||
-      !!(_browse && _browse.menu)
-    );
+    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_wording || !!_own || !!_miss || _habMenu;
   }
   /* A click outside an open menu or the limit closes it; a box being
      edited stays until Cancel, Save for Class or Escape. */
@@ -7935,10 +7931,6 @@ window.ReportQuestionnaire = (function () {
       _miss = null;
       _syncRequired();
     }
-    if (_browse && _browse.menu && !target.closest('#tq-fits-menu, #tq-browse-fits')) {
-      _browse.menu = false;
-      _syncBrowse();
-    }
     if (redraw) _redrawLines(null);
   }
   /* Escape: the open menu, the limit or the box being edited closes. */
@@ -7946,11 +7938,6 @@ window.ReportQuestionnaire = (function () {
     if (!linesOpen()) return false;
     if (_own) {
       _ownCancel();
-      return true;
-    }
-    if (_browse && _browse.menu) {
-      _browse.menu = false;
-      _syncBrowse('tq-browse-fits');
       return true;
     }
     if (_habMenu) {

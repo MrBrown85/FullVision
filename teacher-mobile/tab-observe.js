@@ -327,7 +327,7 @@ window.MObserve = (function () {
   /* A settings-style row: "Context · Independent ›". */
   function _rowHtml(id, kind, key, value) {
     return (
-      '<button type="button" class="m-edit-row" id="' +
+      '<button type="button" class="m-edit-row m-form-row m-form-pick" id="' +
       id +
       '" data-action="m-obs-picker" data-kind="' +
       kind +
@@ -338,7 +338,7 @@ window.MObserve = (function () {
       (value ? '' : ' empty') +
       '">' +
       MC.esc(value || 'None') +
-      '<span class="m-edit-row-car" aria-hidden="true">\u203a</span></span></button>'
+      '</span></button>'
     );
   }
 
@@ -348,14 +348,14 @@ window.MObserve = (function () {
     // (updateQuickOb refuses to change it): a fixed row, no picker.
     if (_contextFixed()) {
       return (
-        '<div class="m-edit-row m-edit-row-fixed" id="m-obs-ctx-row">' +
+        '<div class="m-edit-row m-form-row m-edit-row-fixed" id="m-obs-ctx-row">' +
         '<span class="m-edit-row-k">Context</span><span class="m-edit-row-v">' +
         obsPrivateLabelHtml({ context: _selectedContext }) +
         '</span></div>'
       );
     }
     var c = _selectedContext && OBS_CONTEXTS[_selectedContext];
-    return _rowHtml('m-obs-ctx-row', 'context', 'Context', c ? c.label : '');
+    return _rowHtml('m-obs-ctx-row', 'context', 'Context', c ? _title(c.label) : '');
   }
 
   function _studentRowValue() {
@@ -459,18 +459,11 @@ window.MObserve = (function () {
     var isNew = !ob;
     return (
       '<div class="m-obs-edit" id="m-obs-edit">' +
-      '<div class="m-edit-form">' +
-      '<div class="m-edit-top">' +
+      '<div class="m-edit-form"><div class="m-edit-top">' +
       '<button type="button" class="m-edit-cancel" data-action="m-obs-edit-cancel">Cancel</button>' +
       '<div class="m-edit-title">' +
       MC.esc(isNew ? _newTitle() : shortName(st)) +
-      '</div>' +
-      '<button type="button" class="m-edit-save" id="m-obs-submit" data-action="m-obs-save"' +
-      (isNew ? ' disabled' : '') +
-      '>' +
-      (isNew ? 'Add' : 'Save') +
-      '</button>' +
-      '</div>' +
+      '</div><span class="m-edit-top-sp" aria-hidden="true"></span></div>' +
       ObsCard.typeBandHtml({
         value: _selectedSentiment,
         tabAttrs: function (k) {
@@ -479,18 +472,17 @@ window.MObserve = (function () {
       }) +
       '<div class="m-edit-body">' +
       (isNew ? _wordsHtml() + _studentRowHtml() : _quotedNoticeHtml(quoted)) +
-      '<textarea class="obs-note-box m-edit-text" id="m-obs-text" aria-label="Observation" placeholder="What did you notice?" rows="3">' +
+      '<textarea class="m-sheet-textarea m-edit-text" id="m-obs-text" aria-label="Observation" placeholder="What did you notice?" rows="3">' +
       MC.esc(isNew ? _newDraft : ob.text || '') +
       '</textarea>' +
       _contextRowHtml() +
-      '<div class="m-edit-label" id="m-obs-tags-label">Tags</div>' +
+      '<div class="m-sheet-label m-edit-label" id="m-obs-tags-label">Tags</div>' +
       '<div class="m-edit-tags" id="m-obs-edit-tags" role="group" aria-labelledby="m-obs-tags-label">' +
       _tagChipsHtml() +
       '</div>' +
       (isNew ? '' : ObsFollowUps.panelHtml(cid, ob)) +
       (isNew
-        ? '<label class="m-edit-switch"><span class="m-edit-switch-text"><span class="m-edit-row-k">Also Save as Starter</span>' +
-          '<small>For all your classes. Leave out names.</small></span>' +
+        ? '<label class="m-edit-switch m-form-row"><span class="m-edit-row-k">Also Save as Starter</span>' +
           '<input type="checkbox" role="switch" id="m-obs-save-starter"></label>' +
           _linkRowsHtml(cid)
         : '<button type="button" class="m-obs-sheet-delete" data-action="m-obs-delete" data-obid="' +
@@ -498,6 +490,9 @@ window.MObserve = (function () {
           '" data-sid="' +
           ob.studentId +
           '">Delete Observation</button>') +
+      '<button type="button" class="m-btn-primary m-edit-primary" id="m-obs-submit" data-action="m-obs-save"' +
+      (isNew ? ' disabled>Add' : '>Save') +
+      '</button>' +
       '</div></div>' +
       '<div class="m-edit-picker" id="m-obs-edit-picker" hidden></div>' +
       '</div>'
@@ -516,6 +511,9 @@ window.MObserve = (function () {
   };
   /* Several can be picked in these; the others close on a tap. */
   var PICKER_MULTI = { tags: true, students: true };
+
+  var _title = s =>
+    String(s).replace(/(^|\s)(?!(?:and|of|to|the|a|in|for|on|with)\b)([a-z])/g, (m, sp, ch) => sp + ch.toUpperCase());
 
   function _pickRow(kind, value, label, on, o) {
     o = o || {};
@@ -547,12 +545,12 @@ window.MObserve = (function () {
     var rows = '';
     if (kind === 'context') {
       Object.keys(OBS_CONTEXTS).forEach(function (k) {
-        rows += _pickRow(kind, k, OBS_CONTEXTS[k].label, _selectedContext === k);
+        rows += _pickRow(kind, k, _title(OBS_CONTEXTS[k].label), _selectedContext === k);
       });
       rows += _pickRow(kind, '', 'None', !_selectedContext, { none: true });
     } else if (kind === 'tags') {
       ObsCapture.tagMenuItems(cid).forEach(function (item) {
-        if (item.type === 'section') rows += '<div class="m-pick-section">' + MC.esc(item.label) + '</div>';
+        if (item.type === 'section') rows += '<div class="m-pick-section">' + MC.esc(_title(item.label)) + '</div>';
         else rows += _pickRow(kind, item.key, item.label, _selectedDims.indexOf(item.key) >= 0, { dot: item.color });
       });
     } else if (kind === 'students') {
@@ -574,13 +572,16 @@ window.MObserve = (function () {
     } else if (kind === 'competency') {
       rows +=
         '<input type="search" class="m-pick-search" data-pick-search placeholder="Search competencies" aria-label="Search competencies">';
-      ObsCapture.competencyItems(cid).forEach(function (c) {
-        if (c.type === 'section') rows += '<div class="m-pick-section">' + MC.esc(c.label) + '</div>';
-        else rows += _pickRow(kind, c.id, c.label, _selectedCompetency === c.id, { search: c.label });
+      ObsCapture.competencyItems(cid).forEach(function (c, i, all) {
+        var next = all[i + 1] || {};
+        // A heading over one competency of the same name only says it twice.
+        var twice = next.label === c.label && !(all[i + 2] && all[i + 2].type !== 'section');
+        if (c.type !== 'section')
+          rows += _pickRow(kind, c.id, c.label, _selectedCompetency === c.id, { search: c.label });
+        else if (!twice) rows += '<div class="m-pick-section">' + MC.esc(c.label) + '</div>';
       });
       rows += _pickRow(kind, '', 'None', !_selectedCompetency, { none: true });
     } else if (kind === 'level') {
-      rows += '<div class="m-pick-note">What level does this look like? Evidence only; it never changes a grade.</div>';
       levelOrderFor(cid).forEach(function (n) {
         rows += _pickRow(kind, String(n), ObsCapture.levelLabel(n), _selectedLevel === n);
       });
@@ -1074,10 +1075,7 @@ window.MObserve = (function () {
       '<div class="m-quick-top">' +
       '<div class="m-quick-title" id="m-quick-title">' +
       MC.esc(displayName(st)) +
-      '</div>' +
-      '<button type="button" class="m-edit-cancel m-quick-cancel" data-action="m-sheet-cancel">Cancel</button>' +
-      '</div>' +
-      '<div class="m-quick-sub">One tap posts it. Type, context and tags come from the starter. Most used first.</div>' +
+      '</div><button type="button" class="m-edit-cancel m-quick-cancel" data-action="m-sheet-cancel">Cancel</button></div>' +
       '<div class="m-quick-rows" role="list" aria-labelledby="m-quick-title">';
 
     var starters = quickStarters(cid);

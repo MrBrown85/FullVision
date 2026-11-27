@@ -293,8 +293,8 @@ window.MSweep = (function () {
   // html-safe: fixed keys and labels.
   function _orderHtml() {
     return [
-      { key: 'roster', label: 'Roster order' },
-      { key: 'longest', label: 'Longest since observed' },
+      { key: 'roster', label: 'Roster Order' },
+      { key: 'longest', label: 'Longest Since Observed' },
     ]
       .map(function (o) {
         var on = _s.order === o.key;
@@ -335,7 +335,7 @@ window.MSweep = (function () {
     }
     if (!_s.sid) {
       return _s.ids.length
-        ? '<div class="m-sweep-hint">Tap a name to start.</div>'
+        ? ''
         : '<div class="m-empty"><div class="m-empty-title">No students in this class</div></div>';
     }
     var st = getStudents(_s.cid).find(function (x) {
@@ -401,7 +401,7 @@ window.MSweep = (function () {
           '<textarea class="m-sheet-textarea" id="m-sweep-text" rows="3" placeholder="What did you notice?">' +
           MC.esc(_s.text) +
           '</textarea>'
-        : '<button class="m-quick-compose m-sweep-write" data-action="m-sweep-write">Write instead…</button>') +
+        : '<button class="m-quick-compose m-sweep-write" data-action="m-sweep-write">Write Instead…</button>') +
       (tags ? '<div class="m-obs-tags m-sweep-tags">' + tags + '</div>' : '') +
       '<div class="m-sweep-actions">' +
       '<button class="m-btn-primary" id="m-sweep-save" data-action="m-sweep-save"' +
