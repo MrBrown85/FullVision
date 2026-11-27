@@ -564,7 +564,7 @@ test.describe('A Page Studio form, read as parts', () => {
       await page.keyboard.type(
         ' She keeps asking questions that move the whole class forward and writes it all down with care.',
       );
-    await expect(page.locator('#tq-count')).toHaveText(/^\d{4} characters$/);
+    await expect(page.locator('#tq-count')).toHaveText(/^\d,\d{3} characters$/);
     await page.locator('.report-seg-btn[data-tab="progress"]').click();
     await expect(page.locator('.report-sheet').first()).toBeVisible();
     expect(await overflowing(page)).toEqual([]);

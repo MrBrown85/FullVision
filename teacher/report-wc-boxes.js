@@ -189,7 +189,7 @@ window.ReportWcBoxes = (function () {
           order.find(function (w) {
             return w.id === env.f.bestPickId;
           }) ||
-          (mine.length ? top : null) ||
+          top ||
           {}
         ).title || '',
       foot: foot,
@@ -383,5 +383,15 @@ window.ReportWcBoxes = (function () {
     });
   }
 
-  return { build: build, candidate: candidate, ctxFor: ctxFor, fact: fact, btn: btn, takeLines: takeLines };
+  return {
+    build: build,
+    candidate: candidate,
+    ctxFor: ctxFor,
+    fact: fact,
+    btn: btn,
+    takeLines: takeLines,
+    browsePart: function (/** @type {string} */ key) {
+      return BROWSE_PART[key] || '';
+    },
+  };
 })();

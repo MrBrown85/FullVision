@@ -2,9 +2,9 @@
  * Checks and approval on the review screen (teacher/report-questionnaire.js,
  * fullvision-generate-plan PR 11c; the "Review-screen states" mockup).
  *
- * - Approve and Next is never off (Nov 25 2026: no ticks). A comment past
- *   the character limit or with a sentence over 20 words leaves it on; the
- *   count turns orange and says why.
+ * - Approve and Next is never off (Nov 25 2026: no ticks). A sentence over
+ *   20 words leaves it on; the count turns orange and says why. There is
+ *   no character limit (Nov 26 2026).
  * - Before Generate: "No comment yet", with the habits rated.
  * - Class warnings: a near-identical comment shows in the Teacher Comment
  *   card with Show Both.
@@ -126,26 +126,19 @@ describe('the Not Handed In row and Approve and Next', () => {
 });
 
 describe('the character count and the 20-word rule', () => {
-  it('says so past the limit and turns orange; Approve stays on', () => {
+  it('a limit saved by older code is not read: the count is only the count', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: SIX });
-    saveReportConfig(CID, { form: { sides: [] }, commentSettings: { charLimit: 200 } });
+    saveReportConfig(CID, { form: { sides: [] }, commentSettings: { charLimit: 100 } });
     const ready = { textContent: '' };
     els['tq-ready'] = ready;
     const html = open();
-    expect(html).toContain('class="qn-count-btn over"');
-    expect(html).toContain(
-      '<span class="qn-count-text" id="tq-count">' +
-        SIX.length +
-        ' of 200 characters</span><span id="tq-limit-text"> · over the limit</span>',
-    );
+    expect(html).not.toContain('class="qn-count over"');
+    expect(html).not.toContain('limit');
     expect(RQ.approveBlockers(current())).toEqual([]);
     RQ.syncRoster();
     RQ.syncApprove();
     expect(btn.disabled).toBe(false);
-    expect(ready.textContent).toBe('0 of 2 Ready');
-    saveReportConfig(CID, { form: { sides: [] }, commentSettings: { charLimit: null } });
-    RQ.syncApprove();
     expect(ready.textContent).toBe('0 of 2 Ready');
   });
   it('a sentence over 20 words: the count says so and Approve stays on', () => {
@@ -153,22 +146,20 @@ describe('the character count and the 20-word rule', () => {
     const long = 'Gabriel ' + 'really '.repeat(20) + 'tries.';
     upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' His work habits are steady.' });
     const html = open();
-    expect(html).toContain('class="qn-count-btn over"');
-    expect(html).toContain('<span id="tq-limit-text"> · one sentence is over 20 words</span>');
+    expect(html).toContain('class="qn-count over"');
+    expect(html).toContain('<span id="tq-count-tail"> · one sentence is over 20 words</span>');
     expect(RQ.approveBlockers(current())).toEqual([]);
     RQ.syncApprove();
     expect(btn.disabled).toBe(false);
     upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' ' + long });
-    expect(open()).toContain('<span id="tq-limit-text"> · two sentences are over 20 words</span>');
+    expect(open()).toContain('<span id="tq-count-tail"> · two sentences are over 20 words</span>');
     expect(RQ.approveBlockers(current())).toEqual([]);
   });
-  it('a comment that fits shows the limit after the count, as before', () => {
+  it('a comment with no long sentence shows the count alone', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: SIX });
     expect(open()).toContain(
-      '<span class="qn-count-text" id="tq-count">' +
-        SIX.length +
-        ' characters</span><span id="tq-limit-text"> · no limit</span>',
+      '<span class="qn-count-text" id="tq-count">' + SIX.length + ' characters</span><span id="tq-count-tail"></span>',
     );
     expect(RQ.approveBlockers(current())).toEqual([]);
   });

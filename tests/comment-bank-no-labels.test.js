@@ -48,7 +48,7 @@ describe('no bare competency labels in the shared bank', () => {
       letter: '',
       grade: { mode: 'proficiency', pieces: [] },
       levelText: () => '',
-      classLines: { support: [], pick: null, closing: '', late: '', charLimit: null },
+      classLines: { support: [], pick: null, closing: '', late: '' },
     };
     const text = 'Their next step is in Evidence: “I can weigh evidence.”';
     const d = {
