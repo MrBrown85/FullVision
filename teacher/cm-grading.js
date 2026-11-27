@@ -8,7 +8,6 @@
   /* Handed over by DashClassManager (configure). */
   var renderClassManager,
     state,
-    _addDocListener,
     _cmDefaultGradingSystem,
     _cmRenderCategoriesField,
     _cmRenderLevelOrderField,
@@ -19,7 +18,6 @@
   function configure(h) {
     if ('renderClassManager' in h) renderClassManager = h.renderClassManager;
     if ('state' in h) state = h.state;
-    if ('_addDocListener' in h) _addDocListener = h._addDocListener;
     if ('_cmDefaultGradingSystem' in h) _cmDefaultGradingSystem = h._cmDefaultGradingSystem;
     if ('_cmRenderCategoriesField' in h) _cmRenderCategoriesField = h._cmRenderCategoriesField;
     if ('_cmRenderLevelOrderField' in h) _cmRenderLevelOrderField = h._cmRenderLevelOrderField;
@@ -76,13 +74,23 @@
     }
   }
 
+  // The grading system and calculation method the class shows.
+  function _cmKnobs(cid) {
+    var course = COURSES[cid];
+    var cc = getCourseConfig(cid);
+    var method = cc.calcMethod || course.calcMethod || 'average';
+    // calc.js counts any method it doesn't know as Most Recent; show that.
+    return {
+      gs: course.gradingSystem || _cmDefaultGradingSystem(course),
+      method: CM_METHOD_TEXT[method] ? method : 'mostRecent',
+    };
+  }
+
   function _cmRenderGradingTab(cid) {
     var course = COURSES[cid];
     var cc = getCourseConfig(cid);
-    var gs = course.gradingSystem || _cmDefaultGradingSystem(course);
-    var method = cc.calcMethod || course.calcMethod || 'average';
-    // calc.js counts any method it doesn't know as Most Recent; show that.
-    if (!CM_METHOD_TEXT[method]) method = 'mostRecent';
+    var gs = _cmKnobs(cid).gs;
+    var method = _cmKnobs(cid).method;
     var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
     var lastN = getRecentScoreLimit(cid);
 
@@ -217,7 +225,7 @@
       '<div class="cm-rule-text">A category with no marked work for a student is left out, and the other categories share its weight.</div>' +
       '<div class="cm-rule-text">A category set to Average of Percentages turns each assessment into a percent first, so each counts the same however many points it has.</div>' +
       '<div class="cm-rule-text">Proficiency work counts as the percent set under Counts As in Points and Proficiency. Proficient counts as ' +
-      _cmPctText(_cmStepValues(getGradingScale(cid))['3']) +
+      CmPtsModel.pctText(CmPtsModel.stepValues(getGradingScale(cid))['3']) +
       '% now.</div>' +
       '<div class="cm-rule-text">The letter comes from the % as shown. Shown as a whole number, 85.5% becomes 86% and an A. Shown to one decimal, 85.94% stays 85.9% and a B.</div>' +
       '</div>' +
@@ -406,258 +414,10 @@
     );
   }
 
-  // Markers closer than this (in % of the ruler) go on two rows: a pill's
-  // width on the narrowest ruler (.cm-pts-ruler's min-width, 420px).
-  var CM_PTS_CLOSE = 7.6;
-  var CM_PTS_TICKS = [0, 25, 50, 75, 100];
-
-  function _cmStepId(key) {
-    return key.replace('+', 'p').replace('-', 'm');
-  }
-  // 2- reads 2−.
-  function _cmStepLabel(key) {
-    return key.replace('-', '−');
-  }
-  // Every step's percent, keyed as COUNTS_AS_STEPS.
-  function _cmStepValues(scale) {
-    var list = countsAsStepPercents(scale && scale.percents);
-    var out = {};
-    COUNTS_AS_STEPS.forEach(function (step, i) {
-      out[step.key] = list[i];
-    });
-    return out;
-  }
-  function _cmHasOwnStep(scale, key) {
-    var p = scale && scale.percents;
-    return !!p && p[key] != null && p[key] !== '';
-  }
-  // The percents a save writes: every whole level, and each + or − that has
-  // a value of its own.
-  function _cmOwnPercents(scale) {
-    var saved = _cmStepValues(scale);
-    var out = {};
-    COUNTS_AS_STEPS.forEach(function (step) {
-      if (step.key.length === 1 || _cmHasOwnStep(scale, step.key)) out[step.key] = saved[step.key];
-    });
-    return out;
-  }
-  // Where each proficiency starts on a points score: { 1: 0, 2: 50, 3: 73, 4: 86 }.
-  function _cmStarts(scale) {
-    var at = { 1: 0 };
-    ((scale && scale.boundaries) || DEFAULT_GRADING_SCALE.boundaries).forEach(function (row) {
-      if (row.proficiency > 1) at[row.proficiency] = Number(row.min) || 0;
-    });
-    return at;
-  }
-  // One decimal at most: 91.7, 86.
-  function _cmPctText(v) {
-    return String(Math.round(v * 10) / 10);
-  }
-  function _cmPtsLeft(v) {
-    return Math.max(0, Math.min(100, v)) + '%';
-  }
-
-  // Row 0 or 1 for each marker, lowest first: one too close to the last
-  // marker on the top row drops to the second.
-  function _cmPtsRows(values) {
-    var last = [-Infinity, -Infinity];
-    return values.map(function (v) {
-      var row = v - last[0] >= CM_PTS_CLOSE ? 0 : v - last[1] >= CM_PTS_CLOSE ? 1 : last[0] <= last[1] ? 0 : 1;
-      last[row] = v;
-      return row;
-    });
-  }
-
-  function _cmPtsPicked(cid) {
-    return state._cmPtsPick && state._cmPtsPick.cid === cid ? state._cmPtsPick : null;
-  }
-  function _cmPtsSame(a, b) {
-    return !!a && !!b && a.kind === b.kind && (a.kind === 'step' ? a.key === b.key : a.level === b.level);
-  }
-  function _cmPtsPickId(p) {
-    return p.kind === 'step' ? 'cm-pts-step-' + _cmStepId(p.key) : 'cm-pts-edge-' + p.level;
-  }
-  // The marker or handle a button stands for, or null.
-  function _cmPtsFromEl(cid, el) {
-    var d = (el && el.dataset) || {};
-    if (d.kind === 'step') {
-      var ok = COUNTS_AS_STEPS.some(function (s) {
-        return s.key === d.key;
-      });
-      return ok ? { cid: cid, kind: 'step', key: d.key } : null;
-    }
-    var level = parseInt(d.level, 10);
-    return d.kind === 'edge' && level >= 2 && level <= 4 ? { cid: cid, kind: 'edge', level: level } : null;
-  }
-  function _cmPtsValue(cid, p) {
-    var scale = getGradingScale(cid);
-    return p.kind === 'step' ? _cmStepValues(scale)[p.key] : _cmStarts(scale)[p.level];
-  }
-  // How far a drag can take it: between its neighbours.
-  function _cmPtsRange(cid, p) {
-    var scale = getGradingScale(cid);
-    if (p.kind === 'edge') {
-      var at = _cmStarts(scale);
-      return [at[p.level - 1] + 1, p.level === 4 ? 99 : at[p.level + 1] - 1];
-    }
-    var list = countsAsStepPercents(scale.percents);
-    var i = COUNTS_AS_STEPS.findIndex(function (s) {
-      return s.key === p.key;
-    });
-    var lo = i > 0 ? list[i - 1] + 0.1 : 0;
-    var hi = i < list.length - 1 ? list[i + 1] - 0.1 : 100;
-    return [Math.ceil(lo * 10) / 10, Math.floor(hi * 10) / 10];
-  }
-
+  // The Points and Proficiency section: teacher/cm-pts-edit.js.
   function _cmRenderPointsScale(cid) {
-    var scale = getGradingScale(cid);
-    var steps = _cmStepValues(scale);
-    var at = _cmStarts(scale);
-    var pick = _cmPtsPicked(cid);
-    // The scale's own legend: each band and handle names its proficiency.
-    var names = {};
-    [1, 2, 3, 4].forEach(function (l) {
-      names[l] = PROF_LABELS[l];
-    });
-    var values = COUNTS_AS_STEPS.map(function (s) {
-      return steps[s.key];
-    });
-    var rows = _cmPtsRows(values);
-    var markers = COUNTS_AS_STEPS.map(function (s, i) {
-      var key = s.key;
-      var v = values[i];
-      var on = !!pick && pick.kind === 'step' && pick.key === key;
-      var name = _cmStepLabel(key) + ' counts as ' + _cmPctText(v) + '%';
-      // A whole level that reads back as another level is flagged, not
-      // blocked (DECISIONS, "Proficiency percents"): its marker sits over
-      // that level's band, and its name says so.
-      if (key.length === 1) {
-        var readsAs = pointsToProf(v, 100, scale);
-        if (readsAs !== Number(key)) name += ', which shows as ' + names[readsAs];
-      }
-      return (
-        '<div class="cm-pts-marker lv-' +
-        key.charAt(0) +
-        (rows[i] ? ' is-low' : '') +
-        (on ? ' is-on' : '') +
-        '" data-key="' +
-        esc(key) +
-        '" style="left:' +
-        _cmPtsLeft(v) +
-        '">' +
-        '<button type="button" class="cm-pts-pill' +
-        (on ? ' is-on' : '') +
-        '" id="cm-pts-step-' +
-        _cmStepId(key) +
-        '" data-action="cmPtsPick" data-kind="step" data-key="' +
-        esc(key) +
-        '" aria-pressed="' +
-        on +
-        '" aria-label="' +
-        esc(name) +
-        '" title="' +
-        esc(name) +
-        '">' +
-        esc(_cmStepLabel(key)) +
-        '</button><span class="cm-pts-stem" aria-hidden="true"></span></div>'
-      );
-    }).join('');
-    var cuts = [0, at[2], at[3], at[4], 100];
-    var bands = [1, 2, 3, 4]
-      .map(function (l) {
-        return (
-          '<span class="cm-pts-band lv-' +
-          l +
-          '" data-lv="' +
-          l +
-          '" style="width:' +
-          Math.max(0, cuts[l] - cuts[l - 1]) +
-          '%">' +
-          esc(names[l]) +
-          '</span>'
-        );
-      })
-      .join('');
-    var edges = [2, 3, 4]
-      .map(function (l) {
-        var on = !!pick && pick.kind === 'edge' && pick.level === l;
-        var name = names[l] + ' starts at ' + at[l] + '%';
-        return (
-          '<div class="cm-pts-edge' +
-          (on ? ' is-on' : '') +
-          '" data-level="' +
-          l +
-          '" style="left:' +
-          _cmPtsLeft(at[l]) +
-          '"><span class="cm-pts-edge-line" aria-hidden="true"></span>' +
-          '<button type="button" class="cm-pts-handle' +
-          (on ? ' is-on' : '') +
-          '" id="cm-pts-edge-' +
-          l +
-          '" data-action="cmPtsPick" data-kind="edge" data-level="' +
-          l +
-          '" aria-pressed="' +
-          on +
-          '" aria-label="' +
-          esc(name) +
-          '" title="' +
-          esc(name) +
-          '">' +
-          esc(at[l] + '%') +
-          '</button></div>'
-        );
-      })
-      .join('');
-    var ticks = CM_PTS_TICKS.map(function (t) {
-      return '<span style="left:' + t + '%">' + t + '%</span>';
-    }).join('');
-    var edit = '';
-    if (pick) {
-      var isStep = pick.kind === 'step';
-      var value =
-        state._cmPtsTyped != null ? state._cmPtsTyped : isStep ? _cmPctText(steps[pick.key]) : String(at[pick.level]);
-      edit =
-        '<label class="cm-pts-edit-label" for="cm-pts-input"><span class="cm-pts-edit-name">' +
-        esc(isStep ? _cmStepLabel(pick.key) : names[pick.level]) +
-        '</span> ' +
-        (isStep ? 'counts as' : 'starts at') +
-        '</label>' +
-        '<input class="cm-input cm-pts-input" type="number" id="cm-pts-input" ' +
-        (isStep ? 'min="0" max="100" step="0.1"' : 'min="1" max="99" step="1"') +
-        ' value="' +
-        esc(value) +
-        '" data-action-change="cmPointsScale" data-action-input="cmPtsLive"' +
-        (state._cmPtsError ? ' aria-invalid="true" aria-describedby="cm-pts-error"' : '') +
-        '><span class="cm-pts-unit">%</span>';
-    }
-    return (
-      '<div class="cm-pts-scale">' +
-      '<span class="cm-label" id="cm-pts-label">Points and Proficiency</span>' +
-      CmGradingBars.renderScaleHint() +
-      '<div class="cm-pts-scroll"><div class="cm-pts-ruler' +
-      (rows.indexOf(1) >= 0 ? ' is-two-rows' : '') +
-      '" id="cm-pts-ruler" role="group" aria-labelledby="cm-pts-label">' +
-      markers +
-      '<div class="cm-pts-bands" aria-hidden="true">' +
-      bands +
-      '</div>' +
-      edges +
-      '<div class="cm-pts-ticks" aria-hidden="true">' +
-      ticks +
-      '</div>' +
-      '</div></div>' +
-      '<div class="cm-pts-edit">' +
-      edit +
-      '</div>' +
-      (state._cmPtsError
-        ? '<div class="cm-pts-error" id="cm-pts-error" role="alert">' + esc(state._cmPtsError) + '</div>'
-        : '') +
-      CmGradingBars.renderPresets(scale) +
-      '</div>'
-    );
+    return CmPtsEdit.render(cid);
   }
-
-  var _cmMatchedPercents = CmGradingBars.matchedPercents;
 
   // The first reporting term that has already ended, or null.
   function _cmEndedTerm(cid) {
@@ -670,329 +430,49 @@
     );
   }
 
-  function _cmSamePercents(a, b) {
-    var x = countsAsStepPercents(a);
-    var y = countsAsStepPercents(b);
-    return x.every(function (v, i) {
-      return Math.abs(v - y[i]) < 1e-9;
-    });
-  }
-
-  /* Saves the scale. A change to Counts As moves the course % of every
-     term, so with a term already ended the teacher confirms first. */
-  function _cmApplyPointsScale(cid, scale) {
-    var before = getGradingScale(cid).percents;
-    function save() {
-      var cc = getCourseConfig(cid);
-      cc.gradingScale = scale;
-      saveCourseConfig(cid, cc);
-      if (typeof clearProfCache === 'function') clearProfCache();
-      renderClassManager();
-    }
-    var ended = _cmSamePercents(before, scale.percents) ? null : _cmEndedTerm(cid);
-    if (!ended) return save();
-    renderClassManager();
-    showConfirm(
-      'Change the Course %?',
-      'This changes the course % for every term, including ' +
-        (ended.label || 'Term ' + ended.ordinal) +
-        ', which has already ended. Report cards printed before today won’t match.',
-      'Change',
-      'primary',
-      save,
-    );
-  }
-
-  /* Saves one marker's or handle's percent, typed, nudged or dragged, with
-     the rules the old boxes had: a whole level always has a value; a + or −
-     keeps its own, or is left in between when it is cleared or still shows
-     its in-between value; each step counts for more than the one below;
-     each proficiency starts higher than the one below it. */
-  function _cmPtsSave(cid, pick, raw) {
-    var scale = getGradingScale(cid);
-    var saved = _cmStepValues(scale);
-    var at = _cmStarts(scale);
-    var percents = _cmOwnPercents(scale);
-    var text = String(raw == null ? '' : raw).trim();
-    var v = parseFloat(text);
-    state._cmPtsPick = Object.assign({}, pick, { cid: cid });
-    function refuse(msg) {
-      state._cmPtsError = msg;
-      state._cmPtsTyped = text;
-      renderClassManager();
-    }
-    if (pick.kind === 'edge') {
-      // Blank or not a number: back to what is saved.
-      if (!isFinite(v)) {
-        state._cmPtsError = null;
-        state._cmPtsTyped = null;
-        renderClassManager();
-        return;
-      }
-      at[pick.level] = Math.max(0, Math.min(99, parseInt(text, 10) || 0));
-      if (!(at[2] > at[1] && at[3] > at[2] && at[4] > at[3]))
-        return refuse('Each proficiency must start higher than the one below it.');
-    } else {
-      var whole = pick.key.length === 1;
-      if (text === '' || !isFinite(v)) {
-        if (whole || text !== '') {
-          state._cmPtsError = null;
-          state._cmPtsTyped = null;
-          renderClassManager();
-          return;
-        }
-        delete percents[pick.key];
-      } else {
-        var r = Math.round(Math.max(0, Math.min(100, v)) * 10) / 10;
-        if (!whole && !_cmHasOwnStep(scale, pick.key) && _cmPctText(r) === _cmPctText(saved[pick.key]))
-          delete percents[pick.key];
-        else percents[pick.key] = r;
-      }
-      var ladder = countsAsStepPercents(percents);
-      if (
-        !ladder.every(function (x, i) {
-          return i === 0 || x > ladder[i - 1];
-        })
-      )
-        return refuse('Each step must count for more than the one below it.');
-    }
-    var boundaries = DEFAULT_GRADING_SCALE.boundaries.map(function (db) {
-      return { min: db.proficiency === 1 ? 0 : at[db.proficiency], proficiency: db.proficiency };
-    });
-    state._cmPtsError = null;
-    state._cmPtsTyped = null;
-    var before = JSON.stringify([_cmStarts(scale), _cmOwnPercents(scale)]);
-    if (before === JSON.stringify([at, percents])) return renderClassManager();
-    // Labels saved before the scale moved here are kept as they were.
-    _cmApplyPointsScale(cid, { boundaries: boundaries, percents: percents, labels: scale.labels || null });
-  }
-
-  // The box under the scale changed (typed, then Enter or leaving it).
-  function cmSavePointsScale(el) {
-    if (!state.cmSelectedCourse) return;
-    var pick = _cmPtsPicked(state.cmSelectedCourse);
-    if (!pick || !el) return;
-    _cmPtsSave(state.cmSelectedCourse, pick, el.value);
-  }
-
-  function cmPtsPick(el) {
-    if (!state.cmSelectedCourse) return;
-    // The click that ends a drag: the drag has picked it already.
-    if (Date.now() - state._cmPtsDragEnd < 500) return;
-    var p = _cmPtsFromEl(state.cmSelectedCourse, el);
-    if (!p) return;
-    var was = _cmPtsPicked(state.cmSelectedCourse);
-    state._cmPtsPick = _cmPtsSame(was, p) ? null : p;
-    state._cmPtsError = null;
-    state._cmPtsTyped = null;
-    state._cmKeepFocusSel = '#' + _cmPtsPickId(p);
-    renderClassManager();
-  }
-
-  /* Keys on the scale: Left and Right nudge a marker by 0.1 (Shift: 1) and
-     a handle by 1 (Shift: 5) and save; Enter in the box saves; Escape lets
-     go and puts the focus back on what was picked. */
-  function _cmPtsKeydown(e) {
-    var el = e.target;
-    var cid = state.cmSelectedCourse;
-    if (!cid || !el || !el.closest || !el.closest('.cm-pts-scale')) return false;
-    var pick = _cmPtsPicked(cid);
-    if (e.key === 'Escape' && pick) {
-      e.preventDefault();
-      state._cmPtsPick = null;
-      state._cmPtsError = null;
-      state._cmPtsTyped = null;
-      state._cmKeepFocusSel = '#' + _cmPtsPickId(pick);
-      renderClassManager();
-      return true;
-    }
-    if (el.id === 'cm-pts-input' && e.key === 'Enter' && !e.isComposing) {
-      e.preventDefault();
-      if (!pick) return true;
-      state._cmKeepFocusSel = '#cm-pts-input';
-      _cmPtsSave(cid, pick, el.value);
-      return true;
-    }
-    var btn = el.closest('[data-action="cmPtsPick"]');
-    if (!btn || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.metaKey || e.ctrlKey) return false;
-    var p = _cmPtsFromEl(cid, btn);
-    if (!p) return false;
-    e.preventDefault();
-    var by = p.kind === 'edge' ? (e.shiftKey ? 5 : 1) : e.shiftKey ? 1 : 0.1;
-    var next = Math.round((_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10) / 10;
-    state._cmKeepFocusSel = '#' + _cmPtsPickId(p);
-    _cmPtsSave(cid, p, String(next));
-    return true;
-  }
-
-  /* While typing or dragging, the marker or handle (and the bands either
-     side of a handle) move before anything is saved. */
-  function _cmPtsPreview(p, v, fromInput) {
-    var ruler = document.getElementById('cm-pts-ruler');
-    if (!ruler || !ruler.querySelector || typeof CSS === 'undefined' || !CSS.escape) return;
-    if (p.kind === 'step') {
-      var m = ruler.querySelector('.cm-pts-marker[data-key="' + CSS.escape(p.key) + '"]');
-      if (m) /** @type {any} */ (m).style.left = _cmPtsLeft(v);
-    } else {
-      var edge = ruler.querySelector('.cm-pts-edge[data-level="' + p.level + '"]');
-      if (!edge) return;
-      /** @type {any} */ (edge).style.left = _cmPtsLeft(v);
-      var handle = edge.querySelector('.cm-pts-handle');
-      if (handle) handle.textContent = v + '%';
-      var cuts = [0];
-      [2, 3, 4].forEach(function (l) {
-        var e2 = /** @type {any} */ (ruler).querySelector('.cm-pts-edge[data-level="' + l + '"]');
-        cuts.push(e2 ? parseFloat(/** @type {any} */ (e2).style.left) || 0 : 0);
-      });
-      cuts.push(100);
-      [1, 2, 3, 4].forEach(function (l) {
-        var band = /** @type {any} */ (ruler).querySelector('.cm-pts-band[data-lv="' + l + '"]');
-        if (band) /** @type {any} */ (band).style.width = Math.max(0, cuts[l] - cuts[l - 1]) + '%';
-      });
-    }
-    var inp = document.getElementById('cm-pts-input');
-    if (inp && !fromInput && _cmPtsSame(_cmPtsPicked(state.cmSelectedCourse), p))
-      /** @type {any} */ (inp).value = String(v);
-  }
-
-  function cmPtsLive(el) {
-    var p = state.cmSelectedCourse && _cmPtsPicked(state.cmSelectedCourse);
-    var v = parseFloat(el.value);
-    if (p && isFinite(v)) _cmPtsPreview(p, Math.max(0, Math.min(100, v)), true);
-  }
-
-  function _initCmPtsDrag() {
-    _addDocListener('pointerdown', function (e) {
-      if (e.button !== 0 || !state.cmSelectedCourse) return;
-      var btn = e.target.closest && e.target.closest('.cm-pts-ruler [data-action="cmPtsPick"]');
-      var ruler = btn && btn.closest('.cm-pts-ruler');
-      var p = btn && _cmPtsFromEl(state.cmSelectedCourse, btn);
-      if (!p || !ruler) return;
-      var range = _cmPtsRange(state.cmSelectedCourse, p);
-      state._cmPtsDrag = {
-        cid: state.cmSelectedCourse,
-        pick: p,
-        pointer: e.pointerId,
-        rect: ruler.getBoundingClientRect(),
-        x0: e.clientX,
-        moved: false,
-        value: _cmPtsValue(state.cmSelectedCourse, p),
-        lo: range[0],
-        hi: range[1],
-      };
-      try {
-        btn.setPointerCapture(e.pointerId);
-      } catch (err) {
-        // No capture: the drag still follows the document's pointer events.
-      }
-    });
-    _addDocListener('pointermove', function (e) {
-      var d = state._cmPtsDrag;
-      if (!d || e.pointerId !== d.pointer || !d.rect.width) return;
-      if (!d.moved && Math.abs(e.clientX - d.x0) < 4) return;
-      d.moved = true;
-      e.preventDefault();
-      var snap = d.pick.kind === 'edge' ? 1 : 0.1;
-      var v = Math.round(((e.clientX - d.rect.left) / d.rect.width) * 100 * (1 / snap)) / (1 / snap);
-      d.value = Math.max(d.lo, Math.min(d.hi, v));
-      _cmPtsPreview(d.pick, d.value);
-    });
-    function end(e) {
-      var d = state._cmPtsDrag;
-      if (!d || e.pointerId !== d.pointer) return;
-      state._cmPtsDrag = null;
-      if (!d.moved) return;
-      state._cmPtsDragEnd = Date.now();
-      if (e.type === 'pointercancel' || d.cid !== state.cmSelectedCourse) return renderClassManager();
-      state._cmKeepFocusSel = '#' + _cmPtsPickId(d.pick);
-      _cmPtsSave(d.cid, d.pick, String(d.value));
-    }
-    _addDocListener('pointerup', end);
-    _addDocListener('pointercancel', end);
-  }
-
-  function cmMatchPointsScale() {
-    if (!state.cmSelectedCourse) return;
-    var cid = state.cmSelectedCourse;
-    var scale = getGradingScale(cid);
-    state._cmPtsError = null;
-    state._cmPtsTyped = null;
-    _cmApplyPointsScale(cid, {
-      boundaries: scale.boundaries,
-      percents: _cmMatchedPercents(scale.boundaries),
-      labels: scale.labels || null,
-    });
-  }
-
-  // The BC Letter Bands preset: Counts As only; Points to Proficiency stays.
-  function cmBcPointsScale() {
-    if (!state.cmSelectedCourse) return;
-    var cid = state.cmSelectedCourse;
-    var scale = getGradingScale(cid);
-    state._cmPtsError = null;
-    state._cmPtsTyped = null;
-    _cmApplyPointsScale(cid, {
-      boundaries: scale.boundaries,
-      percents: Object.assign({}, BC_LETTER_BAND_PERCENTS),
-      labels: scale.labels || null,
-    });
-  }
-
-  function cmResetPointsScale() {
-    if (!state.cmSelectedCourse) return;
-    state._cmPtsError = null;
-    state._cmPtsTyped = null;
-    // Saved, not deleted: other devices only take a scale the server has.
-    _cmApplyPointsScale(state.cmSelectedCourse, structuredClone(DEFAULT_GRADING_SCALE));
-  }
-
   var _cmRenderWeightBar = CmGradingBars.renderWeightBar;
 
   /* One student's grade with the settings on the left, from the class's own
      scores: the year so far, as the gradebook shows it, even when Class
+     // html-safe: the card is built by _cmRenderCheckStudentNow, which escapes every name and number
      Management opens over a report (Colin, 2026-11-03). */
   function _cmRenderCheckStudent(cid, gs, method) {
+    // Editing Points and Proficiency, the card reads the draft (or the preset pointed at).
+    var draft = CmPtsEdit.shownScale(cid);
     return readAsOfTerm(cid, null, function () {
-      return _cmRenderCheckStudentNow(cid, gs, method);
+      if (!draft) return _cmRenderCheckStudentNow(cid, gs, method);
+      return withGradingScale(cid, draft, function () {
+        return _cmRenderCheckStudentNow(cid, gs, method);
+      });
     });
   }
-  function _cmRenderCheckStudentNow(cid, gs, method) {
-    var students = sortStudents(getStudents(cid), 'lastName');
-    var head =
-      '<aside class="cm-section cm-check" aria-label="Check with a student">' +
-      '<h2 class="cm-grade-title">Check With a Student</h2>' +
-      '<div class="cm-hint">One student’s grade with the settings on the left. Change a setting and it updates.</div>';
-    if (!students.length) return head + '<div class="cm-hint">Add students to see a grade here.</div></aside>';
-    var sid = _cmCheckSid[cid];
-    if (
-      !students.some(function (s) {
-        return s.id === sid;
-      })
-    )
-      sid = students[0].id;
-    var summary = studentGradeSummary(cid, sid);
-    var html =
-      head +
-      '<div class="cm-field"><label class="cm-label" for="cm-check-student">Student</label>' +
-      '<select class="cm-input" id="cm-check-student" data-action-change="cmCheckStudent">' +
-      students
-        .map(function (s) {
-          return (
-            '<option value="' + s.id + '"' + (s.id === sid ? ' selected' : '') + '>' + esc(fullName(s)) + '</option>'
-          );
-        })
-        .join('') +
-      '</select></div>' +
-      '<div class="cm-check-overall"><span class="cm-check-label">Overall Grade</span>' +
-      '<span class="cm-check-value">' +
-      esc(summary.text || 'No scores yet') +
-      '</span></div>';
 
+  // The student Check With a Student shows for a class: the one picked, else the first.
+  function checkStudent(cid) {
+    var list = sortStudents(getStudents(cid), 'lastName');
+    return (
+      list.find(function (s) {
+        return s.id === _cmCheckSid[cid];
+      }) ||
+      list[0] ||
+      null
+    );
+  }
+
+  // The card redrawn in place, while a marker is dragged or a preset pointed at.
+  function refreshCheck(cid) {
+    var el = document.querySelector('.cm-check');
+    if (!el || cid !== state.cmSelectedCourse) return;
+    var k = _cmKnobs(cid);
+    el.outerHTML = _cmRenderCheckStudent(cid, k.gs, k.method);
+  }
+  // The competency rows of Check With a Student: each one's scores, then its level.
+  function _cmCheckRows(cid, sid, method) {
     var lm = getLearningMap(cid);
     // With "Count Only the Most Recent N", only those N count, so only
     // those are listed (Most Recent Score already counts one).
     var lastN = method !== 'mostRecent' ? getRecentScoreLimit(cid) : null;
-    var rows = (lm.sections || [])
+    return (lm.sections || [])
       .map(function (sec) {
         var tag = sec.tags && sec.tags[0];
         if (!tag) return '';
@@ -1027,6 +507,45 @@
         );
       })
       .join('');
+  }
+
+  function _cmRenderCheckStudentNow(cid, gs, method) {
+    var students = sortStudents(getStudents(cid), 'lastName');
+    var head =
+      '<aside class="cm-section cm-check" aria-label="Check with a student">' +
+      '<h2 class="cm-grade-title">Check With a Student</h2>' +
+      '<div class="cm-hint">One student’s grade with the settings on the left. Change a setting and it updates.</div>';
+    if (!students.length) return head + '<div class="cm-hint">Add students to see a grade here.</div></aside>';
+    var sid = _cmCheckSid[cid];
+    if (
+      !students.some(function (s) {
+        return s.id === sid;
+      })
+    )
+      sid = students[0].id;
+    var summary = studentGradeSummary(cid, sid);
+    var notes = CmPtsSave.checkNotes(cid, sid, summary.text || 'No scores yet');
+    var html =
+      head +
+      '<div class="cm-field"><label class="cm-label" for="cm-check-student">Student</label>' +
+      '<select class="cm-input" id="cm-check-student" data-action-change="cmCheckStudent">' +
+      students
+        .map(function (s) {
+          return (
+            '<option value="' + s.id + '"' + (s.id === sid ? ' selected' : '') + '>' + esc(fullName(s)) + '</option>'
+          );
+        })
+        .join('') +
+      '</select></div>' +
+      '<div class="cm-check-overall"><span class="cm-check-label">Overall Grade</span>' +
+      '<span class="cm-check-value">' +
+      esc(summary.text || 'No scores yet') +
+      '</span>' +
+      notes.was +
+      '</div>' +
+      notes.moves;
+
+    var rows = _cmCheckRows(cid, sid, method);
     html +=
       '<div class="cm-check-group"><div class="cm-label">Competencies <span class="cm-check-sub">· ' +
       CM_METHOD_TEXT[method].label +
@@ -1096,18 +615,23 @@
     CM_METHOD_TEXT: CM_METHOD_TEXT,
     _cmEndedTerm: _cmEndedTerm,
     _cmMethodRule: _cmMethodRule,
-    _cmPtsKeydown: _cmPtsKeydown,
     _cmRenderFoldersCountAsOne: _cmRenderFoldersCountAsOne,
     _cmRenderGradingTab: _cmRenderGradingTab,
-    _initCmPtsDrag: _initCmPtsDrag,
-    cmBcPointsScale: cmBcPointsScale,
+    cmBcPointsScale: function () {
+      CmPtsEdit.takePreset('bc');
+    },
     cmCheckStudent: cmCheckStudent,
     cmFolderCountChoice: cmFolderCountChoice,
-    cmMatchPointsScale: cmMatchPointsScale,
-    cmPtsLive: cmPtsLive,
-    cmPtsPick: cmPtsPick,
-    cmResetPointsScale: cmResetPointsScale,
+    cmMatchPointsScale: function () {
+      CmPtsEdit.takePreset('match');
+    },
+    cmPtsLive: CmPtsEdit.live,
+    cmResetPointsScale: function () {
+      CmPtsEdit.takePreset('reset');
+    },
     cmRoundPercentSelect: cmRoundPercentSelect,
-    cmSavePointsScale: cmSavePointsScale,
+    cmSavePointsScale: CmPtsEdit.savePointsScale,
+    refreshCheck: refreshCheck,
+    checkStudent: checkStudent,
   };
 })();

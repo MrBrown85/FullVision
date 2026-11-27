@@ -49,7 +49,10 @@ describe('scripts loaded on demand', () => {
     const table = onDemandTable();
     expect(table['/assignments'].scripts).toEqual(['/teacher/rubric-library.js', '/teacher/rubric-bank.js']);
     expect(table.gradesPrint.scripts).toEqual(['/teacher/grades-print.js']);
-    expect(table.gradingSetupCopy.scripts).toEqual(['/teacher/grading-setup-copy.js']);
+    expect(table.gradingSetupCopy.scripts).toEqual([
+      '/teacher/grading-setup-copy.js',
+      '/teacher/grading-setup-copy-dialog.js',
+    ]);
     expect(table.qrcode.scripts).toEqual(['/vendor/qrcode.js']);
     // Each entry names the globals that say its scripts have run, and each
     // button's entry a title for its Could Not Open question.

@@ -1027,9 +1027,9 @@
     window.Router.withScripts('gradingSetupCopy', function () {
       if (!state.cmSelectedCourse || !(/** @type {any} */ (window).GradingSetupCopy)) return;
       var cid = state.cmSelectedCourse;
-      if (_cmCatState(cid).dirty || (_cmTermState[cid] && _cmTermState[cid].dirty)) {
+      if (_cmCatState(cid).dirty || (_cmTermState[cid] && _cmTermState[cid].dirty) || CmPtsEdit.editing(cid)) {
         if (typeof showSyncToast === 'function')
-          showSyncToast('Save or undo your changes to categories and terms first.', 'info');
+          showSyncToast('Save or undo your changes to categories, terms and markers first.', 'info');
         return;
       }
       /** @type {any} */ (window).GradingSetupCopy.openDialog(

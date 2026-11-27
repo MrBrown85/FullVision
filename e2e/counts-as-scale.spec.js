@@ -16,27 +16,37 @@ async function openGrading(page) {
   await expect(page.locator('#cm-pts-ruler')).toBeVisible();
 }
 
-// A Counts As change asks first when a Demo Mode term has already ended.
+// Saving a Counts As change asks first when a Demo Mode term has already ended.
 async function confirmIfAsked(page) {
   const ok = page.locator('#confirm-ok-btn');
   if (await ok.isVisible().catch(() => false)) await ok.click();
 }
 
-test('BC Letter Bands markers don’t overlap', async ({ page }) => {
-  await openGrading(page);
-  await page.locator('[data-action="cmPointsScaleBc"]').click();
-  await confirmIfAsked(page);
-  await expect(page.locator('#cm-pts-ruler')).toHaveClass(/is-two-rows/);
-
+async function overlaps(page, selector) {
   const boxes = await page
-    .locator('.cm-pts-pill')
+    .locator(selector)
     .evaluateAll(els => els.map(el => el.getBoundingClientRect()).map(r => [r.left, r.top, r.right, r.bottom]));
   expect(boxes).toHaveLength(10);
-  const overlaps = [];
+  const hits = [];
   boxes.forEach((a, i) =>
     boxes.slice(i + 1).forEach((b, j) => {
-      if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) overlaps.push([i, i + 1 + j]);
+      if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) hits.push([i, i + 1 + j]);
     }),
   );
-  expect(overlaps).toEqual([]);
+  return hits;
+}
+
+test('BC Letter Bands markers don’t overlap, in the draft or once saved', async ({ page }) => {
+  await openGrading(page);
+  await page.locator('[data-action="cmPtsEdit"]').click();
+  await page.locator('[data-action="cmPointsScaleBc"]').click();
+  await expect(page.locator('#cm-pts-ruler')).toHaveClass(/is-two-rows/);
+  // The ghosts of the saved markers are not live markers and may sit under them.
+  expect(await overlaps(page, '.cm-pts-marker:not(.cm-pts-ghost) .cm-pts-pill')).toEqual([]);
+
+  await page.locator('[data-action="cmPtsSave"]').click();
+  await confirmIfAsked(page);
+  await expect(page.locator('.cm-pts-scroll')).toHaveClass(/is-rest/);
+  await expect(page.locator('#cm-pts-ruler')).toHaveClass(/is-two-rows/);
+  expect(await overlaps(page, '.cm-pts-pill')).toEqual([]);
 });

@@ -271,7 +271,7 @@ test.describe('Class Settings Grading tab in Demo Mode', () => {
     await expect(page.locator('#ac-' + movedId + ' .type-badge')).toHaveText('Labs & Investigations');
   });
 
-  test('BC Letter Bands asks first because a term has ended, Reset to Defaults puts Counts As back, and a reload keeps each', async ({
+  test('BC Letter Bands asks at Save because a term has ended, Reset to Defaults puts Counts As back, and a reload keeps each', async ({
     page,
   }) => {
     const BC = { 1: 45, '1+': 50, '2-': 55, 2: 63, '2+': 67, '3-': 73, 3: 80, '3+': 86, '4-': 92, 4: 100 };
@@ -285,10 +285,14 @@ test.describe('Class Settings Grading tab in Demo Mode', () => {
     await expect(checkValue(page)).toHaveText('B 78.9%');
     expect(await percents()).toEqual(DEFAULT);
 
+    // Locked until Edit: the preset is a draft, and nothing is saved until Save.
+    await clickAction(page, 'cmPtsEdit');
     await clickAction(page, 'cmPointsScaleBc');
+    expect(await percents()).toEqual(DEFAULT);
+    await clickAction(page, 'cmPtsSave');
     await expect(page.locator('#confirm-title')).toHaveText('Change the Course %?');
     await expect(page.locator('.confirm-message')).toContainText('Term 1, which has already ended');
-    await expect(page.locator('#confirm-ok-btn')).toHaveText('Change');
+    await expect(page.locator('#confirm-ok-btn')).toHaveText('Save');
     await page.locator('#confirm-ok-btn').click();
     await expect(countsAsRule(page)).toContainText('Proficient counts as 80% now.');
     await expect(page.locator('#cm-pts-step-3')).toHaveAttribute('aria-label', '3 counts as 80%');
@@ -304,7 +308,9 @@ test.describe('Class Settings Grading tab in Demo Mode', () => {
     await expect(countsAsRule(page)).toContainText('Proficient counts as 80% now.');
     await expect(checkValue(page)).toHaveText(bcOverall);
 
+    await clickAction(page, 'cmPtsEdit');
     await clickAction(page, 'cmPointsScaleReset');
+    await clickAction(page, 'cmPtsSave');
     await expect(page.locator('#confirm-title')).toHaveText('Change the Course %?');
     await page.locator('#confirm-ok-btn').click();
     await expect(countsAsRule(page)).toContainText('Proficient counts as 75% now.');

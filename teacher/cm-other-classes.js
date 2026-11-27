@@ -153,11 +153,11 @@
 
   function closeClassManager() {
     state.classManagerOpen = false;
-    // A student's panel on the Student Page tab closes with Class Settings.
+    // A student's panel closes with Class Settings; so do the Done panel and its New marks.
     if (typeof StudentPageStudents !== 'undefined') StudentPageStudents.closeAll();
-    // The Done panel and its New marks last until Class Settings closes.
     state.cmImportDone = null;
     state.cmRosterOnly = null;
+    CmPtsEdit.drop(); // an unsaved Points and Proficiency draft goes with Class Settings
     closeColorPop();
     if (typeof Router !== 'undefined' && Router.setUrl && location.pathname === '/dashboard') {
       Router.setUrl('/dashboard');
@@ -215,9 +215,8 @@
 
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
-    // Class Settings reads the year so far for every class: its previews
-    // (calculation method, Folders Count as One) and Check With a Student
-    // never count as of a report left in view on the Reports page.
+    // Class Settings reads the year so far for every class: its previews and
+    // Check With a Student never count as of a report left in view on Reports.
     if (typeof setActiveTerm === 'function') {
       courseIds.forEach(function (c) {
         setActiveTerm(c, null);
@@ -226,6 +225,7 @@
     var html = '';
     // A remembered tab this class doesn't show opens Details instead.
     if (!_cmTabShown(state.cmTab, state.cmSelectedCourse)) state.cmTab = 'details';
+    CmPtsEdit.keep(state.classManagerOpen && state.cmTab === 'grading' ? state.cmSelectedCourse : null);
     _cmSyncUrl();
 
     var detailTitle =

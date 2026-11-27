@@ -190,7 +190,7 @@ describe('grade-format-guard', () => {
     // The level word as a line's label ("Developing: …").
     'shared/competency-wording.js': 1,
     'teacher/cm-std-help.js': 1, // the sample level's scale name (moved from dash-class-manager.js)
-    'teacher/cm-grading.js': 1,
+    'teacher/cm-pts-model.js': 1, // the scale's own legend: each band and handle names its proficiency (moved from cm-grading.js)
     'teacher/dash-insights.js': 7,
     'teacher/dash-observations.js': 1,
     'teacher/assign-blank-rubric.js': 4, // the compact rubric editor's column heads (moved from page-assignments.js, which keeps 23 of its 27)
@@ -281,7 +281,7 @@ describe('grade-format-guard', () => {
     'teacher/class-results.js round (n / total) * 100': 'a share of students',
     'teacher/cm-questionnaires.js round (answered / students.length) * 100': 'a share answered',
     'teacher/cm-grading.js round dw * 100': 'a Decaying Average weight, a setting',
-    'teacher/cm-grading.js round ((e.clientX - d.rect.left) / d.rect.width) * 100 * (1 / snap)':
+    'teacher/cm-pts-pointer.js round ((e.clientX - d.rect.left) / d.rect.width) * 100 * (1 / snap)':
       'a Counts As % dragged on its slider',
     'teacher/grading-setup-copy.js round calc.decayWeight * 100': 'a Decaying Average weight, a setting',
     'teacher/rubric-print.js round (f - 0.05) * 100': 'a print scale',
@@ -297,9 +297,9 @@ describe('grade-format-guard', () => {
     'teacher/comment-bank.js round (nx.min - Number(g.pct)) * 10': 'the gap to the next letter from the shown course %',
     'teacher/comment-personal.js floor Number(v[k])': 'a count',
     'teacher/cm-students.js round up ? Math.max(8, r.top - 4 - menu.offsetHeight) : r.bottom + 4': 'a menu’s position',
-    'teacher/cm-grading.js round v * 10': 'a Counts As % being set, to one decimal',
-    'teacher/cm-grading.js round Math.max(0, Math.min(100, v)) * 10': 'a Counts As % being set',
-    "teacher/cm-grading.js round (_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10":
+    'teacher/cm-pts-model.js round v * 10': 'a Counts As % being set, to one decimal',
+    'teacher/cm-pts-model.js round Math.max(0, Math.min(100, v)) * 10': 'a Counts As % being set',
+    "teacher/cm-pts-edit.js round (valueOf(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10":
       'a Points to Proficiency start being set',
     'teacher/factor-field.js round Number(v) * 10': 'an assessment’s Factor',
     'teacher/grades-print.js round Math.max(8, r.right - menu.offsetWidth)': 'a menu’s position',
