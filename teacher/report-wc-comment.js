@@ -5,7 +5,7 @@
    click makes it a box to type in, and the typed text is read back into
    sentences when the box loses the focus (ReportWc.endTyping). Under it,
    the checks of the comment as a whole, each with one action, and the
-   count, the reading grade, Generate Again and Copy. The main file keeps
+   count, Comment Bank and Copy; Generate at the top of the card. The main file keeps
    the comment's record and what the card shares with it (the stale
    sentences, the basis switch, the class warning); they come through
    configure(). */
@@ -90,21 +90,24 @@ window.ReportWcComment = (function () {
     var el = document.getElementById('wc-notes');
     // html-safe: notesHtml() esc()s every word
     if (el) el.innerHTML = notesHtml();
-    syncReads();
   }
 
-  /* The reading grade of the comment, 3 to 12. */
-  function readsText(text) {
-    var t = String(text || '').trim();
-    if (!t) return '';
-    var n = H.sentenceCount(t);
-    return 'Reads at Grade ' + P.readingGrade(t, n);
+  /* Where Comment Bank puts a sentence (gap: how many sentences come
+     before it), said at the top of the sheet. */
+  function goesText(rows, gap) {
+    if (!gap) return 'Goes at the start of the comment.';
+    if (gap >= rows.length) return 'Goes at the end of the comment.';
+    var ws = String(rows[gap - 1].text || '').split(/\s+/);
+    return 'Goes after “' + ws.slice(0, 6).join(' ') + (ws.length > 6 ? '…' : '') + '”.';
   }
-  function syncReads() {
-    var el = document.getElementById('wc-reads');
-    var box = H.box();
-    if (el && box) el.textContent = readsText(box.value);
-  }
+
+  /* The buttons' icons: the bank (a book), Generate (a turning arrow). */
+  var ICON =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  var BANK_ICON =
+    ICON +
+    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"></path><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"></path></svg>';
+  var GEN_ICON = ICON + '<path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 4v5h-5"></path></svg>';
 
   /* Vary Them: the second sentence of a run that opens alike is worded
      another way (a bank wording that opens differently), one by one; Undo
@@ -233,7 +236,6 @@ window.ReportWcComment = (function () {
           })
           .join('')}</div>`;
     var hasText = !!p.text.trim();
-    var reads = readsText(p.text);
     return `${p.noDraft}${p.empty}
       <div class="wc-textwrap">
         <p class="wc-read" id="tq-read" role="textbox" tabindex="0" aria-label="Teacher comment. Click to type." title="Click to type" data-action="tqSentences" data-do="wcType"${hasText ? '' : ' hidden'}>${readingHtml(p.rows, p.text)}</p>
@@ -242,11 +244,10 @@ window.ReportWcComment = (function () {
       <div id="wc-notes">${notesHtml()}</div>
       <div class="qn-comment-foot wc-foot-row" id="tq-comment-foot"${hasText ? '' : ' hidden'}>
         <span class="wc-foot-chips">${p.count}
-        <span class="wc-chip" id="wc-reads" title="How hard the comment is to read, as a school grade">${esc(reads)}</span>
         <button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button></span>
         <span class="wc-foot-acts">
-        <button type="button" class="wc-btn" data-action="tqGenerate" id="tq-generate" title="Writes the comment again from the gradebook, your ratings and Student Voice. Sentences you typed or edited and your order stay.">Generate Again</button>
-        <button type="button" class="wc-btn qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${p.copyIcon}<span class="qn-copy-label">Copy</span></button></span>
+        <button type="button" class="btn btn-ghost wc-act" data-action="tqSentences" data-do="wcBank" id="tq-comment-bank" title="Adds a sentence from your bank. Click in the comment first to put it there.">${BANK_ICON}<span>Comment Bank</span></button>
+        <button type="button" class="btn btn-ghost wc-act qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${p.copyIcon}<span class="qn-copy-label">Copy</span></button></span>
       </div>`;
   }
 
@@ -254,13 +255,16 @@ window.ReportWcComment = (function () {
   // html-safe: see _body; the title row's words esc()'d
   function card(cid, student, f) {
     var p = H.commentParts(cid, student, f);
+    var again = p.thisTab
+      ? `<button type="button" class="btn btn-ghost wc-act" data-action="tqGenerate" id="tq-generate" title="Writes the comment again from the gradebook, your ratings and Student Voice. Sentences you typed or edited and your order stay.">${GEN_ICON}<span>Generate Again</span></button>`
+      : '';
     var first = p.thisTab
-      ? `<button type="button" class="wc-btn wc-btn-main" data-action="tqGenerate" id="tq-generate-first"${p.text.trim() ? ' hidden' : ''} title="Writes the comment from the gradebook, your ratings and Student Voice.">Generate Comment</button>`
+      ? `<button type="button" class="btn btn-primary wc-act" data-action="tqGenerate" id="tq-generate-first"${p.text.trim() ? ' hidden' : ''} title="Writes the comment from the gradebook, your ratings and Student Voice.">${GEN_ICON}<span>Generate Comment</span></button>`
       : '';
     return `<div class="qn-comment wc-comment" id="tq-comment-card">
       <div class="qn-comment-top wc-comment-top">
         <h2 class="wc-comment-title">Teacher Comment</h2>
-        ${p.approved}${_tabs(p)}${first}
+        ${p.approved}${_tabs(p)}${first}${again}
       </div>
       ${p.stale}${p.pronoun}${p.basis}
       <div id="tq-warn-wrap">${p.warn}</div>
@@ -275,8 +279,7 @@ window.ReportWcComment = (function () {
     readingHtml: readingHtml,
     notes: notes,
     syncNotes: syncNotes,
-    syncReads: syncReads,
-    readsText: readsText,
+    goesText: goesText,
     vary: vary,
     keepNote: keepNote,
   };

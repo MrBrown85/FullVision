@@ -1820,32 +1820,10 @@ window.CommentBank = (function () {
     });
   }
 
-  /* The character limit as typed in its box: { ok: true, limit } for a
-     whole number from LIMIT_MIN to LIMIT_MAX (limit null when the box is
-     empty: no limit), else { ok: false }. A stray letter, 0, a negative or
-     a decimal is never read as "no limit". */
-  var LIMIT_MIN = 100;
-  var LIMIT_MAX = 5000;
-  function parseLimit(value) {
-    var t = String(value == null ? '' : value).trim();
-    if (t === '') return { ok: true, limit: null };
-    if (!/^\d+$/.test(t)) return { ok: false };
-    var n = Number(t);
-    return n >= LIMIT_MIN && n <= LIMIT_MAX ? { ok: true, limit: n } : { ok: false };
-  }
-  /* A saved limit: a whole number above 0, as older code saved it (one
-     below 100 is honoured as is; only a new entry is held to parseLimit).
-     Anything else is none. */
-  function _savedLimit(v) {
-    var n = Math.floor(Number(v));
-    return v != null && v !== '' && n > 0 ? n : null;
-  }
-
   /* A class's comment settings, kept in its report settings (report_config,
      under blocks_config.commentSettings): the support lines it ticked and
      wrote, each student's own pick per report ({ termId: { sid: line id or
-     'none' } }), the closing sentence and the character limit (null: no
-     limit). The late-work line is the class's Late Work Policy. */
+     'none' } }), and the closing sentence. The late-work line is the class's Late Work Policy. */
   function classSettings(cid) {
     var rc = (typeof getReportConfig === 'function' && getReportConfig(cid)) || {};
     var cs = (rc && rc.commentSettings) || {};
@@ -1867,7 +1845,6 @@ window.CommentBank = (function () {
         : [],
       languageGoalsFor: cs.languageGoalsFor && typeof cs.languageGoalsFor === 'object' ? cs.languageGoalsFor : {},
       closing: String(cs.closing || '').trim(),
-      charLimit: _savedLimit(cs.charLimit),
     };
   }
 
@@ -1909,7 +1886,7 @@ window.CommentBank = (function () {
      report: { support: the ticked lines, pick: this student's own pick
      (a line id, 'none' to leave the sentence out, or null), languageGoals:
      the ticked Language Goals lines, goalPick: this student's pick among
-     them (a line id or null), closing, late, charLimit }. Teacher text is
+     them (a line id or null), closing, late }. Teacher text is
      used exactly as typed. */
   function classLines(cid, sid, termId, family) {
     var cs = classSettings(cid);
@@ -1929,7 +1906,6 @@ window.CommentBank = (function () {
       goalPick: goalPick,
       closing: cs.closing,
       late: String(course.lateWorkPolicy || '').trim(),
-      charLimit: cs.charLimit,
     };
   }
 
@@ -8507,9 +8483,6 @@ window.CommentBank = (function () {
     fitName: fitName,
     classSettings: classSettings,
     classLines: classLines,
-    parseLimit: parseLimit,
-    LIMIT_MIN: LIMIT_MIN,
-    LIMIT_MAX: LIMIT_MAX,
     angleFacts: angleFacts,
     stepOf: stepOf,
     list: list,

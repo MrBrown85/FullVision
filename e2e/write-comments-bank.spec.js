@@ -47,7 +47,7 @@ test('Write Your Own: saved from the sentence sheet, shown as Yours, used, and s
   await page.locator('.qn-hs-stop[data-habit="completes"][data-value="4"]').click();
   await openBox(page, 'habits');
   await page.locator('.wc-box[data-part="habits"] [data-do="wcBrowse"]').click();
-  const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+  const sheet = page.getByRole('dialog', { name: 'Comment Bank for Cece' });
   await sheet.locator('[role="tab"]', { hasText: 'Work Habits' }).click();
   const box = sheet.locator('#tq-own');
   await expect(sheet.locator('.qn-browse-bar .btn')).toHaveText('+ Write Your Own');
@@ -159,7 +159,7 @@ test('Add to My Bank from the comment box: the pill shows only on a typed senten
   expect(await page.evaluate(() => PersonalBank.list().length)).toBe(1);
   await openBox(page, 'strength');
   await page.locator('.wc-box[data-part="strength"] [data-do="wcBrowse"]').click();
-  const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+  const sheet = page.getByRole('dialog', { name: 'Comment Bank for Cece' });
   await sheet.locator('[role="tab"]', { hasText: 'Strength' }).click();
   await expect(sheet.locator('.qn-chip-yours')).toHaveText(['Yours · Any Student']);
   await sheet.locator('.qn-browse-del').click();
@@ -236,4 +236,39 @@ test('the grip moves a sentence with the arrow keys and the comment follows', as
   expect((await comment(page)).split(' ').sort()).toEqual(before.split(' ').sort());
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => comment(page)).toBe(before);
+});
+
+/* Comment Bank under the comment (Colin, Nov 26: "teachers should be able
+   to just click the comment bank button to allow them to insert it
+   anywhere"): the sentence goes where the teacher last clicked in the
+   comment, else at its end, and each next one after it; the sheet says
+   where. */
+test('Comment Bank puts a sentence where the teacher clicked in the comment, else at its end', async ({ page }) => {
+  await open(page);
+  await generated(page);
+  const sents = page.locator('#tq-read .wc-sent');
+  const first = await sents.first().textContent();
+  const n = await sents.count();
+  // No click in the comment: at its end.
+  await page.locator('#tq-comment-bank').click();
+  const sheet = page.getByRole('dialog', { name: 'Comment Bank for Cece' });
+  await expect(sheet.locator('.qn-browse-goes')).toHaveText('Goes at the end of the comment.');
+  await sheet.locator('.qn-browse-done').click();
+  await expect(page.locator('#tq-comment-bank')).toBeFocused();
+  // A click in the first sentence: after it.
+  await page.locator('#tq-read').click({ position: { x: 80, y: 10 } });
+  await expect(page.locator('#tq-narrative')).toBeFocused();
+  expect(await page.locator('#tq-narrative').evaluate(el => el.selectionStart)).toBeLessThan(first.length);
+  await page.locator('#tq-comment-bank').click();
+  await expect(sheet.locator('.qn-browse-goes')).toContainText('Goes after “' + first.split(' ').slice(0, 3).join(' '));
+  const use = sheet.locator('#tq-browse-list [data-do="use"]').first();
+  const used = (
+    await use.evaluate(b => b.closest('.qn-browse-row').querySelector('.qn-browse-text, span').textContent)
+  ).trim();
+  await use.click();
+  await sheet.locator('.qn-browse-done').click();
+  await expect(sents).toHaveCount(n + 1);
+  await expect(sents.nth(0)).toHaveText(first);
+  // The sheet names the student; in the comment, after the first sentence, it says She.
+  await expect(sents.nth(1)).toContainText(used.split(' ').slice(1, 5).join(' '));
 });

@@ -581,8 +581,17 @@
   padding: 2px 1px;
   transition: background-color 0.15s;
 }
+.wc-sent.picked {
+  background: color-mix(in srgb, var(--wc-pick) 18%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--wc-pick) 70%, transparent);
+}
 .wc-sent.hot {
   background: rgba(0, 102, 204, 0.14);
+}
+.wc-box.picked {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 2px color-mix(in srgb, var(--tint) 55%, transparent);
 }
 .wc-sent.last {
   box-shadow: inset 0 -2px 0 #d39a2b;
@@ -626,43 +635,68 @@
   color: var(--wc-amber-ink);
   white-space: nowrap;
 }
+/* Under the comment: the count at the left, the three buttons at the
+   right, all on one line; in a column too narrow for that, the buttons
+   take a line of their own under the count, never one at a time. */
 .wc-foot-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 6px;
   margin-top: 14px;
 }
-/* The two buttons stay together on the first line; in a narrow column the
-   count and the reading grade stack instead, so no word is cut. */
 .wc-foot-chips {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 0 auto;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 .wc-foot-acts {
   flex: 0 0 auto;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 6px;
 }
+/* FullVision's own buttons (styles.css .btn), each with its icon. */
+.wc-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+.wc-act svg {
+  flex: 0 0 auto;
+}
+.wc-act:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
 .wc-foot-row[hidden] {
   display: none;
 }
-.wc-foot-row .wc-chip {
-  height: 26px;
-  border-radius: 7px;
-}
-.wc-foot-row .qn-count-btn,
 .wc-foot-row .qn-count-wrap {
   white-space: nowrap;
+  font-size: var(--text-base);
 }
-.wc-foot-row .qn-count-btn {
-  height: 26px;
-  border-radius: 7px;
+/* Generate Again sits at the top of the card, beside This Report | Term 1,
+   once there is a comment; before, Generate Comment is there. */
+.wc-act[hidden],
+.wc-comment:has(#tq-comment-foot[hidden]) #tq-generate {
+  display: none;
+}
+.wc-act.qn-copy {
+  border: 0;
+  font-size: var(--text-base);
+  background: var(--divider-subtle);
+  line-height: 1;
+}
+.wc-comment-top .wc-act {
+  margin-left: auto;
+}
+.wc-act.qn-copy:hover {
+  background: var(--overlay-hover);
 }
 @media (prefers-reduced-motion: reduce) {
   .wc-box,
@@ -679,4 +713,13 @@
 body.qn-roster #gb-sidebar .student-row-note {
   color: var(--score-2-text);
   font-weight: 600;
+}
+
+/* Comment Bank's sheet says where the sentence goes. */
+.qn-browse-goes {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text);
 }

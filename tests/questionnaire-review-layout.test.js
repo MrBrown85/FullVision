@@ -143,7 +143,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(RQ.notHandedIn(cid, st.id)).toHaveLength(f.record.missing);
   });
 
-  it('draws the review screen: header, habits grid, At a Glance, Voice, comment, attendance; no bank', () => {
+  it('draws the review screen: header, habits grid, At a Glance, Voice, comment, attendance, Comment Bank', () => {
     const st = cece();
     RQ.tqStudentIndex = RQ.getTqStudents().findIndex(s => s.id === st.id);
     const html = RQ.renderTermQuestionnaire(cid);
@@ -180,7 +180,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(html).toContain('Classes Absent');
     expect(html).toContain('Times Late');
     expect(html).toContain('Optional. Left out until entered.');
-    expect(html).not.toContain('Comment Bank');
+    // Comment Bank is the button under the comment that opens the bank's sheet.
+    expect(html).toContain('id="tq-comment-bank"');
     expect(html).not.toContain('What FullVision Has');
     expect(html).not.toContain('Save and Next');
     expect(html).not.toContain('MyEd');

@@ -383,5 +383,15 @@ window.ReportWcBoxes = (function () {
     });
   }
 
-  return { build: build, candidate: candidate, ctxFor: ctxFor, fact: fact, btn: btn, takeLines: takeLines };
+  return {
+    build: build,
+    candidate: candidate,
+    ctxFor: ctxFor,
+    fact: fact,
+    btn: btn,
+    takeLines: takeLines,
+    browsePart: function (/** @type {string} */ key) {
+      return BROWSE_PART[key] || '';
+    },
+  };
 })();
