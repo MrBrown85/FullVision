@@ -203,8 +203,8 @@ window.PageDashboard = (function () {
       ),
     });
 
-    // Questions From Students (S10-F4): only while a class has one waiting.
-    html += Overview.questionsCardHtml(cid);
+    // Questions From Students (S10-F4): in the Inbox as lines (DashInboxQuestions, Nov 27); this card only where the class has no Inbox.
+    if (!(window.GraderWork && GraderWork.workOnInClass(cid))) html += Overview.questionsCardHtml(cid);
 
     // The students, cards or the grid, in a box of their own (renderStudents).
     html +=

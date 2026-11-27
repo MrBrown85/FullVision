@@ -295,6 +295,7 @@ const PRECACHE_URLS = [
   '/teacher/dash-bulletins.js',
   '/teacher/dash-inbox-model.js',
   '/teacher/dash-inbox.js',
+  '/teacher/dash-inbox-questions.js',
   '/teacher/dash-inbox-drop.js',
   '/teacher/dash-inbox-queue.js',
   '/teacher/dash-inbox-stacks.js',

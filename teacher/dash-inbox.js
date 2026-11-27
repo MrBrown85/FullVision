@@ -212,11 +212,6 @@ window.DashInbox = (function () {
     return /** @type {any} */ (window).DashInboxTargets;
   }
 
-  /** @param {any} view @param {any} queue */
-  function _quietNow(view, queue) {
-    return !!(view.key === 'stacks' && queue.on && queue.caughtUp && !(queue.returns && queue.returns.length) && _T());
-  }
-
   /** The one-line tile.
    * @param {string} cid @param {string} swtch @param {any} queue @param {boolean} rest the targets are the body */
   function _quietHtml(cid, swtch, queue, rest) {
@@ -311,7 +306,7 @@ window.DashInbox = (function () {
         })
         .join('') +
       '</div>';
-    var quiet = _quietNow(view, queue);
+    var quiet = DashInboxQuestions.quiet(view, queue, cid, !!_T());
     _quiet = quiet;
     if (quiet) return _quietHtml(cid, swtch, queue, !(ctx && ctx.bulletins));
     var action = view.header ? view.header(cid, queue, queue) : '';
@@ -325,6 +320,7 @@ window.DashInbox = (function () {
       action +
       '</div>' +
       '<div class="dash-inbox-body">' +
+      DashInboxQuestions.html(cid) +
       view.html(cid, queue, queue) +
       '</div></section>'
     );
