@@ -56,9 +56,12 @@ window.ReportWcDraw = (function () {
     var keep = l.earlier
       ? `<button type="button" class="wc-btn" data-action="tqSentences" data-do="keepEarlier" data-row="${l.ri}" title="Makes this sentence yours. Generate keeps it.">Keep This Sentence</button>`
       : '';
+    // A sentence already kept says so; Add to My Bank is offered only for one that is not.
     var bank =
       l.yours && /** @type {any} */ (window).PersonalBank && !l.classLine
-        ? `<button type="button" class="wc-btn" data-action="tqSentences" data-do="ownAdd" data-row="${l.ri}" title="Adds this sentence to your bank, for other students it fits.">Add to My Bank</button>`
+        ? l.inBank
+          ? chip('In My Bank', 'own', 'This sentence is in your bank, for other students it fits.')
+          : `<button type="button" class="wc-btn" data-action="tqSentences" data-do="ownAdd" data-row="${l.ri}" title="Adds this sentence to your bank, for other students it fits.">Add to My Bank</button>`
         : '';
     var cls = 'wc-line' + (l.added ? ' added' : '') + (l.claim ? ' flag' : '');
     return `<div class="${cls}" data-row="${l.ri}" data-rk="${esc(l.rk)}" data-wc-part="${esc(l.box)}">
