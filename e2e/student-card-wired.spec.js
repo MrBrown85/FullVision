@@ -201,7 +201,7 @@ for (const size of [
 test.describe('a real card: the keyboard alone', () => {
   test.use(CHROMEBOOK);
 
-  test('the code, the check, the list and Log Out, without a mouse', async ({ page, browserName }) => {
+  test('the code, the check, the list and Log Out, without a mouse @flaky', async ({ page, browserName }) => {
     // WebKit on a Mac does not stop on buttons with Tab (Safari's own setting, off by default).
     test.skip(browserName === 'webkit', 'Tab skips buttons in WebKit by default');
     const fn = school();
