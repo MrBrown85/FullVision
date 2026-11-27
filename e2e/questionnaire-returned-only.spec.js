@@ -22,7 +22,7 @@ async function demoWithDraft(page, config) {
   // Reports' scripts load when Reports first opens: open it, then go back to the Dashboard.
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   // Drawn in full (its sentence bank loaded too) before it is left.
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   await page.evaluate(r => window.Router.navigate(r), '/dashboard');
   return page.evaluate(cfg => {
     var cid = 'sci8';

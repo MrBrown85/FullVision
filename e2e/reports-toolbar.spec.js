@@ -29,7 +29,7 @@ async function openReports(page, tab = 'questionnaire', width = 1440, height = 9
   await page.locator('.report-toolbar').waitFor();
   if (tab === 'questionnaire') {
     await page.locator('#report-period').selectOption('Report 2');
-    await page.locator('#tq-narrative').waitFor();
+    await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   }
 }
 

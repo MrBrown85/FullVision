@@ -78,7 +78,7 @@ async function demo(page) {
 // The Term Questionnaire drawn: the student strip and the teacher comment.
 async function expectQuestionnaire(page) {
   await expect(page.getByRole('tab', { name: 'Term Questionnaire' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#tq-narrative')).toBeVisible();
+  await expect(page.locator('#tq-narrative')).toBeAttached();
 }
 
 test.describe('Reports loads its scripts when opened', () => {

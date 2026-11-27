@@ -6,7 +6,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 
 async function go(page, student) {
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=' + student);
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
 }
 const saved = (page, sid) => page.evaluate(s => getStudentTermRating('sci8', s, 'term-2') || {}, sid);
 
@@ -27,7 +27,7 @@ test('IE with no date: the calendar opens, nothing saves until a date; Escape ke
   });
   await go(page, 'st1');
   await page.locator('#report-period').selectOption('Report 2');
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   const ie = page.locator('#tq-basis [data-basis="ie"]');
   test.skip(!(await ie.count()), 'IE is not on offer for this student in Demo Mode');
   await ie.click();

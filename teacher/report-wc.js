@@ -216,6 +216,9 @@ window.ReportWc = (function () {
     act: act,
     search: search,
     closeWays: closeWays,
+    ways: function () {
+      return ui.ways;
+    },
     reset: reset,
     typing: function () {
       return ui.typing;

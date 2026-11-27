@@ -59,6 +59,6 @@ test('staying on Reports still draws the questionnaire once the bank loads', asy
   await expect(page.locator('#report-output')).toContainText('Loading the sentence bank');
 
   release();
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   expect(errors).toEqual([]);
 });

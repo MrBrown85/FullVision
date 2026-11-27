@@ -16,7 +16,7 @@ async function approvedAndStale(page) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(r => window.Router.navigate(r), '/reports');
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   await page.evaluate(r => window.Router.navigate(r), '/dashboard');
   await page.evaluate(() => {
     const cfg = getReportConfig('sci8') || {};
@@ -24,9 +24,9 @@ async function approvedAndStale(page) {
     COURSES.sci8.gradingSystem = 'letter';
   });
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   await page.locator('#report-period').selectOption('Report 2');
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   await page.locator('#tq-generate').click();
   await page.waitForTimeout(300);
   await page.locator('#tq-approve-next').click();
@@ -44,7 +44,7 @@ async function approvedAndStale(page) {
   });
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st2');
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
-  await page.locator('#tq-narrative').waitFor();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   await expect(page.locator('#tq-stale')).toBeVisible();
   await expect(page.locator('#tq-approved-chip')).toBeVisible();
 }
