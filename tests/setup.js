@@ -420,6 +420,7 @@ load('teacher/competency-evidence.js');
 load('shared/work-viewer.js');
 load('shared/work-wall.js');
 load('teacher/student-overrides.js');
+load('teacher/rubric-print-controls.js');
 load('teacher/rubric-print.js');
 load('teacher/work-rubric-card.js');
 load('teacher/add-work-stage.js');

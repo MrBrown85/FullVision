@@ -725,7 +725,7 @@
   "teacher/rubric-print.js :: _openNow": 110,
   "teacher/rubric-print.js :: _studentsGroupHtml": 69,
   "teacher/rubric-print.js :: renderSheet": 92,
-  "teacher/rubric-print.js :: sheetData": 88,
+  "teacher/rubric-print.js :: sheetData": 87,
   "teacher/scan-labels.js :: _html": 154,
   "teacher/student-cards.js :: _makeAndPrint": 109,
   "teacher/student-cards.js :: _makeAndPrint > then callback 1": 68,

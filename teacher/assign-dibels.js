@@ -721,7 +721,7 @@
     var tagObjs = _scoreTagObjs(cid, a);
     return (
       (a.description
-        ? '<div style="font-size:0.9375rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
+        ? '<div style="font-size:0.9375rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;white-space:pre-line;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
           esc(a.description) +
           '</div>'
         : '') +
