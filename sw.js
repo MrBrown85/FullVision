@@ -136,6 +136,7 @@ const PRECACHE_URLS = [
   '/s/quiz-view.js',
   '/s/quiz.css',
   '/s/send-note.js',
+  '/s/keyboard-settle.js',
   '/s/send.js',
   '/s/feedback.js',
   '/s/handouts.js',
