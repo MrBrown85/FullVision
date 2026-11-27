@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { waitForRulerStill } from './helpers.js';
 
 /* Grading > Points and Proficiency: one 0–100% ruler. The markers, the typed
    percent, the nudges and the course % rule are pinned in
@@ -15,7 +14,6 @@ async function openGrading(page) {
   await page.locator('[data-action="openClassManager"]').first().click();
   await page.getByRole('tab', { name: /^Grading/ }).click();
   await expect(page.locator('#cm-pts-ruler')).toBeVisible();
-  await waitForRulerStill(page);
 }
 
 // Saving a Counts As change asks first when a Demo Mode term has already ended.

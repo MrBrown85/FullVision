@@ -256,7 +256,9 @@ window.CmPtsRuler = (function () {
     var steps = M.values(v.shown);
     var rowsNow = M.rows(steps);
     var plan = v.editing ? M.ghosts(v.saved, v.shown, v.previewing) : null;
-    var two = plan ? plan.twoRows : rowsNow.indexOf(1) >= 0;
+    // Editing always keeps the room for two rows: a preview or a drag that needs the second one must not
+    // move the presets below it from under the pointer (the button would leave and the press be lost).
+    var two = v.editing || rowsNow.indexOf(1) >= 0;
     var at = M.starts(v.shown);
     var markers = COUNTS_AS_STEPS.map(function (s, i) {
       return markerHtml(v, i, rowsNow);
@@ -307,7 +309,7 @@ window.CmPtsRuler = (function () {
     var at = M.starts(v.shown);
     var plan = M.ghosts(v.saved, v.shown, v.previewing);
     ruler.classList.toggle('is-gliding', !!glide);
-    ruler.classList.toggle('is-two-rows', plan.twoRows);
+    ruler.classList.toggle('is-two-rows', true);
     COUNTS_AS_STEPS.forEach(function (s, i) {
       var m = ruler.querySelector('.cm-pts-marker[data-key="' + CSS.escape(s.key) + '"]:not(.cm-pts-ghost)');
       if (!m) return;

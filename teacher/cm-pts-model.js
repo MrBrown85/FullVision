@@ -210,8 +210,8 @@ window.CmPtsModel = (function () {
     var nv = values(shown);
     var rowsSaved = rows(sv);
     var rowsNow = rows(nv);
-    /** @type {{ ghosts: any[], tethers: any[], edges: any[], twoRows: boolean }} */
-    var out = { ghosts: [], tethers: [], edges: [], twoRows: rowsNow.indexOf(1) >= 0 };
+    /** @type {{ ghosts: any[], tethers: any[], edges: any[] }} */
+    var out = { ghosts: [], tethers: [], edges: [] };
     COUNTS_AS_STEPS.forEach(function (step, i) {
       if (Math.abs(nv[i] - sv[i]) <= SAME) return;
       var key = step.key;
@@ -230,7 +230,6 @@ window.CmPtsModel = (function () {
         ring: !(mine && room),
         title: 'Put ' + stepLabel(key) + ' back at ' + pctText(sv[i]) + '%',
       });
-      if (rowsSaved[i] === 1) out.twoRows = true;
       if (rowsSaved[i] === rowsNow[i])
         out.tethers.push({ at: Math.min(nv[i], sv[i]), width: Math.abs(nv[i] - sv[i]), low: rowsNow[i] === 1 });
     });

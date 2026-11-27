@@ -26,15 +26,6 @@ async function openGrading(page, { letter = true, width = 1440 } = {}) {
   if (letter) await page.locator('[data-action="cmSetGradingSystem"][data-value="letter"]').click();
   await expect(page.locator('#cm-pts-ruler')).toBeVisible();
   await page.locator('#cm-pts-ruler').scrollIntoViewIfNeeded();
-  // The page redraws once the class's other settings have loaded: wait for the ruler to hold still.
-  await expect
-    .poll(async () => {
-      const a = await page.locator(MARKER_3).boundingBox();
-      await page.waitForTimeout(120);
-      const b = await page.locator(MARKER_3).boundingBox();
-      return a.x === b.x && a.y === b.y;
-    })
-    .toBe(true);
 }
 
 // A press on a marker, a pull across the ruler, and (unless held) the release.
@@ -151,6 +142,30 @@ test.describe('editing', () => {
     // Back to where it was saved: nothing moves, so nothing is said.
     await page.locator('.cm-pts-ghost[data-key="3"] .cm-pts-pill').click();
     await expect(line).toHaveText('');
+  });
+
+  test('pointing at a preset does not move the presets, so a press on one is never lost', async ({ page }) => {
+    await slowed(page);
+    await clickAction(page, 'cmPtsEdit');
+    const bc = page.locator('[data-action="cmPointsScaleBc"]');
+    const before = await bc.boundingBox();
+    await bc.hover();
+    // The preview needs a second row of markers: the room for it was there already.
+    await expect.poll(() => left(page, '3')).toBe('80%');
+    await expect(page.locator('#cm-pts-ruler')).toHaveClass(/is-two-rows/);
+    expect((await bc.boundingBox()).y).toBe(before.y);
+    // Edit and the preset pressed at once, on a slow computer: the draft takes it, and Save is on.
+    await bc.click();
+    await expect(page.locator('#cm-pts-save')).toBeEnabled();
+    expect((await scale(page)).percents[3]).toBe(75);
+  });
+
+  test('a drag started straight after Edit, on a slow computer, is not lost', async ({ page }) => {
+    await slowed(page);
+    await clickAction(page, 'cmPtsEdit');
+    await drag(page, MARKER_3, 45);
+    await expect(page.locator('#cm-pts-save')).toBeEnabled();
+    expect(Number((await left(page, '3')).replace('%', ''))).toBeGreaterThan(75.5);
   });
 
   test('a ghost marks the saved place, and clicking it puts the marker back', async ({ page }) => {

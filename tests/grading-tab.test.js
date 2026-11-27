@@ -644,6 +644,18 @@ describe('Points and Proficiency as one scale on the Grading tab', () => {
     const redraw = () => DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
     const NOTICE = 'Points and Proficiency changed on another device, so nothing was saved.';
 
+    it('a load that brings the scale already shown drops nothing: not the draft, the pick, nor a line', () => {
+      edit();
+      pick('step', '3');
+      type('80');
+      _cache.courseConfigs[CID].gradingScale = structuredClone(DEFAULT_GRADING_SCALE);
+      redraw();
+      expect(main.innerHTML).not.toContain(NOTICE);
+      expect(draft().percents[3]).toBe(80);
+      expect(main.innerHTML).toMatch(/id="cm-pts-step-3"[^>]*aria-pressed="true"/);
+      expect(main.innerHTML).toContain('cm-pts-scroll is-editing');
+    });
+
     it('at rest: the ruler shows it, and the next Edit starts from it', () => {
       arrives({ '3+': 90 });
       redraw();

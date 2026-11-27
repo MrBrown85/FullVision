@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoApp, clickAction, getText, waitForRulerStill } from './helpers.js';
+import { gotoApp, clickAction, getText } from './helpers.js';
 
 /* Pins what Class Settings > Grading does today in Demo Mode (Science 8,
    sci8), before any split of teacher/dash-class-manager.js: the grading
@@ -286,7 +286,6 @@ test.describe('Class Settings Grading tab in Demo Mode', () => {
     expect(await percents()).toEqual(DEFAULT);
 
     // Locked until Edit: the preset is a draft, and nothing is saved until Save.
-    await waitForRulerStill(page);
     await clickAction(page, 'cmPtsEdit');
     await clickAction(page, 'cmPointsScaleBc');
     expect(await percents()).toEqual(DEFAULT);
@@ -309,7 +308,6 @@ test.describe('Class Settings Grading tab in Demo Mode', () => {
     await expect(countsAsRule(page)).toContainText('Proficient counts as 80% now.');
     await expect(checkValue(page)).toHaveText(bcOverall);
 
-    await waitForRulerStill(page);
     await clickAction(page, 'cmPtsEdit');
     await clickAction(page, 'cmPointsScaleReset');
     await clickAction(page, 'cmPtsSave');
