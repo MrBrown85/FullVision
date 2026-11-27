@@ -690,7 +690,7 @@ window.MMarkUp = (function () {
     live.innerHTML = MarkupDraw.svgHtml({ v: 1, marks: [_s.stroke] }, _s.size.h / _s.size.w);
   }
 
-  /* The page's notes, each by its number, and what the student sees, in a
+  /* The page's notes, each by its number, and who sees them and when, in a
      white card above the tools (the board "Phone: Mark Up a Photo"). */
   // html-safe: note words and the line go through MC.esc; numbers are ours
   function _notesCardHtml() {
@@ -715,6 +715,17 @@ window.MMarkUp = (function () {
     );
   }
 
+  /* Whether the student sees these marks, and when: a fact about the student's work, not a hint, so it
+     stays in the new look (Nov 26 2026), in fewer words. */
+  function _seesLine() {
+    var first = _first(_student(_s.cid, _s.sid));
+    var sw = typeof getAssessmentStudentWork === 'function' ? getAssessmentStudentWork(_s.cid, _s.aid) : null;
+    if (sw && sw.students_see_markup === false) return first + ' won’t see these marks.';
+    if (window.MGrade && MGrade.holdsGrades && MGrade.holdsGrades(_s.cid))
+      return first + ' sees these when you return the work.';
+    return first + ' sees these once you tap Done.';
+  }
+
   function _drawPage() {
     var box = document.querySelector('#m-markup .m-markup-marks');
     var layer = document.querySelector('#m-markup .m-markup-layer');
@@ -729,18 +740,6 @@ window.MMarkUp = (function () {
     box.innerHTML = _marksHtml();
     if (_s.stroke) _drawStroke();
     _applyView();
-  }
-
-  // What the student sees of these marks, and when.
-  function _seesLine() {
-    var st = _student(_s.cid, _s.sid);
-    var first = _first(st);
-    var sw = typeof getAssessmentStudentWork === 'function' ? getAssessmentStudentWork(_s.cid, _s.aid) : null;
-    if (sw && sw.students_see_markup === false)
-      return first + ' doesn’t see these marks. Students See Your Mark Up is off for this work.';
-    if (window.MGrade && MGrade.holdsGrades && MGrade.holdsGrades(_s.cid))
-      return first + ' sees these marks and notes when you return the work.';
-    return first + ' sees these marks and notes once you tap Done.';
   }
 
   // html-safe: tool names are fixed; note text and messages go through MC.esc
@@ -816,7 +815,7 @@ window.MMarkUp = (function () {
             '"></button>'
           );
         }).join('') +
-        '</span><p class="m-markup-hint">One finger draws. Two fingers move the page.</p></div>';
+        '</span></div>';
     }
     // html-safe: built above from escaped parts
     box.innerHTML = html;

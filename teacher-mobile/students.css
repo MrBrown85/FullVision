@@ -710,3 +710,53 @@
   font-size: 14px;
   color: var(--text);
 }
+
+/* Competencies in the profile: the same flat rows as All Work. A folder is a
+   quiet label with its level at the right; each competency is a name and its
+   level, opening in place. No dots, trails or arrows: the open row says
+   Improving or Dropped in words. */
+.m-sp-row-body .m-group-header {
+  padding: 16px 0 4px;
+}
+.m-sp-row-body .m-group-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.m-sp-row-body .m-group-prof {
+  font-size: 15px;
+}
+.m-sp-row-body .m-section-card {
+  margin: 0;
+  border-radius: 0;
+  background: none;
+}
+.m-sp-row-body .m-section-card + .m-section-card,
+.m-sp-row-body .m-group-header + .m-section-card {
+  border-top: 0;
+}
+.m-sp-row-body .m-section-card + .m-section-card {
+  border-top: 0.5px solid var(--divider-medium);
+}
+.m-sp-row-body .m-section-header {
+  gap: 12px;
+  padding: 12px 0;
+  align-items: flex-start;
+}
+.m-sp-row-body .m-section-name {
+  font-size: 16px;
+  line-height: 1.3;
+}
+.m-sp-row-body .m-section-prof {
+  margin-right: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.m-sp-row-body .m-section-detail {
+  padding-right: 0;
+  padding-left: 0;
+  border-top: 0;
+}
+.m-sp-row-body .m-section-card.m-expanded .m-section-detail {
+  padding: 0 0 12px;
+}

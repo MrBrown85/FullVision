@@ -480,6 +480,27 @@ window.WorkWall = (function () {
     );
   }
 
+  function _byHtml(m) {
+    if (!m.views.list.length) return '';
+    var phone = document.body.classList.contains('mobile-mode'); // a form row there
+    return (
+      '<div class="ww-by-row' +
+      (phone ? ' m-form-row m-form-pick' : '') +
+      '"><label class="ww-label" for="ww-by">' +
+      esc(m.views.label) +
+      '</label><select id="ww-by" class="ww-by" data-ww="by"><option value=""' +
+      (m.by ? '' : ' selected') +
+      '>Whole Piece</option>' +
+      m.views.list
+        .map(function (x) {
+          var on = m.by && m.by.id === x.id;
+          return '<option value="' + esc(x.id) + '"' + (on ? ' selected' : '') + '>' + esc(x.name) + '</option>';
+        })
+        .join('') +
+      '</select></div>'
+    );
+  }
+
   function _wallHtml(w, m, canGrade) {
     var rows = _shownRows(w, m);
     var course = (typeof COURSES !== 'undefined' && COURSES[w.cid]) || {};
@@ -518,36 +539,15 @@ window.WorkWall = (function () {
           '><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>Grade in This Order</button>'
         : '') +
       '</div>' +
-      '<div class="ww-filters">' +
+      '<div class="ww-filters"><div class="ww-pills">' +
       _pill(w, 'all', 'All', m.counts.all) +
       LEVELS.map(function (n) {
         return _pill(w, n, scoreLevelText(n, 0), m.counts.level[n], true);
       }).join('') +
       _pill(w, 'tograde', 'To Grade', m.counts.tograde) +
       _pill(w, 'notin', 'Not In', m.counts.notin) +
-      '<span class="ww-gap"></span>' +
-      (m.views.list.length
-        ? '<label class="ww-label" for="ww-by">' +
-          esc(m.views.label) +
-          '</label><select id="ww-by" class="ww-by" data-ww="by">' +
-          '<option value=""' +
-          (m.by ? '' : ' selected') +
-          '>Whole Piece</option>' +
-          m.views.list
-            .map(function (x) {
-              return (
-                '<option value="' +
-                esc(x.id) +
-                '"' +
-                (m.by && m.by.id === x.id ? ' selected' : '') +
-                '>' +
-                esc(x.name) +
-                '</option>'
-              );
-            })
-            .join('') +
-          '</select>'
-        : '') +
+      '</div><span class="ww-gap"></span>' +
+      _byHtml(m) +
       '</div>' +
       '<div class="ww-scroll">';
     if (!rows.length) {

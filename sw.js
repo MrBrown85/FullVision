@@ -433,6 +433,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/grade-look.js',
   '/teacher-mobile/grade-reader.js',
   '/teacher-mobile/revision-sheet.js',
+  '/teacher-mobile/settings-sheet.js',
   '/teacher-mobile/tab-grade.js',
   '/teacher-mobile/level-sheet.js',
   '/teacher-mobile/pull-refresh.js',

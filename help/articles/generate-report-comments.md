@@ -8,7 +8,7 @@ pages:
   - /reports
 demo: /reports
 labels:
-  - Term Questionnaire
+  - Write Comments
   - Work Habits
   - Generate Comment
   - Teacher Comment
@@ -45,7 +45,7 @@ shots:
 
 ## Steps
 
-1. In the **Term Questionnaire**, select a student and rate the six **Work Habits**. Habits left blank are left out of the draft.
+1. In **Write Comments**, select a student and rate the six **Work Habits**. Habits left blank are left out of the draft.
 2. Choose **Generate Comment**. The draft replaces the text under **Teacher Comment**. It opens with the student's grade, then adds sentences on the best piece, strengths, habits, missing work and a next step when the record supports them.
 3. Choose **Generate Comment** again for another version. Sentences the teacher typed or edited stay as written, in the order set. **Undo** brings back the text that was replaced.
 

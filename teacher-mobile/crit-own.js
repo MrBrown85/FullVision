@@ -99,7 +99,7 @@
       '>' +
       html +
       (buttons
-        ? '<div class="m-crit-each"><span class="m-crit-each-label">Line for One Student:</span>' + buttons + '</div>'
+        ? '<div class="m-crit-each"><span class="m-crit-each-label">Line for One Student</span>' + buttons + '</div>'
         : '') +
       '</div>'
     );

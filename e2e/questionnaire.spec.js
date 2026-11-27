@@ -179,7 +179,7 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   await expect(page.locator('.qn-head-sub')).toHaveText('she/her · Student Dashboard ›');
   await page.locator('.qn-head-link').click();
   await page.waitForURL(/\/student\?id=st1/);
-  await page.getByRole('link', { name: 'Term Questionnaire' }).click();
+  await page.getByRole('link', { name: 'Write Comments' }).click();
   await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
 
