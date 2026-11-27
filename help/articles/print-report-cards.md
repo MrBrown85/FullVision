@@ -33,7 +33,7 @@ labels:
   - Student’s Name
   - Cut Line
   - Return By
-  - Comment Lines
+  - Comments Box Height
   - Organize By
   - One List
   - Category
