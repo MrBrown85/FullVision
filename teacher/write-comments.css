@@ -357,6 +357,33 @@
   width: 150px;
   --hs-w: 150px;
 }
+/* The rating as the board draws it: four bars, the ones up to the rating
+   in the part's purple. The stops over them still take the click and the
+   drag, and the keys work as before. */
+.wc-fact .qn-hs-rail,
+.wc-fact .qn-hs-fill,
+.wc-fact .qn-hs-thumb {
+  display: none !important;
+}
+.wc-fact .qn-hs-dot {
+  top: 8px;
+  left: calc(var(--i) * ((100% - 9px) / 4 + 3px));
+  width: calc((100% - 9px) / 4);
+  height: 8px;
+  border-radius: 4px;
+  background: var(--seg-track);
+  overflow: hidden;
+}
+.wc-fact .qn-hs-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--wc-habits, #6b4fbb);
+  opacity: 0;
+}
+.wc-fact .qn-hs.set .qn-hs-dot::after {
+  opacity: clamp(0, calc((var(--at) + 1 - var(--i)) * 1000), 1);
+}
 .wc-fact .qn-att-field {
   flex: 0 0 auto;
 }
@@ -601,10 +628,26 @@
 }
 .wc-foot-row {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
   margin-top: 14px;
+}
+/* The two buttons stay together on the first line; in a narrow column the
+   count and the reading grade stack instead, so no word is cut. */
+.wc-foot-chips {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.wc-foot-acts {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .wc-foot-row[hidden] {
   display: none;
@@ -621,10 +664,6 @@
   height: 26px;
   border-radius: 7px;
 }
-.wc-spacer {
-  flex-grow: 1;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .wc-box,
   .wc-head,

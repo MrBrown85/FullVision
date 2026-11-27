@@ -241,12 +241,12 @@ window.ReportWcComment = (function () {
       </div>
       <div id="wc-notes">${notesHtml()}</div>
       <div class="qn-comment-foot wc-foot-row" id="tq-comment-foot"${hasText ? '' : ' hidden'}>
-        ${p.count}
+        <span class="wc-foot-chips">${p.count}
         <span class="wc-chip" id="wc-reads" title="How hard the comment is to read, as a school grade">${esc(reads)}</span>
-        <button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button>
-        <span class="wc-spacer"></span>
+        <button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button></span>
+        <span class="wc-foot-acts">
         <button type="button" class="wc-btn" data-action="tqGenerate" id="tq-generate" title="Writes the comment again from the gradebook, your ratings and Student Voice. Sentences you typed or edited and your order stay.">Generate Again</button>
-        <button type="button" class="wc-btn qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${p.copyIcon}<span class="qn-copy-label">Copy</span></button>
+        <button type="button" class="wc-btn qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${p.copyIcon}<span class="qn-copy-label">Copy</span></button></span>
       </div>`;
   }
 

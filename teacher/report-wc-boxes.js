@@ -189,7 +189,7 @@ window.ReportWcBoxes = (function () {
           order.find(function (w) {
             return w.id === env.f.bestPickId;
           }) ||
-          (mine.length ? top : null) ||
+          top ||
           {}
         ).title || '',
       foot: foot,
