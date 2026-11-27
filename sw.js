@@ -308,6 +308,7 @@ const PRECACHE_URLS = [
   '/shared/obs-follow-ups.js',
   '/teacher/student-evidence.js',
   '/teacher/competency-evidence.js',
+  '/shared/work-viewer.js',
   '/shared/work-wall.js',
   '/teacher/student-overrides.js',
   '/teacher/rubric-print.js',

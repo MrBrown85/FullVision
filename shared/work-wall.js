@@ -160,165 +160,6 @@ window.WorkWall = (function () {
     };
   }
 
-  /* ── The full-size viewer (both screens) ──────────────────────
-     items: [{ cid, sid, aid }], each with pages in. Steps a page at a time
-     and an item at a time; the whole page is asked for only here. */
-  var _view = null;
-  var _viewPics = null;
-
-  function _viewItem() {
-    if (!_view) return null;
-    var it = _view.items[_view.at];
-    if (!it) return null;
-    var st = (getStudents(it.cid) || []).find(function (s) {
-      return s.id === it.sid;
-    });
-    var a = _piece(it.cid, it.aid);
-    var sub = getStudentSubmission(it.cid, it.sid, it.aid);
-    return st && a && sub ? { it: it, st: st, a: a, sub: sub, pages: _pages(sub) } : null;
-  }
-
-  function _openViewer(items, at, opts) {
-    _closeViewer(true);
-    if (!items.length) return;
-    _view = {
-      items: items,
-      at: Math.max(0, Math.min(at || 0, items.length - 1)),
-      page: (opts && opts.page) || 0,
-      step: (opts && opts.step) || 'Student',
-      onGrade: (opts && opts.onGrade) || null,
-      opener: document.activeElement,
-    };
-    _viewPics = WorkThumbs.holder();
-    var overlay = document.createElement('div');
-    overlay.id = 'work-viewer-overlay';
-    overlay.className = 'wv-overlay';
-    document.body.appendChild(overlay);
-    overlay.addEventListener('mousedown', function (e) {
-      if (e.target === overlay) _closeViewer();
-    });
-    overlay.addEventListener('click', _viewerClick);
-    _view.overlay = overlay;
-    _drawViewer();
-    var close = overlay.querySelector('[data-wv="close"]');
-    _focus(close);
-  }
-
-  function _drawViewer() {
-    if (!_view) return;
-    var v = _viewItem();
-    if (!v) return _closeViewer();
-    var n = v.pages.length;
-    _view.page = Math.max(0, Math.min(_view.page, n - 1));
-    var file = v.pages[_view.page];
-    var name = displayName(v.st);
-    var many = _view.items.length > 1;
-    var step = _view.step;
-    var html =
-      '<div class="wv-dialog" role="dialog" aria-modal="true" aria-labelledby="wv-title">' +
-      '<div class="wv-head">' +
-      (many
-        ? '<button type="button" class="wv-step" data-wv="item" data-dir="-1" aria-label="Previous ' +
-          esc(step) +
-          '"' +
-          (_view.at === 0 ? ' disabled' : '') +
-          '>‹</button>'
-        : '') +
-      '<div class="wv-titles"><h2 class="wv-title" id="wv-title">' +
-      esc(name) +
-      '</h2><span class="wv-sub">' +
-      esc(v.a.title || '') +
-      '</span></div>' +
-      (many
-        ? '<button type="button" class="wv-step" data-wv="item" data-dir="1" aria-label="Next ' +
-          esc(step) +
-          '"' +
-          (_view.at === _view.items.length - 1 ? ' disabled' : '') +
-          '>›</button>'
-        : '') +
-      '<span class="wv-gap"></span>' +
-      (_view.onGrade
-        ? '<button type="button" class="btn btn-primary wv-grade" data-wv="grade">Open in Grader</button>'
-        : '') +
-      '<button type="button" class="btn wv-close" data-wv="close">Close</button>' +
-      '</div>' +
-      '<div class="wv-body">' +
-      (file
-        ? '<img class="wv-img" data-work-pic data-work-which="page" data-page="' +
-          _view.page +
-          '" alt="' +
-          esc(name + "'s page " + (_view.page + 1)) +
-          '">'
-        : '') +
-      '</div>' +
-      '<div class="wv-foot">' +
-      (n > 1
-        ? '<button type="button" class="wv-step" data-wv="page" data-dir="-1" aria-label="Previous page"' +
-          (_view.page === 0 ? ' disabled' : '') +
-          '>‹</button><span class="wv-at">' +
-          esc(_view.page + 1 + ' of ' + n) +
-          '</span><button type="button" class="wv-step" data-wv="page" data-dir="1" aria-label="Next page"' +
-          (_view.page === n - 1 ? ' disabled' : '') +
-          '>›</button>'
-        : '') +
-      (v.sub.note
-        ? '<p class="wv-note"><strong>' +
-          esc(displayNameFirst(v.st) + "'s Note, Sent With the Work") +
-          '</strong> ' +
-          esc(v.sub.note) +
-          '</p>'
-        : '') +
-      '</div></div>';
-    // The picture being replaced lets go of its address.
-    _viewPics.releaseAll();
-    // html-safe: every name, title, note and number above goes through esc; the rest is fixed markup
-    _view.overlay.innerHTML = html;
-    var it = v.it;
-    var shown = { sid: it.sid, aid: it.aid, file: file && file.id };
-    _viewPics.fill(_view.overlay, it.cid, function (img) {
-      var now = _viewItem();
-      if (!now || now.it.sid !== shown.sid || now.it.aid !== shown.aid) return null;
-      var f = now.pages[Number(img.getAttribute('data-page'))];
-      return f && f.id === shown.file ? f : null;
-    });
-  }
-
-  function _viewerClick(e) {
-    var btn = e.target.closest && e.target.closest('[data-wv]');
-    if (!btn || !_view || btn.disabled) return;
-    var what = btn.getAttribute('data-wv');
-    var dir = Number(btn.getAttribute('data-dir')) || 0;
-    if (what === 'close') return _closeViewer();
-    if (what === 'page') {
-      _view.page += dir;
-      return _drawViewer();
-    }
-    if (what === 'item') {
-      _view.at = Math.max(0, Math.min(_view.items.length - 1, _view.at + dir));
-      _view.page = 0;
-      _drawViewer();
-      var same = _view && _view.overlay.querySelector('[data-wv="item"][data-dir="' + dir + '"]');
-      if (same && !same.disabled) _focus(same);
-      return;
-    }
-    if (what === 'grade') {
-      var it = _view.items[_view.at];
-      var go = _view.onGrade;
-      _closeViewer(true);
-      if (go && it) go(it);
-    }
-  }
-
-  function _closeViewer(quiet) {
-    if (!_view) return;
-    var opener = _view.opener;
-    if (_viewPics) _viewPics.releaseAll();
-    _viewPics = null;
-    if (_view.overlay) _view.overlay.remove();
-    _view = null;
-    if (!quiet && opener && opener.isConnected) _focus(opener);
-  }
-
   /* ── The Work Wall ────────────────────────────────────────── */
   var _wall = null; // { cid, aid, sort, filter, by, overlay, pics, onClose, opener }
 
@@ -653,7 +494,7 @@ window.WorkWall = (function () {
       var items = withPages.map(function (id) {
         return { cid: w.cid, sid: id, aid: w.aid };
       });
-      _openViewer(items, at, { step: 'Student' });
+      WorkViewer.open(items, at, { step: 'Student' });
     }
   }
 
@@ -689,12 +530,10 @@ window.WorkWall = (function () {
 
   function _keydown(e) {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
+    // The page view over the wall takes its own keys (shared/work-viewer.js).
+    if (WorkViewer.isOpen()) return;
     if (window.PageAssignments && PageAssignments.graderOpen && PageAssignments.graderOpen()) return;
     if (document.querySelector('.confirm-overlay')) return;
-    if (_view) {
-      e.preventDefault();
-      return _closeViewer();
-    }
     if (_wall) {
       e.preventDefault();
       close();
@@ -750,7 +589,7 @@ window.WorkWall = (function () {
   }
 
   function close(quiet) {
-    _closeViewer(true);
+    WorkViewer.close(true);
     var w = _wall;
     if (!w) return;
     _wall = null;
@@ -956,9 +795,9 @@ window.WorkWall = (function () {
             .join('')
         : '') +
       '<span class="ww-gap"></span>' +
-      '<button type="button" class="ww-grade" data-sw="full"' +
+      '<button type="button" class="tb-action-btn tb-action-secondary" data-sw="full"' +
       (anyPages ? '' : ' disabled') +
-      '><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>View Full Size</button>' +
+      '>Flip Through Work</button>' +
       '</div>' +
       '<div class="sw-tools">' +
       '<span class="ww-label" id="sw-state-label">Show</span>' +
@@ -1227,7 +1066,7 @@ window.WorkWall = (function () {
       });
     };
     var canGrade = !!(window.PageAssignments && PageAssignments.openGrader);
-    if (what === 'full') return _openViewer(items, 0, { step: 'Piece', onGrade: canGrade ? grade : null });
+    if (what === 'full') return WorkViewer.open(items, 0, { step: 'Piece', onGrade: canGrade ? grade : null });
     if (what === 'open') {
       var aid = btn.getAttribute('data-aid');
       // The grader on that piece; with none, the pages full size.
@@ -1235,7 +1074,7 @@ window.WorkWall = (function () {
       var at = items.findIndex(function (it) {
         return it.aid === aid;
       });
-      if (at >= 0) _openViewer(items, at, { step: 'Piece', onGrade: null });
+      if (at >= 0) WorkViewer.open(items, at, { step: 'Piece', onGrade: null });
     }
   }
 
@@ -1632,7 +1471,7 @@ window.WorkWall = (function () {
     var aid = box.getAttribute('data-aid');
     var pa = window.PageAssignments;
     if (pa && pa.openGrader) return pa.openGrader(r.cid, aid, r.sid, { studentIds: [r.sid] });
-    _openViewer([{ cid: r.cid, sid: r.sid, aid: aid }], 0, {
+    WorkViewer.open([{ cid: r.cid, sid: r.sid, aid: aid }], 0, {
       step: 'Piece',
       page: Number(btn.getAttribute('data-ovw')) || 0,
     });
@@ -1645,7 +1484,6 @@ window.WorkWall = (function () {
       root.addEventListener('click', _rowClick);
     }
     var r = _row;
-    _keys(true); // Escape closes a page opened full size
     r.pics.sweep();
     r.pics.fill(root, cid, function (img) {
       if (_row !== r || !img.closest('.stu-ov-work')) return null;
@@ -1658,7 +1496,7 @@ window.WorkWall = (function () {
     _row.root.removeEventListener('click', _rowClick);
     _row.pics.releaseAll();
     _row = null;
-    _closeViewer(true);
+    WorkViewer.close(true);
     if (!_wall && !_tab) _keys(false);
   }
 
@@ -1668,7 +1506,7 @@ window.WorkWall = (function () {
     if (!t) return;
     _tab = null;
     if (window.WorkRubricCard) WorkRubricCard.hide();
-    _closeViewer(true);
+    WorkViewer.close(true);
     t.panel.removeEventListener('click', _tabClick);
     t.panel.removeEventListener('change', _tabChange);
     t.pics.releaseAll();

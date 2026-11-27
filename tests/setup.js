@@ -415,6 +415,7 @@ load('shared/obs-card.js');
 load('shared/obs-follow-ups.js');
 load('teacher/student-evidence.js');
 load('teacher/competency-evidence.js');
+load('shared/work-viewer.js');
 load('shared/work-wall.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
