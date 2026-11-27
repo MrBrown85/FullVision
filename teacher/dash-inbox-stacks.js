@@ -300,24 +300,24 @@ window.DashInboxStacks = (function () {
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
 
-  /** The stacks as tall as the tile allows (never over the board's 216 px),
-   * the opened pages as tall as it leaves them.
+  /** Closed stacks one size (150 px at most) in a grid that wraps; opened, the row as tall as the tile allows.
    * @param {HTMLElement} el */
   function _size(el) {
     var avail = el.clientHeight;
     if (!avail) return;
-    var solo = !!el.querySelector('.dash-inbox-returns.is-solo');
+    var solo = !!el.querySelector('.dash-inbox-returns.is-solo'),
+      open = el.classList.contains('has-open');
     // Under a stack: its layers (12), the title (two lines) and the gap.
     var sh = avail - 76;
     if (el.querySelector('.dash-inbox-return')) sh = Math.min(sh, (avail - (solo ? 120 : 140)) / (solo ? 0.9 : 0.8));
-    sh = Math.max(MIN_SH, Math.min(STACK_H, Math.floor(sh)));
+    sh = Math.max(MIN_SH, Math.min(open ? STACK_H : 150, Math.floor(sh)));
     // The opened box: its title, the pages, a name and a time, and its padding.
     var ph = Math.max(MIN_PH, Math.min(Math.round(STACK_H * 0.8), Math.floor(avail - 140)));
     el.style.setProperty('--dash-inbox-ph', ph + 'px');
     el.style.setProperty('--dash-inbox-sh', sh + 'px');
-    // Stacks that do not all fit across the tile shrink, down to the least, before the row scrolls.
-    var row = el.querySelector('#dash-inbox-stacks-row');
-    while (row && sh > MIN_SH && row.scrollWidth > row.clientWidth + 1) {
+    // Stacks that do not all fit shrink before they scroll: down the grid, or across the opened row.
+    var row = /** @type {HTMLElement} */ (el.querySelector('#dash-inbox-stacks-row'));
+    while (row && sh > MIN_SH && (open ? row.scrollWidth - row.clientWidth : row.scrollHeight - row.clientHeight) > 1) {
       sh = Math.max(MIN_SH, sh - 8);
       el.style.setProperty('--dash-inbox-sh', sh + 'px');
     }

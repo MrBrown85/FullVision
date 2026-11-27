@@ -70,6 +70,15 @@
 .dash-inbox-stacks.has-open .dash-inbox-stacks-row {
   gap: 20px;
 }
+/* Closed, the stacks wrap into a grid and scroll down the tile, never off
+   its side (Colin, Nov 26). */
+.dash-inbox-stacks:not(.has-open) .dash-inbox-stacks-row {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  row-gap: 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 .dash-inbox-stack-group {
   flex: 0 0 auto;
   display: flex;
