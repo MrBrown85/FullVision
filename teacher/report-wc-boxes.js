@@ -252,7 +252,7 @@ window.ReportWcBoxes = (function () {
       var f = fact({
         id: 'habit:' + h.key,
         name: h.name,
-        tip: h.desc || h.hint,
+        tip: /** @type {any} */ (h).desc || /** @type {any} */ (h).hint,
         slider: h.key,
         val: v ? CommentBank.SCALE[v - 1] : 'Not Rated',
       });
