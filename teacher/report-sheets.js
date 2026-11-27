@@ -313,7 +313,7 @@ window.ReportSheets = (function () {
       lines: 3,
       minLines: 1,
       maxLines: 8,
-      linesLabel: 'Comment Lines',
+      linesLabel: 'Comments Box Height',
       group: 'Family',
       pinnable: true,
     },
