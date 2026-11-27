@@ -89,9 +89,12 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Room for the count on a stack's corner. */
+  /* Room for the count on a stack's corner: the stacks keep it inside
+     their own scroll, so the row gives none of its own. */
   padding-top: 12px;
-  margin-top: -12px;
+}
+.dash-inbox-stacks:not(.has-open) .dash-inbox-stacks-row {
+  padding-top: 0;
 }
 /* The stacks wrap among themselves; Return stays at the right of the first row. */
 .dash-inbox-stacks-cards {

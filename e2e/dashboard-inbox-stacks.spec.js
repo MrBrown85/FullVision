@@ -310,3 +310,30 @@ for (const tile of [true, false]) {
     },
   );
 }
+
+/* One row of stacks fits its tile whole: no scrollbar and no title cut (Colin, Nov 27: "i'm still getting a scroll
+   wheel and the title clipping" with one stack). The room for the count on a stack's corner is counted once. */
+for (const [w, h] of [
+  [1280, 800],
+  [1920, 1080],
+]) {
+  test(`at ${w} x ${h} one row of stacks fits whole, with no scroll`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await open(page);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const c = document.querySelector('.dash-inbox-stacks-cards');
+          return c.scrollHeight - c.clientHeight;
+        }),
+      )
+      .toBeLessThanOrEqual(1);
+    const cut = await page.evaluate(() => {
+      const tile = document.getElementById('dash-inbox').getBoundingClientRect();
+      return [...document.querySelectorAll('.dash-inbox-stack-title')].some(
+        t => t.getBoundingClientRect().bottom > tile.bottom,
+      );
+    });
+    expect(cut).toBe(false);
+  });
+}
