@@ -298,8 +298,8 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     display: none;
   }
 }
-/* Wide: three cards side by side (label and time on top, two lines of words, Seen by), the buttons in a foot, the class's name in the subtitle. A card needs about 280 px across and 92 px down, so under 860 px, or under 168 px of height, the tile stays in rows. On an iPad every control is 44 px, so a card needs 250 px of height. */
-@container dash-bulletins (min-width: 860px) and (min-height: 168px) {
+/* Wide: cards side by side (label and time on top, two lines of words, Seen by), the buttons in a foot, the class's name in the subtitle: three from 860 px across, two from 580 px (Colin, Nov 26: "always notes"). A card needs about 280 px across and 92 px down, so under 580 px, or under 150 px of height, the tile stays in rows. On an iPad every control is 44 px, so a card needs 250 px of height. */
+@container dash-bulletins (min-width: 580px) and (min-height: 150px) {
   html:not(.fv-tablet) .dash-bulletins-tile .dash-bulletins-head {
     grid-column: 1 / -1;
     height: 26px;
@@ -363,7 +363,7 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
     line-height: 16px;
   }
 }
-@container dash-bulletins (min-width: 860px) and (min-height: 250px) {
+@container dash-bulletins (min-width: 580px) and (min-height: 250px) {
   html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-head {
     grid-column: 1 / -1;
     height: 26px;
@@ -433,7 +433,7 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
 /* The cards as posted notes (Colin, Nov 18: "look like actual bulletins that
    are posted"): paper on the board with a pin at the top, a reminder on
    yellow, each set a little askew. Dark text on light paper in both modes. */
-@container dash-bulletins (min-width: 860px) and (min-height: 168px) {
+@container dash-bulletins (min-width: 580px) and (min-height: 150px) {
   .dash-bulletins-tile .dash-bulletins-rows {
     column-gap: 18px;
     padding: 5px 8px 3px;
@@ -631,7 +631,8 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
   font-weight: 600;
   line-height: 1.25;
   text-align: center;
-  color: var(--active-fill);
+  /* --link: the app's blue for words, light enough on the dark note too. */
+  color: var(--link);
   background: var(--active-light);
   border: 2px dashed color-mix(in srgb, var(--active) 45%, transparent);
   border-radius: 3px;
@@ -710,5 +711,19 @@ html.fv-tablet .dash-row .dash-bulletins-tile .dash-bulletins-row {
 @media (prefers-reduced-motion: reduce) {
   .dash-bulletins-tile .dash-bulletins-row {
     transition: none;
+  }
+}
+
+/* Narrower than three notes need (580 to 860 px across): two notes and the
+   slim blank one; Open Bulletins has the rest. */
+@container dash-bulletins (min-width: 580px) and (max-width: 859.99px) {
+  .dash-bulletins-tile .dash-bulletins-rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .dash-bulletins-tile.is-notes .dash-bulletins-rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 0.5fr) !important;
+  }
+  .dash-bulletins-tile .dash-bulletins-row:nth-child(n + 3) {
+    display: none !important;
   }
 }
