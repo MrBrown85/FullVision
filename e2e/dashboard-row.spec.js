@@ -53,9 +53,10 @@ async function row(page) {
   };
 }
 
+// The glance row's cards (Nov 26) are 19 px shorter than the old box, so where the window rules the row is 19 px taller.
 for (const [w, h, rowH] of [
-  [1280, 800, 510],
-  [1440, 900, 610],
+  [1280, 800, 529],
+  [1440, 900, 629],
   [1280, 720, 510],
 ]) {
   test(`${w} x ${h}: the row is ${rowH} px and the Students heading starts below the first view`, async ({ page }) => {
@@ -87,7 +88,7 @@ test('a photo-expiry line that arrives after the first draw: the row still ends 
   await page.setViewportSize({ width: 1280, height: 900 });
   await openDashboard(page);
   const before = await row(page);
-  expect(Math.round(before.row.height)).toBe(610);
+  expect(Math.round(before.row.height)).toBe(629);
   // The line arrives late, as it does for a signed-in teacher: the list comes
   // in and only the line's own box is drawn again. Nothing here measures the row.
   await page.evaluate(() => {
@@ -105,7 +106,7 @@ test('a photo-expiry line that arrives after the first draw: the row still ends 
     .toBeLessThanOrEqual(1);
   const after = await row(page);
   expect(after.row.top).toBeGreaterThan(300);
-  expect(Math.round(after.row.height)).toBeLessThan(610);
+  expect(Math.round(after.row.height)).toBeLessThan(629);
 });
 
 test("the old two-card row is gone, whatever an old 'fv-build-dashRow' says", async ({ page }) => {
@@ -244,7 +245,7 @@ test('Curricular and Core switch by click and by arrow key, and the choice survi
   expect(await page.evaluate(() => localStorage.getItem('fv-dash-comp-page:sci8'))).toBe('core');
 });
 
-test('with Bulletins built the left column splits 60 / 40', async ({ page }) => {
+test('with Bulletins built the Inbox takes at most 60% of the column and Bulletins the rest', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openDashboard(page);
   // A stand-in for the tile (the real one is tried in dashboard-bulletins-tile.spec.js): define it, then draw again.
@@ -257,8 +258,10 @@ test('with Bulletins built the left column splits 60 / 40', async ({ page }) => 
   });
   const inbox = await box(page, '.dash-row-inbox');
   const bull = await box(page, '.dash-row-bulletins');
-  expect(Math.abs(inbox.height - 299)).toBeLessThanOrEqual(1);
-  expect(Math.abs(bull.height - 199)).toBeLessThanOrEqual(1);
+  const col = await box(page, '.dash-row-left');
+  expect(inbox.height).toBeLessThanOrEqual((col.height - 12) * 0.6 + 1);
+  expect(bull.height).toBeGreaterThanOrEqual((col.height - 12) * 0.4 - 1);
+  expect(Math.abs(inbox.height + 12 + bull.height - col.height)).toBeLessThanOrEqual(1);
   expect(Math.round(bull.top - inbox.bottom)).toBe(12);
 });
 

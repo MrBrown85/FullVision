@@ -111,6 +111,7 @@
     "teacher/dash-inbox-rollcall.js",
     "teacher/dash-inbox-targets.js",
     "teacher/dash-tile-redraw.js",
+    "teacher/dash-next-report.js",
     "teacher/report-one-zoom.js",
     "teacher/student-overview.js",
     "teacher/student-page-students.js",

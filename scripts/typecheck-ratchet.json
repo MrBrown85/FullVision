@@ -52,6 +52,7 @@
     "teacher/dash-inbox-rollcall.js",
     "teacher/dash-inbox-targets.js",
     "teacher/dash-tile-redraw.js",
+    "teacher/dash-next-report.js",
     "teacher/cm-grading-bars.js",
     "teacher/cm-competency-import.js",
     "teacher/cm-withdrawn.js",

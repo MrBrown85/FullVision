@@ -172,12 +172,14 @@ describe('class-insights', () => {
       expect(html).not.toContain('Past Due');
     });
 
-    it('opens the gradebook when anything is missing or late, and is plain text at zero (plan F.8)', () => {
+    it('opens the gradebook, whether or not anything is missing or late (plan F.8; every card is a link, Nov 26)', () => {
       const html = DashInsights.missingGlanceHtml([{ kind: 'ns' }], CID);
       expect(html).toMatch(/^<a class="dash-glance-cell dash-glance-missing" role="link" tabindex="0"/);
       expect(html).toContain('data-href="/gradebook?course=' + CID + '"');
       expect(html).not.toContain('naFilter');
-      expect(DashInsights.missingGlanceHtml([], CID)).toMatch(/^<div class="dash-glance-cell dash-glance-missing">/);
+      const none = DashInsights.missingGlanceHtml([], CID);
+      expect(none).toMatch(/^<a class="dash-glance-cell dash-glance-missing" role="link" tabindex="0"/);
+      expect(none).toContain('Nothing is missing or late.');
     });
 
     it('the Needs Attention card and the Who Needs Help rule are gone (Nov 25: the competency filter went with the old tile)', () => {

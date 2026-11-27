@@ -194,7 +194,7 @@ test('at 1100 x 900 the Inbox slot is at most 359 px and the tile at least 239 p
 }) => {
   await page.setViewportSize({ width: 1100, height: 900 });
   await open(page, { questions: false });
-  expect(Math.round((await box(page, '.dash-row')).height)).toBe(610);
+  expect(Math.round((await box(page, '.dash-row')).height)).toBe(629);
   // The stacks size themselves once the row has its height, so the tiles settle a moment after the draw.
   await expect.poll(async () => (await box(page, '.dash-bulletins-tile')).height).toBeGreaterThanOrEqual(238);
   expect((await box(page, '.dash-row-inbox')).height).toBeLessThanOrEqual(360);

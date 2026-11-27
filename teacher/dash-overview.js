@@ -93,8 +93,9 @@ window.DashOverview = (function () {
     );
   }
 
-  /* The top bar: Class Average with its proficiency (or letter) mix, Missing
-     and Late, and Upcoming Birthdays. */
+  /* The top bar: Class Average with its proficiency (or letter) mix, To
+     Grade, Missing and Late, and Next Report (DashNextReport; it replaced
+     Upcoming Birthdays, Nov 26 2026). Every card opens its page. */
   function glanceHtml(opts) {
     var cid = opts.cid;
     var allStudents = opts.allStudents;
@@ -104,13 +105,14 @@ window.DashOverview = (function () {
     // The class average as this class shows grades (level, letter, or both).
     var classGrade = classGradeSummary(cid, studentIds);
     var word = levelWord(cid, opts.classAvg);
-    // The To Grade cell (S6-F5) takes a column of its own; Upcoming
-    // Birthdays then shows only the next birthday (the board's cost note).
+    // The To Grade cell (S6-F5) takes a column of its own.
     var toGrade = toGradeGlanceHtml(cid, studentIds);
     var html = '<section class="dash-glance' + (toGrade ? ' has-to-grade' : '') + '" aria-label="Class at a Glance">';
 
     html +=
-      '<div class="dash-glance-cell dash-glance-avg">' +
+      '<a class="dash-glance-cell dash-glance-avg" role="link" tabindex="0" data-href="' +
+      esc('/gradebook?course=' + (cid || '')) +
+      '">' +
       '<span class="dash-glance-label">Class Average</span>' +
       '<span class="dash-glance-value">' +
       esc(classGrade.text || '\u2014') +
@@ -174,44 +176,12 @@ window.DashOverview = (function () {
     } else {
       html += '<span class="dash-glance-sub">No scores yet.</span>';
     }
-    html += '</div>';
+    html += '</a>';
 
     html += toGrade;
     html += DashInsights.missingGlanceHtml(opts.missing || [], cid);
 
-    var bdays = getUpcomingBirthdays(cid);
-    if (toGrade) bdays = bdays.slice(0, 1);
-    html += '<div class="dash-glance-cell dash-glance-bdays"><span class="dash-glance-label">Upcoming Birthdays</span>';
-    if (!bdays.length) {
-      html += '<span class="dash-glance-sub">No birthdays on file.</span>';
-    } else {
-      html += '<div class="dash-bdays">';
-      // Days to go in the bar's large figures (Today and Tomorrow in green),
-      // then the full name and the date.
-      bdays.forEach(function (b) {
-        var date = b.nextBday.toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' });
-        var count =
-          b.daysUntil === 0
-            ? '<b class="is-soon">Today</b>'
-            : b.daysUntil === 1
-              ? '<b class="is-soon">Tomorrow</b>'
-              : '<b>' + b.daysUntil + '</b><span>days</span>';
-        html +=
-          '<div class="dash-bday">' +
-          '<span class="dash-bday-count">' +
-          count +
-          '</span>' +
-          '<span class="dash-bday-name">' +
-          esc(displayNameWithLast(b.student)) +
-          '</span>' +
-          '<span class="dash-bday-date">' +
-          esc(date) +
-          '</span>' +
-          '</div>';
-      });
-      html += '</div>';
-    }
-    html += '</div>';
+    html += window.DashNextReport ? DashNextReport.html(cid, allStudents) : '';
     return html + '</section>';
   }
 

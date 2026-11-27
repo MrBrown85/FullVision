@@ -161,13 +161,14 @@ test('the tile is as tall as its stacks beside Bulletins (299 px at most) and th
     document.getElementById('main').scrollWidth - document.getElementById('main').clientWidth,
   ]);
   expect(sideways).toEqual([0, 0]);
-  expect(Math.round((await box(page, '.dash-row')).height)).toBe(510);
+  // The window rules the row: 529 px at 1280 × 800 under the glance row's cards (Nov 26).
+  expect(Math.round((await box(page, '.dash-row')).height)).toBe(529);
   await shot(page, 'inbox-299-light');
 });
 
 test('with no Bulletins tile the Inbox is the row tall', async ({ page }) => {
   await open(page, { tile: false });
-  expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(510);
+  expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(529);
   await shot(page, 'inbox-510-light');
 });
 

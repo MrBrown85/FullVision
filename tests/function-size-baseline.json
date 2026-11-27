@@ -520,7 +520,7 @@
   "teacher/dash-inbox-stacks.js :: mount": 75,
   "teacher/dash-inbox.js :: click": 52,
   "teacher/dash-insights.js :: studentGridHtml": 125,
-  "teacher/dash-overview.js :: glanceHtml": 119,
+  "teacher/dash-overview.js :: glanceHtml": 88,
   "teacher/dash-overview.js :: questionsCardHtml": 70,
   "teacher/dash-overview.js :: studentControlsHtml": 67,
   "teacher/dash-student-cards.js :: renderStudentCards": 185,
