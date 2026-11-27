@@ -130,14 +130,15 @@ window.ReportWcBoxes = (function () {
     });
     if (!g.lines.length && !env.path) g.sayData = { box: 'grade', fact: '' };
     var facts = [g];
-    if (env.close) {
-      var closeRows = mine.filter(function (x) {
-        return /^close:/.test(String(x.row.id));
-      });
+    var closeRows = mine.filter(function (x) {
+      return /^close:/.test(String(x.row.id));
+    });
+    if (env.close || closeRows.length) {
+      var letter = env.close ? env.close.letter : String(closeRows[0].row.id).slice(6);
       facts.push(
         fact({
           id: 'close',
-          name: 'Close to ' + CommentBank.aOrAn(env.close.letter),
+          name: 'Close to ' + CommentBank.aOrAn(letter),
           lines: closeRows.map(env.line),
           sayData: closeRows.length ? null : { box: 'grade', fact: 'close' },
         }),

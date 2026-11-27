@@ -117,6 +117,14 @@ window.ReportWc = (function () {
     document.addEventListener('focusout', function (e) {
       if (/** @type {HTMLElement} */ (e.target).id === 'tq-narrative') A.endTyping();
     });
+    // "No comment yet" is the box to type in until there is a sentence.
+    document.addEventListener('click', function (e) {
+      var t = /** @type {HTMLElement | null} */ (e.target);
+      if (t && t.closest && t.closest('#tq-empty')) {
+        e.preventDefault();
+        A.startTyping();
+      }
+    });
     document.addEventListener('keydown', function (e) {
       var t = /** @type {HTMLElement | null} */ (e.target);
       if (t && t.id === 'tq-read' && (e.key === 'Enter' || e.key === ' ')) {
