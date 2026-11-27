@@ -78,7 +78,7 @@ function box(value) {
   };
   return els['tq-narrative'];
 }
-const card = html => html.slice(html.indexOf('id="tq-sentences"'));
+const card = html => html;
 
 // The old generator's sentences (Saaleha's comment, Oct 20), for Maya.
 const OLD_1 =
@@ -123,11 +123,9 @@ describe('a saved comment with no record of what the teacher typed', () => {
   it('shows its sentences as Earlier Comment rows, not Your Sentence', () => {
     rate({ narrative: OLD_1 + ' ' + OLD_2 });
     const html = card(open());
-    expect((html.match(/<span class="qn-req-label">Earlier Comment<\/span>/g) || []).length).toBe(2);
-    expect(html).not.toContain('<span class="qn-req-label">Your Sentence</span>');
-    expect(html).not.toContain('Typed by you');
-    expect(html).toContain('From the earlier comment · Generate Comment replaces it');
-    expect((html.match(/data-do="options"/g) || []).length).toBe(2);
+    // Each is a line of Your Sentences with Keep This Sentence, none marked Yours.
+    expect((html.match(/data-do="keepEarlier"/g) || []).length).toBe(2);
+    expect(html).not.toContain('>Yours<');
   });
 
   it('Generate replaces them, says so, and Undo brings them back', () => {
@@ -167,11 +165,7 @@ describe('a saved comment with no record of what the teacher typed', () => {
     const text = OLD_1 + ' ' + OLD_2;
     rate({ narrative: text });
     const before = card(open());
-    expect(before).not.toContain('data-do="keepEarlier"');
-    RQ.tqSentences('options', { dataset: { row: '1' } });
-    const menu = card(RQ.renderTermQuestionnaire(CID));
-    expect(menu).toContain('<span class="qn-menu-head">Earlier Comment</span>');
-    expect(menu).toContain('>Keep This Sentence</span>');
+    expect(before).toContain('data-do="keepEarlier"');
     const el = box(text);
     RQ.tqSentences('keepEarlier', { dataset: { row: '1' } });
     expect(saved().draftMeta.teacher_text).toEqual([OLD_2]);

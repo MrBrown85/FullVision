@@ -153,6 +153,8 @@ function quick(cid, students, ctx, out, view, handout) {
 
 function questionnaire(cid, students, ctx, out, view, ordinal) {
   const RQ = ReportQuestionnaire;
+  // The screen is drawn with every box open, whatever a test left open or closed.
+  wcOpenAll();
   withReportPicked(ordinal, ctx.termLabel, () => {
     RQ.configure({ activeCourse: cid, renderReports: () => {} });
     const roster = RQ.getTqStudents();
@@ -178,7 +180,9 @@ function questionnaire(cid, students, ctx, out, view, ordinal) {
         sentences: draft && (draft.sentences || []).map(s => [s.step, s.text]),
         stale: RQ.staleFor(cid, st, ctx.termId),
         claims: RQ.claimChanges(st),
-        screen: RQ.renderTermQuestionnaire(cid),
+        // Which facts have a Say This follows what Generate has drafted for the class (it remembers the
+        // stories it has told), like the draft itself; the screen is kept without those buttons.
+        screen: RQ.renderTermQuestionnaire(cid).replace(/<button[^>]*data-do="wcSay"[^>]*>[^<]*<\/button>/g, ''),
       });
     });
   });

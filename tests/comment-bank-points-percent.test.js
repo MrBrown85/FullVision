@@ -122,9 +122,9 @@ describe('the Term Questionnaire’s best piece (At a Glance)', () => {
       ReportQuestionnaire.configure({ activeCourse: run.cid, renderReports: () => {} });
       ReportQuestionnaire.tqStudentIndex = ReportQuestionnaire.getTqStudents().findIndex(s => s.id === st.id);
       const html = ReportQuestionnaire.renderTermQuestionnaire(run.cid);
-      const best = html.match(/<div class="qn-fact qn-best"[^>]*>[\s\S]*?<span class="qn-best-mark">[^<]*<\/span>/)[0];
+      const best = html.match(/aria-label="Best Piece"[\s\S]*?<\/section>/)[0];
       expect(best).toContain('>Primary Source Analysis</span>');
-      expect(best).toContain('<span class="qn-best-mark">90%</span>');
+      expect(best).toContain('<span class="wc-val">90%</span>');
       expect(best).not.toContain('100%');
     } finally {
       if (hadDoc) globalThis.document = oldDoc;

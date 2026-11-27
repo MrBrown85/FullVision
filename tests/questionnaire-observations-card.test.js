@@ -45,26 +45,28 @@ function page(st) {
   RQ.tqStudentIndex = RQ.getTqStudents().findIndex(s => s.id === st.id);
   return RQ.renderTermQuestionnaire(CID);
 }
-/* The Observations card's HTML. */
+/* The Observations box's HTML. */
 function card(st) {
   const html = page(st);
-  const at = html.indexOf('<div class="qn-card qn-obs">');
-  return at < 0 ? '' : html.slice(at, html.indexOf('<div class="qn-card qn-voice', at));
+  const at = html.indexOf('aria-label="Observations"');
+  return at < 0 ? '' : html.slice(at, html.indexOf('</section>', at));
 }
 
 describe('the Observations card', () => {
-  it('sits between At a Glance and the Voice', () => {
+  it('sits after the Voice and before Missing Work, for reading only', () => {
     const html = page(cece());
-    const glance = html.indexOf('<div class="qn-card qn-glance');
-    const obs = html.indexOf('<div class="qn-card qn-obs">');
-    const voice = html.indexOf('<div class="qn-card qn-voice');
-    expect(glance).toBeGreaterThan(-1);
-    expect(obs).toBeGreaterThan(glance);
-    expect(voice).toBeGreaterThan(obs);
+    const voice = html.indexOf('aria-label="Cece’s Voice"');
+    const obs = html.indexOf('aria-label="Observations"');
+    const missing = html.indexOf('aria-label="Missing Work"');
+    expect(voice).toBeGreaterThan(-1);
+    expect(obs).toBeGreaterThan(voice);
+    expect(missing).toBeGreaterThan(obs);
+    expect(card(cece())).toContain('Only You');
+    expect(card(cece())).not.toContain('data-do="wcSay"');
   });
 
-  it('says how many came in since the Term 1 report', () => {
-    expect(card(cece())).toContain('<span class="qn-ev-text">So far this year · 3 since the Term 1 report</span>');
+  it('says how many there are so far this year in its closed line', () => {
+    expect(card(cece())).toContain('5 So Far This Year');
   });
 
   it('counts each type and all of them, in order', () => {
@@ -114,7 +116,7 @@ describe('the Observations card', () => {
       expect(c).toContain(
         '<div class="qno-empty">No observations for Cece yet. Observations you record for her this year show here.</div>',
       );
-      expect(c).toContain('<span class="qn-ev-text">So far this year</span>');
+      expect(c).toContain('None Yet');
       expect(c).not.toContain('qno-strip');
       expect(c).not.toContain('View All');
     } finally {

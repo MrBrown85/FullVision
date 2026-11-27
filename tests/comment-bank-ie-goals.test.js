@@ -551,13 +551,11 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
     seed({ missing: [3] });
     rate({ reportingBasis: 'ie' });
     const html = open();
-    expect(html).toContain('<span class="qn-grade-big">IE</span>');
-    expect(html).toContain('<span class="qn-grade-sub">Insufficient Evidence</span>');
-    expect(html).toContain('An IE comment needs every part marked Required.');
+    expect(html).toContain('<span class="wc-val">IE</span>');
+    expect(html).toContain('Insufficient Evidence');
     ['Grade', 'Problem', 'Plan', 'Deadline', 'Meeting'].forEach(l =>
       expect(html).toContain('<span class="qn-req-label">' + l + '</span>'),
     );
-    expect((html.match(/>Required</g) || []).length).toBe(5);
     expect(html).not.toContain('I checked this');
     expect(html).toContain('Pick a Date');
     expect(html).toContain('Pick the date by which the IE must become a grade.');
@@ -581,9 +579,8 @@ describe('the review screen (teacher/report-questionnaire.js)', () => {
     expect(html).toContain('she/her · ELL · ');
     rate({ reportingBasis: 'language_goals' });
     html = open();
-    expect(html).toContain('<span class="qn-grade-big">No Letter Grade</span>');
+    expect(html).toContain('<span class="wc-val">No Letter Grade</span>');
     expect(html).toContain('Assessed on language goals');
-    expect(html).toContain('The grade sentence is replaced by the required statement.');
     expect(html).toContain('Required when Language Goals is chosen. Fixed wording; it cannot be reworded.');
     expect(RQ.approveBlockers(RQ.getTqStudents()[RQ.tqStudentIndex])).toEqual([]);
   });

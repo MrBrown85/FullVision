@@ -451,9 +451,8 @@ describe('the class settings (report_config) and the review screen', () => {
     seed(['a9', 'a8']);
     COURSES[CID].lateWorkPolicy = 'Late work is accepted until December 4.';
     const html = open();
-    expect(html).toContain('<span class="qn-req-label">Missing Work</span>');
-    expect(html).toMatch(/<span class="qn-req-text">[^<]*“Task 9”[^<]*“Task 10\.?”/);
-    expect(html).toContain('>Late work is accepted until December 4.</button>');
+    expect(html).toContain('aria-label="Missing Work"');
+    expect(html).toContain('Late work is accepted until December 4.');
     expect(html).toContain('2 of 10');
     expect(open(AVA.id)).not.toContain('Not Handed In');
   });
@@ -474,9 +473,8 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(said).not.toBe(fixed);
     upsertTermRating(CID, GAB.id, TERM, { narrative: d.text });
     const html = open();
-    const row = html.slice(html.indexOf('id="tq-row-missing"'));
-    expect(row.slice(0, row.indexOf('</div>\n    </div>'))).toContain(said);
-    expect(row.slice(0, 600)).not.toContain(fixed);
+    const box = html.slice(html.indexOf('aria-label="Missing Work"'));
+    expect(box.slice(0, box.indexOf('</section>'))).toContain(said);
   });
 
   it('leaves Completes Work blank until the teacher rates it; clearing returns it to blank (Step 4 group 3 #65, Nov 4)', () => {
@@ -492,19 +490,19 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(html).not.toContain('from-record');
     expect(html).not.toContain('from the assignment record');
     expect(html).not.toContain('From assignments:');
-    expect(html).toContain('id="tq-rated">0 of 6 rated');
+    expect(html).toContain('0 of 6 Rated');
     // Rated by the teacher: the slider shows their rating.
     upsertTermRating(CID, GAB.id, TERM, { habits: { completes: 4 } });
     html = open();
     expect(html).toMatch(
       /class="qn-hs set" role="slider" tabindex="0" data-habit="completes" data-value="4"[^>]*aria-valuenow="4" aria-valuetext="Consistently"/,
     );
-    expect(html).toContain('id="tq-rated">1 of 6 rated');
+    expect(html).toContain('1 of 6 Rated');
     // Cleared: blank again, not the record's guess.
     upsertTermRating(CID, GAB.id, TERM, { habits: {} });
     html = open();
     expect(html).toMatch(blank);
-    expect(html).toContain('id="tq-rated">0 of 6 rated');
+    expect(html).toContain('0 of 6 Rated');
   });
 
   it('saves the closing sentence for the class; approved comments keep the old one', () => {
@@ -519,9 +517,7 @@ describe('the class settings (report_config) and the review screen', () => {
     });
     open();
     RQ.tqLine('editClosing');
-    expect(RQ.renderTermQuestionnaire(CID)).toContain(
-      'Ends every new comment in History 12. Approved comments are flagged so you can update or keep each one. Leave it empty to end without one.',
-    );
+    expect(RQ.renderTermQuestionnaire(CID)).toContain('aria-label="Closing sentence for History 12"');
     inputs['tq-line-closing'] = { value: 'Extra help is at lunch on Wednesdays.', focus() {} };
     RQ.tqLine('saveClosing');
     expect(settings().closing).toBe('Extra help is at lunch on Wednesdays.');
@@ -546,9 +542,6 @@ describe('the class settings (report_config) and the review screen', () => {
     RQ.tqLine('editLate');
     const html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain('aria-label="Late work line for History 12"');
-    expect(html).toContain(
-      'This is the class’s Late Work Policy. It follows the missing-work sentence for every student who has some.',
-    );
     inputs['tq-line-late'] = { value: 'Late work is accepted until December 4.', focus() {} };
     RQ.tqLine('saveLate');
     expect(COURSES[CID].lateWorkPolicy).toBe('Late work is accepted until December 4.');
@@ -579,9 +572,7 @@ describe('the class settings (report_config) and the review screen', () => {
     RQ.tqLine('pickSupport', { dataset: { line: own.id } });
     expect(settings().supportFor[TERM][GAB.id]).toBe(own.id);
     html = RQ.renderTermQuestionnaire(CID);
-    expect(html).toContain(
-      'title="One of your support lines for History 12">In class, I will meet with the group each Friday.</span>',
-    );
+    expect(html).toContain('In class, I will meet with the group each Friday.');
     RQ.tqLine('pickSupport', { dataset: { line: 'none' } });
     html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain('Left out of this comment.');

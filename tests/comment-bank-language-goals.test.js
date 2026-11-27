@@ -197,14 +197,14 @@ describe('the line in the comment', () => {
 describe('the Language Goals row on the review screen', () => {
   it('shows only for a student assessed on language goals, with the empty state and Choose…', () => {
     seed();
-    expect(open()).not.toContain('Language Goals</span>');
+    expect(open()).not.toContain('wc-fact-name">Language Goals</span>');
     upsertTermRating(CID, NOOR.id, TERM, { reportingBasis: 'language_goals' });
     const html = open();
-    expect(html).toContain('<span class="qn-req-label">Language Goals</span>');
+    expect(html).toContain('wc-fact-name">Language Goals</span>');
     expect(html).toContain('>+ Language Goal ▾</button>');
     expect(html).toContain('data-do="langMenu"');
     // The other student, on the grade path, has no such row.
-    expect(open(SAM.id)).not.toContain('Language Goals</span>');
+    expect(open(SAM.id)).not.toContain('wc-fact-name">Language Goals</span>');
   });
 
   it('ticks lines for the class, writes one, and picks or leaves out a line for one student', () => {
@@ -239,15 +239,13 @@ describe('the Language Goals row on the review screen', () => {
     RQ.tqLine('pickLang', { dataset: { line: own.id } });
     expect(settings().languageGoalsFor[TERM][NOOR.id]).toBe(own.id);
     html = RQ.renderTermQuestionnaire(CID);
-    expect(html).toContain(
-      'title="One of your language goal lines for History 12">She can greet the class in English; the next step is a full sentence.</span>',
-    );
+    expect(html).toContain('She can greet the class in English; the next step is a full sentence.');
     RQ.tqLine('pickLang', { dataset: { line: 'none' } });
     expect(settings().languageGoalsFor[TERM][NOOR.id]).toBeNull();
     html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain('No language goal picked for Noor.');
     // The support row and the closing row are still there, in their style.
-    expect(html).toContain('<span class="qn-req-label">Support</span>');
-    expect(html).toContain('<span class="qn-req-label">Closing</span>');
+    expect(html).toContain('wc-fact-name">Support Line</span>');
+    expect(html).toContain('wc-fact-name">Closing Sentence</span>');
   });
 });

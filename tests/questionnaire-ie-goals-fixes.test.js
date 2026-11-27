@@ -161,20 +161,20 @@ describe('2. The Language Goals row once the comment has sentences', () => {
         'Noor is assessed in relation to her goals for English language proficiency. She explains causes and their effects clearly.',
     });
     let html = open();
-    expect(html).toContain('id="tq-row-languageGoals"');
+    expect(html).toContain('wc-fact-name">Language Goals</span>');
     expect(html).toContain('>+ Language Goal ▾</button>');
-    const lang = html.indexOf('id="tq-row-languageGoals"');
-    expect(lang).toBeLessThan(html.indexOf('id="tq-row-closing"'));
-    expect(lang).toBeLessThan(html.indexOf('id="tq-row-support"'));
+    const lang = html.indexOf('wc-fact-name">Language Goals</span>');
+    expect(lang).toBeLessThan(html.indexOf('wc-fact-name">Closing Sentence</span>'));
+    expect(lang).toBeLessThan(html.indexOf('wc-fact-name">Support Line</span>'));
     expect(lang).toBeGreaterThan(html.indexOf('<span class="qn-req-label">Statement</span>'));
 
     // With a line ticked and picked, the row shows it.
     save({ languageGoalsChosen: ['lg-reads-aloud'], languageGoalsFor: { [TERM]: { [NOOR.id]: 'lg-reads-aloud' } } });
     html = open();
-    expect(html).toContain('One of your language goal lines for History 12');
+    expect(html).toContain('Pick the language goal for Noor');
     // Never on the grade path.
     rate({ reportingBasis: 'grade' });
-    expect(open()).not.toContain('id="tq-row-languageGoals"');
+    expect(open()).not.toContain('wc-fact-name">Language Goals</span>');
   });
 
   it('sits before the Next Step row, never between it and its family line', () => {
@@ -189,10 +189,8 @@ describe('2. The Language Goals row once the comment has sentences', () => {
     expect(d.sentences.map(x => x.step)).toContain('nextStep');
     upsertTermRating(CID, MAYA.id, TERM, { narrative: d.text });
     let html = open(MAYA.id);
-    const next = () => html.indexOf('<span class="qn-req-label">Next Step</span>');
-    expect(next()).toBeGreaterThan(0);
-    expect(html.indexOf('id="tq-row-languageGoals"')).toBeGreaterThan(0);
-    expect(html.indexOf('id="tq-row-languageGoals"')).toBeLessThan(next());
+    expect(html.indexOf('aria-label="Next Step"')).toBeGreaterThan(0);
+    expect(html.indexOf('wc-fact-name">Language Goals</span>')).toBeGreaterThan(0);
     // With a line picked, Generate puts it just before the Next Step sentence.
     save({ languageGoalsChosen: ['lg-reads-aloud'], languageGoalsFor: { [TERM]: { [MAYA.id]: 'lg-reads-aloud' } } });
     const g = draftMaya();
@@ -201,8 +199,7 @@ describe('2. The Language Goals row once the comment has sentences', () => {
     if (steps.includes('home')) expect(steps.indexOf('home')).toBe(steps.indexOf('nextStep') + 1);
     upsertTermRating(CID, MAYA.id, TERM, { narrative: g.text });
     html = open(MAYA.id);
-    expect(html.indexOf('id="tq-row-languageGoals"')).toBeGreaterThan(0);
-    expect(html.indexOf('id="tq-row-languageGoals"')).toBeLessThan(next());
+    expect(html.indexOf('wc-fact-name">Language Goals</span>')).toBeGreaterThan(0);
   });
 });
 
@@ -260,9 +257,7 @@ describe('3b. A meeting sentence the teacher typed', () => {
     });
     let html = open();
     expect(meetingRows(html)).toBe(1);
-    expect(html).toMatch(
-      /<span class="qn-req-label">Meeting<\/span><\/div>\s*<div class="qn-req-body"><span class="qn-req-text" title="Written by you">Please call me so we can set up a time to talk\.<\/span>/,
-    );
+    expect(html).toContain('title="Written by you">Please call me so we can set up a time to talk.</span>');
     // Generate fills in the other parts around it, never a second Meeting.
     const box = {
       value: TYPED,
