@@ -394,12 +394,17 @@ describe('with the build switch off the Assignments page is what it was', () => 
   // from their grip (teacher/assign-drag-events.js), so their draggable="true" is gone. It is put back before
   // comparing, so every other byte of the list is still what it was.
   const DRAG = / data-(assess|module)-drag="/g;
+  // Added on purpose (Colin, Nov 27 2026): View as Student, in a card's ⋯ menu while the class's Student Page is on
+  // (teacher/view-as-student.js). It is taken out before comparing, so every other byte is still what it was.
+  const VIEW_AS =
+    /<button type="button" role="menuitem" class="assess-menu-item" data-action="viewAsStudent"[^>]*><svg[^>]*>[\s\S]*?<\/svg><span>View as Student<\/span><\/button>/g;
   const same = now => {
     const stripped = {};
     Object.keys(now).forEach(name => {
       const html = String(now[name])
         .replace(ADD_WORK, '')
         .replace(NEW_QUIZ, '')
+        .replace(VIEW_AS, '')
         .replace(PILL, '<span$1</span>')
         .replace(DRAG, ' draggable="true" data-$1-drag="');
       stripped[name] = EMPTY_NEW_MENU.test(html) ? html.replace(EMPTY_NEW_MENU, '').replace(' atb-split', '') : html;

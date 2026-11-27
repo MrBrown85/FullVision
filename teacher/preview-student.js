@@ -602,7 +602,7 @@ window.PreviewStudent = (function () {
   /* Opens the preview of student `sid` in class `cid`. `trigger` is the
      control that opened it; the focus goes back to `returnFocusId` (or the
      trigger) when it closes. `opts.tab` is the tab it opens on;
-     `opts.learning` shows My Learning before the class turns it on (S13-F1). */
+     `opts.learning` shows My Learning before the class turns it on (S13-F1); `opts.ui` is the page's whole start. */
   function open(cid, sid, trigger, returnFocusId, opts) {
     if (!cid || !sid || !_student(cid, sid)) return false;
     close();
@@ -613,7 +613,7 @@ window.PreviewStudent = (function () {
       trigger: trigger || null,
       returnTo: returnFocusId || null,
       // What the student looks at, as on the phone: the page opens on Assignments, Outstanding.
-      ui: opts && opts.tab ? { tab: opts.tab } : {},
+      ui: opts && opts.ui ? opts.ui : opts && opts.tab ? { tab: opts.tab } : {},
       learning: !!(opts && opts.learning),
     };
     var el = document.createElement('div');

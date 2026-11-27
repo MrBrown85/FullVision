@@ -472,6 +472,8 @@ declare var StudentCards: any;
 declare var CmStudentPage: any;
 declare var StudentView: any;
 declare var PreviewStudent: any;
+declare var ViewAsStudent: any;
+declare var StudentPageView: any;
 declare var Questionnaires: any;
 declare function showUndoToast(message: string, undoFn?: () => void, commitFn?: () => void, durationMs?: number): void;
 declare function dismissUndoToast(): void;

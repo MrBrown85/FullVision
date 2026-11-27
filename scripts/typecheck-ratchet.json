@@ -215,6 +215,7 @@
     "teacher/rubric-print-controls.js",
     "teacher/bulletin-share.js",
     "teacher/bulletin-seen.js",
+    "teacher/view-as-student.js",
     "teacher/report-wc-act.js",
     "teacher/report-wc-boxes-more.js",
     "teacher/report-wc-boxes.js",

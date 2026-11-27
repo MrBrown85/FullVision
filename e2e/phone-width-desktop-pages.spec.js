@@ -141,11 +141,13 @@ test('gradebook grader fits a phone', async ({ page }) => {
 // sideways. (The term picker left the page, Colin 2026-11-03.)
 test('desktop student page fits a phone', async ({ page }) => {
   await openDesktop(page, '/student?id=st1');
-  await expect(page.locator('.student-toolbar .tb-edit-btn')).toBeVisible();
+  await expect(page.locator('.student-toolbar .tb-edit-btn[data-action="openEditStudent"]')).toBeVisible();
   const r = await page.evaluate(() => {
     const crumb = document.querySelector('.student-toolbar .tb-breadcrumb').getBoundingClientRect();
     const step = document.querySelector('.student-toolbar .stu-step').getBoundingClientRect();
-    const term = document.querySelector('.student-toolbar .tb-edit-btn').getBoundingClientRect();
+    const term = document
+      .querySelector('.student-toolbar .tb-edit-btn[data-action="openEditStudent"]')
+      .getBoundingClientRect();
     const main = document.getElementById('main');
     const overlap = !(
       step.right <= crumb.left ||

@@ -174,8 +174,8 @@
             _CLASS_RESULTS_ICON,
             'Class Results',
           )) + _cardPrintItem(cid, a);
-    // Work Wall (S14, shared/work-wall.js): every student's work side by
-    // side, only while the piece takes work.
+    html += ViewAsStudent.menuItemHtml(cid, a, _cardMenuItem);
+    // Work Wall (S14, shared/work-wall.js): every student's work side by side, only while the piece takes work.
     var workShown = !a.isDraft && !pageState.focusStudentId && GraderWork.workShown(cid, a);
     if (workShown && window.WorkWall)
       html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');

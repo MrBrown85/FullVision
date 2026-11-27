@@ -2684,13 +2684,13 @@ window.PageStudent = (function () {
     var allScores = getScores(cid)[studentId] || [];
     var statuses = getAssignmentStatuses(cid);
 
-    // ── Toolbar ──
     var html =
       '<div class="student-toolbar">' +
       renderBreadcrumb('Dashboard', '/dashboard', displayName(student)) +
       '<span class="stu-step">' +
       _stepButtonsHtml() +
       '</span>' +
+      ViewAsStudent.buttonHtml(cid, 'tb-edit-btn') +
       '<button class="tb-edit-btn" data-action="openEditStudent">Edit Student</button>' +
       '</div>';
 
@@ -2814,9 +2814,7 @@ window.PageStudent = (function () {
     var action = el.dataset.action;
     if (el.dataset.stopProp === 'true') e.stopPropagation();
     var handlers = {
-      openEditStudent: function () {
-        openEditStudent();
-      },
+      openEditStudent: openEditStudent,
       stuTab: function () {
         setTab(el.dataset.tab);
       },

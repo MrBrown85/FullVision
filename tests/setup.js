@@ -358,6 +358,7 @@ load('teacher/student-page-students.js');
 // Your Competencies on the Overview, and the ranking the Competencies tab's line shares.
 load('teacher/student-comps.js');
 load('teacher/preview-student.js');
+load('teacher/view-as-student.js');
 load('teacher/cm-student-page.js');
 load('shared/student-voice.js');
 load('teacher/learner-profile.js');

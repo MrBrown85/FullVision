@@ -250,6 +250,7 @@ const PRECACHE_URLS = [
   '/vendor/jsqr/jsQR.js',
   '/teacher/scan-labels.js',
   '/teacher/preview-student.js',
+  '/teacher/view-as-student.js',
   '/teacher/cm-student-page.js',
   '/shared/student-voice.js',
   '/teacher/learner-profile.js',
