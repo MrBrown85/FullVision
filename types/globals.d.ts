@@ -146,6 +146,8 @@ interface Window {
   ReportPrintPaper: unknown;
   // The Overview's picture of the grade (teacher/student-overview.js).
   StudentOverview: unknown;
+  // Your Competencies on the student Overview, and the ranking the Competencies tab shares (teacher/student-comps.js).
+  StudentComps: { html(m: unknown): string; rank(items: unknown[]): { hi: any[]; lo: any[] } };
   // The phone's tab bar and last tab (teacher-mobile/tab-bar.js).
   MTabBar: unknown;
   MBulletins: unknown;

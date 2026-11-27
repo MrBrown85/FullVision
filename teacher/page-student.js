@@ -557,20 +557,19 @@ window.PageStudent = (function () {
           trend: tr && tr.dir !== 'none' ? tr.text : '',
           dir: tr ? tr.dir : 'none',
           aids: aids,
-          n: aids.length,
+          pieces: aids.length,
+          n: es.length,
+          enough: !!tr && tr.dir !== 'none',
         };
       });
     };
+    // In curriculum order: each folder's competencies, then the ones in no folder.
     var grouped = getGroupedSections(cid) || { groups: [], ungrouped: [] };
-    var groups = (grouped.groups || [])
-      .filter(function (g) {
-        return g.sections && g.sections.length;
-      })
-      .map(function (g) {
-        return { name: (g.group && g.group.name) || '', items: items(g.sections) };
-      });
-    if ((grouped.ungrouped || []).length)
-      groups.push({ name: groups.length ? 'Other' : '', items: items(grouped.ungrouped) });
+    var list = [];
+    (grouped.groups || []).forEach(function (g) {
+      list = list.concat(items(g.sections || []));
+    });
+    list = list.concat(items(grouped.ungrouped || []));
     var split = [];
     if (mode !== 'letter')
       [4, 3, 2, 1].forEach(function (l) {
@@ -616,7 +615,7 @@ window.PageStudent = (function () {
       proj: ov.proj ? { value: ov.proj.lg.R, label: 'If missing work is in: ' + ov.proj.text } : null,
       levelNames: { 1: levelWord(cid, 1), 2: levelWord(cid, 2), 3: levelWord(cid, 3), 4: levelWord(cid, 4) },
       bands: BC_LETTER_BANDS,
-      comps: { groups: groups, counts: split, scored: scored, total: total },
+      comps: { items: list, counts: split, scored: scored, total: total },
       compFilter: _ovComp,
     };
   }
@@ -807,10 +806,8 @@ window.PageStudent = (function () {
   function _ovAllHtml(ov, ctx, pic) {
     // A competency picked on Your Competencies narrows the list to its work.
     var comp = null;
-    pic.comps.groups.forEach(function (g) {
-      g.items.forEach(function (it) {
-        if (it.id === _ovComp) comp = it;
-      });
+    pic.comps.items.forEach(function (it) {
+      if (it.id === _ovComp) comp = it;
     });
     var list = ctx.assessments
       .slice()
@@ -880,7 +877,7 @@ window.PageStudent = (function () {
       _ovGradeHtml(ov, window.StudentOverview ? StudentOverview.lineHtml(pic) : '') +
       _ovMissingTileHtml(ov) +
       '</div>' +
-      (window.StudentOverview ? StudentOverview.compsHtml(pic) : '') +
+      (window.StudentComps ? StudentComps.html(pic) : '') +
       '</div>' +
       _ovAllHtml(ov, ctx, pic) +
       '<p class="stu-ov-foot">Shows grades, feedback and missing work only: no notes, observations, designations or other students.</p>' +
@@ -1174,23 +1171,13 @@ window.PageStudent = (function () {
   /* One quiet line over the list: how many are assessed, the strongest and
      the one to work on next, each with its level as the app shows levels,
      and where the class's calculation is set. */
-  /* Strongest and Next to Work On, chosen only among competencies with
-     enough evidence for the table's own Since the Start reading (fewer
-     prints "Too few to tell"), so neither rests on one score. On a tie,
-     the one with more scores. A missing pick is left out of the line.
+  /* Strongest and Next to Work On: the first of each from the ranking Your
+     Competencies shows on the Overview (StudentComps.rank), so the two
+     never disagree. A missing pick is left out of the line.
        items  [{ v: level, n: scores, enough: true|false, ... }] */
   function _cpPick(items) {
-    var ok = (items || []).filter(function (x) {
-      return x.enough && x.v > 0;
-    });
-    if (!ok.length) return { hi: null, lo: null };
-    var hi = ok.reduce(function (m, x) {
-      return x.v > m.v || (x.v === m.v && x.n > m.n) ? x : m;
-    }, ok[0]);
-    var lo = ok.reduce(function (m, x) {
-      return x.v < m.v || (x.v === m.v && x.n > m.n) ? x : m;
-    }, ok[0]);
-    return { hi: hi, lo: lo === hi ? null : lo };
+    var r = StudentComps.rank(items);
+    return { hi: r.hi[0] || null, lo: r.lo[0] || null };
   }
 
   function _cpSummaryHtml(ctx) {
