@@ -17,13 +17,22 @@ window.CmPtsSave = (function () {
   var E = CmPtsEdit;
 
   function commit(cid, scale) {
-    var before = getGradingScale(cid);
-    write(cid, scale);
+    // What was stored before; a class that never saved a scale has none.
+    var was = getCourseConfig(cid).gradingScale;
+    var before = was ? structuredClone(was) : null;
+    var wrote = structuredClone(scale);
+    write(cid, wrote);
+    E.clearNotice();
     E.drop();
     E.focusOn('#cm-pts-edit-btn');
     E.host().render();
     showUndoToast('Markers saved', function () {
-      write(cid, before);
+      // Only while what is saved is still exactly what this Save wrote: a scale
+      // that arrived from another device since is never put back over.
+      if (M.stored(getGradingScale(cid)) !== M.stored(wrote)) return;
+      // No scale saved before: the defaults, as a copy of their own (the server
+      // takes a scale, not "none"; Reset to Defaults saves the same).
+      write(cid, before || structuredClone(DEFAULT_GRADING_SCALE));
       E.host().render();
     });
   }
@@ -84,7 +93,11 @@ window.CmPtsSave = (function () {
   function save() {
     var cid = E.selected();
     var d = cid && E.draft(cid);
-    if (!cid || !d || !E.dirty(cid)) return;
+    if (!cid || !d) return;
+    // A scale from another device since Edit: nothing is written over it.
+    if (E.reconcile(cid)) return E.host().render();
+    d = E.draft(cid);
+    if (!d || !E.dirty(cid)) return;
     var fx = M.gradeEffects(cid, getGradingScale(cid), d);
     if (!fx.pctMoves) return commit(cid, d);
     showConfirm(
@@ -93,7 +106,9 @@ window.CmPtsSave = (function () {
       'Save',
       'primary',
       function () {
-        if (E.editing(cid)) commit(cid, d);
+        // The question was open a while: look again before writing.
+        if (E.reconcile(cid)) return E.host().render();
+        if (E.editing(cid) && E.dirty(cid)) commit(cid, E.draft(cid));
       },
       'Cancel',
     );
@@ -142,5 +157,30 @@ window.CmPtsSave = (function () {
     };
   }
 
-  return { save: save, checkNotes: checkNotes };
+  /* The one line beside the box under the ruler while editing: the student
+     picked in Check With a Student under the draft and as saved, and how many
+     letter grades change. Empty when the draft moves no grade shown. */
+  // html-safe: the name and every grade through esc
+  function previewHtml(cid) {
+    var shown = E.shownScale(cid);
+    var saved = getGradingScale(cid);
+    var st = CmGrading.checkStudent(cid);
+    if (!shown || !st || !M.differs(saved, shown)) return '';
+    var read = function (scale) {
+      return readAsOfTerm(cid, null, function () {
+        return withGradingScale(cid, scale, function () {
+          return studentGradeSummary(cid, st.id).text || 'No scores yet';
+        });
+      });
+    };
+    var now = read(shown);
+    var was = read(saved);
+    var n = M.gradeEffects(cid, saved, shown).moves.length;
+    var out = '';
+    if (now !== was) out += '<span>' + esc(fullName(st) + ' ' + now + ', was ' + was) + '</span>';
+    if (n) out += '<span>' + n + (n === 1 ? ' letter grade changes' : ' letter grades change') + '</span>';
+    return out;
+  }
+
+  return { save: save, checkNotes: checkNotes, previewHtml: previewHtml };
 })();

@@ -41,10 +41,10 @@
 }
 .cm-pts-btn-tint {
   color: var(--active-fill);
-  background: rgba(0, 122, 255, 0.1);
+  background: color-mix(in srgb, var(--active) 10%, transparent);
 }
 .cm-pts-btn-tint:hover {
-  background: rgba(0, 122, 255, 0.16);
+  background: color-mix(in srgb, var(--active) 16%, transparent);
 }
 .cm-pts-btn-fill {
   color: #fff;
@@ -63,10 +63,10 @@
 /* Pressing a locked marker pulses Edit twice. */
 @keyframes cm-pts-nudge {
   0% {
-    box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.6);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--active) 60%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 12px rgba(0, 122, 255, 0);
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--active) 0%, transparent);
   }
 }
 .cm-pts-btn-tint.is-nudge {
@@ -106,11 +106,34 @@
   transition: none;
 }
 
+/* The row is as tall as the box, so picking a marker does not move what is below. */
+.cm-pts-edit {
+  min-height: 34px;
+}
+
+/* ── The grade preview beside the box: two short lines in the row's own height ── */
+.cm-pts-preview {
+  margin-left: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: var(--text-xs);
+  line-height: 15px;
+  color: var(--text-2);
+}
+.cm-pts-preview span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Editing: the ruler is a field in focus, and the markers lift ── */
 .cm-pts-scroll.is-editing {
   box-shadow:
     0 0 0 1.5px var(--active),
-    0 0 0 5px rgba(0, 122, 255, 0.12);
+    0 0 0 5px color-mix(in srgb, var(--active) 12%, transparent);
   padding-top: 12px;
   padding-bottom: 8px;
 }
@@ -296,6 +319,14 @@
   width: min(600px, calc(100% - 32px));
   padding: 24px 28px;
 }
+.gsc-dialog .gsc-mode {
+  align-self: flex-start;
+}
+.gsc-dialog .confirm-ok:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
 .gsc-dialog .copy-dialog-body {
   gap: 10px;
   margin: 12px 0 18px;
@@ -441,6 +472,6 @@
   }
   .cm-pts-btn-tint.is-nudge {
     animation: none;
-    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.3);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--active) 30%, transparent);
   }
 }

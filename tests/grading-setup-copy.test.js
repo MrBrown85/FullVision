@@ -260,6 +260,15 @@ describe('grading setup copies across classes', () => {
       expect(plan.changes[0].lines).toContain('Proficient starts at 73% → 70%.');
     });
 
+    it('counts a difference in the level names alone as a change', () => {
+      _cache.courseConfigs[A].gradingScale = {
+        ...structuredClone(DEFAULT_GRADING_SCALE),
+        labels: [null, null, 'Meeting', null],
+      };
+      const plan = GradingSetupCopy.planSetup(A, B, { gradingScale: true });
+      expect(plan.changes[0].lines).toEqual(['The level names change.']);
+    });
+
     it('copies the scale to the other class, as a copy, and leaves the source and the scores alone', async () => {
       _cache.courseConfigs[A].gradingScale = structuredClone(MARKERS);
       await GradingSetupCopy.applySetup(GradingSetupCopy.planSetup(A, B, { gradingScale: true }), {});
@@ -407,6 +416,23 @@ describe('grading setup copies across classes', () => {
       await settle();
       expect([...doc.querySelectorAll('[data-gsc-from]')].map(b => b.getAttribute('role'))).toEqual(['radio', 'radio']);
       expect(doc.querySelector('[data-gsc-from]').getAttribute('aria-checked')).toBe('true');
+    });
+
+    it('Import rows are radios that move with the arrow keys', async () => {
+      GradingSetupCopy.openDialog(A, { mode: 'from' });
+      await settle();
+      const rows = () => [...doc.querySelectorAll('[data-gsc-from]')];
+      expect(rows().map(b => b.getAttribute('tabindex'))).toEqual(['0', '-1']);
+      const key = (el, k) => {
+        const e = new doc.defaultView.Event('keydown', { bubbles: true, cancelable: true });
+        e.key = k;
+        el.dispatchEvent(e);
+      };
+      key(rows()[0], 'ArrowDown');
+      expect(rows().map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+      expect(rows().map(b => b.getAttribute('tabindex'))).toEqual(['-1', '0']);
+      key(rows()[1], 'ArrowUp');
+      expect(rows().map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'false']);
     });
 
     it('greys Categories and Weights when the source has none', async () => {

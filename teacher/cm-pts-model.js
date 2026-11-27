@@ -105,6 +105,11 @@ window.CmPtsModel = (function () {
     };
   }
 
+  // Everything a scale stores, as one string: starts, own percents and level names.
+  function stored(scale) {
+    return JSON.stringify([starts(scale), ownPercents(scale), (scale && scale.labels) || null]);
+  }
+
   // Whether two scales are the same to the teacher: the same starts and the same own percents.
   function sameScale(a, b) {
     return JSON.stringify([starts(a), ownPercents(a)]) === JSON.stringify([starts(b), ownPercents(b)]);
@@ -336,6 +341,7 @@ window.CmPtsModel = (function () {
     build: build,
     invalid: invalid,
     sameScale: sameScale,
+    stored: stored,
     edit: edit,
     range: range,
     preset: preset,

@@ -222,7 +222,8 @@ describe('Points and Proficiency as one scale on the Grading tab', () => {
   }
   function editLine() {
     var m = main.innerHTML.match(/<div class="cm-pts-edit">(.*?)<\/div>/);
-    return m ? m[1] : null;
+    // The grade preview at the right end of the row is checked on its own.
+    return m ? m[1].replace(/<span class="cm-pts-preview"[^>]*>.*<\/span>$/, '') : null;
   }
   // The scale as saved, nothing in the draft.
   const DEFAULTS = { 4: 100, 3: 75, 2: 50, 1: 25 };
@@ -620,6 +621,177 @@ describe('Points and Proficiency as one scale on the Grading tab', () => {
       save();
       expect(CmPtsEdit.draft(CID)).not.toBeNull();
       expect(confirms).toHaveLength(0);
+    });
+  });
+
+  describe('a scale that arrives from another device', () => {
+    // Letter class with two students, so a Counts As change moves a course %.
+    function letterClass() {
+      COURSES[CID].gradingSystem = 'letter';
+      _cache.assessments[CID].forEach(a => (a.scoreMode = 'proficiency'));
+      clearProfCache();
+      DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
+    }
+    // What the class loader does when another device saved: a new object in the config.
+    function arrives(percents) {
+      _cache.courseConfigs[CID].gradingScale = {
+        boundaries: structuredClone(DEFAULT_GRADING_SCALE.boundaries),
+        percents: { ...DEFAULTS, ...percents },
+        labels: null,
+      };
+      clearProfCache();
+    }
+    const redraw = () => DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
+    const NOTICE = 'Points and Proficiency changed on another device, so nothing was saved.';
+
+    it('at rest: the ruler shows it, and the next Edit starts from it', () => {
+      arrives({ '3+': 90 });
+      redraw();
+      expect(markerLeft('3+')).toBe(90);
+      expect(main.innerHTML).not.toContain('What You Typed');
+      edit();
+      expect(draft().percents['3+']).toBe(90);
+    });
+
+    it('mid-draft: nothing is written over it, and what was typed is listed until Dismiss', () => {
+      edit();
+      pick('step', '3');
+      type('80');
+      arrives({ '3+': 90 });
+      save();
+      // The other device's scale stands; the teacher's draft is on screen as What You Typed.
+      expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
+      expect(CmPtsEdit.draft(CID)).toBeNull();
+      expect(main.innerHTML).toContain(NOTICE);
+      expect(main.innerHTML).toContain('These are the current ones. What you typed is below.');
+      expect(main.innerHTML).toContain('<div class="cm-cat-typed-label">What You Typed</div>');
+      expect(main.innerHTML).toContain('<li>3: 75% → 80%.</li>');
+      expect(markerLeft('3+')).toBe(90);
+      expect(markerLeft('3')).toBe(75);
+      act('cmPtsNoticeDone');
+      expect(main.innerHTML).not.toContain('What You Typed');
+      expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
+    });
+
+    it('mid-draft, seen on the next redraw without pressing Save', () => {
+      edit();
+      pick('step', '3');
+      type('80');
+      arrives({ '3+': 90 });
+      redraw();
+      expect(main.innerHTML).toContain(NOTICE);
+      expect(CmPtsEdit.draft(CID)).toBeNull();
+    });
+
+    it('mid-draft with nothing typed: the draft starts again from the new scale, with no line', () => {
+      edit();
+      arrives({ '3+': 90 });
+      redraw();
+      expect(CmPtsEdit.draft(CID).percents['3+']).toBe(90);
+      expect(main.innerHTML).not.toContain(NOTICE);
+      expect(main.innerHTML).toContain('cm-pts-scroll is-editing');
+    });
+
+    it('with the Save question open: Save in the question writes nothing over it either', () => {
+      letterClass();
+      edit();
+      pick('step', '3');
+      type('80');
+      save();
+      expect(confirms).toHaveLength(1);
+      arrives({ '3+': 90 });
+      confirms[0].run();
+      expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
+      expect(main.innerHTML).toContain(NOTICE);
+      expect(main.innerHTML).toContain('<li>3: 75% → 80%.</li>');
+      expect(undos).toHaveLength(0);
+    });
+
+    it('between Save and Undo: Undo does nothing once another scale has arrived', () => {
+      edit();
+      pick('step', '3');
+      type('80');
+      save();
+      expect(undos.map(u => u.message)).toEqual(['Markers saved']);
+      arrives({ '3+': 90 });
+      undos[0].undo();
+      expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 90 });
+    });
+
+    it('Undo puts the previous scale back while it is still what the Save wrote', () => {
+      _cache.courseConfigs[CID].gradingScale = structuredClone(DEFAULT_GRADING_SCALE);
+      _cache.courseConfigs[CID].gradingScale.percents = { ...DEFAULTS, '3+': 85 };
+      redraw();
+      edit();
+      pick('step', '3');
+      type('80');
+      save();
+      expect(getGradingScale(CID).percents[3]).toBe(80);
+      undos[0].undo();
+      expect(getGradingScale(CID).percents).toEqual({ ...DEFAULTS, '3+': 85 });
+    });
+
+    it('Undo after the first save puts back the defaults as a copy, never the constant itself', () => {
+      // No scale was ever saved for this class.
+      expect(getCourseConfig(CID).gradingScale).toBeUndefined();
+      edit();
+      expect(draft()).not.toBe(DEFAULT_GRADING_SCALE);
+      pick('step', '3');
+      type('80');
+      save();
+      const wrote = getCourseConfig(CID).gradingScale;
+      expect(wrote).not.toBe(draft());
+      expect(wrote).not.toBe(DEFAULT_GRADING_SCALE);
+      undos[0].undo();
+      const back = getCourseConfig(CID).gradingScale;
+      expect(back).toEqual(DEFAULT_GRADING_SCALE);
+      expect(back).not.toBe(DEFAULT_GRADING_SCALE);
+      expect(back.percents).not.toBe(DEFAULT_GRADING_SCALE.percents);
+      // And the constant itself was never touched.
+      expect(DEFAULT_GRADING_SCALE.percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25 });
+    });
+  });
+
+  describe('the grade preview beside the box', () => {
+    function letterClass() {
+      COURSES[CID].gradingSystem = 'letter';
+      _cache.assessments[CID].forEach(a => (a.scoreMode = 'proficiency'));
+      clearProfCache();
+      DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
+    }
+    const line = () => {
+      const m = main.innerHTML.match(/<span class="cm-pts-preview" id="cm-pts-preview">(.*?)<\/span>(?=<\/div>)/);
+      return m ? m[1] : null;
+    };
+
+    it('is empty while the draft moves no grade shown', () => {
+      letterClass();
+      edit();
+      expect(line()).toBe('');
+      pick('edge', '4');
+      type('88');
+      expect(line()).toBe('');
+    });
+
+    it('counts the letter grades that change, singular for one', () => {
+      letterClass();
+      edit();
+      pick('step', '3');
+      type('90');
+      const text = line().replace(/<[^>]+>/g, '|');
+      // This seed's overall grade reads from levels, so only the count part shows (the Demo class shows both: e2e).
+      expect(text).not.toContain('Amara Osei');
+      expect(text).toMatch(/\|1 letter grade changes\|/);
+    });
+
+    it('says letter grades, plural, and drops the count part at zero', () => {
+      letterClass();
+      edit();
+      pick('step', '3');
+      type('90');
+      pick('step', '2');
+      type('70');
+      expect(line()).toContain('2 letter grades change');
     });
   });
 

@@ -237,6 +237,19 @@ window.CmPtsRuler = (function () {
     );
   }
 
+  // The line under the ruler while editing: the box for a picked marker, the refusal, and the grade preview.
+  function editRowHtml(v) {
+    if (!v.editing) return '';
+    return (
+      '<div class="cm-pts-edit">' +
+      typeHtml(v) +
+      '<span class="cm-pts-preview" id="cm-pts-preview">' +
+      (v.preview || '') +
+      '</span></div>' +
+      (v.error ? '<div class="cm-pts-error" id="cm-pts-error" role="alert">' + esc(v.error) + '</div>' : '')
+    );
+  }
+
   /* v: { cid, editing, shown (the scale on the ruler), saved, pick, typed,
      error, previewing, dirty }. */
   function render(v) {
@@ -259,6 +272,7 @@ window.CmPtsRuler = (function () {
     return (
       '<div class="cm-pts-scale">' +
       headHtml(v) +
+      (v.notice || '') +
       CmGradingBars.renderScaleHint(v.editing) +
       '<div class="cm-pts-scroll ' +
       (v.editing ? 'is-editing' : 'is-rest') +
@@ -276,10 +290,7 @@ window.CmPtsRuler = (function () {
       '<div class="cm-pts-ticks" aria-hidden="true">' +
       ticks +
       '</div></div></div>' +
-      (v.editing ? '<div class="cm-pts-edit">' + typeHtml(v) + '</div>' : '') +
-      (v.editing && v.error
-        ? '<div class="cm-pts-error" id="cm-pts-error" role="alert">' + esc(v.error) + '</div>'
-        : '') +
+      editRowHtml(v) +
       (v.editing ? CmGradingBars.renderPresets(v.shown) : '') +
       '</div>'
     );

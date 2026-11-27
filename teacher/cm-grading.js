@@ -447,6 +447,18 @@
     });
   }
 
+  // The student Check With a Student shows for a class: the one picked, else the first.
+  function checkStudent(cid) {
+    var list = sortStudents(getStudents(cid), 'lastName');
+    return (
+      list.find(function (s) {
+        return s.id === _cmCheckSid[cid];
+      }) ||
+      list[0] ||
+      null
+    );
+  }
+
   // The card redrawn in place, while a marker is dragged or a preset pointed at.
   function refreshCheck(cid) {
     var el = document.querySelector('.cm-check');
@@ -620,5 +632,6 @@
     cmRoundPercentSelect: cmRoundPercentSelect,
     cmSavePointsScale: CmPtsEdit.savePointsScale,
     refreshCheck: refreshCheck,
+    checkStudent: checkStudent,
   };
 })();

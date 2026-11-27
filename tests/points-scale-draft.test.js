@@ -6,6 +6,7 @@
  * holds the rules the ruler always had, and the ghost rule.
  */
 import './setup.js';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const CID = 'e0000000-0000-4000-8000-0000000draft1';
@@ -223,5 +224,23 @@ describe('CmPtsModel', () => {
   it('shows no course % in a Proficiency class', () => {
     COURSES[CID].gradingSystem = 'proficiency';
     expect(M.gradeEffects(CID, DEFAULT_GRADING_SCALE, HIGH)).toEqual({ pctMoves: false, moves: [] });
+  });
+});
+
+describe('the caches withGradingScale puts back', () => {
+  const body = (src, fn) => {
+    const from = src.indexOf('function ' + fn + '(');
+    return src.slice(from, src.indexOf('\n}\n', from));
+  };
+  const calc = readFileSync('shared/calc.js', 'utf8');
+  const scale = readFileSync('teacher/calc-scale.js', 'utf8');
+  const cleared = [...body(calc, 'clearProfCache').matchAll(/^\s*(_\w+) = \{\};/gm)].map(m => m[1]).sort();
+
+  it('are the caches clearProfCache clears, so a new cache cannot be forgotten', () => {
+    expect(cleared.length).toBeGreaterThan(10);
+    const listed = [...body(scale, '_profCaches').matchAll(/^\s*(_\w+),$/gm)].map(m => m[1]).sort();
+    const restored = [...body(scale, '_setProfCaches').matchAll(/^\s*(_\w+) = c\[/gm)].map(m => m[1]).sort();
+    expect(listed).toEqual(cleared);
+    expect(restored).toEqual(cleared);
   });
 });

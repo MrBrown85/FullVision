@@ -21,10 +21,15 @@ window.CmPtsEdit = (function () {
   var M = CmPtsModel;
   /** @type {any} */
   var _host = null;
-  /** @type {{ cid: string, scale: any } | null} */
+  /** @type {{ cid: string, scale: any, opened: any } | null} */
   var _draft = null;
+  // What the teacher typed over a scale that changed on another device first: { cid, typed: [lines] }.
+  /** @type {{ cid: string, typed: string[] } | null} */
+  var _notice = null;
   /** @type {{ name: string, scale: any } | null} */
   var _preview = null;
+  // The scale on the ruler while a drag, a typed value or a preset pointed at is not yet in the draft.
+  var _live = null;
   /** @type {{ pick: any, typed: string | null, error: string | null, dragEnd: number }} */
   var _ui = { pick: null, typed: null, error: null, dragEnd: 0 };
 
@@ -47,7 +52,7 @@ window.CmPtsEdit = (function () {
   }
   // The scale Check With a Student reads: the preset in view, else the draft; null at rest.
   function shownScale(cid) {
-    return editing(cid) ? (_preview ? _preview.scale : draftOf(cid)) : null;
+    return editing(cid) ? _live || draftOf(cid) : null;
   }
   function noteDragEnd() {
     _ui.dragEnd = Date.now();
@@ -66,9 +71,11 @@ window.CmPtsEdit = (function () {
 
   /* The Points and Proficiency section, for the Grading tab. */
   function render(cid) {
+    reconcile(cid);
     var saved = getGradingScale(cid);
     var ed = editing(cid);
     _preview = null;
+    _live = null;
     return CmPtsRuler.render({
       cid: cid,
       editing: ed,
@@ -79,6 +86,8 @@ window.CmPtsEdit = (function () {
       error: _ui.error,
       previewing: false,
       dirty: ed && dirty(cid),
+      notice: _notice && _notice.cid === cid ? noticeHtml(_notice) : '',
+      preview: ed ? CmPtsSave.previewHtml(cid) : '',
     });
   }
 
@@ -88,7 +97,8 @@ window.CmPtsEdit = (function () {
     if (!cid) return;
     clearUi();
     _preview = null;
-    _draft = { cid: cid, scale: structuredClone(getGradingScale(cid)) };
+    _notice = null;
+    _draft = { cid: cid, scale: structuredClone(getGradingScale(cid)), opened: structuredClone(getGradingScale(cid)) };
     focusOn('#cm-pts-step-1');
     _host.render();
   }
@@ -98,9 +108,44 @@ window.CmPtsEdit = (function () {
     focusOn('#cm-pts-edit-btn');
     if (cid) _host.render();
   }
+  /* A scale that arrived from another device while the draft was open is
+     never written over (Class Settings keeps categories the same way, DECISIONS
+     "Class settings on two computers"). Nothing typed yet: the draft starts
+     again from the new scale. Something typed: the ruler shows the saved
+     markers and the line says what was typed, until Dismiss. True when the
+     draft was let go. */
+  function reconcile(cid) {
+    var d = draftOf(cid) && _draft;
+    if (!d || M.stored(getGradingScale(cid)) === M.stored(d.opened)) return false;
+    if (M.differs(d.opened, d.scale)) {
+      _notice = { cid: cid, typed: M.lines(d.opened, d.scale) };
+      drop();
+      return true;
+    }
+    d.opened = structuredClone(getGradingScale(cid));
+    d.scale = structuredClone(d.opened);
+    return false;
+  }
+  // The line the categories use, with its What You Typed list and Dismiss (cm-cat-notice).
+  // html-safe: the sentence is a constant; each typed line through esc
+  function noticeHtml(n) {
+    return (
+      '<div class="cm-cat-notice" role="status"><div class="cm-cat-notice-text">' +
+      'Points and Proficiency changed on another device, so nothing was saved. These are the current ones. What you typed is below.' +
+      '</div><div class="cm-cat-typed"><div class="cm-cat-typed-label">What You Typed</div><ul>' +
+      n.typed
+        .map(function (l) {
+          return '<li>' + esc(l) + '</li>';
+        })
+        .join('') +
+      '</ul></div><button class="cm-add-link" data-action="cmPtsNoticeDone">Dismiss</button></div>'
+    );
+  }
+
   // Let the draft go, without a redraw (leaving the tab, or the class).
   function drop() {
     _draft = null;
+    _live = null;
     _preview = null;
     clearUi();
   }
@@ -110,6 +155,7 @@ window.CmPtsEdit = (function () {
   }
   function reset() {
     drop();
+    _notice = null;
     _ui.dragEnd = 0;
   }
 
@@ -257,10 +303,15 @@ window.CmPtsEdit = (function () {
     if (_checkTimer) return;
     _checkTimer = setTimeout(function () {
       _checkTimer = 0;
-      if (editing(cid) && _host.refreshCheck) _host.refreshCheck(cid);
+      if (!editing(cid)) return;
+      if (_host.refreshCheck) _host.refreshCheck(cid);
+      var line = document.getElementById('cm-pts-preview');
+      // html-safe: previewHtml escapes the student's name and every grade
+      if (line) line.innerHTML = CmPtsSave.previewHtml(cid);
     }, 90);
   }
   function show(cid, scale, glide, previewing) {
+    _live = scale === draftOf(cid) ? null : scale;
     CmPtsRuler.sync(document, { shown: scale, saved: getGradingScale(cid), previewing: previewing }, glide);
     refreshSoon(cid);
   }
@@ -285,11 +336,17 @@ window.CmPtsEdit = (function () {
     show(cid, _preview ? _preview.scale : d, true, !!name);
   }
 
+  function dismiss() {
+    _notice = null;
+    _host.render();
+  }
+
   /* Every cmPts* press from the dispatcher; true when it was one of these. */
   function handleAction(action, el) {
     if (action === 'cmPtsEdit') start();
     else if (action === 'cmPtsCancel') cancel();
     else if (action === 'cmPtsSave') CmPtsSave.save();
+    else if (action === 'cmPtsNoticeDone') dismiss();
     else if (action === 'cmPtsUse') _host.openCopy({ only: 'gradingScale' });
     else if (action === 'cmPtsPick') pick(el);
     else if (action === 'cmPtsGhost') ghost(el);
@@ -306,6 +363,10 @@ window.CmPtsEdit = (function () {
     shownScale: shownScale,
     keep: keep,
     drop: drop,
+    reconcile: reconcile,
+    clearNotice: function () {
+      _notice = null;
+    },
     reset: reset,
     handleAction: handleAction,
     keydown: keydown,

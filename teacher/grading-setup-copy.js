@@ -267,7 +267,11 @@ window.GradingSetupCopy = (function () {
     var to = getGradingScale(srcCid);
     plan.scaleBefore = structuredClone(from);
     plan.scale = structuredClone(to);
-    add('gradingScale', CmPtsModel.lines(from, to));
+    var lines = CmPtsModel.lines(from, to);
+    // Level names are part of the scale: a difference in them alone is a change too.
+    if (JSON.stringify(from.labels || null) !== JSON.stringify(to.labels || null))
+      lines.push('The level names change.');
+    add('gradingScale', lines);
     var ended = CmGrading._cmEndedTerm(dstCid);
     if (ended && CmPtsModel.gradeEffects(dstCid, from, to).pctMoves)
       plan.endedNote =

@@ -141,6 +141,7 @@ interface Window {
   PageDashboard: unknown;
   DashInboxRollCall: unknown;
   CmGradingBars: unknown;
+  CmGrading: unknown;
   CmPtsModel: unknown;
   CmPtsRuler: unknown;
   CmPtsEdit: unknown;
@@ -550,6 +551,7 @@ declare var CmKeepMenu: any;
 declare var _avatarColor: any;
 declare var CmQuestionnaires: any;
 declare var CmGradingBars: any;
+declare var CmGrading: any;
 declare var CmPtsModel: any;
 declare var CmPtsRuler: any;
 declare var CmPtsEdit: any;

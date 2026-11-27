@@ -135,6 +135,8 @@
           (on ? ' active' : '') +
           '" role="radio" aria-checked="' +
           on +
+          '" tabindex="' +
+          (on ? '0' : '-1') +
           '" data-gsc-from="' +
           esc(c.id) +
           '"><span class="cm-method-dot" aria-hidden="true"></span><span class="gsc-row-text"><span class="cm-method-name">' +
@@ -231,9 +233,22 @@
     root.querySelectorAll('[data-gsc-from]').forEach(function (b) {
       var on = b === src;
       b.setAttribute('aria-checked', String(on));
+      b.setAttribute('tabindex', on ? '0' : '-1');
       b.classList.toggle('active', on);
     });
     fillGroups(root, st);
+  }
+
+  // Round buttons move with the arrow keys, as radios do: the next one is picked and takes the focus.
+  function arrowSource(root, st, e) {
+    var cur = e.target.closest && e.target.closest('[data-gsc-from]');
+    var by = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (!cur || !by) return;
+    var all = Array.prototype.slice.call(root.querySelectorAll('[data-gsc-from]'));
+    var next = all[(all.indexOf(cur) + by + all.length) % all.length];
+    e.preventDefault();
+    pickSource(root, st, next);
+    next.focus();
   }
 
   // A press on a row or its switch flips it; on a source, picks it; on a direction, turns the dialog round.
@@ -300,6 +315,9 @@
         render(root, st);
         root.addEventListener('click', function (e) {
           press(root, st, e);
+        });
+        root.addEventListener('keydown', function (e) {
+          arrowSource(root, st, e);
         });
       },
       onOk: function (root) {

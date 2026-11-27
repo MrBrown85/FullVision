@@ -130,6 +130,29 @@ test.describe('editing', () => {
     await expect(page.locator('.cm-check-was')).toBeVisible();
   });
 
+  test('the grade preview is in view with the ruler during a drag, and goes when the draft moves no grade', async ({
+    page,
+  }) => {
+    await clickAction(page, 'cmPtsEdit');
+    await expect(page.locator('#cm-pts-preview')).toHaveText('');
+    await drag(page, MARKER_3, 45, { release: false });
+    const line = page.locator('#cm-pts-preview');
+    await expect(line).toContainText('Cece Adeyemi');
+    await expect(line).toContainText(', was B 78.9%');
+    // The ruler and the answer to the drag are on screen together, with no scrolling up to the card.
+    const inView = async sel => {
+      const b = await page.locator(sel).boundingBox();
+      const h = await page.evaluate(() => innerHeight);
+      return b.y >= 0 && b.y + b.height <= h;
+    };
+    expect(await inView('#cm-pts-ruler')).toBe(true);
+    expect(await inView('#cm-pts-preview')).toBe(true);
+    await page.mouse.up();
+    // Back to where it was saved: nothing moves, so nothing is said.
+    await page.locator('.cm-pts-ghost[data-key="3"] .cm-pts-pill').click();
+    await expect(line).toHaveText('');
+  });
+
   test('a ghost marks the saved place, and clicking it puts the marker back', async ({ page }) => {
     await clickAction(page, 'cmPtsEdit');
     await drag(page, MARKER_3, 45);
@@ -275,6 +298,24 @@ test.describe('Use in Other Classes', () => {
     await page.evaluate(() => {
       createCourse({ name: 'Science 8', gradingSystem: 'letter', block: 'D' });
     });
+    // The preview beside the longest pick label fits in the row, and the row keeps its height.
+    await clickAction(page, 'cmPtsEdit');
+    const rowHeight = () => page.locator('.cm-pts-edit').evaluate(el => el.getBoundingClientRect().height);
+    const idle = await rowHeight();
+    await page.locator('#cm-pts-edge-2').click();
+    await page.fill('#cm-pts-input', '55');
+    await page.locator('#cm-pts-step-3').click();
+    await page.fill('#cm-pts-input', '90');
+    await page.press('#cm-pts-input', 'Enter');
+    await page.locator('#cm-pts-edge-2').click();
+    await expect(page.locator('#cm-pts-preview span').first()).toBeVisible();
+    expect(await rowHeight()).toBe(idle);
+    const clipped = await page.evaluate(() =>
+      [...document.querySelectorAll('#cm-pts-preview span')].map(s => s.scrollWidth > s.clientWidth + 1),
+    );
+    expect(clipped.length).toBeGreaterThan(0);
+    expect(clipped.every(c => c === false)).toBe(true);
+    await clickAction(page, 'cmPtsCancel');
     // The header's two buttons fit beside the label, and the hint does not run under them.
     const head = await page.locator('.cm-pts-head').boundingBox();
     const actions = await page.locator('.cm-pts-head-actions').boundingBox();
