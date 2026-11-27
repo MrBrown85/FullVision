@@ -151,6 +151,8 @@ interface Window {
   ReportOneHead: unknown;
   ReportOneOpts: unknown;
   ReportResponse: any;
+  ReportLegend: any;
+  ReportStudentPage: any;
   ReportPrintPaper: unknown;
   // The Overview's picture of the grade (teacher/student-overview.js).
   StudentOverview: unknown;

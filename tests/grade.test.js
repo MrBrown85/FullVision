@@ -205,7 +205,8 @@ describe('grade-format-guard', () => {
     'teacher/page-assignments.js': 8, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)
     'teacher/page-gradebook.js': 1,
     'teacher/page-student.js': 2,
-    'teacher/report-blocks.js': 21,
+    'teacher/report-blocks.js': 17, // the legend's four moved to report-legend.js, Nov 27
+    'teacher/report-legend.js': 1, // the BC Proficiency Scale names each level, Nov 27
     'teacher/report-feedback-cards.js': 2,
     'teacher/report-qn-browse-cases.js': 1,
     'teacher/rubric-bank.js': 2,

@@ -186,6 +186,8 @@ const PRECACHE_URLS = [
   '/teacher/print-legal.js',
   '/teacher/report-blocks.js',
   '/teacher/report-response.js',
+  '/teacher/report-legend.js',
+  '/teacher/report-student-page.js',
   '/teacher/report-sheets.js',
   '/teacher/report-issues.js',
   '/shared/comment-bank.js',
