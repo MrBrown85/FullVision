@@ -201,6 +201,7 @@
     "s/quiz-view.js",
     "s/quiz.js",
     "s/seen-watch.js",
+    "s/keyboard-settle.js",
     "s/send-note.js",
     "s/rubric-whole.js",
     "shared/website-ask.js",
