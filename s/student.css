@@ -70,6 +70,8 @@ html.sp-size-larger {
 html,
 body {
   margin: 0;
+  /* No double-tap zoom (students zoomed by accident, Colin Nov 27 2026); pinch-to-zoom stays for those who need it. */
+  touch-action: manipulation;
   background: var(--sp-bg);
   color: var(--sp-text);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
