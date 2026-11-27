@@ -88,6 +88,51 @@ window.StudentComps = (function () {
     );
   }
 
+  // How the levels split: a Proficiency or Both class names its levels (a Letter class does not).
+  function _splitHtml(counts) {
+    if (!counts.length) return '';
+    var said = counts.map(function (k) {
+      return k.n + ' ' + k.name;
+    });
+    var out = '<div class="stu-gp-seg" role="img" aria-label="' + esc(said.join(', ')) + '">';
+    counts.forEach(function (k) {
+      out +=
+        '<span class="stu-gp-seg-part stu-gp-lv-' +
+        k.lv +
+        '" style="flex:' +
+        k.n +
+        ' 1 0" data-lv="' +
+        k.lv +
+        '" title="' +
+        esc(k.n + ' ' + k.name) +
+        '">' +
+        k.n +
+        '</span>';
+    });
+    out += '</div><div class="stu-gp-key" aria-hidden="true">';
+    counts.forEach(function (k) {
+      out += '<span data-lv="' + k.lv + '"><i class="stu-gp-lv-' + k.lv + '"></i>' + esc(k.name) + '</span>';
+    });
+    return out + '</div>';
+  }
+
+  // A named group of bars; wide when nothing sits beside it.
+  function _groupHtml(m, label, list, wide) {
+    if (!list.length) return '';
+    var bars = list.map(function (it) {
+      return _barHtml(m, it);
+    });
+    return (
+      '<div class="stu-gp-group' +
+      (wide ? ' wide' : '') +
+      '"><span class="stu-ov-label">' +
+      label +
+      '</span>' +
+      bars.join('') +
+      '</div>'
+    );
+  }
+
   function html(m) {
     var c = m.comps;
     if (!c.total) return '';
@@ -95,68 +140,23 @@ window.StudentComps = (function () {
       '<section class="stu-gp-card stu-gp-comps" aria-label="Your competencies"><div class="stu-gp-head">' +
       '<h3 class="stu-ov-h3">Your Competencies</h3>';
     if (!c.scored) return head + '<span class="stu-gp-sub">None of ' + c.total + ' assessed yet</span></div></section>';
-    var out =
-      head +
-      '<button type="button" class="stu-gp-all" data-action="stuTab" data-tab="comps">See All ' +
-      c.total +
-      '</button></div>';
-    // How the levels split: a Proficiency or Both class names its levels (a Letter class does not).
-    if (c.counts.length) {
-      out +=
-        '<div class="stu-gp-seg" role="img" aria-label="' +
-        esc(
-          c.counts
-            .map(function (k) {
-              return k.n + ' ' + k.name;
-            })
-            .join(', '),
-        ) +
-        '">';
-      c.counts.forEach(function (k) {
-        out +=
-          '<span class="stu-gp-seg-part stu-gp-lv-' +
-          k.lv +
-          '" style="flex:' +
-          k.n +
-          ' 1 0" data-lv="' +
-          k.lv +
-          '" title="' +
-          esc(k.n + ' ' + k.name) +
-          '">' +
-          k.n +
-          '</span>';
-      });
-      out += '</div><div class="stu-gp-key" aria-hidden="true">';
-      c.counts.forEach(function (k) {
-        out += '<span data-lv="' + k.lv + '"><i class="stu-gp-lv-' + k.lv + '"></i>' + esc(k.name) + '</span>';
-      });
-      out += '</div>';
-    }
-    out += '<div class="stu-gp-groups">';
     var r = rank(c.items);
     var scored = c.items.filter(function (it) {
       return it.v > 0;
     });
-    var group = function (label, list, wide) {
-      if (!list.length) return '';
-      var bars = list.map(function (it) {
-        return _barHtml(m, it);
-      });
-      return (
-        '<div class="stu-gp-group' +
-        (wide ? ' wide' : '') +
-        '"><span class="stu-ov-label">' +
-        label +
-        '</span>' +
-        bars.join('') +
-        '</div>'
-      );
-    };
-    // Nothing with enough scores to rank yet: what is assessed so far, in curriculum order.
-    out += !r.hi.length
-      ? group('Assessed So Far', scored.slice(0, 6), true)
-      : group('Strongest', r.hi, !r.lo.length) + group('Next to Work On', r.lo);
-    return out + '</div></section>';
+    return (
+      head +
+      '<button type="button" class="stu-gp-all" data-action="stuTab" data-tab="comps">See All ' +
+      c.total +
+      '</button></div>' +
+      _splitHtml(c.counts) +
+      '<div class="stu-gp-groups">' +
+      // Nothing with enough scores to rank yet: what is assessed so far, in curriculum order.
+      (r.hi.length
+        ? _groupHtml(m, 'Strongest', r.hi, !r.lo.length) + _groupHtml(m, 'Next to Work On', r.lo, false)
+        : _groupHtml(m, 'Assessed So Far', scored.slice(0, 6), true)) +
+      '</div></section>'
+    );
   }
 
   return { html: html, rank: rank };

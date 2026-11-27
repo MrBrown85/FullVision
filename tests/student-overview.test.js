@@ -142,7 +142,6 @@ describe('the Overview tab', () => {
     ).document;
     globalThis.document = doc;
     globalThis.requestAnimationFrame = fn => fn();
-    runInThisContext(readFileSync('teacher/student-comps.js', 'utf-8'), { filename: 'teacher/student-comps.js' });
     runInThisContext(readFileSync('teacher/student-overview.js', 'utf-8'), { filename: 'teacher/student-overview.js' });
     runInThisContext(readFileSync('teacher/page-student.js', 'utf-8'), { filename: 'teacher/page-student.js' });
     seed('letter');
@@ -320,10 +319,6 @@ describe('Your Competencies at a glance', () => {
       g => g.querySelector('.stu-ov-label').textContent === label,
     );
   const bars = g => Array.from(g.querySelectorAll('.stu-gp-tile .stu-gp-name')).map(n => n.textContent);
-
-  beforeEach(() => {
-    runInThisContext(readFileSync('teacher/student-comps.js', 'utf-8'), { filename: 'teacher/student-comps.js' });
-  });
 
   it('ranks up to three each way, a third of what has enough scores', () => {
     const nine = [3.5, 3.4, 3.1, 3.0, 2.9, 2.8, 2.5, 2.3, 2.1].map((v, i) => comp('C' + i, v, 4));
