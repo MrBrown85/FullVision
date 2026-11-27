@@ -30,6 +30,10 @@ window.CmPtsEdit = (function () {
   var _preview = null;
   // The scale on the ruler while a drag, a typed value or a preset pointed at is not yet in the draft.
   var _live = null;
+  // A notice has just appeared: bring it into view once it is drawn.
+  var _reveal = false;
+  // While a draft is open, a scale arriving from another device is looked for twice a second.
+  var _watch = 0;
   /** @type {{ pick: any, typed: string | null, error: string | null, dragEnd: number }} */
   var _ui = { pick: null, typed: null, error: null, dragEnd: 0 };
 
@@ -72,6 +76,8 @@ window.CmPtsEdit = (function () {
   /* The Points and Proficiency section, for the Grading tab. */
   function render(cid) {
     reconcile(cid);
+    if (_reveal) setTimeout(revealNotice, 0);
+    _reveal = false;
     var saved = getGradingScale(cid);
     var ed = editing(cid);
     _preview = null;
@@ -98,6 +104,7 @@ window.CmPtsEdit = (function () {
     clearUi();
     _preview = null;
     _notice = null;
+    startWatch();
     _draft = { cid: cid, scale: structuredClone(getGradingScale(cid)), opened: structuredClone(getGradingScale(cid)) };
     focusOn('#cm-pts-step-1');
     _host.render();
@@ -119,6 +126,7 @@ window.CmPtsEdit = (function () {
     if (!d || M.stored(getGradingScale(cid)) === M.stored(d.opened)) return false;
     if (M.differs(d.opened, d.scale)) {
       _notice = { cid: cid, typed: M.lines(d.opened, d.scale) };
+      _reveal = true;
       drop();
       return true;
     }
@@ -126,11 +134,32 @@ window.CmPtsEdit = (function () {
     d.scale = structuredClone(d.opened);
     return false;
   }
+  /* Brings the notice into view (smooth; at once with Reduce Motion) and puts the
+     focus on it, so a screen reader reads it once: it has no live-region role. */
+  function revealNotice() {
+    var el = /** @type {HTMLElement | null} */ (document.querySelector('.cm-pts-scale .cm-cat-notice'));
+    if (!el) return;
+    var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+    el.focus({ preventScroll: true });
+  }
+  function startWatch() {
+    if (_watch) return;
+    _watch = setInterval(function () {
+      var cid = _draft && _draft.cid;
+      if (!cid) return stopWatch();
+      if (reconcile(cid)) _host.render();
+    }, 500);
+  }
+  function stopWatch() {
+    clearInterval(_watch);
+    _watch = 0;
+  }
   // The line the categories use, with its What You Typed list and Dismiss (cm-cat-notice).
   // html-safe: the sentence is a constant; each typed line through esc
   function noticeHtml(n) {
     return (
-      '<div class="cm-cat-notice" role="status"><div class="cm-cat-notice-text">' +
+      '<div class="cm-cat-notice" tabindex="-1"><div class="cm-cat-notice-text">' +
       'Points and Proficiency changed on another device, so nothing was saved. These are the current ones. What you typed is below.' +
       '</div><div class="cm-cat-typed"><div class="cm-cat-typed-label">What You Typed</div><ul>' +
       n.typed
@@ -144,6 +173,7 @@ window.CmPtsEdit = (function () {
 
   // Let the draft go, without a redraw (leaving the tab, or the class).
   function drop() {
+    stopWatch();
     _draft = null;
     _live = null;
     _preview = null;

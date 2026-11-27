@@ -16,6 +16,20 @@ window.CmPtsSave = (function () {
   var M = CmPtsModel;
   var E = CmPtsEdit;
 
+  /* The Undo toast goes the moment a different scale is saved (one from another
+     device): Undo is never offered where it could do nothing. The same check
+     guards the button itself, as a backstop. */
+  var _undoWatch = 0;
+  function watchUndo(cid, wrote) {
+    clearInterval(_undoWatch);
+    var until = Date.now() + 6000;
+    _undoWatch = setInterval(function () {
+      var gone = !document.getElementById('undo-toast');
+      if (M.stored(getGradingScale(cid)) !== M.stored(wrote) && !gone) dismissUndoToast();
+      if (gone || Date.now() > until || M.stored(getGradingScale(cid)) !== M.stored(wrote)) clearInterval(_undoWatch);
+    }, 300);
+  }
+
   function commit(cid, scale) {
     // What was stored before; a class that never saved a scale has none.
     var was = getCourseConfig(cid).gradingScale;
@@ -26,6 +40,7 @@ window.CmPtsSave = (function () {
     E.drop();
     E.focusOn('#cm-pts-edit-btn');
     E.host().render();
+    watchUndo(cid, wrote);
     showUndoToast('Markers saved', function () {
       // Only while what is saved is still exactly what this Save wrote: a scale
       // that arrived from another device since is never put back over.
