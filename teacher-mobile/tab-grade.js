@@ -833,23 +833,21 @@ window.MGrade = (function () {
       _updateFilterBadge();
     }
 
-    /* The filter sheet's "Showing 6 of 18", and All Caught Up (a class
-       whose students send work), for the list as it is now. */
+    /* All Caught Up (a class whose students send work), for the list as
+       it is now. */
     function _syncWorkList(cid, assessments, ctx) {
       var shown = assessments.filter(function (a) {
         return _matchesAllFilters(a, ctx);
       }).length;
       var caught = MGradePhotos.on(cid) ? document.getElementById('m-grade-caught') : null;
       if (caught) _setHidden(caught, !(_segmentMode === 'tograde' && !shown));
-      var count = document.querySelector('#m-sheet-container .m-live-filter-count');
-      if (count) count.textContent = 'Showing ' + shown + ' of ' + assessments.length;
     }
 
     /* ── Filter sheet ───────────────────────────────────────────── */
 
     /* The filter that applies as it is tapped (S7-F1): Status, Date,
        Category and Module as short lists, a check on each row picked (not
-       outlined capsules: Colin, 2026-11-25), "Showing 6 of 18", Clear All
+       outlined capsules: Colin, 2026-11-25), Clear All
        and Done. Each tap changes the list under the sheet at once. */
 
     // html-safe: labels go through MC.esc; values are ours or category ids through MC.esc
@@ -890,27 +888,19 @@ window.MGrade = (function () {
         return (
           '<div class="m-filter-sheet-section" role="group" aria-label="' +
           title +
-          '"><div class="m-filter-sheet-title" aria-hidden="true">' +
+          '"><div class="m-filter-sheet-title m-sheet-label" aria-hidden="true">' +
           title +
           '</div><div class="m-filter-list">' +
           chips +
           '</div></div>'
         );
       };
-      var assessments = getAssignedAssessments(cid);
-      var ctx = _filterCtx(cid);
-      var shown = assessments.filter(function (a) {
-        return _matchesAllFilters(a, ctx);
-      }).length;
       return (
         '<div class="m-filter-sheet m-live-filter" role="dialog" aria-label="Filter">' +
         '<div class="m-live-filter-head">' +
-        '<div class="m-filter-sheet-heading">Filter</div>' +
         '<button type="button" class="m-btn-ghost m-live-filter-clear" data-action="m-grade-filter-clear">Clear All</button>' +
+        '<div class="m-filter-sheet-heading">Filter</div>' +
         '<button type="button" class="m-btn-ghost m-live-filter-done" data-action="m-grade-filter-done">Done</button>' +
-        '</div>' +
-        '<div class="m-live-filter-count" role="status">' +
-        MC.esc('Showing ' + shown + ' of ' + assessments.length) +
         '</div>' +
         section(
           'Status',

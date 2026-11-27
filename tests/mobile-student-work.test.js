@@ -268,17 +268,16 @@ describe('with the student page and Send Work on', () => {
     MGrade.openFilterSheet(CID);
     // The phone lists assigned work only; the sample class also has a quiz not yet assigned.
     const total = getAssignedAssessments(CID).length;
-    const count = () => document.querySelector('#m-sheet-container .m-live-filter-count').textContent;
-    expect(count()).toBe('Showing ' + total + ' of ' + total);
+    const rows = () => [...document.querySelectorAll('#m-grade-list .m-tg-row')].filter(c => !c.hidden).length;
+    expect(rows()).toBe(total);
     MGrade.onFilterSegChange('gradedStatus', 'has-ungraded');
     const shown = [...document.querySelectorAll('#m-grade-list .m-tg-row')].filter(c => !c.hidden);
     expect(shown.length).toBeLessThan(total);
-    expect(count()).toBe('Showing ' + shown.length + ' of ' + total);
     // Kept, as Apply keeps it.
     expect(JSON.parse(localStorage.getItem('gb-grade-filters-' + CID)).gradedStatus).toBe('has-ungraded');
     // Tapped again, it lets go.
     MGrade.onFilterSegChange('gradedStatus', 'has-ungraded');
-    expect(count()).toBe('Showing ' + total + ' of ' + total);
+    expect(rows()).toBe(total);
     MGrade.doneFilterSheet();
   });
 });

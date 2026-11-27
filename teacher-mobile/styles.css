@@ -2760,9 +2760,11 @@ body.fv-switching-course::after {
    left, Clear All and Done on the right; "Showing 6 of 18" under them;
    each section a short grey list, a check on what is picked. */
 .m-live-filter-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  min-height: 44px;
   /* Done stays in reach however far the lists scroll. */
   position: sticky;
   top: 0;
@@ -2770,37 +2772,33 @@ body.fv-switching-course::after {
   background: var(--surface);
 }
 .m-live-filter-head .m-filter-sheet-heading {
-  flex: 1;
   margin: 0;
   padding: 0;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
 }
 .m-live-filter-head .m-btn-ghost {
-  flex: none;
   width: auto;
   min-height: 44px;
-  padding: 0 8px;
+  padding: 0;
   background: none;
   color: var(--link);
   font-size: 17px;
-  font-weight: 500;
+  font-weight: 400;
+}
+.m-live-filter-head .m-live-filter-clear {
+  justify-self: start;
 }
 .m-live-filter-head .m-live-filter-done {
-  font-weight: 700;
-}
-.m-live-filter-count {
-  margin: 0 0 16px;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
+  justify-self: end;
+  font-weight: 600;
 }
 .m-live-filter .m-filter-sheet-section {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 .m-live-filter .m-filter-sheet-title {
-  margin: 0 0 6px 2px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
+  margin: 12px 0 6px 2px;
 }
 /* A section's choices: rows in one grey group, a hairline between them. */
 .m-filter-list {
@@ -3332,19 +3330,14 @@ body.fv-switching-course::after {
 .m-markup-card .m-markup-sees {
   margin-top: 4px;
   padding-left: 28px;
-  font-size: 13px;
   text-align: left;
   color: #636366;
 }
-/* Red, green and blue for the Pen and Highlight, beside the hint. */
+/* Red, green and blue for the Pen and Highlight. */
 .m-markup-foot {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-.m-markup-foot .m-markup-hint {
-  flex: 1;
-  text-align: right;
 }
 .m-markup-colors {
   display: flex;
@@ -3386,7 +3379,6 @@ body.fv-switching-course::after {
   gap: 8px;
 }
 .m-markup-sees,
-.m-markup-hint,
 .m-markup-msg {
   margin: 0;
   font-size: 13px;
@@ -3444,11 +3436,16 @@ body.fv-switching-course::after {
 .m-markup-note-text {
   width: 100%;
   box-sizing: border-box;
-  padding: 8px 10px;
+  min-height: 80px;
+  padding: 12px;
   border: none;
   border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
   font: inherit;
-  font-size: 16px;
+  font-size: 17px;
+  resize: none;
+  outline: none;
 }
 .m-markup-note-btns {
   display: flex;

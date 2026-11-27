@@ -46,7 +46,7 @@ test('Mark Up from the paper’s pencil: draw, a tick, a note, two fingers zoom,
 
   const mk = page.locator('#m-markup');
   await expect(mk.locator('.m-markup-title')).toHaveText('Mark Up');
-  await expect(mk.locator('.m-markup-hint')).toHaveText('One finger draws. Two fingers move the page.');
+  await expect(mk.locator('.m-markup-hint')).toHaveCount(0);
   await expect(mk.locator('.markup-pin text')).toHaveCount(3);
   await expect(mk).toHaveAttribute('data-page-shown', /.+/);
   const before = await page.evaluate(() => MMarkUp.marks().length);

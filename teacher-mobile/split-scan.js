@@ -491,7 +491,7 @@
         offered
           .map(function (r) {
             var on = r.a.id === s.aid;
-            var sub = [r.notIn + ' Not In', _day(r.a.date) ? 'due ' + _day(r.a.date) : ''].filter(Boolean).join(' · ');
+            var sub = [r.notIn + ' Not In', _day(r.a.date) ? 'Due ' + _day(r.a.date) : ''].filter(Boolean).join(' · ');
             return (
               '<button type="button" class="m-ss-option' +
               (on ? ' is-on' : '') +
@@ -507,7 +507,7 @@
             );
           })
           .join('') +
-        '</div><p class="m-ss-hint">The one with the most students Not In comes first.</p>';
+        '</div>';
     }
     html += '<p class="m-ss-privacy">The scan is split on this phone. Only each student’s own pages upload.</p></div>';
     var can = !!s.aid && offered.length > 0 && !s.switching;
@@ -518,7 +518,7 @@
       '">Choose a File<input type="file" class="m-ss-input" accept="application/pdf,.pdf"' +
       (can ? '' : ' disabled') +
       '></label>' +
-      '<p class="m-ss-hint">Save the scan from Mail to this phone (to Files on an iPhone, to Downloads on Android), then choose it here.</p>';
+      '';
     return html + foot + '</div>';
   }
 
@@ -562,12 +562,12 @@
     var on = m.leaveOut();
     var twice = m.twice();
     var blankLine = !c.blank
-      ? 'No blank pages found.'
+      ? ''
       : on
         ? _plural(c.left, 'blank page', 'blank pages') +
-          ' left out. Tap one to keep it.' +
-          (c.blank > c.left ? ' ' + (c.blank - c.left) + ' kept.' : '')
-        : _plural(c.blank, 'page looks', 'pages look') + ' blank. All are kept.';
+          ' left out' +
+          (c.blank > c.left ? ', ' + (c.blank - c.left) + ' kept' : '')
+        : _plural(c.blank, 'page looks', 'pages look') + ' blank, all kept';
     var html =
       '<div class="m-ss-body">' +
       (s.note ? '<p class="m-ss-said" role="status">' + esc(s.note) + '</p>' : '') +
@@ -581,15 +581,10 @@
       '</span><button type="button" class="m-ss-step" data-ss="per" data-d="1" aria-label="One more page per student"' +
       (per >= AddWorkSplitModel.maxPiece() ? ' disabled' : '') +
       '>+</button></div></div>' +
-      '<p class="m-ss-line" role="status">' +
-      esc(m.line()) +
-      '</p>' +
       '<button type="button" class="m-ss-switch" role="switch" data-ss="leaveOut" aria-checked="' +
       on +
       '"><span class="m-ss-switch-label">Leave Out Blank Pages</span><span class="m-ss-switch-track" aria-hidden="true"><span class="m-ss-switch-knob"></span></span></button>' +
-      '<p class="m-ss-hint">' +
-      esc(blankLine) +
-      '</p>' +
+      (blankLine ? '<p class="m-ss-tally">' + esc(blankLine) + '</p>' : '') +
       '<p class="m-ss-tally"><b>' +
       esc(String(c.named)) +
       '</b> named · <b>' +
@@ -597,7 +592,6 @@
       '</b> to name' +
       (c.twice ? ' · <b class="is-bad">' + esc(_plural(c.twice, 'student', 'students')) + ' twice</b>' : '') +
       '</p>' +
-      '<p class="m-ss-hint">Each piece shows the top of its first page. Type a few letters of the name.</p>' +
       '<div class="m-ss-pieces" role="list" aria-label="Pieces">';
     var ps = m.pieces();
     if (!ps.length)
