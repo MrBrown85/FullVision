@@ -1534,41 +1534,15 @@ window.ReportBlocks = (function () {
       });
   }
 
-  /* ── Parent / Guardian Response ── */
-  /* options.lines: the comments box's writing room, from the form.
-     options.wording: the class's wording (above). */
+  /* ── Parent / Guardian Response ── drawn by report-response.js, with
+     the class's wording and this file's way of printing it. */
   function renderBlockParentResponse(cid, student, options) {
-    const lines = Math.max(1, Number((options && options.lines) || 3));
-    const w = _wording('parent-response', options);
-    let html = `<div class="report-block-box report-parent-response">`;
-    html += `<div class="report-block-title">${_say(w.title)}</div>`;
-    html += `<div class="report-parent-intro" data-wt="intro" data-wraw="${esc(w.intro == null ? '' : String(w.intro))}" style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">${_intro(w.intro, student)}</div>`;
-    // The labelled lines, two to a row: Signature + Date, Phone + Email
-    const field = (f, i) =>
-      `<div class="report-parent-line" data-wrow="fields.${i}"${f === 'Date' ? ' style="max-width:180px"' : ''}><span class="report-parent-label" data-wt="fields.${i}">${_say(f)}</span><span class="report-parent-field"></span></div>`;
-    for (let i = 0; i < w.fields.length; i += 2) {
-      html += `<div class="report-parent-lines">
-    ${w.fields
-      .slice(i, i + 2)
-      .map((f, j) => field(f, i + j))
-      .join('\n    ')}
-  </div>`;
-    }
-    // Checkboxes
-    if (w.checks.length) {
-      html += `<div class="report-parent-checks">
-    ${w.checks.map((c, i) => `<div class="report-parent-check" data-wrow="checks.${i}"><span class="report-parent-checkbox"></span> <span data-wt="checks.${i}">${_say(c)}</span></div>`).join('\n    ')}
-  </div>`;
-    }
-    // Comments
-    w.open.forEach((label, i) => {
-      html += `<div class="report-parent-comments" data-wrow="open.${i}" style="margin-top:14px">
-    <div class="report-parent-label" data-wt="open.${i}" style="margin-bottom:6px">${_say(label)}</div>
-    <div class="report-parent-comments-box" style="border:1.5px solid var(--border);border-radius:8px;min-height:${lines * 22 + 16}px;padding:8px"></div>
-  </div>`;
+    return ReportResponse.html(cid, student, options, {
+      wording: _wording('parent-response', options),
+      say: _say,
+      intro: _intro,
+      today: WORDING['parent-response']().intro,
     });
-    html += `</div>`;
-    return html;
   }
 
   /* ── Student Self-Reflections ──

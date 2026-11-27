@@ -1792,3 +1792,14 @@ Colin, Nov 27, on the teacher's student page, Overview tab: "'your competencies'
 5. **See All opens the Competencies tab**, where every competency is listed. It replaces "27 of 27 assessed"; the tab says how many are assessed.
 6. **What a tile did, a bar does.** Pointing at a bar lights the days it was assessed on the line over the year and shows how it has moved and how many pieces; pointing at a day lights the bars its work counted toward; a click narrows All Your Work to that competency's work, with the chip to undo it; on an iPad the first tap shows and the second acts.
 7. **The label is "Next to Work On"**, the tab's own words, so one thing has one name. The box of that name that came off this page on 2026-11-17 was sentences nobody read; this is the competency's name and level. Colin has not ruled on the label.
+
+## The Parent / Guardian Response's place and options (2026-11-27)
+
+Colin: "teachers are also asking for more options for this. they like to move it to the bottom of the next item, rather than automatically on the bottom of the page. give users more options for the parent comment." Asked which places and which options, he chose all of them, then: "teachers can choose to have it follow the previous item on the page or can have it be at the bottom of the page." No board: "just make the changes."
+
+1. **Place: At the Bottom or After Part Above.** At the Bottom is today's: the response docks at the foot of the report's last side and cannot be moved. After Part Above prints it straight after the part above it, with the usual gap, and it moves up and down the panel like any part. It is one piece either way: a response that does not fit in the room left starts the next side. Switched to After Part Above it stays last until moved; switched back, it docks last again. This amends "Parts flow" (One Report, 2026-11-12) for the response only. The tear-off rule stays out: nothing is kept blank behind it.
+2. **Student's Name** prints the student's name and class beside the response's heading, so a returned slip says whose it is. Off at first.
+3. **Cut Line** prints a dashed line with scissors over the response. Off at first. It is a line only; the side behind it is not kept blank.
+4. **Return By** is a date. With today's instruction the sentence reads "Please review this report with your child and return this section to {teacher} by {date}." (to "the school" when the teacher has no display name). A class's own instruction can name `{date}`; one that does not gets "Please return it by {date}." after it. The day prints as the date the teacher picked, in any time zone.
+5. **Comment Lines** was already there and stays. Which lines and checkboxes print, and their words, stay in Edit Wording (One Report, "Teachers can reword…").
+6. A printed copy reprints from its saved HTML: the options are new markup and new CSS classes, and no rule an older copy uses was changed.

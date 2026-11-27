@@ -81,6 +81,8 @@
     "teacher/student-overview.js",
     "teacher/student-page-students.js",
     "teacher/report-one-head.js",
+    "teacher/report-one-opts.js",
+    "teacher/report-response.js",
     "teacher/report-print-paper.js",
     "teacher/report-toolbar.js",
     "shared/data-withdrawn.js",

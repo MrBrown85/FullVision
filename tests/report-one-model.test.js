@@ -124,6 +124,39 @@ describe('changing the model', () => {
     expect(end.slice(-2)).toEqual(['proficiency', 'parent-response']);
   });
 
+  it('the response docks last until it is set to follow the part above; then it moves like any part', () => {
+    const m = CARD();
+    expect(R.docks(m)).toBe(true);
+    expect(R.canMove('parent-response', m)).toBe(false);
+    expect(R.move(m, 'parent-response', 2)).toBe(m);
+    expect(R.optionsFor(m, 'parent-response').find(o => o.key === 'place')).toMatchObject({
+      kind: 'choice',
+      value: 'foot',
+    });
+    const free = R.setOption(m, 'parent-response', 'place', 'follow');
+    expect(R.docks(free)).toBe(false);
+    expect(R.canMove('parent-response', free)).toBe(true);
+    expect(R.canMove('header', free)).toBe(false);
+    // Let go of the foot, it starts where it printed: last.
+    expect(free.parts.slice(-1)).toEqual(['parent-response']);
+    const moved = R.move(free, 'parent-response', 4);
+    expect(moved.parts.indexOf('parent-response')).toBe(4);
+    expect(R.order(moved).indexOf('parent-response')).toBe(4);
+    // A part moved below it stays below it.
+    expect(R.move(moved, 'proficiency', 99).parts.slice(-1)).toEqual(['proficiency']);
+    // Back to the bottom, it prints last again, wherever it sat.
+    const back = R.setOption(moved, 'parent-response', 'place', 'foot');
+    expect(R.order(back).slice(-1)).toEqual(['parent-response']);
+  });
+
+  it('the response takes a return-by date, the student’s name and a cut line, all off at first', () => {
+    const o = R.optionsFor(CARD(), 'parent-response');
+    expect(o.find(x => x.key === 'due')).toMatchObject({ kind: 'date', value: '' });
+    expect(o.find(x => x.key === 'name')).toMatchObject({ kind: 'toggle', value: false });
+    expect(o.find(x => x.key === 'cut')).toMatchObject({ kind: 'toggle', value: false });
+    expect(o.find(x => x.key === 'lines')).toMatchObject({ kind: 'lines', value: 3 });
+  });
+
   it('a change for one student is kept as a difference from the class', () => {
     const m = CARD();
     const off = R.setOn(m, 'legend', false, 'st-1');
