@@ -19,7 +19,7 @@ const { tabs, unknownTab, tabFor, tabIdFor, tabBarHtml } = PageReports._helpers;
 
 // The bar as it was written out by hand before the list (the toolbar literal on main).
 const BAR_BEFORE =
-  '<button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true" title="Write and approve each student’s report comment.">Term Questionnaire</button>\n' +
+  '<button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true" title="Write and approve each student’s report comment.">Write Comments</button>\n' +
   '        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false" title="Build and print the class’s report cards.">Print Reports</button>';
 
 const hiddenTab = { id: 'myed', label: 'MyEdBC Input', title: 'Marks and comments for MyEdBC.', hidden: true };
@@ -29,9 +29,9 @@ function labels(html) {
 }
 
 describe('the Reports tab list', () => {
-  it('has two tabs today, Term Questionnaire then Print Reports', () => {
+  it('has two tabs today, Write Comments then Print Reports', () => {
     expect(tabs.map(t => t.id)).toEqual(['questionnaire', 'progress']);
-    expect(tabs.map(t => t.label)).toEqual(['Term Questionnaire', 'Print Reports']);
+    expect(tabs.map(t => t.label)).toEqual(['Write Comments', 'Print Reports']);
     expect(tabs.every(t => t.hidden === false)).toBe(true);
     // The toolbar's Print Reports button belongs to the Print Reports tab.
     expect(tabs.map(t => !!t.printButton)).toEqual([false, true]);
@@ -51,7 +51,7 @@ describe('the Reports tab list', () => {
 
   it('draws one button for each tab, in the list’s order', () => {
     const three = tabs.concat([Object.assign({}, hiddenTab, { hidden: false })]);
-    expect(labels(tabBarHtml(three))).toEqual(['Term Questionnaire', 'Print Reports', 'MyEdBC Input']);
+    expect(labels(tabBarHtml(three))).toEqual(['Write Comments', 'Print Reports', 'MyEdBC Input']);
     expect(tabBarHtml(three)).toContain('data-tab="myed"');
     // Only the first is drawn selected.
     expect(tabBarHtml(three).match(/aria-selected="true"/g)).toHaveLength(1);
@@ -104,7 +104,7 @@ describe('which tab an address opens', () => {
 
 /* TODAY'S BEHAVIOUR, PINNED, NOT ENDORSED. An address naming a tab the list
    doesn't have (/reports?tab=bogus) has always drawn Progress Reports'
-   canvas with the Term Questionnaire button still lit, no student picker,
+   canvas with the Write Comments button still lit, no student picker,
    Print Reports showing, and tab=bogus kept in the address. That is a bug.
    S16-T1 is a tidying PR and keeps it exactly; the fix (open the first tab
    instead) is a follow-up of its own. When that lands, these tests change

@@ -247,148 +247,40 @@ describe('MStudents.renderDetail', () => {
   });
 });
 
-/* ── Trend arrows (bug fix verification) ────────────────────── */
-describe('Trend display (string comparison fix)', () => {
-  it('shows ↑ for upward trend', () => {
+/* ── The competency row: a name and its level; the change is in words ── */
+describe('Competency rows in the profile', () => {
+  const sec = { id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' };
+  const base = {
+    getSections: () => [sec],
+    getGroupedSections: () => ({ groups: [], ungrouped: [sec] }),
+    getSectionProficiency: () => 3.0,
+  };
+
+  it('says Improving in words when the counted evidence rises, with no arrow, dot or sparkline', () => {
     mockDataLayer({
-      getSections: () => [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
-      getGroupedSections: () => ({
-        groups: [],
-        ungrouped: [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
-      }),
-      getSectionProficiency: () => 3.0,
-      // Developing, then Proficient: the arrow reads the counted evidence's change.
+      ...base,
       sectionCountedEvidence: () => [
         { score: 2, date: '2026-09-01' },
         { score: 3, date: '2026-09-08' },
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('↑');
-    expect(html).toContain('var(--score-3)'); // green for upward
+    expect(html).toContain('Improving from');
+    expect(html).not.toContain('m-section-trend');
+    expect(html).not.toContain('m-section-dot');
+    expect(html).not.toContain('growth-sparkline');
   });
 
-  it('shows ↓ for downward trend', () => {
+  it('says Dropped in words when the counted evidence falls', () => {
     mockDataLayer({
-      getSections: () => [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
-      getGroupedSections: () => ({
-        groups: [],
-        ungrouped: [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
-      }),
+      ...base,
       getSectionProficiency: () => 2.0,
       sectionCountedEvidence: () => [
         { score: 3, date: '2026-09-01' },
         { score: 2, date: '2026-09-08' },
       ],
     });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('↓');
-    expect(html).toContain('var(--score-1)'); // red for downward
-  });
-
-  it('shows — for flat trend', () => {
-    mockDataLayer({
-      getSections: () => [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
-      getGroupedSections: () => ({
-        groups: [],
-        ungrouped: [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
-      }),
-      getSectionProficiency: () => 3.0,
-      getSectionTrend: () => 'flat',
-    });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('—');
-  });
-});
-
-/* ── Evidence count ─────────────────────────────────────────── */
-describe('Evidence count filtering', () => {
-  it('shows all scored evidence in the timeline', () => {
-    const sec = {
-      id: 's1',
-      name: 'Test',
-      shortName: 'Test',
-      color: '#888',
-      tags: [{ id: 't1', label: 'Tag 1' }],
-    };
-    mockDataLayer({
-      getSections: () => [sec],
-      getGroupedSections: () => ({ groups: [], ungrouped: [sec] }),
-      getSectionProficiency: () => 3.0,
-      getSectionTrend: () => 'flat',
-      getTagScores: () => [
-        { score: 3, tagId: 't1', assessmentId: 'a1', type: 'summative', date: '2025-01-01' },
-        { score: 2, tagId: 't1', assessmentId: 'a2', type: 'formative', date: '2025-01-02' },
-        { score: 4, tagId: 't1', assessmentId: 'a3', type: 'formative', date: '2025-01-03' },
-      ],
-      getTagProficiency: () => 3.0,
-    });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    // Timeline should show every scored evidence entry.
-    expect(html).toContain('m-sec-tl-dot');
-    var dotCount = (html.match(/m-sec-tl-dot/g) || []).length;
-    expect(dotCount).toBe(3);
-  });
-});
-
-/* ── Competency groups ──────────────────────────────────────── */
-describe('Competency group display', () => {
-  it('renders group headers with averaged proficiency', () => {
-    mockDataLayer({
-      getSections: () => [
-        { id: 's1', name: 'Questioning', shortName: 'Quest', tags: [], color: '#888', groupId: 'g1' },
-      ],
-      getGroupedSections: () => ({
-        groups: [
-          {
-            group: { id: 'g1', label: 'Thinking', name: 'Thinking' },
-            sections: [{ id: 's1', name: 'Questioning', shortName: 'Quest', tags: [], color: '#888' }],
-          },
-        ],
-        ungrouped: [],
-      }),
-      getSectionProficiency: () => 3.0,
-      getSectionTrend: () => 'flat',
-      getGroupProficiency: () => 3.2,
-    });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Thinking');
-    expect(html).toContain('m-group-header');
-    expect(html).toContain('3.2');
-  });
-
-  it('falls back to flat section list when no groups exist', () => {
-    const sec = { id: 's1', name: 'Test', shortName: 'Test', tags: [], color: '#888' };
-    mockDataLayer({
-      getSections: () => [sec],
-      getGroupedSections: () => ({ groups: [], ungrouped: [] }),
-      getSectionProficiency: () => 3.0,
-      getSectionTrend: () => 'flat',
-    });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Test');
-    expect(html).not.toContain('m-group-header');
-  });
-});
-
-/* ── Growth sparklines ──────────────────────────────────────── */
-describe('Growth sparklines', () => {
-  it('renders sparkline in section card', () => {
-    const sec = { id: 's1', name: 'Test', shortName: 'Test', tags: [], color: '#888' };
-    mockDataLayer({
-      getSections: () => [sec],
-      getGroupedSections: () => ({ groups: [], ungrouped: [sec] }),
-      getSectionProficiency: () => 3.0,
-      getSectionTrend: () => 'up',
-      getSectionGrowthData: () => [
-        { date: '2025-01-01', prof: 2 },
-        { date: '2025-02-01', prof: 3 },
-      ],
-      renderGrowthSparkline: () => '<div class="growth-sparkline">mock-sparkline</div>',
-    });
-    const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('growth-sparkline');
-    expect(html).toContain('mock-sparkline');
+    expect(MStudents.renderDetail(CID, 'stu1')).toContain('Dropped from');
   });
 });
 

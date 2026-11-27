@@ -61,7 +61,7 @@ window.PageReports = (function () {
   var TABS = [
     {
       id: 'questionnaire',
-      label: 'Term Questionnaire',
+      label: 'Write Comments',
       title: 'Write and approve each student’s report comment.',
       hidden: false,
       show: _showQuestionnaireTab,

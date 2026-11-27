@@ -1691,7 +1691,7 @@ window.PersonalBank = (function () {
       <div class="qn-bank-foot">
         <span class="qn-bank-dim" id="tq-bank-count">${esc(tally)}</span>
         <span class="qn-bank-gap"></span>
-        <button type="button" class="qn-btn" data-bank="later" title="Closes this for now. It opens again the next time you open the Term Questionnaire for this class.">Later</button>
+        <button type="button" class="qn-btn" data-bank="later" title="Closes this for now. It opens again the next time you open Write Comments for this class.">Later</button>
         <button type="button" class="qn-generate" data-bank="done" title="Closes this. Sentences you did not keep stay out of your bank.">Done</button>
       </div>
     </div>`;

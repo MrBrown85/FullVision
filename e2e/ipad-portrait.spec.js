@@ -166,7 +166,7 @@ const SCREENS = [
   ],
   ['Gradebook', async page => page.goto('/gradebook')],
   ['Observations', async page => page.goto('/observations')],
-  ['Term Questionnaire', async page => page.goto('/reports')],
+  ['Write Comments', async page => page.goto('/reports')],
   [
     'Print Reports',
     async page => {

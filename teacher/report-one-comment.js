@@ -431,7 +431,7 @@ window.ReportOneComment = (function () {
       countText(base, draft) +
       '. It saves to ' +
       first +
-      '’s Term Questionnaire too' +
+      ' in Write Comments too' +
       (r && r.approvedAt ? ', and the comment will need approving again.' : '.');
     var el = document.createElement('div');
     el.className = 'one-com-ask no-print';

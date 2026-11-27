@@ -59,7 +59,7 @@ test.describe('One primary action per screen', () => {
     // the comment and Approve and Next sends it on (the approved "Review
     // screen" mockup, fullvision-generate-plan PR 11a).
     {
-      name: 'Term Questionnaire',
+      name: 'Write Comments',
       route: '/reports',
       ready: '#tq-approve-next',
       primary: [/^Approve and Next/, 'Generate Comment'],
@@ -68,7 +68,7 @@ test.describe('One primary action per screen', () => {
       name: 'Student page',
       route: '/student?id=st23&course=sci8',
       ready: '.student-toolbar',
-      primary: ['Term Questionnaire'],
+      primary: ['Write Comments'],
     },
   ];
 

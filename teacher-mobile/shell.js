@@ -1003,34 +1003,8 @@
         // on it threw, so the gear did nothing after the first sync.
         var lastSyncedAt = window.GB ? window.GB.getLastSyncedAt() : null;
         if (lastSyncedAt instanceof Date) lastSyncedAt = lastSyncedAt.toISOString();
-        var syncLine =
-          '<div style="font-size:13px;color:var(--text-3);text-align:center;margin-bottom:16px">' +
-          (lastSyncedAt ? 'Last synced: ' + MC.relativeTime(String(lastSyncedAt)) : 'Not yet synced this session') +
-          '</div>';
-        var userBlock =
-          '<div style="padding:4px 16px 12px;text-align:center">' +
-          (_userName
-            ? '<div style="font-size:15px;font-weight:600;color:var(--text)">' + MC.esc(_userName) + '</div>'
-            : '') +
-          (_userEmail
-            ? '<div style="font-size:13px;color:var(--text-3);margin-top:2px">' + MC.esc(_userEmail) + '</div>'
-            : '') +
-          '</div>';
-        var versionBlock =
-          '<div style="font-size:12px;color:var(--text-3);text-align:center;padding:12px 0 4px">FullVision v' +
-          APP_VERSION +
-          '</div>';
         MC.presentSheet(
-          '<div style="padding:8px 0 16px">' +
-            '<div style="font-size:17px;font-weight:600;text-align:center;margin-bottom:4px">Settings</div>' +
-            userBlock +
-            syncLine +
-            // Help opens the help site in a new tab.
-            '<a class="m-btn-primary m-help-link" href="/help" target="_blank" rel="noopener">Help</a>' +
-            '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-switch-desktop">Switch to Desktop</button>' +
-            '<button class="m-btn-primary" style="background:none;color:var(--score-1);border:none;margin-top:4px" data-action="m-sign-out">Sign Out</button>' +
-            versionBlock +
-            '</div>',
+          MSettingsSheet.html({ name: _userName, email: _userEmail, syncedAt: lastSyncedAt, version: APP_VERSION }),
         );
         return;
       }

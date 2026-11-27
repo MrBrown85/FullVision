@@ -16,16 +16,8 @@ window.MStudentDetail = (function () {
   function _renderSectionCard(cid, sid, sec) {
     var prof = getSectionProficiency(cid, sid, sec.id);
     var profRounded = roundLevel(prof);
-    // The arrow and the Improving / Dropped line read the same change: the
-    // counted evidence's first and last levels (calc.js evidenceChange).
+    // The Improving / Dropped line reads the counted evidence's first and last levels (calc.js evidenceChange).
     var change = evidenceChange(sectionCountedEvidence(cid, sid, sec.id));
-    var trend = change && change.dir > 0 ? 'up' : change && change.dir < 0 ? 'down' : 'flat';
-    var trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '—';
-    var trendColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--score-1)' : 'var(--text-3)';
-    // The last five points, as the timeline below lists the last five
-    // scores: a whole sparkline fits the header at phone width.
-    var growthData = getSectionGrowthData(cid, sid, sec.id);
-    var sparkline = renderGrowthSparkline((growthData || []).slice(-5));
     var allAssessments = getAssignedAssessments(cid);
     var allEvidenceScores = [];
     sec.tags.forEach(function (tag) {
@@ -131,18 +123,9 @@ window.MStudentDetail = (function () {
       sec.id +
       '">' +
       '<div class="m-section-header">' +
-      '<div class="m-section-dot" style="background:' +
-      cssColor(sec.color || '#888') +
-      '"></div>' +
       '<div class="m-section-name">' +
       MC.esc(sec.shortName || sec.name) +
       '</div>' +
-      sparkline +
-      '<span class="m-section-trend" style="color:' +
-      trendColor +
-      '">' +
-      trendIcon +
-      '</span>' +
       '<span class="m-section-prof" style="color:' +
       MC.profBg(profRounded) +
       '">' +
