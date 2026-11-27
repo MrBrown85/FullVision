@@ -352,6 +352,12 @@
   border-radius: 5px;
   padding: 2px 7px;
 }
+/* The rating word takes the width of the longest (Consistently), so the
+   six bars line up whatever each says. */
+.wc-fact .qn-hs + .wc-val {
+  flex: 0 0 auto;
+  min-width: 13ch;
+}
 .wc-fact .qn-hs {
   flex: 0 0 150px;
   width: 150px;

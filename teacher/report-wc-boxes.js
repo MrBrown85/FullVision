@@ -266,8 +266,6 @@ window.ReportWcBoxes = (function () {
         val: v ? CommentBank.SCALE[v - 1] : 'Not Rated',
       });
       f.lines = lines;
-      f.sayData = !lines.length && !mine.length && i === 0 ? { box: 'habits', fact: '' } : null;
-      f.sayLabel = 'Say This';
       return f;
     });
     var left = mine.filter(function (x) {
@@ -275,7 +273,9 @@ window.ReportWcBoxes = (function () {
     });
     var more = !mine.length || left.length ? null : candidate(env, 'habits', '', env.ctx);
     var foot = [];
-    if (more && mine.length) foot.push(btn('+ Say More About Work Habits', 'wcSay', { box: 'habits', fact: '' }));
+    // Under the six ratings, not beside the first, so the six bars line up.
+    if (!mine.length) foot.push(btn('+ Say This About Work Habits', 'wcSay', { box: 'habits', fact: '' }));
+    else if (more) foot.push(btn('+ Say More About Work Habits', 'wcSay', { box: 'habits', fact: '' }));
     return { facts: facts, head: env.habitsText, foot: foot, top: left.map(env.line) };
   }
 
