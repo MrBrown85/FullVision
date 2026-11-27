@@ -150,4 +150,47 @@ describe('One Report block options', { timeout: 60000 }, () => {
       expect(html).not.toContain('Self-Assessment and Goal');
     });
   });
+  describe('the Parent / Guardian Response’s options', () => {
+    const slip = o => draw('parent-response', students[0], o || {});
+
+    it('prints as it always did with none of them on', () => {
+      const html = slip({ place: 'follow' });
+      expect(html).toBe(slip());
+      expect(html).not.toContain('report-parent-cut');
+      expect(html).not.toContain('report-parent-who');
+      expect(html).toContain('return this section to the school.');
+    });
+
+    it('a cut line over the slip, and the student’s name and class beside its heading', () => {
+      const st = students[0];
+      expect(slip({ cut: true })).toContain('class="report-parent-cut"');
+      const named = slip({ name: true });
+      expect(named).toContain('report-parent-who');
+      expect(named).toContain(esc(printedStudentName(st)));
+      expect(named).toContain(esc(COURSES[cid].name));
+    });
+
+    it('a return-by date goes into today’s instruction, the day as typed', () => {
+      const was = getConfig().displayName;
+      saveConfig(Object.assign(getConfig(), { displayName: 'Mr. Brown' }));
+      try {
+        expect(slip({ due: '2026-12-05' })).toContain('return this section to Mr. Brown by Saturday, December 5.');
+        saveConfig(Object.assign(getConfig(), { displayName: '' }));
+        expect(slip({ due: '2026-12-05' })).toContain('return this section to the school by Saturday, December 5.');
+      } finally {
+        saveConfig(Object.assign(getConfig(), { displayName: was }));
+      }
+    });
+
+    it('a class’s own instruction names {date}, or gets a sentence after it', () => {
+      expect(slip({ due: '2026-12-04', wording: { intro: 'Sign it by {date}, please.' } })).toContain(
+        'Sign it by Friday, December 4, please.',
+      );
+      expect(slip({ due: '2026-12-04', wording: { intro: 'Sign <b>and</b> return.' } })).toContain(
+        'Sign &lt;b&gt;and&lt;/b&gt; return. Please return it by Friday, December 4.',
+      );
+      // No date, or one that is not a date: the instruction as written.
+      expect(slip({ due: 'soon' })).toBe(slip());
+    });
+  });
 });

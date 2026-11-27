@@ -28,6 +28,12 @@ labels:
   - Out Of
   - Missing Work
   - Only Missing Work
+  - Place
+  - After Part Above
+  - Student’s Name
+  - Cut Line
+  - Return By
+  - Comment Lines
   - Organize By
   - One List
   - Category
@@ -89,7 +95,7 @@ shots:
 
 ![Print Reports with the Report Card setup on Cece Adeyemi's front page](img/print-report-cards.jpg 'The Report Card setup. The line above the pages counts the sheets each student needs.')
 
-4. The pages beside the panel show what prints. A part that reaches the foot of a page carries on at the top of the next under its heading, "(continued)". The **Parent / Guardian Response** always prints at the foot of the last page.
+4. The pages beside the panel show what prints. A part that reaches the foot of a page carries on at the top of the next under its heading, "(continued)". The **Parent / Guardian Response** prints at the bottom of the last page. To print it straight after the part above it instead, open its options and set **Place** to **After Part Above**; then it moves up and down the list like any other part. Its options also add the **Student’s Name** beside its heading, a dashed **Cut Line** over it, a **Return By** date in its instructions, and set its **Comment Lines**.
 5. On the page, **Hide** takes a part off the report. The − beside a row leaves that row off. Double-click a heading, or select it and press Enter, to rename it. In the **Assessments** part's options, **Choose Assessments** sets which assessments are listed. Leaving a row or an assessment off changes what prints, never a grade.
 
    The **Assessments** part's options also set how the list is laid out. **Organize By** prints **One List**, or a heading for each **Category** (with its weight and grade when **Category Grades** is on), **Month** or **Competency**. **Columns** prints the list in **One** column or **Two** side by side. **Range** lists the **Last 10**, **This Term** or the **Year to Date**. **Only Missing Work** prints just the missing pieces under the heading **Missing Work**, or "None" with today's date; it always lists every missing piece. A Letter class can also turn **Score**, **Percent** and **Proficiency Word** on or off.

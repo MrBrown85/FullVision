@@ -331,6 +331,38 @@
   border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
+/* The slip's options (One Report, Nov 27): a dashed cut line over it, and
+   the student's name beside its heading. */
+.report-parent-cut {
+  position: relative;
+  border-top: 1.5px dashed var(--text-3);
+  margin: 6px 0 14px;
+}
+.report-parent-cut-mark {
+  position: absolute;
+  left: 8px;
+  top: -0.72em;
+  padding: 0 4px;
+  background: #fff;
+  font-size: var(--text-md);
+  line-height: 1;
+  color: var(--text-2);
+}
+.report-parent-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.report-parent-head .report-block-title {
+  flex: 1 1 auto;
+}
+.report-parent-who {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
 
 /* ── Student Self-Reflection blocks ─────────────────────────── */
 .report-reflect-bubble {
@@ -5249,6 +5281,19 @@ body.qn-roster #gb-sidebar .student-row-note {
   padding-bottom: 3px;
   margin-bottom: 6px !important;
   border-bottom: 1.5px solid #000;
+}
+/* The slip's heading with the student's name beside it: one rule under both. */
+.one-flat .report-parent-head {
+  padding-bottom: 3px;
+  margin-bottom: 6px;
+  border-bottom: 1.5px solid #000;
+}
+.one-flat .report-parent-head .report-block-title {
+  margin-bottom: 0 !important;
+}
+.one-flat .report-parent-who,
+.one-flat .report-parent-cut-mark {
+  color: #000;
 }
 .one-flat .report-ct th {
   border-bottom: 1.5px solid #000;

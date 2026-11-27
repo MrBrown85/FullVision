@@ -54,7 +54,7 @@ window.Router = (function () {
         '/teacher/report-one-panel.js',
         '/teacher/report-one-page.js',
         '/teacher/report-one-comment.js',
-        ...['word-ops', 'words', 'copy', 'undo', 'zoom', 'head'].map(n => '/teacher/report-one-' + n + '.js'),
+        ...['word-ops', 'words', 'copy', 'undo', 'zoom', 'head', 'opts'].map(n => '/teacher/report-one-' + n + '.js'),
         '/teacher/report-print-paper.js',
         '/teacher/report-toolbar.js',
         '/teacher/page-reports.js',
