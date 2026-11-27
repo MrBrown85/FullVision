@@ -2,7 +2,7 @@
 title: Fill In the Term Questionnaire
 section: Reporting
 order: 1
-summary: The Term Questionnaire shows one student at a time, with work habits, grades, observations and Student Voice beside the report comment. Each student's comment is written and approved here.
+summary: The Term Questionnaire shows one student at a time: what happened in class, one box for each part, beside the report comment. Each student's comment is written and approved here.
 checked: 2026-11-05
 pages:
   - /reports
@@ -11,21 +11,31 @@ labels:
   - Reporting
   - Term Questionnaire
   - Needs Approval
-  - Not Ready
+  - Needs a Look
+  - Undo
+  - No Next Step
+  - Grade
+  - Next Step
+  - For the Class
+  - Name This One
+  - Quote This
   - Work Habits
   - Rarely
   - Consistently
-  - At a Glance
+  - Strength
+  - Best Piece
+  - Missing Work
   - Observations
   - Teacher Comment
   - Generate Comment
-  - Sentences
+  - Your Sentences
+  - Say This
+  - Other Ways
   - Attendance
   - Classes Absent
   - Times Late
   - Approve and Next
   - This Report
-  - Options
   - Add to My Bank
   - Belongs Under
   - Save
@@ -49,14 +59,14 @@ shots:
 ## Steps
 
 1. Open **Reporting** and choose **Term Questionnaire**. Choose the report in the list beside it. Each report keeps its own comments and attendance.
-2. Select a student in the class list. A student without an approved comment shows **Needs Approval**. **Not Ready** lists only those students.
-3. Under **Work Habits**, rate each habit from **Rarely** to **Consistently**. A habit left blank is not used in the comment.
+2. Select a student in the class list. Under a name, an amber line says why the comment needs a look: **Needs Approval**, **No Next Step**, or a sentence that no longer matches the gradebook. **Needs a Look** lists only those students.
+3. On the left, each part of the comment has a box: **Grade**, **Best Piece**, **Strength**, **Work Habits**, **Attendance**, the student's Voice, **Observations**, **Missing Work**, **Next Step** and **For the Class**. A box is one row until you open it; **Work Habits** starts open. Choose the row to open it.
+4. Under **Work Habits**, rate each habit from **Rarely** to **Consistently**. A habit left blank is not used in the comment. Under **Attendance**, enter **Classes Absent** and **Times Late**. Attendance is optional and is left out of the comment until entered.
 
-![The Term Questionnaire for Cece Adeyemi with three work habits rated](img/fill-in-the-term-questionnaire.jpg 'Work Habits and At a Glance on the left; the Teacher Comment on the right.')
+![The Term Questionnaire for Cece Adeyemi with three work habits rated](img/fill-in-the-term-questionnaire.jpg 'Work Habits on the left; the Teacher Comment on the right.')
 
-4. Review **At a Glance**: the strongest skill, the next step, the biggest change since the last report, the best piece and any missing or late work. **Observations** lists the year's notes. The student's Voice card shows the goal and About Me answers. Notes marked Private are never printed.
-5. Under **Teacher Comment**, type the comment, or choose **Generate Comment** to draft it from the Comment Bank. Each sentence appears as a row under **Sentences**, where it can be reworded, edited or dragged to a new place.
-6. Under **Attendance**, enter **Classes Absent** and **Times Late**. Attendance is optional and is left out of the comment until entered.
+5. An open box shows every fact of that part. Under a fact the comment already says, you see its sentence. Beside a fact it does not say, choose **Say This** to add a sentence after the last one of that part. In **Best Piece**, **Name This One** changes which piece the comment names. The student's Voice box lists the goal and About Me answers; **Quote This** puts one in the comment. Notes marked Private are never printed. **Observations** lists the year's notes for reading only.
+6. Under **Teacher Comment**, click to type, or choose **Generate Comment** to draft it from the Comment Bank. When you click away, your text is read back into sentences: a sentence left as it was keeps its fact, one you reworded stays in its box marked Yours, and a new one goes in **Your Sentences**. **Undo** puts the comment back.
 7. Choose **Approve and Next**. The comment is saved as approved, the student is ticked in the class list and the next student opens. ⌘ Return (Ctrl+Enter on Windows) does the same. The count beside it shows how many students are Ready. When every student is Ready the count turns green and the button reads **Print Reports** and opens it.
 
 ## Earlier Reports
@@ -65,6 +75,6 @@ The tabs above the comment switch between **This Report** and each earlier repor
 
 ## My Bank
 
-A sentence typed for one student can be saved for others. On the sentence's row, open **Options** and choose **Add to My Bank**. Set **Belongs Under** to the part of the comment it fits, then choose **Save**. In the saved sentence, the words in brackets, such as [Name], change for each student. Saved sentences are marked Yours in **Browse Sentences**.
+A sentence typed or reworded for one student can be saved for others. On the sentence's line, choose **Add to My Bank**. Set **Belongs Under** to the part of the comment it fits, then choose **Save**. In the saved sentence, the words in brackets, such as [Name], change for each student. Saved sentences are marked Yours in **Browse Sentences**.
 
 The ⋯ button in the toolbar holds **Edit Student**, which opens the student's name, pronouns, designations and contacts, and **Where This Information Comes From**, a list of where each part of the screen gets its content.
