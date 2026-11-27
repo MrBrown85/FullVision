@@ -576,6 +576,14 @@ button.m-tabbar-class {
   min-height: 96px;
   object-fit: cover;
 }
+/* A photo still on its way: the plain grey box, not the browser's
+   broken-picture mark and alt text (Colin, Nov 16). */
+.m-bulletin-photo img:not([src]) {
+  content: url('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+  background: #eceef2;
+  color: transparent;
+  font-size: 0;
+}
 /* A file and a link are tiles: the name, then what it is. */
 .m-bulletin-tile {
   display: flex;
