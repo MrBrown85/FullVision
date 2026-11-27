@@ -158,8 +158,8 @@ window.ReportWcAct = (function () {
     if (!st || !w || !text) return;
     if (!/[.!?…]["”]?$/.test(text)) text += '.';
     var row = H.typedRow(text);
-    var step = (P.BOX_STEPS[w.box] || [])[0];
-    if (step && w.box !== 'cls') row.step = step;
+    // Typed here, so it stays in this box; no step, so Generate keeps it like any typed sentence.
+    if (w.box !== 'cls' && P.BOX_STEPS[w.box]) row.inBox = w.box;
     ui.write = null;
     insert(st, mk(st, H.facts(st)), row, w.box);
   }

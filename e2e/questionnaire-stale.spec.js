@@ -66,7 +66,7 @@ for (const font of FONTS) {
     test('typing in an approved comment takes the card off with the approval', async ({ page }) => {
       await approvedAndStale(page);
       await useFont(page, font);
-      await page.locator('#tq-narrative').click();
+      await page.locator('#tq-read').click();
       await page.keyboard.press('End');
       await page.keyboard.type(' Well done.');
       await expect(page.locator('#tq-approved-chip')).toHaveCount(0);

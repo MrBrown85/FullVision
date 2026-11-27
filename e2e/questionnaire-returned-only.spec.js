@@ -77,7 +77,7 @@ test('the questionnaire and Print Reports keep the grade Cece was given until he
   await page.waitForFunction(() => typeof getAssessments === 'function' && getAssessments('sci8').length > 0);
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
-  const given = (await page.locator('.qn-grade-big').textContent()).trim();
+  const given = (await page.locator('#wc-head-grade').textContent()).trim();
 
   const at = await demoWithDraft(page, { student_page_enabled: true, return_grades: 'on_return' });
   expect(at.state).toBe('draft');
@@ -86,7 +86,7 @@ test('the questionnaire and Print Reports keep the grade Cece was given until he
   expect(at.now).toBe('Developing');
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
-  await expect(page.locator('.qn-grade-big')).toHaveText(given);
+  await expect(page.locator('#wc-head-grade')).toHaveText(given);
   expect(await readFamily(page)).toBe(at.before);
 });
 

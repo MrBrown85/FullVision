@@ -706,7 +706,7 @@
   "teacher/report-questionnaire.js :: tqGenerate": 95,
   "teacher/report-questionnaire.js :: tqLine": 137,
   "teacher/report-questionnaire.js :: tqPickDeadline": 82,
-  "teacher/report-questionnaire.js :: tqSentences": 197,
+  "teacher/report-questionnaire.js :: tqSentences": 192,
   "teacher/report-questionnaire.js :: tqStale": 67,
   "teacher/report-sheets.js :: classSummaryLater": 51,
   "teacher/report-sheets.js :: keptLayouts": 53,

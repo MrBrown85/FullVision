@@ -97,7 +97,7 @@ window.ReportWcParts = (function () {
   function boxOf(row, isBest) {
     if (!row) return 'yours';
     if (row.words) return 'voice';
-    if (!row.step) return 'yours';
+    if (!row.step) return row.inBox || 'yours';
     if (row.step === 'example') {
       if (isBest) return 'best';
       return row.s && row.s.group === "In the Student's Words" ? 'voice' : 'best';

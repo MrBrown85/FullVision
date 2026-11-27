@@ -199,3 +199,41 @@ test('an edited sentence can go back to the bank wording from Other Ways; Remove
   await page.locator('#undo-toast button', { hasText: 'Undo' }).click();
   await expect.poll(() => comment(page)).toBe(before);
 });
+
+test('an edited sentence is marked Yours and a typed one is kept; Generate Again keeps both', async ({ page }) => {
+  await open(page);
+  await generated(page);
+  await openBox(page, 'grade');
+  const line = page.locator('.wc-box[data-part="grade"] .wc-line').first();
+  const bankText = (await line.locator('.wc-text').textContent()).trim();
+  await line.locator('.wc-text').click();
+  await line.locator('.wc-edit').fill(bankText.replace(/\.$/, ' this month.'));
+  await line.locator('.wc-edit').press('Enter');
+  await expect(line.locator('.wc-chip.own', { hasText: 'Yours' })).toBeVisible();
+  await page.locator('.wc-box[data-part="grade"] [data-do="wcWrite"]').click();
+  await page.locator('#tq-wc-write').fill('Cece keeps a tidy notebook');
+  await page.locator('#tq-wc-write').press('Enter');
+  await expect.poll(() => comment(page)).toContain('Cece keeps a tidy notebook.');
+  await page.locator('#tq-generate').click();
+  expect(await comment(page)).toContain('this month.');
+  expect(await comment(page)).toContain('Cece keeps a tidy notebook.');
+  await expect(
+    page.locator('.wc-box[data-part="grade"] .wc-line', { hasText: 'Cece keeps a tidy notebook' }),
+  ).toHaveCount(1);
+});
+
+test('the grip moves a sentence with the arrow keys and the comment follows', async ({ page }) => {
+  await open(page);
+  await generated(page);
+  await openBox(page, 'grade');
+  const before = await comment(page);
+  const grip = page.locator('[data-wc-grip]').first();
+  const first = (await page.locator('#tq-read .wc-sent').first().textContent()).trim();
+  await grip.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => comment(page)).not.toBe(before);
+  expect((await comment(page)).startsWith(first)).toBe(false);
+  expect((await comment(page)).split(' ').sort()).toEqual(before.split(' ').sort());
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => comment(page)).toBe(before);
+});

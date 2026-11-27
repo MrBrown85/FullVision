@@ -101,6 +101,11 @@ window.ReportWcLook = (function () {
 
   function drain() {
     _timer = null;
+    // The tab was left: the rest waits for the next drawing to ask again.
+    if (!document.querySelector('.qn.wc')) {
+      _queue = [];
+      return;
+    }
     var st = _queue.shift();
     if (st) {
       try {

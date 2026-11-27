@@ -20,7 +20,8 @@ test('three quick keys in Browse Sentences count the class once, and the list sh
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
   await page.locator('#tq-narrative').waitFor({ state: 'attached' });
-  await page.locator('#tq-browse-btn').click();
+  await page.locator('#wc-head-grade').click();
+  await page.locator('.wc-box[data-part="grade"] [data-do="wcBrowse"]').click();
   const search = page.locator('#tq-browse-search');
   await expect(search).toBeFocused();
   await page.evaluate(() => {

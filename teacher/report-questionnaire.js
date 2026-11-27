@@ -5037,7 +5037,7 @@ window.ReportQuestionnaire = (function () {
     o.remove();
     if (quiet) return;
     if (gap != null) _focusGap(gap);
-    else _focusSel('#tq-browse-btn');
+    else _focusSel('.wc-box [data-do="wcBrowse"]');
   }
   function _focusGap(g) {
     _focusSel('#tq-sentences .qn-gap[data-gap="' + g + '"] .qn-gap-add');
@@ -5192,16 +5192,8 @@ window.ReportQuestionnaire = (function () {
         _undoToast(st, 'Removed from the comment.', removed);
         _focusAny([
           '#tq-sentences [data-row="' + Math.min(i, _rows[key].length - 1) + '"] .qn-srow-handle[tabindex]',
-          '#tq-browse-btn',
+          '.wc-box [data-do="wcBrowse"]',
         ]);
-        return;
-      }
-      case 'addEnd': {
-        // At the end of the movable sentences: before the class's closing.
-        var all = _rows[key] || [];
-        var end = all.length;
-        if (end && all[end - 1].step === 'closer') end--;
-        _ownOpen('gap', 'write', { gap: end });
         return;
       }
       case 'browseAt': {
@@ -5678,7 +5670,7 @@ window.ReportQuestionnaire = (function () {
     var from = part;
     if (where === 'row' && !part) {
       var r = (_rows[_rowKey(st)] || [])[index];
-      var p = r && r.step ? partOf(r.step) : null;
+      var p = r ? partOf(r.step || (ReportWcParts.BOX_STEPS[r.inBox] || [])[0]) : null;
       from = p ? p.id : '';
       part = p && _ownStep(p.id) ? p.id : '';
     }
