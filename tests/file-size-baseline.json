@@ -129,8 +129,8 @@
   "teacher/dash-inbox-stacks.js": 601,
   "teacher/dash-inbox-targets.js": 415,
   "teacher/dash-inbox.js": 598,
-  "teacher/dash-insights.js": 732,
-  "teacher/dash-overview.js": 526,
+  "teacher/dash-insights.js": 726,
+  "teacher/dash-overview.js": 496,
   "teacher/dash-student-cards.js": 474,
   "teacher/export-all.js": 1287,
   "teacher/grade-report.js": 1560,
@@ -175,5 +175,5 @@
   "teacher/student-evidence.js": 955,
   "teacher/student-overview.js": 524,
   "teacher/student-page-students.js": 1157,
-  "teacher/ui.js": 2828
+  "teacher/ui.js": 2807
 }

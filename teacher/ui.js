@@ -1547,27 +1547,6 @@ document.addEventListener('keydown', function (e) {
   e.preventDefault();
 });
 
-/* ── Upcoming Birthdays ────────────────────────────────────── */
-function getUpcomingBirthdays(cid) {
-  const students = getStudents(cid);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const thisYear = today.getFullYear();
-
-  return students
-    .filter(s => s.dateOfBirth)
-    .map(s => {
-      const dob = parseLocalDate(s.dateOfBirth);
-      let nextBday = new Date(thisYear, dob.getMonth(), dob.getDate());
-      nextBday.setHours(0, 0, 0, 0);
-      if (nextBday < today) nextBday.setFullYear(thisYear + 1);
-      const daysUntil = Math.round((nextBday - today) / (1000 * 60 * 60 * 24));
-      return { student: s, nextBday, daysUntil };
-    })
-    .sort((a, b) => a.daysUntil - b.daysUntil)
-    .slice(0, 3);
-}
-
 /* ── Shared HTML: Student Header ────────────────────────────── */
 /* ── Segmented control (.seg in styles.css) ─────────────────── */
 /* The chosen segment carries the ARIA state its role calls for:

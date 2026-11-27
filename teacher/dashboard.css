@@ -38,89 +38,117 @@ body.cm-open #app-dock [data-action='toggleSidebar'] {
 /* The top bar (Class Average, To Grade, Missing and Late, Upcoming
    Birthdays); then the middle row (.dash-row, below); then the students. */
 
-/* The top bar: one white box, its cells split by hairlines. */
+/* The top bar (Colin, Nov 26: the design spec): four cards like the tiles
+   under them, each a link to its page with a › after its name, one rhythm in
+   every card (its name, the number, a thin bar, one line under it) so the
+   lines sit level across the row, and no grey. */
 .dash-glance {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr) minmax(0, 1.9fr);
+  grid-template-columns: minmax(0, 1.45fr) repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.dash-glance.has-to-grade {
+  grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
+}
+.dash-glance-cell {
+  display: grid;
+  grid-template-rows: 20px 40px 16px 20px;
+  align-content: start;
+  min-width: 0;
+  padding: 16px 20px;
   background: var(--surface);
   border: 1px solid var(--divider-strong);
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
+  font-family: var(--font-base);
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
-/* With the To Grade cell (S6-F5): four columns, wide enough at 1440 that
-   "2 Not Returned · Oldest 11 Days" and the one birthday's name each stay
-   on one line, as on the board. */
-.dash-glance.has-to-grade {
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.95fr) minmax(0, 0.9fr);
+.dash-glance-cell > * {
+  grid-column: 1;
+  min-width: 0;
 }
-.dash-glance.has-to-grade .dash-bdays {
-  grid-template-columns: minmax(0, 1fr);
+.dash-glance-cell:hover {
+  background: color-mix(in srgb, var(--surface) 94%, var(--text));
+}
+.dash-glance-cell:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
 }
 .dash-glance-old {
   white-space: nowrap;
 }
-.dash-glance-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 0;
-  padding: 14px 20px 16px;
-  border: 0;
-  border-left: 1px solid var(--divider-subtle);
-  background: none;
-  font-family: var(--font-base);
-  text-align: left;
-  color: var(--text);
-}
-.dash-glance-cell:first-child {
-  border-left: 0;
-}
-/* Missing and Late opens the gradebook when anything is missing or late. */
-a.dash-glance-cell {
-  text-decoration: none;
-  cursor: pointer;
-}
-a.dash-glance-cell:hover {
-  background: var(--overlay-hover);
-}
-.dash-glance-cell:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: -2px;
-  border-radius: 12px;
-}
 .dash-glance-label {
-  font-size: var(--text-sm);
-  color: var(--text-2);
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 20px;
+}
+/* The ›: it says the card opens a page, and moves a little under the pointer. */
+.dash-glance-label::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-left: 3px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.45;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+.dash-glance-cell:hover .dash-glance-label::after {
+  opacity: 0.9;
+  transform: translateX(2px) rotate(45deg);
 }
 .dash-glance-value {
+  grid-row: 2;
+  align-self: end;
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  font-size: var(--text-3xl);
-  font-weight: 600;
-  line-height: 1.2;
+  gap: 7px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 36px;
   font-variant-numeric: tabular-nums;
 }
 .dash-glance-word {
-  font-size: var(--text-md);
+  font-size: 15px;
   font-weight: 600;
 }
 .dash-glance-sub,
 .dash-glance-key {
-  font-size: var(--text-sm);
-  color: var(--text-2);
+  grid-row: 4;
+  align-self: end;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dash-glance-sub b,
 .dash-glance-key b {
-  color: var(--text);
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+/* The class's change since the last report, at the right of the number line. */
 .dash-glance-change {
-  font-size: var(--text-xs);
+  grid-row: 2;
+  grid-column: 1;
+  justify-self: end;
+  align-self: end;
+  margin-bottom: 7px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-2);
+  white-space: nowrap;
 }
 .dash-glance-change.is-up {
   color: var(--score-3-text);
@@ -132,12 +160,13 @@ a.dash-glance-cell:hover {
 .dash-glance-change.is-none {
   visibility: hidden;
 }
-.dash-glance-dist {
+.dash-glance-dist,
+.dash-glance-bar {
+  grid-row: 3;
+  align-self: center;
   display: flex;
   gap: 2px;
-  align-self: stretch;
-  height: 8px;
-  margin-top: 8px;
+  height: 6px;
 }
 .dash-glance-dist .dist-seg {
   border-radius: 2px;
@@ -151,79 +180,28 @@ a.dash-glance-cell:hover {
 .dash-glance-dist .dist-seg:only-child {
   border-radius: 4px;
 }
+/* Next Report's bar fills as its comments are approved. */
+.dash-glance-bar {
+  border-radius: 3px;
+  background: var(--divider-subtle);
+  overflow: hidden;
+}
+.dash-glance-bar > span {
+  border-radius: 3px;
+  background: var(--active-fill);
+}
 .dash-glance-key {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
-  margin-top: 4px;
-  font-size: var(--text-xs);
+  flex-wrap: nowrap;
 }
-.dash-bdays {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  align-self: stretch;
-}
-.dash-bday {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-/* Days to go, in the same figures as Class Average and Missing. */
-.dash-bday-count {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-}
-.dash-bday-count b {
-  font-size: var(--text-3xl);
-  font-weight: 600;
-  /* One line height for numbers and words, so the names line up. */
-  line-height: calc(var(--text-3xl) * 1.2);
-  font-variant-numeric: tabular-nums;
-}
-/* Today and Tomorrow are words, a size down so they fit a narrow column. */
-.dash-bday-count b.is-soon {
-  font-size: var(--text-2xl);
-  color: var(--score-3-text);
-}
-.dash-bday-count span {
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-/* The full name always shows: a long one wraps rather than being cut. */
-.dash-bday-name {
-  margin-top: 2px;
-  font-size: var(--text-md);
-  font-weight: 600;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-.dash-bday-date {
-  font-size: var(--text-sm);
-  color: var(--text-2);
+.dash-glance-key > * + *::before {
+  content: '·';
+  margin: 0 5px;
 }
 @media (max-width: 900px) {
   .dash-glance,
   .dash-glance.has-to-grade {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-  .dash-glance-bdays {
-    grid-column: 1 / -1;
-    border-left: 0;
-    border-top: 1px solid var(--divider-subtle);
-  }
-  /* Four cells make two rows of two. */
-  .dash-glance.has-to-grade .dash-glance-cell:nth-child(n + 3) {
-    grid-column: auto;
-    border-top: 1px solid var(--divider-subtle);
-  }
-  .dash-glance.has-to-grade .dash-glance-cell:nth-child(3) {
-    border-left: 0;
-  }
-  .dash-glance.has-to-grade .dash-glance-bdays {
-    border-left: 1px solid var(--divider-subtle);
   }
 }
 
