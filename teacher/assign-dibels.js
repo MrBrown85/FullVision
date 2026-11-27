@@ -848,7 +848,6 @@
         a.id +
         '"' +
         _cardHas(n) +
-        ' draggable="true"' +
         ' data-assess-drag="' +
         a.id +
         '"' +
@@ -1045,7 +1044,7 @@
         cssColor(u.color || '#6366f1') +
         '" data-module-id="' +
         u.id +
-        '" draggable="true" data-module-drag="' +
+        '" data-module-drag="' +
         u.id +
         '" data-folder-drop="' +
         u.id +

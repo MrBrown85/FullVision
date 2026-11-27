@@ -390,10 +390,18 @@ describe('with the build switch off the Assignments page is what it was', () => 
   // as the span it was before comparing, so every other byte of the list is still what it was.
   const PILL =
     /<button type="button" data-action="toggleCategoryFilter" data-catid="[^"]*" aria-pressed="(?:true|false)"( class="type-badge type-badge-s"[^>]*>[^<]*)<\/button>/g;
+  // Pin moved on purpose (Colin, Nov 26 2026): a card and a folder are no longer draggable as a whole, only
+  // from their grip (teacher/assign-drag-events.js), so their draggable="true" is gone. It is put back before
+  // comparing, so every other byte of the list is still what it was.
+  const DRAG = / data-(assess|module)-drag="/g;
   const same = now => {
     const stripped = {};
     Object.keys(now).forEach(name => {
-      const html = String(now[name]).replace(ADD_WORK, '').replace(NEW_QUIZ, '').replace(PILL, '<span$1</span>');
+      const html = String(now[name])
+        .replace(ADD_WORK, '')
+        .replace(NEW_QUIZ, '')
+        .replace(PILL, '<span$1</span>')
+        .replace(DRAG, ' draggable="true" data-$1-drag="');
       stripped[name] = EMPTY_NEW_MENU.test(html) ? html.replace(EMPTY_NEW_MENU, '').replace(' atb-split', '') : html;
     });
     const packed = pack(stripped);
