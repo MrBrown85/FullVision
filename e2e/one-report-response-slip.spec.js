@@ -13,6 +13,10 @@ test.setTimeout(120_000);
 const WIDE_FONT = `.report-sheet, .report-sheet * {
   font-family: Verdana, 'DejaVu Sans', sans-serif !important;
   letter-spacing: 0.03em !important;
+}
+#studio-palette, #studio-palette * {
+  font-family: Verdana, 'DejaVu Sans', sans-serif !important;
+  letter-spacing: 0.04em !important;
 }`;
 // A whole-class layout follows each change and blocks the page for seconds
 // on a loaded runner (e2e/one-report.spec.js).
@@ -92,7 +96,7 @@ for (const wide of [false, true]) {
 
       await openSlipOptions(page);
       const place = page.locator('#one-opts-parent-response').getByRole('radiogroup', { name: 'Place' });
-      await expect(place.getByRole('radio', { name: 'At the Bottom' })).toHaveAttribute('aria-checked', 'true');
+      await expect(place.getByRole('radio', { name: 'Bottom' })).toHaveAttribute('aria-checked', 'true');
       // Both choices on one line, in the panel's width.
       const tops = await place
         .getByRole('radio')
@@ -132,7 +136,7 @@ for (const wide of [false, true]) {
       expect(w.past).toBe(0);
 
       // Back to the bottom: last again, docked at the foot.
-      await place.getByRole('radio', { name: 'At the Bottom' }).click();
+      await place.getByRole('radio', { name: 'Bottom' }).click();
       await expect.poll(async () => (await where(page)).docked, SLOW).toBe(true);
       w = await where(page);
       expect(Math.abs(w.aboveFoot)).toBeLessThanOrEqual(1);

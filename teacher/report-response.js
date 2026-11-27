@@ -3,7 +3,7 @@
    where (DECISIONS, "The Parent / Guardian Response's place and options",
    2026-11-27).
 
-   Place: At the Bottom docks it at the foot of the report's last side, as
+   Place: Bottom docks it at the foot of the report's last side, as
    it always printed; After Part Above prints it straight after the part
    above it, and it moves in One Report's panel like any part. Either way it
    is one piece. Its options add the student's name beside its heading, a
@@ -25,7 +25,7 @@ window.ReportResponse = (function () {
       label: 'Place',
       def: 'foot',
       choices: [
-        { v: 'foot', label: 'At the Bottom' },
+        { v: 'foot', label: 'Bottom' },
         { v: 'follow', label: 'After Part Above' },
       ],
     },
