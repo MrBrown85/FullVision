@@ -344,10 +344,12 @@ test('with a question waiting the row starts lower, the page scrolls to its foot
     };
   });
   // The whole row can be brought into view: the Inbox and the Bulletins tile under it share the left column
-  // (299 and 199 px, 12 apart), and Competencies is the row's full height.
+  // (the Inbox as tall as its stacks, 299 px at most; Bulletins the rest, 12 apart), and Competencies is the row's full height.
   expect(m.rowBottom).toBeLessThanOrEqual(m.winH + 0.5);
   expect(m.rowTop).toBeGreaterThanOrEqual(0);
-  expect(m.tiles).toEqual([299, 199, 510]);
+  expect(m.tiles[0]).toBeLessThanOrEqual(300);
+  expect(m.tiles[0] + 12 + m.tiles[1]).toBe(510);
+  expect(m.tiles[2]).toBe(510);
   expect(m.sideways).toEqual([0, 0]);
   // The Students heading follows the row, 12 px under it.
   const heading = await box(page, '.dash-students-head');

@@ -151,9 +151,11 @@ test('a redraw keeps the tile, the chosen view and an open stack, and asks for n
   await expect(page.locator('[data-dash-inbox="mode"][data-mode="rollcall"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('the tile is 299 px beside Bulletins and the row tall without it, with nothing sideways', async ({ page }) => {
+test('the tile is as tall as its stacks beside Bulletins (299 px at most) and the row tall without it, with nothing sideways', async ({
+  page,
+}) => {
   await open(page);
-  expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(299);
+  expect(Math.round((await box(page, '#dash-inbox')).height)).toBeLessThanOrEqual(300);
   const sideways = await page.evaluate(() => [
     document.documentElement.scrollWidth - document.documentElement.clientWidth,
     document.getElementById('main').scrollWidth - document.getElementById('main').clientWidth,
@@ -180,7 +182,7 @@ test('dark: the tile draws on the dark surface', async ({ page }) => {
 test('dark beside Bulletins', async ({ page }) => {
   await open(page, { dark: true });
   await shot(page, 'inbox-299-dark');
-  expect(Math.round((await box(page, '#dash-inbox')).height)).toBe(299);
+  expect(Math.round((await box(page, '#dash-inbox')).height)).toBeLessThanOrEqual(300);
 });
 
 test("a browser that kept 'fv-build-dashRow' as 0 still gets the row and the Inbox", async ({ page }) => {
