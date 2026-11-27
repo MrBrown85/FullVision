@@ -108,6 +108,34 @@ test('+ Write Your Own in a box foot adds a Yours line there; Add to My Bank on 
   await own.locator('#tq-own-save').click();
   await expect(own).toHaveCount(0);
   expect(await page.evaluate(() => PersonalBank.list().length)).toBe(1);
+  // Saved: the line says it is in the bank, and offers to add it no more.
+  await expect(line.locator('[data-do="ownAdd"]')).toHaveCount(0);
+  await expect(line.locator('.wc-chip', { hasText: 'In My Bank' })).toBeVisible();
+  // Still so after a reload, in whichever box the sentence is read back into.
+  await page.reload();
+  await page.locator('#tq-narrative').waitFor({ state: 'attached' });
+  const back = page.locator('.wc-line', { hasText: 'Cece asks a question' });
+  await expect(back).toHaveCount(1);
+  const part = await back.getAttribute('data-wc-part');
+  await openBox(page, part);
+  await expect(back.locator('.wc-chip', { hasText: 'In My Bank' })).toBeVisible();
+  await expect(back.locator('[data-do="ownAdd"]')).toHaveCount(0);
+  // Selected in the comment box, it is not offered for the bank either.
+  await page.locator('#tq-narrative').evaluate(el => {
+    const at = el.value.indexOf('Cece asks a question');
+    el.focus();
+    el.setSelectionRange(at, at + 20);
+    el.dispatchEvent(new Event('select'));
+  });
+  await expect(page.locator('#tq-sel-add')).toBeHidden();
+  // Changed by hand, it is a new sentence: Add to My Bank comes back.
+  await back.locator('.wc-text').click();
+  await back.locator('.wc-edit').fill('Cece asks a question when a step is unclear, and then tries it again.');
+  await back.locator('.wc-edit').press('Enter');
+  await expect.poll(() => comment(page)).toContain('tries it again.');
+  const changed = page.locator('.wc-line', { hasText: 'tries it again' });
+  await expect(changed.locator('[data-do="ownAdd"]')).toHaveCount(1);
+  await expect(changed.locator('.wc-chip', { hasText: 'In My Bank' })).toHaveCount(0);
 });
 
 test('Belongs Under says why Grade is not offered', async ({ page }) => {
