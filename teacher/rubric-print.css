@@ -166,6 +166,15 @@
   margin-right: 0.6em;
 }
 
+/* The assessment's Description, under the name and above the rubric,
+   with the teacher's line breaks kept (as the student page shows it). */
+.rubric-desc {
+  font-size: 0.95em;
+  line-height: 1.35;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+}
+
 /* ── Rubric grid ──────────────────────────────────────────── */
 .rubric-table {
   width: 100%;

@@ -31,7 +31,6 @@
    touched only from open() and print(). */
 (function () {
   'use strict';
-
   /* Every score, comment, tick and status a sheet shows is read through
      ReportScores (teacher/report-scores.js), never from the data layer
      here. The helpers that read one sheet (sheetData, scoreSheetData,
@@ -61,6 +60,12 @@
   _mayPrint = _inReportScores(_mayPrint);
   markPrinted = _inReportScores(markPrinted);
   _markState = _inReportScores(_markState);
+
+  /* In rubric-print-controls.js (moved 2026-11-27). */
+  var _check = RubricPrintControls._check;
+  var _pageDrawing = RubricPrintControls._pageDrawing;
+  var _radio = RubricPrintControls._radio;
+  var _tile = RubricPrintControls._tile;
 
   var ROOT_ID = 'rubric-print-root';
   var STYLE_ID = 'rubric-print-page';
@@ -140,6 +145,7 @@
     layout: 'full',
     nameStyle: 'preferred', // preferred | first; the last name always follows
     include: {
+      description: false,
       feedback: true,
       criterionComments: true,
       codes: true,
@@ -364,6 +370,31 @@
       .join('\n');
   }
 
+  /* The assessment's Description, as the student page shows it: the
+     teacher's plain text, its line breaks kept. '' when there is none. */
+  function _description(assessment) {
+    return assessment && assessment.description ? String(assessment.description).trim() : '';
+  }
+  // Printed under the name, above the rubric, when Include has it on.
+  function _descriptionHtml(data, include) {
+    return include.description && data.description
+      ? '<div class="rubric-desc">' + esc(data.description) + '</div>'
+      : '';
+  }
+  // Its box in Include: first, as it prints first, and only when there is one.
+  function _descriptionCheck(cid, aid, opts) {
+    if (!_description(aid ? _assessment(cid, aid) : null)) return '';
+    return _check('description', opts.include.description, 'Assignment Description');
+  }
+
+  function _student(cid, sid) {
+    return (
+      getStudents(cid).find(function (s) {
+        return s && s.id === sid;
+      }) || null
+    );
+  }
+
   /* The name at the top of a sheet (printedStudentName in shared/data.js). */
   function printName(student, nameStyle) {
     return printedStudentName(student, nameStyle);
@@ -375,9 +406,7 @@
     var assessment = _assessment(cid, aid);
     if (assessment && isPointsScored(assessment)) return scoreSheetData(cid, aid, sid, nameStyle);
     var rubric = _rubric(cid, assessment);
-    var student = getStudents(cid).find(function (s) {
-      return s && s.id === sid;
-    });
+    var student = _student(cid, sid);
     if (!assessment || !rubric || !student) return null;
     var entries = ReportScores.entries(cid, sid).filter(function (e) {
       return e && e.assessmentId === aid;
@@ -454,6 +483,7 @@
       scored: scored,
       rows: rows,
       overall: overall,
+      description: _description(assessment),
       feedback: _feedbackText(cid, sid, aid, entries),
       // An Advanced Rubric's ticked checkboxes for this student.
       ticked: ReportScores.getRubricCheckIds(cid, sid, aid),
@@ -481,9 +511,7 @@
   /* One student's score sheet on points or Complete/Incomplete work. */
   function scoreSheetData(cid, aid, sid, nameStyle) {
     var assessment = _assessment(cid, aid);
-    var student = getStudents(cid).find(function (s) {
-      return s && s.id === sid;
-    });
+    var student = _student(cid, sid);
     if (!assessment || !student) return null;
     var entries = ReportScores.entries(cid, sid).filter(function (e) {
       return e && e.assessmentId === aid;
@@ -503,6 +531,7 @@
       scored: !!overall,
       rows: [],
       overall: overall,
+      description: _description(assessment),
       feedback: _feedbackText(cid, sid, aid, entries),
       ticked: [],
     };
@@ -535,6 +564,7 @@
         };
       }),
       overall: null,
+      description: _description(assessment),
       feedback: '',
       ticked: [],
     };
@@ -937,7 +967,7 @@
     } else if (data.status && data.status !== 'Late') {
       html += '<div class="rubric-overall"><span class="rubric-status">' + esc(data.status) + '</span></div>';
     }
-    html += '</div>';
+    html += '</div>' + _descriptionHtml(data, include);
 
     if (data.scoreOnly) return html + _feedbackHtml(data, include) + '</div></div>';
     if (_isSinglePoint(data.rubric)) {
@@ -1066,6 +1096,7 @@
         codes: !!(opts.include && opts.include.codes),
         checks: !!(opts.include && opts.include.checks),
         nextSteps: !!(opts.include && opts.include.nextSteps),
+        description: !!(opts.include && opts.include.description),
       },
     };
     var sheet = data ? renderSheet(data, sheetOpts) : '';
@@ -1232,73 +1263,6 @@
     }
   }
 
-  function _radio(name, value, checked, label, help) {
-    return (
-      '<label class="rp-option"><input type="radio" name="' +
-      name +
-      '" value="' +
-      value +
-      '"' +
-      (checked ? ' checked' : '') +
-      '><span>' +
-      esc(label) +
-      (help ? ' <span class="rp-help">' + esc(help) + '</span>' : '') +
-      '</span></label>'
-    );
-  }
-
-  function _check(key, checked, label) {
-    return (
-      '<label class="rp-option"><input type="checkbox" data-include="' +
-      key +
-      '"' +
-      (checked ? ' checked' : '') +
-      '><span>' +
-      esc(label) +
-      '</span></label>'
-    );
-  }
-
-  /* A choice drawn as a tile: a real radio, so arrows and Space work. */
-  function _tile(name, value, checked, title, help, drawing, disabled) {
-    return (
-      '<label class="rp-tile' +
-      (checked ? ' is-on' : '') +
-      (disabled ? ' is-disabled' : '') +
-      '"><input type="radio" name="' +
-      name +
-      '" value="' +
-      value +
-      '"' +
-      (checked ? ' checked' : '') +
-      (disabled ? ' disabled' : '') +
-      '>' +
-      (drawing || '') +
-      '<span class="rp-tile-title">' +
-      esc(title) +
-      '</span><span class="rp-tile-help">' +
-      esc(help) +
-      '</span></label>'
-    );
-  }
-
-  /* A small page with its sheets, for the Rubrics per Page tiles. */
-  function _pageDrawing(layout) {
-    var cells = '';
-    for (var i = 0; i < layout.cols * layout.rows; i++) cells += '<span></span>';
-    return (
-      '<span class="rp-page-icon is-' +
-      layout.orientation +
-      '" style="grid-template-columns:repeat(' +
-      layout.cols +
-      ',1fr);grid-template-rows:repeat(' +
-      layout.rows +
-      ',1fr)" aria-hidden="true">' +
-      cells +
-      '</span>'
-    );
-  }
-
   /* A criterion with a competency code, so Competency Codes has something
      to print. */
   function _hasCodes(cid, rubric) {
@@ -1380,7 +1344,7 @@
 
     if (!blank) html += _nameGroupHtml(opts);
 
-    var includes = '';
+    var includes = _descriptionCheck(cid, aid, opts);
     if (!blank) {
       includes += _check('overall', opts.include.overall, 'Overall Level');
       includes += _check('feedback', opts.include.feedback, 'Feedback Comment');
@@ -1554,6 +1518,7 @@
     html += _nameGroupHtml(opts);
     html +=
       '<fieldset class="rp-group"><legend>Include</legend>' +
+      _descriptionCheck(cid, aid, opts) +
       _check('overall', opts.include.overall, complete ? 'Mark' : 'Score') +
       _check('feedback', opts.include.feedback, 'Feedback Comment') +
       '</fieldset>';

@@ -311,6 +311,7 @@ const PRECACHE_URLS = [
   '/shared/work-viewer.js',
   '/shared/work-wall.js',
   '/teacher/student-overrides.js',
+  '/teacher/rubric-print-controls.js',
   '/teacher/rubric-print.js',
   '/teacher/work-rubric-card.js',
   '/teacher/add-work-stage.js',
