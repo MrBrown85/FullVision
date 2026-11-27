@@ -558,8 +558,7 @@ test.describe('A Page Studio form, read as parts', () => {
     // checked here.
     await openStudio(page);
     await page.locator('.report-seg-btn[data-tab="questionnaire"]').click();
-    const editor = page.locator('#tq-narrative');
-    await editor.click();
+    await page.locator('#tq-read').click();
     await page.keyboard.press('End');
     for (let i = 0; i < 12; i++)
       await page.keyboard.type(

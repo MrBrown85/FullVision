@@ -29,7 +29,7 @@ async function openReports(page, tab = 'questionnaire', width = 1440, height = 9
   await page.locator('.report-toolbar').waitFor();
   if (tab === 'questionnaire') {
     await page.locator('#report-period').selectOption('Report 2');
-    await page.locator('#tq-narrative').waitFor();
+    await page.locator('#tq-narrative').waitFor({ state: 'attached' });
   }
 }
 
@@ -232,9 +232,11 @@ test.describe('the Term Questionnaire bar', () => {
     }));
     expect(green.fill).toBe('rgb(46, 125, 50)');
     expect(green.token).toBe('#2e7d32');
-    expect(green.text).toBe('rgb(22, 101, 52)');
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.getElementById('tq-ready-wrap')).color))
+      .toBe('rgb(22, 101, 52)');
     // An edit takes the approval off: Approve and Next is back.
-    await page.locator('#tq-narrative').click();
+    await page.locator('#tq-read').click();
     await page.keyboard.press('End');
     await page.keyboard.type(' Again.');
     await expect(ready(page)).toHaveText('26 of 27 Ready');

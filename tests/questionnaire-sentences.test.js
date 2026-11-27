@@ -807,7 +807,7 @@ describe('the card drawn for a Demo Mode student', () => {
     ).toBe('Liam’s Voice');
   });
 
-  it('a saved draft: one row per sentence with its part, source, handle and Other Wording; Browse Sentences…', () => {
+  it('a saved draft: one line per sentence in its box, with a handle and Other Ways; each box opens the sentence sheet', () => {
     const students = RQ.getTqStudents();
     const st = students.find(s => s.firstName === 'Noor');
     RQ.tqStudentIndex = students.indexOf(st);
@@ -822,35 +822,29 @@ describe('the card drawn for a Demo Mode student', () => {
     upsertTermRating(cid, st.id, termId, { narrative: d.text });
     const html = RQ.renderTermQuestionnaire(cid);
     saveScoreReportNote(cid, st.id, best.id, '');
-    const card = html.slice(html.indexOf('id="tq-sentences"'));
-    expect(card).not.toContain('Reword, edit or drag to reorder.');
-    expect(card).toContain('Browse Sentences…');
-    expect(card).not.toContain('Reset Order');
-    // One row per unit: the next-step sentences share a row.
-    const units = RQ.units(RQ.rowsFromDraft(d)).length;
-    expect(units).toBeLessThan(d.sentences.length);
-    expect((card.match(/class="qn-srow-handle" aria-label="Move this sentence"/g) || []).length).toBe(units);
-    expect((card.match(/data-do="wording"/g) || []).length).toBe(units);
-    expect((card.match(/<span class="qn-req-label">Next Step<\/span>/g) || []).length).toBe(1);
-    expect(card).toContain('<span class="qn-req-label">Grade</span>');
-    expect(card).toContain('<span class="qn-req-label">Best Piece</span>');
-    // The best-piece row alone is tinted and names the note.
-    expect((card.match(/qn-srow best/g) || []).length).toBe(1);
-    expect(card).toContain('· your note for the report');
-    expect(card).toContain('<span class="qn-req-label">Next Step</span>');
-    expect(card).toContain('Drag to move this sentence. ⌥↑ and ⌥↓ move it too.');
+    // Every sentence is a line of a box, none of them a class line twice.
+    const lines = (html.match(/class="wc-line[ "]/g) || []).length;
+    expect(lines).toBe(RQ.rowsFromDraft(d).length);
+    expect((html.match(/data-wc-grip="/g) || []).length).toBe(lines);
+    expect((html.match(/data-do="remove"/g) || []).length).toBe(lines);
+    expect(html).toContain('data-do="wcWays"');
+    // Each part has its own box, in the comment's order; the sentence sheet opens on it.
+    const at = label => html.indexOf('aria-label="' + label + '"');
+    expect(at('Grade')).toBeLessThan(at('Best Piece'));
+    expect(at('Best Piece')).toBeLessThan(at('Work Habits'));
+    expect(at('Next Step')).toBeLessThan(at('For the Class'));
+    expect(html).toMatch(/data-do="wcBrowse" data-part="bestPiece">All \d+ Best Piece Sentences…/);
+    expect(html).not.toContain('Reset Order');
+    expect(html).not.toContain('>Yours<');
     // The class rows the comment has no sentence for are there too (plan PR 8).
-    expect(card).toContain('<span class="qn-req-label">Support</span>');
-    expect(card).toContain('<span class="qn-req-label">Closing</span>');
-    expect(card).not.toContain('Edited');
-    // The class rows sit where their steps fall: Support before the home
-    // sentence, Closing last.
-    const at = s => card.indexOf(s);
-    expect(at('>Support<')).toBeGreaterThan(at('>Next Step<'));
-    expect(at('>Closing<')).toBeGreaterThan(at('>Support<'));
+    expect(html).toContain('wc-fact-name">Support Line</span>');
+    expect(html).toContain('wc-fact-name">Closing Sentence</span>');
+    // The best-piece sentence is in the Best Piece box.
+    const bestBox = html.slice(at('Best Piece'), html.indexOf('</section>', at('Best Piece')));
+    expect(bestBox).toContain('data-wc-part="best"');
   });
 
-  it('a hand-written comment: every sentence a Your Sentence row with Options, typed by you', () => {
+  it('a hand-written comment: every sentence is Yours, in Your Sentences, with Add to My Bank', () => {
     const students = RQ.getTqStudents();
     const st = students.find(s => s.firstName === 'Hannah');
     RQ.tqStudentIndex = students.indexOf(st);
@@ -859,18 +853,10 @@ describe('the card drawn for a Demo Mode student', () => {
       draftMeta: { v: 1, sentences: [], teacher_text: ['Hannah had a steady term.', 'She asks good questions.'] },
     });
     const html = RQ.renderTermQuestionnaire(cid);
-    const card = html.slice(html.indexOf('id="tq-sentences"'));
-    expect((card.match(/class="qn-edited"/g) || []).length).toBe(0);
-    expect((card.match(/<span class="qn-req-label">Your Sentence<\/span>/g) || []).length).toBe(2);
-    expect((card.match(/data-do="options"/g) || []).length).toBe(2);
-    expect(card).toContain('Typed by you · kept when you regenerate');
-    expect(card).not.toContain('data-do="wording"');
-    // A gap after each row, with its pill; none before the first.
-    expect((card.match(/class="qn-gap" data-gap="\d+"/g) || []).length).toBe(2);
-    expect(card).toContain('data-gap="1"');
-    expect(card).toContain('data-gap="2"');
-    expect(card).not.toContain('data-gap="0"');
-    expect(card).toContain('aria-label="Add a sentence here"');
-    expect(card).toContain('+ Add a Sentence Here</button>');
+    const box = html.slice(html.indexOf('aria-label="Your Sentences"'));
+    expect((box.match(/<span class="wc-chip own">Yours<\/span>/g) || []).length).toBe(2);
+    expect(box).toContain('2 in the Comment');
+    expect(box).not.toContain('data-do="wcWays"');
+    expect(box).toContain('data-do="remove"');
   });
 });

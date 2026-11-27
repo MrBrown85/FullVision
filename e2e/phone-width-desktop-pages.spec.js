@@ -164,38 +164,36 @@ test('desktop student page fits a phone', async ({ page }) => {
   expect(r.overlap).toBe(false);
   expect(r.termRight).toBeLessThanOrEqual(375);
   expect(r.sideways).toBe(false);
+  await page.locator('#app-dock [data-action="toggleSidebar"]').click();
+  await expect(page.locator('#gb-sidebar')).toBeVisible();
 });
 
-// Group 2 #45: the Term Questionnaire works on a phone: the sidebar button
-// opens the student list, the name has room, the Work Habits scale's words
-// sit over their stops, and Times Late is on screen.
-test('Term Questionnaire fits a phone', async ({ page }) => {
+// Group 2 #45: Write Comments works on a phone: the sidebar button opens the
+// student list, the name has room, the columns stack, nothing scrolls
+// sideways, and Times Late is on screen.
+test('Write Comments fits a phone', async ({ page }) => {
   await openDesktop(page, '/reports?tab=questionnaire');
-  await expect(page.locator('.qn-habits')).toBeVisible();
+  await expect(page.locator('.wc-head-card')).toBeVisible();
+  await page.locator('#wc-head-att').click();
   const r = await page.evaluate(() => {
     const toggle = document.querySelector('#app-dock [data-action="toggleSidebar"]');
     const tb = toggle.getBoundingClientRect();
-    const heads = [...document.querySelectorAll('.qn-habit-scale span')].map(e => e.getBoundingClientRect());
-    const dots = [...document.querySelector('.qn-hs').querySelectorAll('.qn-hs-dot')].map(e =>
-      e.getBoundingClientRect(),
-    );
     const late = document.querySelector('[data-tq-att="lates"]');
     const lb = late.getBoundingClientRect();
     const qn = document.querySelector('.qn');
+    const left = document.querySelector('.wc-left').getBoundingClientRect();
+    const right = document.querySelector('.wc-right').getBoundingClientRect();
     return {
       toggleHit: toggle.contains(document.elementFromPoint(tb.x + tb.width / 2, tb.y + tb.height / 2)),
       whoWidth: document.querySelector('.qn-who').getBoundingClientRect().width,
-      offsets: heads.map((h, i) => Math.abs(h.x + h.width / 2 - (dots[i].x + dots[i].width / 2))),
-      headsApart: heads.every((h, i) => i === 0 || h.left >= heads[i - 1].right - 0.5),
+      stacked: right.top >= left.bottom - 1,
       lateInView: lb.width > 0 && lb.right <= innerWidth,
       sideways: qn.scrollWidth > qn.clientWidth + 1,
     };
   });
   expect(r.toggleHit).toBe(true);
   expect(r.whoWidth).toBeGreaterThan(200);
-  expect(r.offsets).toHaveLength(4);
-  r.offsets.forEach(d => expect(d).toBeLessThan(1));
-  expect(r.headsApart).toBe(true);
+  expect(r.stacked).toBe(true);
   expect(r.lateInView).toBe(true);
   expect(r.sideways).toBe(false);
   await page.locator('#app-dock [data-action="toggleSidebar"]').click();

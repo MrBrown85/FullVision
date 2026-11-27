@@ -2298,7 +2298,6 @@ describe('report-note-glance', () => {
       const src = readFileSync('teacher/page-reports.js', 'utf-8');
       expect(src).toContain('RQ.tqAddReportNote(el.dataset.aid)');
       expect(src).toContain('RQ.tqOpenGrader(el.dataset.aid)');
-      expect(src).toContain('RQ.tqGlanceToggle(el.dataset.row)');
     });
   });
 });

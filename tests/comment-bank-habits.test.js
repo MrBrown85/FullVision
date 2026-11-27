@@ -425,14 +425,15 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
      the Attendance row (the States mockup's "Attendance entered"). */
   describe('the Sentences card follows', () => {
     let drawn, els;
-    const label = (html, name) => new RegExp('qn-req-label">' + name + '<').test(html);
+    const label = (html, name) => html.includes('aria-label="' + name + '"');
     beforeEach(() => {
       drawn = [];
       els = {
-        'tq-sentences': {
-          set outerHTML(v) {
+        'wc-boxes': {
+          set innerHTML(v) {
             drawn.push(v);
           },
+          querySelector: () => null,
         },
         'tq-att-absences': { value: '', classList: { toggle() {} } },
         'tq-att-lates': { value: '', classList: { toggle() {} } },
@@ -474,15 +475,13 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
       let card = drawn[drawn.length - 1];
       expect(label(card, 'Attendance')).toBe(true);
       expect(card).toContain(att[0].trim());
-      expect(card).toContain('From Attendance above · new');
       expect(saved()).toBe(box.value);
       els['tq-att-absences'].value = '';
       els['tq-att-lates'].value = '';
       RQ.tqSetAttendance(GABRIEL.id);
       expect(box.value).not.toMatch(/has missed/);
       card = drawn[drawn.length - 1];
-      expect(label(card, 'Attendance')).toBe(false);
-      expect(card).not.toContain('From Attendance above');
+      expect(card).not.toContain(att[0].trim());
       expect(saved()).toBe(box.value);
     });
   });

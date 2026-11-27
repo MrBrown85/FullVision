@@ -164,7 +164,7 @@ for (const font of FONTS) {
     await page.goto('/reports?tab=questionnaire&student=st1');
     await page.locator('.report-toolbar').waitFor();
     await page.locator('#report-period').selectOption('Report 2');
-    await page.locator('#tq-narrative').waitFor();
+    await page.locator('#tq-narrative').waitFor({ state: 'attached' });
     await useFont(page, font);
     menus['Reporting ⋯'] = await openMenu(page, '#tq-more-btn', '.rtb-more-wrap .assess-menu');
 

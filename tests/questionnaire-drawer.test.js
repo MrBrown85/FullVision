@@ -78,8 +78,8 @@ describe('the Skills drawer', () => {
   it('is drawn after the page, outside the two columns', () => {
     RQ.tqOpenSkills();
     const html = RQ.renderTermQuestionnaire(CID);
-    expect(html.lastIndexOf('<div class="qn-right">')).toBeLessThan(html.indexOf('<div class="qno-panel"'));
-    expect(html.startsWith('<div class="qn"')).toBe(true);
+    expect(html.lastIndexOf('<div class="qn-right wc-right">')).toBeLessThan(html.indexOf('<div class="qno-panel"'));
+    expect(html.startsWith('<div class="qn wc"')).toBe(true);
   });
 
   it('has the title, the sub-line and the ✕', () => {

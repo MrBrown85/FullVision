@@ -313,10 +313,27 @@ load('teacher/comment-bank.js');
 load('teacher/comment-personal.js');
 load('teacher/report-qn-browse-cases.js');
 load('teacher/report-qn-voice-observations.js');
-load('teacher/report-qn-boxes.js');
 load('teacher/report-qn-motion.js');
+load('teacher/report-wc-parts.js');
+load('teacher/report-wc-look.js');
+load('teacher/report-wc-boxes-more.js');
+load('teacher/report-wc-boxes.js');
+load('teacher/report-wc-draw.js');
+load('teacher/report-wc-comment.js');
+load('teacher/report-wc-class.js');
+load('teacher/report-wc-card.js');
+load('teacher/report-wc-host.js');
+load('teacher/report-wc-env.js');
+load('teacher/report-wc-act.js');
+load('teacher/report-wc.js');
 load('teacher/report-toolbar.js');
 load('teacher/report-questionnaire.js');
+// Write Comments' boxes start closed but Work Habits; a test that reads a box's facts opens them all.
+globalThis.wcOpenAll = () => {
+  ReportWcParts.ORDER.forEach(k => {
+    ReportWc.ui.open[k] = true;
+  });
+};
 load('teacher/grade-report.js');
 load('teacher/report-one.js');
 load('teacher/report-preview.js');
@@ -474,4 +491,5 @@ beforeEach(() => {
   _refusalsReported = {}; // the refusals already reported to Sentry this page load
   _keptText = {}; // the fourth piece of per-session memory: each tab's own copy of scores and statuses
   _scoresApart = {}; // and whether a class's scores in memory may have parted from that copy
+  wcOpenAll();
 });

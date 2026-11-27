@@ -27,8 +27,19 @@ const REPORTS = [
   '/teacher/report-issues.js',
   '/teacher/report-qn-browse-cases.js',
   '/teacher/report-qn-voice-observations.js',
-  '/teacher/report-qn-boxes.js',
   '/teacher/report-qn-motion.js',
+  '/teacher/report-wc-parts.js',
+  '/teacher/report-wc-look.js',
+  '/teacher/report-wc-boxes-more.js',
+  '/teacher/report-wc-boxes.js',
+  '/teacher/report-wc-draw.js',
+  '/teacher/report-wc-comment.js',
+  '/teacher/report-wc-class.js',
+  '/teacher/report-wc-card.js',
+  '/teacher/report-wc-host.js',
+  '/teacher/report-wc-env.js',
+  '/teacher/report-wc-act.js',
+  '/teacher/report-wc.js',
   '/teacher/report-questionnaire.js',
   '/teacher/grade-report.js',
   '/teacher/report-preview.js',
@@ -67,7 +78,7 @@ async function demo(page) {
 // The Term Questionnaire drawn: the student strip and the teacher comment.
 async function expectQuestionnaire(page) {
   await expect(page.getByRole('tab', { name: 'Write Comments' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#tq-narrative')).toBeVisible();
+  await expect(page.locator('#tq-narrative')).toBeAttached();
 }
 
 test.describe('Reports loads its scripts when opened', () => {

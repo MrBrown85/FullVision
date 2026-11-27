@@ -107,7 +107,7 @@ describe('the Not Handed In row and Approve and Next', () => {
   it('shows the row with its count and no tick; Approve and Next stays on', () => {
     seed({ missing: ['a3', 'a7'] });
     const html = open();
-    expect(html).toContain('class="qn-req-row qn-line-row has-menu" id="tq-row-missing"');
+    expect(html).toContain('aria-label="Missing Work"');
     expect(html).not.toContain('data-tq-check');
     expect(html).not.toContain('I checked this');
     expect(html).toContain('2 of 10</span>');

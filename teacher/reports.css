@@ -2438,9 +2438,6 @@
     box-sizing: border-box;
   }
 }
-.qn-muted {
-  color: var(--text-2);
-}
 .qn,
 .qn-info,
 .qno-panel {
@@ -2624,23 +2621,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-card-link:hover {
   text-decoration: underline;
 }
-.qn-grade {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  flex: none;
-}
-.qn-grade-big {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  line-height: 1.2;
-}
-.qn-grade-sub {
-  color: var(--text-2);
-  font-size: 12.5px;
-  white-space: nowrap;
-}
 
 /* Cards */
 .qn-card {
@@ -2649,92 +2629,12 @@ body.qn-roster #gb-sidebar .student-row-note {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
-.qn-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-}
-.qn-card-title {
-  font-weight: 600;
-}
 .qn-sub {
   color: var(--text-2);
   font-size: var(--text-xs);
 }
 .qn-card-link {
   font-size: 12.5px;
-}
-
-/* Work Habits, compact (Colin, Nov 4, option A): the scale's four words
-   head four equal columns over a 236 px rating area; each habit is one row,
-   its name and what it means on the left and a small slider on the right
-   whose stops sit under the column words (half a column in from each end:
-   --hs-in), --at the chosen stop, 0 to 3. The rating area stays 236 px at
-   every width; the words take what is left. */
-.qn-habits {
-  --hs-w: 236px;
-  padding: 10px 14px 4px;
-  display: flex;
-  flex-direction: column;
-}
-.qn-habits .qn-card-top {
-  padding-bottom: 4px;
-}
-.qn-habit-head,
-.qn-habit-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--hs-w);
-  column-gap: 10px;
-  align-items: center;
-}
-.qn-habit-scale {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  font-size: 11px;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-.qn-habit-scale > span {
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-}
-/* "Consistently" is a few px wider than its 59 px column: it ends at the
-   column's right edge and runs into the gap beside Usually instead of past
-   the card's edge. */
-.qn-habit-scale > span:last-child {
-  justify-content: flex-end;
-}
-/* Two lines per habit (Colin, Nov 4): the name and the slider, then the
-   description across the whole row. Each line is one line; a name or a
-   description too long for it ends in an ellipsis, the full text in its
-   title. */
-.qn-habit-row {
-  row-gap: 1px;
-  padding: 6px 0 7px;
-  border-top: 1px solid var(--qn-hairline);
-}
-.qn-habit-head + .qn-habit-row {
-  margin-top: 3px;
-}
-.qn-habit-name,
-.qn-habit-desc {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.qn-habit-name {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-.qn-habit-desc {
-  grid-column: 1 / -1;
-  font-size: 12.5px;
-  line-height: 1.35;
-  color: var(--text-2);
 }
 .qn-hs {
   --hs-in: 12.5%;
@@ -2813,44 +2713,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-hs.set .qn-hs-thumb {
   display: block;
 }
-/* At a Glance */
-.qn-glance {
-  padding: 10px 14px;
-}
-.qn-band {
-  padding: 10px 0 2px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-}
-/* A row: its part's tile, then the label in the part's colour over the
-   name and what it rests on (slice 7). */
-.qn-fact {
-  display: flex;
-  gap: 10px;
-  padding: 7px 6px;
-  margin: 0 -6px;
-  border-radius: 8px;
-  align-items: center;
-  font-size: var(--text-sm);
-}
-.qn-fact > .qn-box-tile,
-.qn-glance-toggle > .qn-box-tile {
-  align-self: flex-start;
-  margin-top: 1px;
-}
-.qn-fact-label {
-  color: var(--qn-ink, var(--text-2));
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.qn-fact-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
 .qn-count {
   flex: none;
   font-size: var(--text-xs);
@@ -2865,30 +2727,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: var(--text-sm);
   border-top: 1px solid var(--qn-hairline);
 }
-.qn-band + .qn-skill {
-  border-top: 0;
-}
 .qn-skill-name {
   flex: 1;
   min-width: 0;
-}
-.qn-chip-quoted,
-.qn-chip-private {
-  flex: none;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 6px;
-  background: var(--surface-2);
-  color: var(--qn-dim);
-  white-space: nowrap;
-}
-.qn-chip-quoted {
-  background: var(--score-4-bg);
-  color: var(--score-4-text);
-}
-.qn-chip-quoted[hidden] {
-  display: none;
 }
 .qn-level {
   flex: none;
@@ -2906,159 +2747,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-level[data-level='1'] {
   color: var(--score-1);
-}
-
-/* At a Glance sets up the comment (Questionnaire glance plan, step 2):
-   three skill rows, three work rows and a foot that opens every skill. */
-.qno-glance .qn-fact {
-  align-items: center;
-}
-/* A row that opens in place (Colin, Nov 4): the competency's name and its
-   own wording, the figure on the right, a chevron; opened, the pieces
-   behind the figure, each title opening the grader. */
-.qno-glance .qn-glance-row {
-  display: block;
-}
-.qn-glance-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.qn-glance-toggle.static {
-  cursor: default;
-}
-.qn-glance-toggle:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: -2px;
-}
-.qn-glance-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.qn-glance-fig {
-  flex: none;
-  max-width: 40%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  text-align: right;
-}
-/* The value: black, 14/600; its level step stays in data-level. */
-.qn-glance-fig .qn-level {
-  width: auto;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-.qn-glance-detail {
-  font-size: 13px;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-/* Missing Work's count and chevron, one chip. */
-.qn-glance-chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 8px 0 10px;
-  border-radius: 7px;
-  background: var(--qn-chip-amber, rgba(138, 90, 0, 0.12));
-  color: var(--qn-missing-ink);
-}
-.qn-glance-chip .qn-count {
-  font-size: 13px;
-  font-weight: 700;
-  color: inherit;
-}
-.qn-glance-chip .qn-chev {
-  border-color: currentColor;
-}
-.qn-glance-extra {
-  font-size: 12px;
-  color: var(--text-2);
-}
-.qn-best-mark {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.qn-best-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  margin-top: 2px;
-}
-.qn-best-links .qn-card-link {
-  border: 0;
-  background: none;
-  padding: 0;
-  font-family: inherit;
-  font-size: 12.5px;
-}
-.qn-chev {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  margin: 0 2px 0 0;
-  border-right: 1.5px solid var(--text-3);
-  border-bottom: 1.5px solid var(--text-3);
-  transform: translateY(-2px) rotate(45deg);
-}
-.qn-glance-toggle[aria-expanded='true'] .qn-chev {
-  transform: translateY(2px) rotate(-135deg);
-}
-.qn-glance-list {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 6px 32px;
-}
-.qn-glance-list[hidden] {
-  display: none;
-}
-.qn-glance-list li {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 5px 0;
-  border-top: 1px solid var(--qn-hairline);
-  font-size: var(--text-sm);
-}
-.qn-glance-piece {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: none;
-  padding: 0;
-  font-family: inherit;
-  font-size: var(--text-sm);
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-.qn-glance-mark {
-  flex: none;
-  white-space: nowrap;
-  font-weight: 600;
-  color: var(--text-2);
-}
-.qn-glance-mark.missing {
-  color: var(--score-1);
-}
-.qn-glance-mark.late {
-  color: var(--score-2-text);
 }
 .qno-foot {
   display: flex;
@@ -3452,26 +3140,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-voice {
   padding: 10px 14px;
 }
-.qn-voice-row {
-  display: flex;
-  gap: 10px;
-  padding: 8px 0 2px 32px;
-  font-size: var(--text-sm);
-  align-items: flex-start;
-}
-.qn-voice-main {
-  flex: 1;
-  min-width: 0;
-}
-.qn-voice .qn-fact-label {
-  display: block;
-  color: var(--qn-ink, var(--text-2));
-}
-.qn-voice-text {
-  flex: 1;
-  min-width: 0;
-  white-space: pre-wrap;
-}
 
 /* The Teacher Comment */
 .qn-comment {
@@ -3490,11 +3158,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-.qn-comment-title {
-  flex: 1;
-  font-size: var(--text-md);
-  font-weight: 600;
 }
 .qn-comment-tabs .seg-btn {
   white-space: nowrap;
@@ -3518,63 +3181,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-generate:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
-}
-.qn-text-wrap {
-  position: relative;
-}
-.qn-text {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 15.5px;
-  line-height: 1.7;
-  color: var(--text);
-  resize: none;
-  overflow: hidden;
-  min-height: 1.7em;
-  outline: none;
-  border-radius: 4px;
-  position: relative;
-}
-.qn-text:focus-visible {
-  box-shadow: 0 0 0 2px var(--score-4-bg);
-}
-/* The marks behind the box: the same text, wrapped the same way, with
-   only the best-piece tint and the missing-work ring showing. */
-.qn-marks {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  padding: 0;
-  font: inherit;
-  font-size: 15.5px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  color: transparent;
-  pointer-events: none;
-  border-radius: 4px;
-}
-.qn-mark {
-  border-radius: 4px;
-}
-.qn-mark.best {
-  background: var(--qn-best-bg);
-  box-shadow: 0 0 0 2px var(--qn-best-bg);
-}
-.qn-mark.missing {
-  box-shadow: 0 0 0 2px var(--qn-ring);
-}
-/* The sentence put in just now, tinted like its row and fading with it. */
-.qn-mark.added {
-  background: var(--qn-new-bg);
-  box-shadow: 0 0 0 2px var(--qn-new-bg);
-  animation: qn-added-mark 5s ease-in forwards;
 }
 @keyframes qn-added-mark {
   0%,
@@ -3946,15 +3552,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   align-items: center;
   gap: 16px;
   font-size: var(--text-sm);
-}
-.qn-att-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.qn-att-title {
-  font-weight: 600;
-  font-size: 14px;
 }
 .qn-att-field {
   display: flex;
@@ -4595,17 +4192,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   margin-bottom: 0;
 }
 
-/* At a Glance: "No note for the report yet · Add one" under the best piece. */
-.qn-note-line {
-  font-size: 12px;
-}
-.qn-note-add {
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-}
-
 /* The Teacher Comment's reporting switch: Letter Grade | IE, Language
    Goals or IEP Goals (Generate plan PR 3, the IE and goals mockups). */
 .qn-basis {
@@ -4642,26 +4228,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-weight: 600;
   box-shadow: inset 0 0 0 1px var(--active);
 }
-
-/* The Required sentences of an IE or goals comment. */
-.qn-required {
-  position: relative;
-  padding: 0;
-  overflow: visible;
-}
-.qn-req-top {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--surface-2);
-}
-.qn-req-top .qn-card-title {
-  font-size: var(--text-md);
-}
-.qn-req-top .qn-sub {
-  flex: 1;
-}
 .qn-req-row {
   display: flex;
   align-items: flex-start;
@@ -4691,15 +4257,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-weight: 600;
   color: var(--text-2);
 }
-.qn-req-chip {
-  align-self: flex-start;
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 0 6px;
-  border-radius: 5px;
-  background: var(--score-2-bg);
-  color: var(--score-2-text);
-}
 .qn-req-body {
   flex: 1;
   min-width: 0;
@@ -4714,20 +4271,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-req-source {
   font-size: 12px;
   color: var(--text-2);
-}
-/* What a bank sentence says it from (the grade, the piece, the skill):
-   on hover over the sentence, and read by screen readers, not shown
-   under every row (Colin, Nov 6: distracting more often than helpful). */
-.qn-srow-facts {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
 }
 /* A thin part of the bank, under the row's source line (plan PR 13). */
 .qn-pron-note {
@@ -4777,16 +4320,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
-
-/* The Sentences card's rows for the class's lines (plan PR 8). */
-.qn-sentences {
-  position: relative;
-  padding: 0;
-  overflow: visible;
-}
-.qn-line-row {
-  align-items: flex-start;
-}
 .qn-req-row.has-menu {
   position: relative;
 }
@@ -4799,24 +4332,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   flex: 1;
   font-size: 13.5px;
   color: var(--text-2);
-}
-.qn-line-off {
-  color: var(--text-2);
-}
-.qn-line-text {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 14.5px;
-  line-height: 1.45;
-  padding: 0;
-  text-align: left;
-  cursor: text;
-  border-radius: 4px;
-}
-.qn-line-text:hover {
-  background: var(--overlay-hover);
 }
 .qn-line-text:focus-visible,
 .qn-line-choose:focus-visible,
@@ -4870,9 +4385,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.qn-line-edit-body {
-  gap: 6px;
 }
 .qn-line-input {
   flex: 1;
@@ -5031,12 +4543,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
-.qn-srow-spacer {
-  cursor: default;
-}
-.qn-sentences .qn-req-row {
-  padding-left: 10px;
-}
 .qn-srow.best {
   background: var(--qn-best-bg);
 }
@@ -5046,12 +4552,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-srow.dragging {
   opacity: 0.35;
-}
-.qn-drop-line {
-  height: 4px;
-  margin: 0 14px;
-  border-radius: 2px;
-  background: var(--active);
 }
 /* A row put in just now (the InsertRows mockup): a tint that fades. */
 .qn-srow.added {
@@ -5066,48 +4566,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   100% {
     background-color: transparent;
   }
-}
-/* The Options menu of a Your Sentence row. */
-.qn-options {
-  width: 270px;
-}
-/* The line for a sentence of the teacher's own at a gap, drawn as a row. */
-.qn-own-row .qn-own {
-  padding-top: 0;
-}
-.qn-edited {
-  flex: none;
-  font-size: 12px;
-  color: var(--text-2);
-  padding: 2px 8px;
-  background: var(--surface-2);
-  border-radius: 6px;
-  white-space: nowrap;
-}
-.qn-reset {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-}
-.qn-req-top .qn-card-link {
-  font-size: 13px;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  font-family: inherit;
-}
-.qn-req-top .qn-card-link:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-.qn-wording {
-  width: 430px;
-}
-.qn-menu-all {
-  padding-left: 32px;
 }
 
 /* Browse Sentences: the sheet over the page. The tabs and the Fits | All
@@ -5747,26 +5205,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn-head-sub {
     white-space: normal;
   }
-  .qn-grade {
-    align-items: flex-start;
-    margin-left: 52px;
-  }
-  .qn-grade-sub {
-    white-space: normal;
-  }
-  .qn-glance-list {
-    padding-left: 14px;
-  }
-  /* The words take the row; the scale and each slider keep their 236 px,
-     on the right under them. */
-  .qn-habit-head,
-  .qn-habit-row {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 6px;
-  }
-  .qn-habit-head > span:first-child {
-    display: none;
-  }
   .qn-habit-scale,
   .qn-hs {
     width: var(--hs-w);
@@ -5780,29 +5218,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn-att-note {
     flex-basis: 100%;
     text-align: left;
-  }
-  .qn-req-top {
-    flex-wrap: wrap;
-  }
-  .qn-req-top .qn-sub {
-    flex-basis: 100%;
-    order: 3;
-  }
-  .qn-req-top .qn-card-link {
-    margin-left: auto;
-  }
-  .qn-sentences .qn-req-row {
-    flex-wrap: wrap;
-  }
-  .qn-sentences .qn-req-part {
-    width: auto;
-    flex: 1 1 auto;
-  }
-  .qn-sentences .qn-req-body,
-  .qn-sentences .qn-line-empty {
-    order: 3;
-    flex: 1 1 100%;
-    min-width: 0;
   }
 }
 
@@ -6089,28 +5504,6 @@ body.qn-roster #gb-sidebar .student-row-note {
     --qn-ink-change: #a1a1a6;
   }
 }
-/* The card itself is only the page's section: the title, then the boxes. */
-.qn-sentences {
-  background: transparent;
-  box-shadow: none;
-}
-.qn-sentences .qn-req-top {
-  border-bottom: 0;
-  padding: 0 2px 8px;
-  align-items: center;
-}
-.qn-sentences .qn-req-top .qn-sub {
-  flex: 1;
-}
-.qn-req-top-end {
-  margin-left: auto;
-}
-.qn-req-top-end {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-}
 .qn-box {
   position: relative;
   background: var(--qn-box-bg);
@@ -6177,20 +5570,6 @@ body.qn-roster #gb-sidebar .student-row-note {
     box-shadow 0.16s ease,
     background-color 0.16s ease;
 }
-.qn-box.qn-lit,
-.qn-card.qn-lit {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    0 0 0 2px color-mix(in srgb, var(--qn-part) 40%, transparent);
-}
-.qn-fact.qn-lit {
-  background: color-mix(in srgb, var(--qn-part) 9%, transparent);
-}
-.qn-grade.qn-lit {
-  background: color-mix(in srgb, var(--qn-part) 9%, transparent);
-  border-radius: 8px;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qn-part) 9%, transparent);
-}
 @media (prefers-reduced-motion: reduce) {
   .qn-box,
   .qn-card[data-lit],
@@ -6198,105 +5577,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn-grade[data-lit] {
     transition: none;
   }
-  .qn-box.qn-lit,
-  .qn-card.qn-lit {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  }
-  .qn-fact.qn-lit,
-  .qn-grade.qn-lit {
-    background-color: transparent;
-    box-shadow: none;
-  }
-  .qn-box[data-part='notHandedIn'].qn-lit {
-    background-color: var(--qn-missing-bg);
-  }
 }
 .qn-box[data-part='notHandedIn'] {
   background: var(--qn-missing-bg);
-}
-.qn-box-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 26px;
-}
-.qn-box-tile {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.qn-box-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  min-width: 0;
-}
-.qn-card-top .qn-box-name {
-  flex: none;
-  white-space: nowrap;
-}
-.qn-box-head .qn-req-chip {
-  flex: none;
-}
-.qn-box-evidence {
-  margin-left: auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  padding-left: 10px;
-}
-.qn-ev-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-.qn-ev-badge {
-  flex: none;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.5;
-  padding: 0 7px;
-  border-radius: 5px;
-  background: var(--qn-ev-badge-bg);
-  color: var(--qn-ev-badge-text);
-}
-.qn-ev-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 15px;
-}
-.qn-ev-bar {
-  width: 5px;
-  border-radius: 2px;
-  background: var(--qn-habit);
-}
-.qn-ev-bar.off {
-  background: var(--qn-ev-track);
-}
-.qn-ev-track {
-  flex: none;
-  width: 62px;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--qn-ev-track);
-  overflow: hidden;
-}
-.qn-ev-track > span {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: var(--qn-missing-ink);
-  width: calc(var(--n) / var(--t) * 100%);
 }
 
 /* The rows in a box: the handle, the sentence (indented to line up with the
@@ -6311,9 +5594,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-box .qn-req-row + .qn-req-row,
 .qn-box .qn-gap + .qn-req-row {
   border-top: 0;
-}
-.qn-box .qn-box-head + .qn-req-row {
-  margin-top: 3px;
 }
 .qn-box .qn-req-part {
   display: none;
@@ -6333,9 +5613,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 15px;
   line-height: 1.45;
   color: var(--text);
-}
-.qn-box .qn-line-text {
-  padding: 0;
 }
 .qn-box .qn-req-row.flag {
   background: var(--report-callout-bg);
@@ -6395,55 +5672,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-box .qn-line-empty-row {
   display: flex;
 }
-.qn-box .qn-empty-row {
-  margin-top: 6px;
-  padding-left: 32px;
-}
-.qn-box .qn-box-head + .qn-empty-row {
-  margin-top: 6px;
-}
-/* An empty Closing: its button sits at the right of the head line. */
-.qn-box .qn-closing-empty {
-  position: absolute;
-  top: 10px;
-  right: 14px;
-  margin: 0;
-  padding: 0;
-}
-.qn-box .qn-drop-line {
-  margin: 2px 0;
-}
 @media (max-width: 600px) {
-  .qn-sentences .qn-box .qn-req-row {
-    flex-wrap: nowrap;
-  }
-  .qn-sentences .qn-box .qn-req-body {
-    order: 0;
-    flex: 1 1 auto;
-  }
-  .qn-req-top .qn-card-link {
-    margin-left: 0;
-  }
-}
-
-/* ── Adding and editing in one click (slice 4) ── */
-.qn-add-sentence {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--qn-tint-bg);
-  color: var(--qn-tint-ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 0 11px;
-  cursor: pointer;
-}
-.qn-add-sentence:hover {
-  background: rgba(0, 102, 204, 0.16);
 }
 .qn-add-sentence:focus-visible,
 .qn-gap-add:focus-visible {
@@ -6476,20 +5705,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   right: 0;
   top: 100%;
   height: 8px;
-}
-.qn-gap-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 1.5px;
-  height: 2px;
-  background: #0066cc;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 1ms;
-}
-.qn-box .qn-gap:last-child .qn-gap-line {
-  top: calc(100% + 3px);
 }
 .qn-gap-add {
   position: absolute;
@@ -6528,41 +5743,11 @@ body.qn-roster #gb-sidebar .student-row-note {
   opacity: 1;
   transition-delay: 0s;
 }
-/* While a sentence is dragged, no bar shows. */
-.qn-sentences.dragging .qn-gap-line,
-.qn-sentences.dragging .qn-gap-add {
-  display: none;
-}
 /* A sentence's own edges lie over the pill, so a click there reaches it. */
 .qn-box .qn-srow .qn-req-text {
   position: relative;
   z-index: 3;
   cursor: text;
-}
-.qn-box .qn-edit-field,
-.qn-box .qn-edit-field:focus {
-  box-shadow: 0 0 0 2px #0066cc !important;
-}
-.qn-edit-field {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  resize: none;
-  overflow: hidden;
-  font: inherit;
-  font-size: 15px;
-  line-height: 1.45;
-  color: var(--text);
-  background: var(--qn-box-bg);
-  border: 0;
-  border-radius: 6px;
-  padding: 0 4px;
-  margin: 0 -4px;
-  box-shadow: 0 0 0 2px #0066cc;
-  outline: 0;
-  position: relative;
-  z-index: 6;
 }
 .qn-box .qn-srow.editing {
   position: relative;
@@ -6601,9 +5786,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   touch-action: none;
   user-select: none;
 }
-.qn-sentences {
-  position: relative;
-}
 /* The lifted sentence: its own background rings it, a long shadow lifts it,
    it is a little larger and follows the pointer. */
 .qn-box .qn-srow.lifted {
@@ -6625,108 +5807,13 @@ body.qn-roster #gb-sidebar .student-row-note {
   z-index: 1;
   pointer-events: none;
 }
-.qn-sentences.dragging {
-  cursor: grabbing;
-  user-select: none;
-}
-/* What hangs off a sentence waits until it lands. */
-.qn-sentences.dragging .qn-claim,
-.qn-sentences.dragging .qn-pron-note,
-.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-line-menu,
-.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-edited,
-.qn-sentences.dragging .qn-box .qn-srow.lifted .qn-own-add {
-  visibility: hidden;
-}
 .qn-box .qn-srow,
 .qn-box .qn-req-row.flag {
   transition: background-color 150ms ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  .qn-sentences *,
-  .qn-sentences *::before,
-  .qn-sentences *::after {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-/* ── The menus (slice 6) ── */
-.qn-menu-right {
-  margin-left: auto;
-  padding-left: 12px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-}
-.qn-see-missing {
-  flex: none;
-  min-height: 26px;
-  border: 0;
-  border-radius: 7px;
-  background: rgba(138, 90, 0, 0.14);
-  color: #6b4200;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 0 10px;
-  cursor: pointer;
-}
-.qn-see-missing:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
 }
 @media (prefers-color-scheme: dark) {
-  .qn-see-missing {
-    background: rgba(255, 214, 10, 0.16);
-    color: #ffd60a;
-  }
-}
-.qn-miss-menu {
-  width: 520px;
-}
-.qn-miss-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 10px;
-}
-.qn-miss-item .qn-menu-text {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.qn-miss-open {
-  flex: none;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-/* ── Work Habits in the box, the amber note and + Close to (slice 8) ── */
-.qn-box-head {
-  position: relative;
-}
-.qn-ev-habits {
-  position: static;
-  display: inline-flex;
-}
-.qn-ev-bars-btn {
-  display: inline-flex;
-  align-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: rgba(107, 79, 187, 0.08);
-  padding: 4px 8px;
-  cursor: pointer;
-  transition: background-color 150ms ease;
-}
-.qn-ev-bars-btn:hover,
-.qn-ev-bars-btn.on {
-  background: rgba(107, 79, 187, 0.16);
 }
 .qn-ev-bars-btn:focus-visible,
 .qn-hm-step:focus-visible,
@@ -6734,29 +5821,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-add-btn:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
-}
-.qn-habits-menu {
-  top: calc(100% + 2px);
-  right: 0;
-  width: 480px;
-}
-.qn-hm-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 10px;
-}
-.qn-hm-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--text);
-}
-.qn-hm-steps {
-  flex: none;
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
 }
 .qn-hm-step {
   display: flex;
@@ -6781,72 +5845,5 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-hm-step:hover {
   background: rgba(107, 79, 187, 0.12);
 }
-.qn-hm-word {
-  flex: none;
-  width: 108px;
-  text-align: right;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-}
-.qn-habit-note {
-  margin: 6px 0 0 32px;
-  background: var(--qn-missing-bg);
-  border-radius: 9px;
-  padding: 6px 6px 6px 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.qn-habit-note-text {
-  flex: 1 1 280px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--text);
-}
-.qn-habit-note button {
-  min-height: 26px;
-  border: 0;
-  border-radius: 7px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 0 10px;
-  cursor: pointer;
-}
-.qn-habit-note-fix {
-  background: #a35f00;
-  color: #fff;
-}
-.qn-habit-note-keep {
-  background: rgba(138, 90, 0, 0.14);
-  color: #6b4200;
-}
 @media (prefers-color-scheme: dark) {
-  .qn-habit-note-keep {
-    background: rgba(255, 214, 10, 0.16);
-    color: #ffd60a;
-  }
-}
-.qn-extra-row {
-  display: flex;
-  gap: 6px;
-  margin: 6px 0 0 32px;
-}
-.qn-add-btn {
-  min-height: 26px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--qn-tint-bg);
-  color: var(--link);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 0 10px;
-  cursor: pointer;
-}
-.qn-sentences.dragging .qn-habit-note,
-.qn-sentences.dragging .qn-extra-row {
-  visibility: hidden;
 }

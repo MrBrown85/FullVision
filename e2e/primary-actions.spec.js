@@ -55,14 +55,13 @@ test.describe('One primary action per screen', () => {
     },
     { name: 'Observations', route: '/observations', ready: '.obsc-add', primary: ['Add'] },
     { name: 'Gradebook', route: '/gradebook', ready: '.tb-action-btn', primary: ['+ New Assessment'] },
-    // The review screen's two actions are both solid: Generate Comment writes
-    // the comment and Approve and Next sends it on (the approved "Review
-    // screen" mockup, fullvision-generate-plan PR 11a).
+    // Write Comments has one solid action, Approve and Next; Generate Again
+    // and the rest are quiet (docs/plans/write-comments-plan.md).
     {
       name: 'Write Comments',
       route: '/reports',
       ready: '#tq-approve-next',
-      primary: [/^Approve and Next/, 'Generate Comment'],
+      primary: [/^Approve and Next/],
     },
     {
       name: 'Student page',

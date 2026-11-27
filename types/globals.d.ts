@@ -115,6 +115,7 @@ declare var CommentBank: {
   bestPieceSkillOf(...args: any[]): any;
   studentRef(...args: any[]): any;
   facts(...args: any[]): any;
+  [key: string]: any;
 };
 // Browse Sentences' cases (teacher/report-qn-browse-cases.js) and the
 // Observations card, the student's Voice and the class's report parts
@@ -124,7 +125,6 @@ interface Window {
   RubricScale: any;
   ReportQnBrowseCases: unknown;
   ReportQnVoiceObservations: unknown;
-  ReportQnBoxes: any;
   ReportQnMotion: any;
   CmStdHelp: unknown;
   CmKeepDraw: unknown;
@@ -479,7 +479,7 @@ interface Window {
   ReportOneUndo: any;
 }
 declare var ReportOneCopy: Window['ReportOneCopy'];
-declare var ReportBlocks: { wordingOf(key: string): any };
+declare var ReportBlocks: { wordingOf(key: string): any; [key: string]: any };
 declare var COURSES: Record<string, any>;
 declare function getReportConfig(cid: string): any;
 declare function saveReportConfig(cid: string, config: unknown): void;
@@ -620,3 +620,19 @@ declare var MarkupDraw: any;
 interface Window {
   MarkupDraw?: any;
 }
+
+// Write Comments (teacher/report-wc*.js), the Reports page's first tab.
+declare var ReportWc: any;
+declare var ReportWcParts: any;
+declare var ReportWcBoxes: any;
+declare var ReportWcBoxesMore: any;
+declare var ReportWcDraw: any;
+declare var ReportWcComment: any;
+declare var ReportWcClass: any;
+declare var ReportWcCard: any;
+declare var ReportWcHost: any;
+declare var ReportWcEnv: any;
+declare var ReportWcAct: any;
+declare var ReportWcLook: any;
+declare var ReportQnMotion: any;
+declare var COMMENT_BANK: { sentences: any[]; [key: string]: any };

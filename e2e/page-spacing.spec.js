@@ -95,25 +95,26 @@ test('Observations: 12px edges, 12px between cards in a day, capture box in line
   expect(await toolbarInset(page, '.obs-toolbar')).toBe(12);
 });
 
-// The review screen keeps the mockup's 24px side gutters and 20px between
-// its two columns (fullvision-generate-plan PR 11a).
-test('Term Questionnaire: 24px side gutters, 20px between the columns, 12px between the cards', async ({ page }) => {
+// Write Comments keeps 24px side gutters and 24px between its two columns,
+// with 10px between the boxes (docs/plans/write-comments-plan.md).
+test('Write Comments: 24px side gutters, 24px between the columns, 10px between the boxes', async ({ page }) => {
   await open(page, '/reports');
-  await page.locator('.qn-head').waitFor();
+  await page.locator('.wc-head-card').waitFor();
   const m = await page.evaluate(() => {
     const main = document.getElementById('main').getBoundingClientRect();
-    const head = document.querySelector('.qn-head').getBoundingClientRect();
-    const habits = document.querySelector('.qn-habits').getBoundingClientRect();
-    const glance = document.querySelector('.qn-glance').getBoundingClientRect();
+    const head = document.querySelector('.wc-head-card').getBoundingClientRect();
+    const left = document.querySelector('.wc-left').getBoundingClientRect();
+    const right = document.querySelector('.wc-right').getBoundingClientRect();
     const comment = document.querySelector('.qn-comment').getBoundingClientRect();
+    const boxes = [...document.querySelectorAll('.wc-box')].map(b => b.getBoundingClientRect());
     return {
       left: Math.round(head.left - main.left),
       right: Math.round(main.right - comment.right),
-      between: Math.round(comment.left - head.right),
-      gap: Math.round(glance.top - habits.bottom),
+      between: Math.round(right.left - left.right),
+      gap: Math.round(boxes[1].top - boxes[0].bottom),
     };
   });
-  expect(m).toEqual({ left: 24, right: 24, between: 20, gap: 12 });
+  expect(m).toEqual({ left: 24, right: 24, between: 24, gap: 10 });
 });
 
 test('Dashboard: the toolbar is in line with the boxes', async ({ page }) => {

@@ -154,13 +154,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect((html.match(/role="slider"/g) || []).length).toBe(6);
     expect(html).not.toContain('role="radio"');
     expect(html).not.toContain('Not Seen');
-    expect(html).toContain(
-      '<span class="qn-habit-name" id="tq-habit-ready" title="Comes Ready, Uses Class Time">Comes Ready, Uses Class Time</span>',
-    );
+    // Each habit's name, with what it means as its tooltip.
     CommentBank.HABITS.forEach(h =>
-      expect(html).toContain(
-        '<span class="qn-habit-desc" id="tq-habit-desc-' + h.key + '" title="' + h.desc + '">' + h.desc + '</span>',
-      ),
+      expect(html).toContain('<span class="wc-fact-name" title="' + h.desc + '">' + h.name + '</span>'),
     );
     expect(CommentBank.HABITS.map(h => h.desc)).toEqual([
       'Hands in assignments complete and on time, and finishes class work.',
@@ -171,20 +167,19 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       'Phone away when asked; devices for learning, not distraction.',
     ]);
     expect(html).not.toContain('From assignments:');
-    expect(html).toContain('At a Glance');
     expect(html).toContain('Best Piece');
-    expect(html).toContain('<span class="qn-fact-label">Missing Work</span>');
+    expect(html).toContain('aria-label="Missing Work"');
     expect(html).toContain('Cece’s Voice');
     expect(html).toContain('Questionnaires ›');
     expect(html).toContain('Teacher Comment');
     expect(html).toContain('Generate Comment');
+    expect(html).toContain('Generate Again');
     expect(html).toContain('id="tq-narrative"');
     expect(html).toMatch(/\d+ characters/);
     expect(html).toContain('⌘⇧C');
     expect(html).toContain('Classes Absent');
     expect(html).toContain('Times Late');
     expect(html).toContain('Optional. Left out until entered.');
-    expect(html).toContain('The rest of the Sentences card (PR 11b) goes here.');
     expect(html).not.toContain('Comment Bank');
     expect(html).not.toContain('What FullVision Has');
     expect(html).not.toContain('Save and Next');
@@ -203,7 +198,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
         /class="qn-hs" role="slider" tabindex="0" data-habit="part" data-value="0"[^>]*aria-valuetext="Not rated"/,
       );
       expect(html).toMatch(/data-habit="others" data-value="3"[^>]*aria-valuenow="3"/);
-      expect(html).toContain('id="tq-rated">1 of 6 rated');
+      expect(html).toContain('1 of 6 Rated');
       // Nothing is on the page to draw in place.
       globalThis.document.querySelector = () => null;
       RQ.tqRate('others', 0);
