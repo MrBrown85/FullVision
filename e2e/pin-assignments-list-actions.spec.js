@@ -140,6 +140,52 @@ test.describe('Assignments list actions in Demo Mode', () => {
     expect(await cardIds(folder(page, CELLS))).toEqual(moved);
   });
 
+  /* Only the grip moves a card or a folder. The whole card and folder were draggable, so a drag that began in a
+     score box or between rows picked the card up mid-typing (Colin and a teacher, Nov 26, 2026). */
+  test('a drag that starts inside a card or a folder, away from its grip, moves nothing', async ({ page }) => {
+    await openList(page);
+    const cells = folder(page, CELLS);
+    const before = await cardIds(cells);
+    const target = card(page, 'sci8q11');
+    // Neither a card nor a folder can be picked up until its grip is pressed.
+    await expect(card(page, 'sci8a3')).not.toHaveAttribute('draggable', 'true');
+    await expect(cells).not.toHaveAttribute('draggable', 'true');
+    const drags = () => page.evaluate(() => window.__drags);
+    await page.evaluate(() => {
+      window.__drags = 0;
+      window.addEventListener('dragstart', e => {
+        if (!e.defaultPrevented) window.__drags++;
+      });
+    });
+
+    // From inside an open card: down on its body, then across to another card.
+    await card(page, 'sci8a3').locator('[data-action="toggleAssess"]').first().click();
+    await expect(card(page, 'sci8a3')).toHaveClass(/open/);
+    const body = card(page, 'sci8a3').locator('.assess-body, .assess-card-body').first();
+    const from = await body.boundingBox();
+    const to = await target.boundingBox();
+    await page.mouse.move(from.x + from.width / 2, from.y + 30);
+    await page.mouse.down();
+    await page.mouse.move(to.x + 200, to.y + 4, { steps: 12 });
+    await page.mouse.up();
+    // From the folder's own header, away from its grip.
+    const head = await cells.locator('.mod-folder-header, .mod-header').first().boundingBox();
+    await page.mouse.move(head.x + head.width / 2, head.y + head.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(head.x + head.width / 2, head.y + 400, { steps: 12 });
+    await page.mouse.up();
+
+    expect(await drags()).toBe(0);
+    expect(await cardIds(cells)).toEqual(before);
+    // After a press on a grip and a press elsewhere, the card is not draggable again.
+    await card(page, 'sci8a3').locator('.assess-grip').dispatchEvent('pointerdown');
+    await expect(card(page, 'sci8a3')).toHaveAttribute('draggable', 'true');
+    await page.mouse.move(from.x + from.width / 2, from.y + 30);
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect(card(page, 'sci8a3')).not.toHaveAttribute('draggable', 'true');
+  });
+
   test('Expand All opens every card and Collapse All closes them all, from the ⋯ menu', async ({ page }) => {
     await openList(page);
     const items = async () =>

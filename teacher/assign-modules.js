@@ -34,12 +34,11 @@
     });
     return u ? u.name : input.value;
   }
-  /* A module's folder can be dragged, so while its name is being edited the
-     folder stops being draggable: otherwise selecting the text drags the
-     module. */
+  /* A folder moves only from its grip (AssignDragEvents._handlePointerDown), so editing its name never makes
+     the folder draggable: turning it back on here made the whole folder draggable again after a rename. */
   function _setModuleDraggable(input, on) {
     var folder = input.closest('.mod-folder');
-    if (folder) folder.draggable = on;
+    if (folder && !on) folder.draggable = false;
   }
   function updateModuleColor(moduleId, color) {
     var cid = pageState.activeCourse;
