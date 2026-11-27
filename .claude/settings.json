@@ -10,6 +10,21 @@
             "if": "Bash(git commit *)",
             "command": "jq -r '.tool_input.command' | grep -qE '(^|[^-[:alnum:]])git commit([[:space:]]|$)' && bash scripts/format-staged.sh || true",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard.mjs\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*__(apply_migration|execute_sql|deploy_edge_function)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard.mjs\"",
+            "timeout": 15
           }
         ]
       }

@@ -77,3 +77,14 @@ A test that fails twice under load is a lead before it is noise. Run it alone, t
 ## A pull request with a migration
 
 Rehearse it locally first (`docs/migrations.md`) and push it once, with the live schema snapshot, so the database drift check runs once and passes.
+
+## Hooks
+
+`.claude/settings.json` runs `scripts/hooks/guard.mjs` before every shell command and every Supabase migration, SQL or edge-function call a Claude session makes. It holds the limits a session must never cross by accident:
+
+- **Production:** opening, pushing or merging anything into `production` is refused unless Colin's latest message says "release" (CLAUDE.md rule 8).
+- **The live database:** every `apply_migration` and `deploy_edge_function` on `gradebook-prod`, and any `execute_sql` there that is not plainly a read, asks him first (CLAUDE.md rule 1). Plain `select` counts go through.
+- **Skipped checks:** `--no-verify`, and a force-push to `main` or `production`, are refused.
+- **Deleted tests:** a commit that deletes a test file needs a line starting `Tests removed:` saying why.
+
+If the guard itself fails it lets the call through, so a bug in it never stops work. Its cases are in `tests/hooks-guard.test.js`; change both together.
