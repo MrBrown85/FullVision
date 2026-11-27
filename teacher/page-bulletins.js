@@ -175,7 +175,7 @@
   function _drawHead() {
     var el = _el('bulletin-head');
     if (!el) return;
-    var html = _headHtml();
+    var html = _headHtml() + ViewAsStudent.bulletinsButtonHtml(_cid);
     if (html === _lastHead && el.firstChild) return;
     _lastHead = html;
     // html-safe: the class name never reaches here; counts are numbers; names and the address are escaped above.

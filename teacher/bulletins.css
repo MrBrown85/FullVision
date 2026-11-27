@@ -35,6 +35,11 @@
   column-gap: 12px;
   row-gap: 2px;
 }
+/* View as Student, at the header's right end. */
+.bulletin-view-as {
+  margin-left: auto;
+  align-self: center;
+}
 .bulletin-title {
   font-size: 26px;
   letter-spacing: -0.01em;

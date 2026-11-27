@@ -609,7 +609,7 @@
   "teacher/page-student.js :: _coreSelfHtml > forEach callback 4": 55,
   "teacher/page-student.js :: _grControlsHtml": 56,
   "teacher/page-student.js :: _grGroupsHtml": 77,
-  "teacher/page-student.js :: _handleClick": 179,
+  "teacher/page-student.js :: _handleClick": 177,
   "teacher/page-student.js :: _ovAllHtml": 59,
   "teacher/page-student.js :: _ovGradeHtml": 53,
   "teacher/page-student.js :: _ovItemHtml": 56,

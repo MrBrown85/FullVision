@@ -240,6 +240,7 @@
     "teacher/rubric-words.js",
     "teacher/rubric-print-controls.js",
     "teacher/bulletin-share.js",
-    "teacher/bulletin-seen.js"
+    "teacher/bulletin-seen.js",
+    "teacher/view-as-student.js"
   ]
 }
