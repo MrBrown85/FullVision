@@ -317,6 +317,16 @@ window.ReportWcBoxes = (function () {
     cls: 'support',
   };
 
+  /* A Say This shows only when the bank has a sentence for the fact; a skill or piece it has none for says so. */
+  function settleSay(env, key, facts) {
+    facts.forEach(function (f) {
+      if (f.sayData && !env.canSay(f.sayData)) {
+        if (/^(comp|work):/.test(f.sayData.fact)) f.writeBox = key;
+        f.sayData = null;
+      }
+    });
+  }
+
   function build(env) {
     var q = String(env.q || '')
       .trim()
@@ -334,11 +344,7 @@ window.ReportWcBoxes = (function () {
       var facts = model.facts.filter(function (f) {
         return hit(f, q);
       });
-      // A Say This shows only when the bank has a sentence for the fact.
-      if (openNow)
-        facts.forEach(function (f) {
-          if (f.sayData && !env.canSay(f.sayData)) f.sayData = null;
-        });
+      if (openNow) settleSay(env, b.key, facts);
       var top = (model.top || []).filter(function (l) {
         return !q || String(l.text).toLowerCase().indexOf(q) >= 0;
       });

@@ -85,16 +85,19 @@ describe('the student list and Say This for a Demo Mode class', () => {
     localStorage.clear();
   });
 
-  it('says No Comment for a student with none, Needs Approval for one not yet approved, nothing once approved', () => {
+  it('counts no reason for a comment not yet approved; the line under the name still says so', () => {
     const [a, b, c] = RQ.getTqStudents();
     const term = ReportBlocks.getTermId();
     upsertTermRating(cid, a.id, term, { narrative: '', approvedAt: null });
     upsertTermRating(cid, b.id, term, { narrative: 'Hannah had a steady term.', approvedAt: null });
     upsertTermRating(cid, c.id, term, { narrative: 'Sam had a steady term.', approvedAt: '2026-11-01T10:00:00Z' });
     ReportWcLook.reset();
-    expect(ReportWcLook.reason(a)).toBe('No Comment');
-    expect(ReportWcLook.reason(b)).toBe('Needs Approval');
-    expect(ReportWcLook.reason(c)).toBe('');
+    // Neither is a reason to look: the tick and the line under the name already say so.
+    expect(ReportWcLook.reason(a)).toBe('');
+    expect(ReportWcLook.reason(b)).toBe('');
+    expect(ReportWcLook.basic(a.id)).toBe('No Comment');
+    expect(ReportWcLook.basic(b.id)).toBe('Needs Approval');
+    expect(ReportWcLook.basic(c.id)).toBe('');
   });
 
   it('adds a sentence for a skill after the last Strength sentence and takes no other’s place', () => {

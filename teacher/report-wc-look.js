@@ -66,7 +66,7 @@ window.ReportWcLook = (function () {
     var r = getStudentTermRating(cid, st.id, termId) || {};
     var text = rq.plainComment(r.narrative || '').trim();
     var approved = !!r.approvedAt;
-    if (!text) return 'No Comment';
+    if (!text) return '';
     var f = CommentBank.facts(cid, st, termId);
     if (CommentBank.reportPath(f) === 'ie' && !CommentBank.deadlineOk(cid, r.ieDeadline, rq.today()))
       return 'IE Needs a Date';
@@ -82,7 +82,7 @@ window.ReportWcLook = (function () {
       });
       if (!has) return 'No Next Step';
     }
-    return approved ? '' : 'Needs Approval';
+    return '';
   }
 
   function keyOf(st) {
@@ -131,9 +131,12 @@ window.ReportWcLook = (function () {
     )
       _queue.push(st);
     if (!_timer) _timer = setTimeout(drain, 0);
-    if (hit) return hit.v;
-    // Until it is worked out: no comment, or one not yet approved.
-    var r = getStudentTermRating(rq.cid(), st.id, rq.termId()) || {};
+    return hit ? hit.v : '';
+  }
+
+  /* The plain state under a name when there is no reason to look: no comment, or not yet approved. */
+  function basic(sid) {
+    var r = getStudentTermRating(rq.cid(), sid, rq.termId()) || {};
     if (!rq.plainComment(r.narrative || '').trim()) return 'No Comment';
     return r.approvedAt ? '' : 'Needs Approval';
   }
@@ -143,5 +146,5 @@ window.ReportWcLook = (function () {
     _queue = [];
   }
 
-  return { configure: configure, reason: reason, reset: reset };
+  return { configure: configure, reason: reason, basic: basic, reset: reset };
 })();

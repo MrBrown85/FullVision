@@ -826,7 +826,7 @@ window.ReportQuestionnaire = (function () {
       var ok = _approved(sid);
       var flag = ok && _flagged(sid);
       return {
-        sub: why[sid] || '',
+        sub: why[sid] || ReportWcLook.basic(sid),
         mark: flag
           ? '<span class="student-row-mark flag" role="img" aria-label="Approved, Something Changed" title="Approved, but a sentence no longer matches the gradebook or your class settings. Open the student to see what changed.">●</span>'
           : ok

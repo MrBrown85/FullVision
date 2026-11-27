@@ -182,7 +182,12 @@ function questionnaire(cid, students, ctx, out, view, ordinal) {
         claims: RQ.claimChanges(st),
         // Which facts have a Say This follows what Generate has drafted for the class (it remembers the
         // stories it has told), like the draft itself; the screen is kept without those buttons.
-        screen: RQ.renderTermQuestionnaire(cid).replace(/<button[^>]*data-do="wcSay"[^>]*>[^<]*<\/button>/g, ''),
+        screen: RQ.renderTermQuestionnaire(cid)
+          .replace(/<button[^>]*data-do="wcSay"[^>]*>[^<]*<\/button>/g, '')
+          .replace(
+            /<span class="wc-chip">No Sentence Yet<\/span><button[^>]*data-do="wcWrite"[^>]*>[^<]*<\/button>/g,
+            '',
+          ),
       });
     });
   });

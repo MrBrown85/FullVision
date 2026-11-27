@@ -112,6 +112,8 @@ window.ReportWcDraw = (function () {
     return tag + main + rightOf(f) + sayButton(f) + extraHtml(f).join('');
   }
   function sayButton(f) {
+    if (f.writeBox)
+      return `<span class="wc-chip">No Sentence Yet</span><button type="button" class="wc-btn" data-action="tqSentences" data-do="wcWrite" data-box="${esc(f.writeBox)}" title="Write your own sentence for ${esc(f.name)}.">+ Write One</button>`;
     if (!f.sayData) return '';
     var data = Object.keys(f.sayData)
       .map(function (k) {
