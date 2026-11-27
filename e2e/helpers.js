@@ -1629,3 +1629,20 @@ export async function reportPagesStill(page, place) {
     place || null,
   );
 }
+
+/* Class Settings redraws once, a moment after it opens, when the class's other
+   settings have loaded; a press that lands in between is lost. Waits until the
+   Points and Proficiency ruler holds still. */
+export async function waitForRulerStill(page) {
+  await page.locator('#cm-pts-ruler').scrollIntoViewIfNeeded();
+  await (
+    await import('@playwright/test')
+  ).expect
+    .poll(async () => {
+      const a = await page.locator('#cm-pts-step-3').boundingBox();
+      await page.waitForTimeout(150);
+      const b = await page.locator('#cm-pts-step-3').boundingBox();
+      return !!a && !!b && a.x === b.x && a.y === b.y;
+    })
+    .toBe(true);
+}
