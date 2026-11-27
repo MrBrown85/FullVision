@@ -138,6 +138,8 @@ const PRECACHE_URLS = [
   '/s/send.css',
   '/s/send-note.js',
   '/s/keyboard-settle.js',
+  '/s/home-screen-card.js',
+  '/s/home-screen-card.css',
   '/s/send.js',
   '/s/feedback.js',
   '/s/handouts.js',
