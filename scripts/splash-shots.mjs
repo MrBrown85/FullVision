@@ -104,92 +104,6 @@ async function openPreview(page, base) {
   await pause(page, 1500);
 }
 
-// A made-up class scan for Split the Scan: one Chemical Reactions Lab page
-// per student, in class-list order, each with the student's name written at
-// the top, printed to a PDF the way a photocopier sends one.
-const SCAN_NAMES = [
-  'Cece A.',
-  'Noor A.',
-  'Hannah B.',
-  'Sam B.',
-  'Liam C.',
-  'Mateo C.',
-  'Ethan D.',
-  'Caleb F.',
-  'Jas G.',
-  'Fatima H.',
-  'Tessa I.',
-  'Anisa J.',
-  'Priya K.',
-  'Jordan K.',
-  'Ines L.',
-  'Marcus L.',
-  'Leo M.',
-  'Amara O.',
-  'Sofia P.',
-  'Tyler R.',
-  'Aiden S.',
-  'Olivia T.',
-  'Darius T.',
-  'Raj V.',
-  'Maya W.',
-  'Mei W.',
-  'Liv Z.',
-];
-async function classScan(page) {
-  const rows = [
-    ['Baking soda + vinegar', 'fizzing, bubbles, cold'],
-    ['Steel wool + vinegar', 'turned brown after a day'],
-    ['Milk + lemon juice', 'lumps formed'],
-    ['Candle burning', 'wax melted, smoke'],
-  ];
-  const said = [
-    'New stuff forms, so it is chemical. Melting wax is physical.',
-    'Gas and a colour change mean a new substance.',
-    'The bubbles were a gas we did not start with.',
-    'Rust is a new substance. It can not go back.',
-  ];
-  const sheet = (name, i) =>
-    '<section style="page-break-after:always;width:8.5in;height:11in;box-sizing:border-box;padding:.7in .8in;' +
-    'background:#fdfcf7 repeating-linear-gradient(#fdfcf7 0 31px,#c9d6e8 31px 32px);font-family:Caveat,cursive;color:#1f3a7a;' +
-    'transform:rotate(' +
-    ((i % 3) - 1) * 0.4 +
-    'deg)">' +
-    '<div style="font-size:26px">Name: <b style="font-size:36px">' +
-    name +
-    '</b></div>' +
-    '<div style="font-size:38px"><b>Chemical Reactions Lab</b></div>' +
-    '<div style="font-size:26px;margin-top:6px">Purpose: tell a chemical change from a physical change.</div>' +
-    '<table style="font-size:25px;margin-top:26px;width:100%">' +
-    rows
-      .map(
-        (r, k) =>
-          '<tr><td style="padding:6px 0;width:50%">' +
-          r[0] +
-          '</td><td>' +
-          (k === (i + 1) % 4 ? r[1].split(',')[0] : r[1]) +
-          '</td></tr>',
-      )
-      .join('') +
-    '</table><div style="font-size:30px;margin-top:30px;text-decoration:underline">Chemical or physical?</div>' +
-    '<div style="font-size:25px;line-height:32px;margin-top:6px">' +
-    said[i % 4] +
-    '</div></section>';
-  const printer = await page.context().newPage();
-  await printer.setContent(
-    '<!doctype html><html><head><link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap" rel="stylesheet">' +
-      '<style>@page{size:8.5in 11in;margin:0}body{margin:0}</style></head><body>' +
-      SCAN_NAMES.map(sheet).join('') +
-      '</body></html>',
-    { waitUntil: 'networkidle' },
-  );
-  await printer.evaluate(() => document.fonts.ready);
-  const out = join(TMP, 'class-scan.pdf');
-  await printer.pdf({ path: out, width: '8.5in', height: '11in', printBackground: true });
-  await printer.close();
-  return out;
-}
-
 const SHOTS = [
   {
     file: 'grader.jpg',
@@ -261,29 +175,29 @@ const SHOTS = [
     },
   },
   {
-    file: 'add-work.jpg',
+    file: 'write-comments.jpg',
     async run(page, base) {
-      await studentPageOn(page, base);
-      const scan = await classScan(page);
-      await page.goto(base + '/assignments');
-      await pause(page, 1500);
-      await page.evaluate(() => {
-        const head = [...document.querySelectorAll('.assess-header[data-aid]')].find(e =>
-          /Chemical Reactions Lab/.test(e.textContent),
-        );
-        document.querySelector('[data-action=openAddWorkClass][data-aid="' + head.dataset.aid + '"]').click();
-      });
-      await pause(page, 1500);
-      const [chooser] = await Promise.all([
-        page.waitForEvent('filechooser'),
-        page.getByRole('button', { name: /Split a Scan/ }).click(),
-      ]);
-      await chooser.setFiles(scan);
-      await page.getByRole('button', { name: 'Class List Order' }).waitFor({ timeout: 30000 });
-      await pause(page, 4000);
-      await page.getByRole('button', { name: 'Class List Order' }).click();
+      // Write Comments on Cece: her six work habits rated, then the comment
+      // generated again from her whole record.
+      await page.goto(base + '/reports?tab=questionnaire');
+      await page.locator('.qn-hs[role=slider]').first().waitFor({ timeout: 15000 });
+      await pause(page, 1200);
+      const habits = [4, 3, 4, 3, 3, 4];
+      for (let i = 0; i < habits.length; i++) {
+        const slider = page.locator('.qn-hs[role=slider]').nth(i);
+        await slider.focus();
+        await page.keyboard.press('End');
+        for (let k = habits[i]; k < 4; k++) await page.keyboard.press('ArrowLeft');
+        await pause(page, 300);
+      }
+      await page
+        .getByRole('button', { name: /^Generate/ })
+        .first()
+        .click();
+      // Its Undo toast, gone before the picture.
+      await page.locator('#undo-toast').waitFor({ state: 'detached', timeout: 15000 });
       await page.mouse.move(0, 0);
-      await pause(page, 1500);
+      await pause(page, 800);
       return { clip: [0, 0, W, H] };
     },
   },
@@ -364,15 +278,38 @@ const SHOTS = [
     },
   },
   {
-    file: 'phone-app.jpg',
+    file: 'student-bulletins.jpg',
+    async run(page, base) {
+      await openPreview(page, base);
+      await page.locator('.ps-screen').getByText('Bulletins', { exact: true }).last().click();
+      await pause(page, 1500);
+      return page.locator('.ps-screen');
+    },
+  },
+  {
+    file: 'teacher-students.jpg',
     width: 390,
     height: 844,
     async run(page, base) {
       if (!/teacher-mobile/.test(page.url())) await page.goto(base + '/teacher-mobile/');
+      await pause(page, 2000);
+      return { clip: [0, 0, 390, 844] };
+    },
+  },
+  {
+    file: 'teacher-grade.jpg',
+    width: 390,
+    height: 844,
+    async run(page, base) {
+      // The phone's grader on the first sent piece, scored Proficient.
+      if (!/teacher-mobile/.test(page.url())) await page.goto(base + '/teacher-mobile/');
       await pause(page, 1500);
-      // Observe: the day's notes, not the competency table.
-      await page.getByText('Observe', { exact: true }).last().click();
-      await pause(page, 1200);
+      await page.locator('.m-tab-item[data-tab=grade]').click();
+      await pause(page, 1000);
+      await page.locator('.m-tg-pill').first().click();
+      await pause(page, 1800);
+      await page.locator('.m-level-btn[aria-label="3, Proficient"]:visible').first().click();
+      await pause(page, 1500);
       return { clip: [0, 0, 390, 844] };
     },
   },
@@ -427,7 +364,7 @@ try {
         path: png,
         animations: 'disabled',
         caret: 'hide',
-        style: '.tb-demo-pill { display: none !important; }',
+        style: '.tb-demo-pill { display: none !important; } .m-tabbar-demo { visibility: hidden !important; }',
       };
       if (target && typeof target.screenshot === 'function') {
         await target.first().screenshot(opts);
