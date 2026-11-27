@@ -13,6 +13,10 @@
  *    student Overview pictures the grade"): calc.js gradeOverYear gives the
  *    grade on each day; the line has one point a day work counted, then
  *    today; All Your Work shows each piece's feedback without a click.
+ * 4. Your Competencies at a glance (teacher/student-comps.js, DECISIONS
+ *    "Your Competencies at a glance (2026-11-27)"): the strongest and the
+ *    next to work on by name, ranked by the rule the Competencies tab's
+ *    line uses.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -278,5 +282,181 @@ describe('the Overview tab', () => {
     const main = open();
     expect(main.querySelector('.stu-ov-proj')).toBeNull();
     expect(main.querySelector('.stu-ov').textContent).not.toContain('counts as 0');
+  });
+});
+
+/* ── 4. Your Competencies at a glance ────────────────────────── */
+
+describe('Your Competencies at a glance', () => {
+  let doc;
+  const comp = (name, v, n, more) =>
+    Object.assign(
+      {
+        id: name,
+        name,
+        v,
+        n,
+        enough: n > 1,
+        lv: Math.round(v),
+        text: v.toFixed(1),
+        word: ['', 'Emerging', 'Developing', 'Proficient', 'Extending'][Math.round(v)],
+        trend: '',
+        dir: 'none',
+        aids: ['a1'],
+        pieces: 1,
+      },
+      more || {},
+    );
+  const names = list => list.map(x => x.name);
+  const draw = (items, more) => {
+    const scored = items.filter(x => x.v > 0).length;
+    const m = Object.assign({ comps: { items, counts: [], scored, total: items.length }, compFilter: '' }, more || {});
+    doc = parseHTML('<!DOCTYPE html><html><body>' + StudentComps.html(m) + '</body></html>').document;
+    return doc.querySelector('.stu-gp-comps');
+  };
+  const group = (card, label) =>
+    Array.from(card.querySelectorAll('.stu-gp-group')).find(
+      g => g.querySelector('.stu-ov-label').textContent === label,
+    );
+  const bars = g => Array.from(g.querySelectorAll('.stu-gp-tile .stu-gp-name')).map(n => n.textContent);
+
+  it('ranks up to three each way, a third of what has enough scores', () => {
+    const nine = [3.5, 3.4, 3.1, 3.0, 2.9, 2.8, 2.5, 2.3, 2.1].map((v, i) => comp('C' + i, v, 4));
+    const r = StudentComps.rank(nine);
+    expect(names(r.hi)).toEqual(['C0', 'C1', 'C2']);
+    expect(names(r.lo)).toEqual(['C8', 'C7', 'C6']);
+    // Seven with enough: two each way. Twenty-seven: still three.
+    const seven = StudentComps.rank(nine.slice(0, 7));
+    expect([seven.hi.length, seven.lo.length]).toEqual([2, 2]);
+    const many = StudentComps.rank(Array.from({ length: 27 }, (_, i) => comp('M' + i, 1 + i / 10, 3)));
+    expect([many.hi.length, many.lo.length]).toEqual([3, 3]);
+  });
+
+  it('leaves out a competency scored once, and breaks a tie by more scores', () => {
+    const r = StudentComps.rank([
+      comp('Once', 4, 1),
+      comp('Few', 3, 2),
+      comp('Many', 3, 8),
+      comp('Low few', 2, 2),
+      comp('Low many', 2, 9),
+      comp('Mid', 2.5, 3),
+    ]);
+    expect(names(r.hi)).toEqual(['Many']);
+    expect(names(r.lo)).toEqual(['Low many']);
+  });
+
+  it('never shows one level on both sides', () => {
+    // One Extending and six at 3.0: the six cannot be both strongest and next to work on.
+    const r = StudentComps.rank([comp('Top', 4, 3)].concat([5, 4, 3, 2, 6, 7].map((n, i) => comp('P' + i, 3, n))));
+    expect(names(r.hi)).toEqual(['Top']);
+    expect(names(r.lo)).toEqual(['P5', 'P4']);
+    // Every competency at one level: a strongest by more scores, and nothing to work on next.
+    const flat = StudentComps.rank([comp('A', 3, 2), comp('B', 3, 5), comp('C', 3, 4)]);
+    expect(names(flat.hi)).toEqual(['B']);
+    expect(flat.lo).toEqual([]);
+  });
+
+  it('never shows one level, as the class shows it, on both sides', () => {
+    // 3.04 and 2.96 both read "3.0": the lower one is not the next to work on.
+    const close = StudentComps.rank([comp('A', 3.04, 4), comp('B', 2.96, 4)]);
+    expect(names(close.hi)).toEqual(['A']);
+    expect(close.lo).toEqual([]);
+    // Six with enough scores, two each way: "3.0" is taken by the strongest, so only "2.0" is next.
+    const r = StudentComps.rank([3.6, 3.04, 3.0, 2.96, 2.95, 2.0].map((v, i) => comp('C' + i, v, 4)));
+    expect(names(r.hi)).toEqual(['C0', 'C1']);
+    expect(names(r.lo)).toEqual(['C5']);
+  });
+
+  it('gives the Competencies tab the first of each, whatever the ties', () => {
+    runInThisContext(readFileSync('teacher/page-student.js', 'utf-8'), { filename: 'teacher/page-student.js' });
+    const lists = [
+      [],
+      [comp('Once', 4, 1)],
+      [comp('Only', 3, 4)],
+      [comp('A', 3, 2), comp('B', 3, 2), comp('C', 3, 2)],
+      [comp('A', 3, 2), comp('B', 3, 5), comp('C', 2, 5), comp('D', 2, 5)],
+      [comp('A', 3.04, 4), comp('B', 2.96, 4)],
+      [3.5, 3.4, 3.1, 3.0, 2.9, 2.8, 2.5, 2.3, 2.1].map((v, i) => comp('C' + i, v, 4)),
+    ];
+    lists.forEach(list => {
+      const r = StudentComps.rank(list);
+      expect(PageStudent._helpers.cpPick(list)).toEqual({ hi: r.hi[0] || null, lo: r.lo[0] || null });
+    });
+  });
+
+  it('draws the strongest and the next to work on by name, with the level as the class shows it', () => {
+    const items = [3.5, 3.4, 3.1, 3.0, 2.9, 2.8, 2.5, 2.3, 2.1].map((v, i) => comp('Competency ' + i, v, 4));
+    items[0] = comp('Data Recording', 3.5, 4, { dir: 'down', trend: '↓ Down from 4.0', pieces: 2, aids: ['a1', 'a2'] });
+    const card = draw(items);
+    expect(bars(group(card, 'Strongest'))).toEqual(['Data Recording', 'Competency 1', 'Competency 2']);
+    expect(bars(group(card, 'Next to Work On'))).toEqual(['Competency 8', 'Competency 7', 'Competency 6']);
+    const bar = card.querySelector('.stu-gp-tile[data-sec="Data Recording"]');
+    expect(bar.querySelector('.stu-gp-val').textContent).toBe('3.5Extending↓');
+    expect(bar.getAttribute('aria-label')).toBe('Data Recording: 3.5 Extending, ↓ Down from 4.0');
+    expect(bar.getAttribute('data-action')).toBe('stuGpComp');
+    expect(bar.getAttribute('data-aids')).toBe('a1 a2');
+    expect(bar.querySelector('.stu-gp-tip').textContent).toBe('↓ Down from 4.0Show its 2 pieces');
+    // See All opens the Competencies tab.
+    const all = card.querySelector('.stu-gp-all');
+    expect(all.textContent).toBe('See All 9');
+    expect([all.getAttribute('data-action'), all.getAttribute('data-tab')]).toEqual(['stuTab', 'comps']);
+  });
+
+  it('in a Letter class, shows the % and no proficiency word', () => {
+    const pct = (name, v, dir) => comp(name, v, 4, { text: v + '%', word: '', lv: v >= 90 ? 4 : 3, dir });
+    const card = draw([pct('Evidence', 90, 'up'), pct('Perspective', 89, 'none'), pct('Inquiry', 83, 'down')]);
+    expect(bars(group(card, 'Strongest'))).toEqual(['Evidence']);
+    expect(bars(group(card, 'Next to Work On'))).toEqual(['Inquiry']);
+    expect(card.querySelector('.stu-gp-tile[data-sec="Evidence"] .stu-gp-val').textContent).toBe('90%↑');
+    expect(card.querySelector('.stu-gp-tile[data-sec="Inquiry"]').getAttribute('aria-label')).toBe('Inquiry: 83%');
+    expect(card.querySelector('.stu-gp-seg')).toBeNull();
+  });
+
+  it('marks the competency All Your Work is narrowed to', () => {
+    const items = [3.5, 3.0, 2.1].map((v, i) => comp('C' + i, v, 4));
+    const card = draw(items, { compFilter: 'C0' });
+    const on = card.querySelector('.stu-gp-tile[aria-pressed="true"]');
+    expect(on.getAttribute('data-sec')).toBe('C0');
+    expect(on.querySelector('.stu-gp-tip').textContent).toBe('Show all work');
+  });
+
+  it('keeps how the levels split above the names', () => {
+    const items = [3.5, 3.0, 2.1].map((v, i) => comp('C' + i, v, 4));
+    const m = {
+      comps: {
+        items,
+        counts: [
+          { lv: 4, n: 1, name: 'Extending' },
+          { lv: 3, n: 2, name: 'Proficient' },
+        ],
+        scored: 3,
+        total: 3,
+      },
+      compFilter: '',
+    };
+    const card = parseHTML(
+      '<!DOCTYPE html><html><body>' + StudentComps.html(m) + '</body></html>',
+    ).document.querySelector('.stu-gp-comps');
+    expect(card.querySelector('.stu-gp-seg').getAttribute('aria-label')).toBe('1 Extending, 2 Proficient');
+    expect(Array.from(card.querySelectorAll('.stu-gp-seg-part')).map(p => p.textContent)).toEqual(['1', '2']);
+  });
+
+  it('with each competency scored once, shows what is assessed so far and ranks nothing', () => {
+    const card = draw([comp('Comprehension', 3, 1), comp('Not Yet', 0, 0), comp('Writing Process', 2, 1)]);
+    expect(group(card, 'Strongest')).toBeUndefined();
+    expect(bars(group(card, 'Assessed So Far'))).toEqual(['Comprehension', 'Writing Process']);
+    expect(card.querySelector('.stu-gp-all').textContent).toBe('See All 3');
+  });
+
+  it('with nothing assessed, is one line', () => {
+    const card = draw([comp('A', 0, 0), comp('B', 0, 0)]);
+    expect(card.querySelector('.stu-gp-sub').textContent).toBe('None of 2 assessed yet');
+    expect(card.querySelector('.stu-gp-tile, .stu-gp-all, .stu-gp-groups')).toBeNull();
+  });
+
+  it('escapes a competency name a teacher typed', () => {
+    const card = draw([comp('<img src=x onerror=1>', 3, 1)]);
+    expect(card.querySelector('img')).toBeNull();
+    expect(card.querySelector('.stu-gp-name').textContent).toBe('<img src=x onerror=1>');
   });
 });

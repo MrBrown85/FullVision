@@ -149,7 +149,7 @@
   "teacher/page-observations.js": 1130,
   "teacher/page-reports.js": 2228,
   "teacher/page-starters.js": 412,
-  "teacher/page-student.js": 3132,
+  "teacher/page-student.js": 3115,
   "teacher/preview-student.js": 1150,
   "teacher/question-cards.js": 548,
   "teacher/quiz-builder.js": 1466,
@@ -173,7 +173,7 @@
   "teacher/scan-labels.js": 589,
   "teacher/student-cards.js": 1589,
   "teacher/student-evidence.js": 955,
-  "teacher/student-overview.js": 524,
+  "teacher/student-overview.js": 422,
   "teacher/student-page-students.js": 1157,
   "teacher/ui.js": 2807
 }

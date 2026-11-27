@@ -523,6 +523,15 @@ textarea.bulletin-field {
   object-fit: cover;
   display: block;
 }
+/* A page still on its way (_loadPictures sets its source once the address is
+   ready): the plain grey box, not the browser's broken-picture mark and alt
+   text (Colin, Nov 16; the same rule as img[data-work-pic] in styles.css). */
+.bulletin-thumb:not([src]) {
+  content: url('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+  background: #eceef2;
+  color: transparent;
+  font-size: 0;
+}
 .bulletin-thumb-more {
   align-self: center;
   font-size: var(--text-sm);

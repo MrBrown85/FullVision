@@ -113,6 +113,7 @@
     "teacher/dash-tile-redraw.js",
     "teacher/dash-next-report.js",
     "teacher/report-one-zoom.js",
+    "teacher/student-comps.js",
     "teacher/student-overview.js",
     "teacher/student-page-students.js",
     "teacher/report-one-head.js",
