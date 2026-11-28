@@ -2,7 +2,7 @@
    "Teacher: Preview as Student").
 
    The teacher sees one student's page as that student sees it, on a Phone
-   or a Chromebook, with what the student sees and does not see beside it.
+   or a Chromebook, in a dialog over the page.
    Opened from Class Settings › Student Page (teacher/cm-student-page.js),
    which has the tab only for a class whose student page is on (the build
    switch).
@@ -37,7 +37,6 @@ window.PreviewStudent = (function () {
   var _onKey = null;
   var _onLeave = null;
 
-  var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
   // What a student reads when their card does not open their page (s/student.js, card_closed).
   var CLOSED_LINE = 'The student page is turned off for this class. Ask your teacher.';
 
@@ -395,118 +394,10 @@ window.PreviewStudent = (function () {
     StudentQuizView.refresh(screen, _quizCtx(built.view, quiz));
   }
 
-  /* ── The two lists ─────────────────────────────────────────── */
-
-  function _item(title, line) {
-    return (
-      '<li class="ps-item"><span class="ps-item-title">' +
-      esc(title) +
-      '</span><span class="ps-item-line">' +
-      esc(line) +
-      '</span></li>'
-    );
-  }
-
-  // How many of this student's grades wait as drafts: the cells a screen shows as Draft (GradeState.stateOf).
-  function _draftsFor(cid, sid) {
-    if (typeof GradeState === 'undefined') return 0;
-    return (getAssignedAssessments(cid) || []).filter(function (a) {
-      return a && GradeState.stateOf(cid, sid, a.id) === GradeState.DRAFT;
-    }).length;
-  }
-
-  /* The teacher's Mark Up the student sees: the notes on returned work,
-     over every piece the student was given marks on ("3 notes on his
-     work", the board's, by the student's name here), or null. */
-  function _marksSeen(view) {
-    var pages = 0;
-    var notes = 0;
-    ((view && view.work) || []).forEach(function (p) {
-      if (p && p.marks) {
-        pages += p.marks.pages;
-        notes += p.marks.notes;
-      }
-    });
-    return pages ? { pages: pages, notes: notes } : null;
-  }
-
-  /* Whether any returned piece came back with words from the teacher: the
-     piece's comment, or a comment on one of its competencies or rubric
-     criteria (shared/student-view.js sets them only from a returned grade). */
-  function _commentsSeen(view) {
-    function said(row) {
-      return !!(row && row.comment);
-    }
-    return ((view && view.work) || []).some(function (p) {
-      return !!p && (said(p) || (p.competencies || []).some(said) || ((p.rubric && p.rubric.rows) || []).some(said));
-    });
-  }
-
-  function _seesHtml(first, cid, view) {
-    var marks = _marksSeen(view);
-    return (
-      '<section class="ps-card" aria-labelledby="ps-sees-title"><h3 class="ps-card-title" id="ps-sees-title">' +
-      esc(first + ' Sees') +
-      '</h3><ul class="ps-items">' +
-      _item(
-        'Your Result',
-        'Each returned piece, in this class’s grading style (' + STYLE_NAMES[courseGradeMode(cid)] + ').',
-      ) +
-      (StudentView.learningOn(cid, _open && _open.sid) || (_open && _open.learning)
-        ? _item('My Learning', 'Their grade, only from work you’ve returned.')
-        : '') +
-      (_commentsSeen(view) ? _item('Your comment and criterion comments', 'Word for word, as you wrote them.') : '') +
-      (marks
-        ? _item(
-            marks.notes
-              ? (marks.notes === 1 ? '1 note' : marks.notes + ' notes') + ' on ' + first + '’s work'
-              : 'Your Mark Up',
-            marks.notes ? 'Your Mark Up, on the photos.' : 'On the photos of work you’ve returned.',
-          )
-        : '') +
-      '</ul></section>'
-    );
-  }
-
-  // Why the grade is not shown: the class's switch, or this one student's Hide (per-student options).
-  function _gradeOffLine(first, cid, sid) {
-    var own = typeof getStudentPageOptions === 'function' ? getStudentPageOptions(cid)[sid] : null;
-    if (own && own.show_overall_grade === 'hide') {
-      return 'Show Overall Grade is off for ' + first + '. Change it in Class Settings › Student Page.';
-    }
-    return 'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.';
-  }
-
   // True when this student's page is paused (per-student options).
   function _pausedFor(cid, sid) {
     var own = typeof getStudentPageOptions === 'function' ? getStudentPageOptions(cid)[sid] : null;
     return !!(own && own.paused_at);
-  }
-
-  function _notSeenHtml(first, cid, sid, ready) {
-    var n = ready ? _draftsFor(cid, sid) : 0;
-    var drafts =
-      'Drafts never reach the student page.' +
-      (n === 1
-        ? ' 1 grade is waiting for you to return it.'
-        : n > 1
-          ? ' ' + n + ' grades are waiting for you to return them.'
-          : '');
-    return (
-      '<section class="ps-card" aria-labelledby="ps-not-title"><h3 class="ps-card-title" id="ps-not-title">' +
-      esc(first + ' Doesn’t See') +
-      '</h3><ul class="ps-items">' +
-      _item('Grades you haven’t returned', drafts) +
-      _item('Other students', 'No class average, no one else’s work.') +
-      _item('Your private notes', 'Observations marked Private stay with you.') +
-      (StudentView.learningOn(cid, sid) || (_open && _open.learning)
-        ? ''
-        : _item('Their grade', _gradeOffLine(first, cid, sid))) +
-      (_pausedFor(cid, sid)
-        ? _item('Their page', 'Paused. ' + first + '’s card doesn’t open it until you choose Open.')
-        : '') +
-      '</ul></section>'
-    );
   }
 
   /* ── The preview ───────────────────────────────────────────── */
@@ -531,9 +422,7 @@ window.PreviewStudent = (function () {
       .map(function (d) {
         var on = d === device;
         return (
-          '<button type="button" class="ps-seg-btn' +
-          (on ? ' active' : '') +
-          '" role="radio" aria-checked="' +
+          '<button type="button" class="seg-btn" role="radio" aria-checked="' +
           on +
           '" data-ps-device="' +
           d +
@@ -544,23 +433,18 @@ window.PreviewStudent = (function () {
       })
       .join('');
     return (
-      '<div class="ps-bar">' +
+      '<div class="ps-dialog">' +
+      '<div class="ps-head">' +
       '<h2 class="ps-title" id="ps-title">' +
       esc('Previewing as ' + full) +
       '</h2>' +
-      '<span class="ps-bar-line" id="ps-line">' +
-      esc('This is ' + first + '’s page now. Nothing is sent.') +
-      '</span>' +
-      '<span class="ps-bar-space"></span>' +
-      '<div class="ps-seg" role="radiogroup" aria-label="Device">' +
+      '<span class="ps-head-space"></span>' +
+      '<div class="seg" role="radiogroup" aria-label="Device">' +
       seg +
       '</div>' +
-      '<button type="button" class="ps-back" data-ps-close>Back to Class Settings</button>' +
+      '<button type="button" class="ps-close" data-ps-close aria-label="Close">&times;</button>' +
       '</div>' +
       '<div class="ps-body">' +
-      '<div class="ps-side ps-side-left">' +
-      _seesHtml(first, cid, built.ready ? built.view : null) +
-      '</div>' +
       '<div class="ps-stage"><div class="ps-device ps-device-' +
       device +
       '"><div class="ps-screen" aria-label="' +
@@ -568,8 +452,6 @@ window.PreviewStudent = (function () {
       '" role="region">' +
       screen +
       '</div></div></div>' +
-      '<div class="ps-side ps-side-right">' +
-      _notSeenHtml(first, cid, sid, built.ready) +
       '</div>' +
       '</div>'
     );
@@ -623,11 +505,10 @@ window.PreviewStudent = (function () {
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-modal', 'true');
     el.setAttribute('aria-labelledby', 'ps-title');
-    el.setAttribute('aria-describedby', 'ps-line');
     el.addEventListener('click', function (e) {
       var t = e.target && e.target.closest ? e.target : null;
       if (!t) return;
-      if (t.closest('[data-ps-close]')) return close();
+      if (t === el || t.closest('[data-ps-close]')) return close();
       var d = t.closest('[data-ps-device]');
       if (d) return setDevice(d.dataset.psDevice);
       var a = t.closest('.ps-screen [data-act]');
