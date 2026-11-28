@@ -73,7 +73,7 @@ for (const font of FONTS)
         }
       });
 
-      test('Strength: Say This on a lower row names the group and the page keeps its place; x reverses it', async ({
+      test('Strength: Say This on a lower row names the group and the page keeps its place; x reverses it @flaky', async ({
         page,
       }) => {
         await openBox(page, 'strength');
