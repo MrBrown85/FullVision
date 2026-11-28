@@ -7,8 +7,8 @@
  * - The preview draws the student's page from shared/student-view.js
  *   alone: returned grades only, results worded by calc.js. A draft's
  *   words, level and result are nowhere in it.
- * - Phone and Chromebook; Jordan Sees and Jordan Doesn't See.
- * - Back to Class Settings and Escape close it, and the focus goes back to
+ * - Phone and Chromebook.
+ * - Close, the backdrop and Escape close it, and the focus goes back to
  *   Open Preview.
  * - Not loaded draws "Loading this class…"; when the rows load and Class
  *   Settings draws again, the preview draws the page. A redraw for another
@@ -239,17 +239,19 @@ describe('the preview', () => {
     return openPreview();
   }
 
-  it('is a dialog with the board’s bar: who, Nothing is sent, Phone and Chromebook, Back', () => {
+  it('is a dialog: who, Phone and Chromebook on the app’s segmented control, Close, and no side lists', () => {
     const el = openJordan();
     expect(el.getAttribute('role')).toBe('dialog');
     expect(el.getAttribute('aria-modal')).toBe('true');
-    expect(text(el.querySelector('#ps-line'))).toBe('This is Jordan’s page now. Nothing is sent.');
+    expect(el.querySelector('.seg [data-ps-device]')).toBeTruthy();
+    expect(el.querySelector('.ps-card, .ps-side, .ps-bar')).toBeNull();
+    expect(el.textContent).not.toMatch(/Doesn’t See|Nothing is sent/);
     const seg = [...el.querySelectorAll('[data-ps-device]')];
     expect(seg.map(b => [text(b), b.getAttribute('aria-checked')])).toEqual([
       ['Phone', 'true'],
       ['Chromebook', 'false'],
     ]);
-    expect(text(el.querySelector('[data-ps-close]'))).toBe('Back to Class Settings');
+    expect(el.querySelector('[data-ps-close]').getAttribute('aria-label')).toBe('Close');
     expect(doc.activeElement).toBe(el.querySelector('[data-ps-close]'));
   });
 
@@ -340,68 +342,11 @@ describe('the preview', () => {
     expect(screen().querySelector('.sp-logout')).toBeNull();
   });
 
-  it('lists what Jordan sees and doesn’t see, in the board’s words', () => {
+  it('it is a dialog over the page, and the backdrop closes it', () => {
     const el = openJordan();
-    const cards = [...el.querySelectorAll('.ps-card')].map(c => ({
-      title: text(c.querySelector('.ps-card-title')),
-      items: [...c.querySelectorAll('.ps-item')].map(i => [
-        text(i.querySelector('.ps-item-title')),
-        text(i.querySelector('.ps-item-line')),
-      ]),
-    }));
-    expect(cards).toEqual([
-      {
-        title: 'Jordan Sees',
-        items: [
-          ['Your Result', 'Each returned piece, in this class’s grading style (Both).'],
-          ['Your comment and criterion comments', 'Word for word, as you wrote them.'],
-        ],
-      },
-      {
-        title: 'Jordan Doesn’t See',
-        items: [
-          [
-            'Grades you haven’t returned',
-            'Drafts never reach the student page. 2 grades are waiting for you to return them.',
-          ],
-          ['Other students', 'No class average, no one else’s work.'],
-          ['Your private notes', 'Observations marked Private stay with you.'],
-          ['Their grade', 'Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.'],
-        ],
-      },
-    ]);
-  });
-
-  it('leaves out the comments row when nothing returned has a comment', () => {
-    seed(undefined, undefined, true);
-    const titles = [...openJordan().querySelectorAll('.ps-item-title')].map(text);
-    expect(titles).not.toContain('Your comment and criterion comments');
-  });
-
-  it('with My Learning on (or opened from See What They’d See) it is a Sees row, not a Doesn’t See row', () => {
-    const el = openJordan();
-    PreviewStudent.close();
-    expect(el.isConnected).toBe(false);
-    PreviewStudent.open(CID, S1, null, null, { learning: true });
-    const right = text(overlay().querySelector('.ps-side-right'));
-    const sees = [...overlay().querySelectorAll('.ps-side-left .ps-item')].map(li => [
-      text(li.querySelector('.ps-item-title')),
-      text(li.querySelector('.ps-item-line')),
-    ]);
-    expect(right).not.toContain('My Learning');
-    expect(right).not.toContain('Their grade');
-    expect(sees).toContainEqual(['My Learning', 'Their grade, only from work you’ve returned.']);
-  });
-
-  it.each([
-    ['proficiency', 'Proficiency'],
-    ['letter', 'Letter'],
-  ])('names the class’s grading style (%s)', (system, word) => {
-    seed(undefined, system);
-    const el = openJordan();
-    expect(text(el.querySelector('.ps-item-line'))).toBe(
-      'Each returned piece, in this class’s grading style (' + word + ').',
-    );
+    expect(el.querySelector('.ps-dialog')).toBeTruthy();
+    click(el);
+    expect(overlay()).toBeNull();
   });
 
   it('switches between Phone and Chromebook, keeping the focus on the toggle', () => {
@@ -418,7 +363,7 @@ describe('the preview', () => {
     expect(workRows(el)).toHaveLength(3);
   });
 
-  it('Back to Class Settings and Escape close it, and the focus goes back to Open Preview', () => {
+  it('Close, the backdrop and Escape close it, and the focus goes back to Open Preview', () => {
     let el = openJordan();
     click(el.querySelector('[data-ps-close]'));
     expect(overlay()).toBeNull();
@@ -480,8 +425,6 @@ describe('a signed-in class whose Draft and Returned rows have not loaded', () =
     expect(text(el.querySelector('.ps-waiting'))).toBe('Loading this class…');
     expect(el.querySelectorAll('.sp-piece, .sp-ml-row').length).toBe(0);
     expect(el.innerHTML).not.toMatch(SECRET);
-    // No draft count is said while the rows are not known.
-    expect(text(el.querySelectorAll('.ps-item-line')[1])).toBe('Drafts never reach the student page.');
     _loadGradeReturns(CID, structuredClone(_cache.gradeReturns[CID] || {}));
     CmStudentPage.render(CID);
     expect(overlay().querySelectorAll('.ps-screen .sp-deck .sp-piece').length).toBe(1);
@@ -545,14 +488,9 @@ describe('S9-F3: See Your Work in the preview, from the marks the student was gi
     click(screen().querySelector('.sp-ml-row[data-act="feedback"][data-piece="essay"]'));
   }
 
-  it('Jordan Sees names the notes; Your Feedback has See Your Work; it opens the page with the marks', async () => {
+  it('Your Feedback has See Your Work; it opens the page with the marks', async () => {
     stubMarkup();
     openEssayFeedback();
-    const sees = [...overlay().querySelectorAll('.ps-side-left .ps-item')].map(li => [
-      text(li.querySelector('.ps-item-title')),
-      text(li.querySelector('.ps-item-line')),
-    ]);
-    expect(sees).toContainEqual(['1 note on Jordan’s work', 'Your Mark Up, on the photos.']);
     expect(text(screen().querySelector('.sp-fb-work-line'))).toBe('1 page · 1 note on your work');
     click(screen().querySelector('[data-act="work"]'));
     await vi.waitFor(() => expect(screen().querySelector('.sp-work-img')).toBeTruthy());
