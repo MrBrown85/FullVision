@@ -99,9 +99,10 @@ test('Name Your Class: the Letter description, Reporting Terms and Counts As for
   await expect(page.locator('.cw-set-row', { hasText: 'Reporting Terms' })).toContainText(
     'Grandview Heights Secondary, 4 terms',
   );
-  await page.getByRole('button', { name: 'Show Reporting Terms' }).click();
-  await expect(page.locator('.cw-set-panel')).toContainText('Term 1 Sep 8 – Nov 27');
-  await expect(page.locator('.cw-set-panel')).toContainText('Change them in Reporting Terms once the class is made.');
+  // Change opens Class Settings' own Reporting Terms section (2026-11-27).
+  await page.getByRole('button', { name: 'Change Reporting Terms' }).click();
+  await expect(page.locator('.cw-set-panel .cm-term-tile').first()).toContainText('Sep 8 – Nov 27');
+  await expect(page.locator('.cw-set-panel')).not.toContainText('once the class is made');
   await expect(page.locator('.cw-set-row', { hasText: 'Counts As' })).toContainText('BC Letter Bands');
 });
 

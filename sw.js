@@ -265,6 +265,7 @@ const PRECACHE_URLS = [
   '/teacher/cm-std-help.js',
   '/teacher/cm-keep-draw.js',
   '/teacher/cm-keep-menu.js',
+  '/teacher/cm-terms-start.js',
   '/teacher/cm-terms.js',
   '/teacher/cm-grading-bars.js',
   '/teacher/cm-pts-model.js',

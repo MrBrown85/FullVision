@@ -2635,6 +2635,11 @@ a.dash-ins-name:hover {
 .cw-set-panel {
   padding: 0 0 14px;
 }
+/* New Class › Reporting Terms is Class Settings' section in a narrower
+   column: a term's name gives way so its dates and ✕ stay in the row. */
+.cw-set-panel .cm-term-label {
+  min-width: 0;
+}
 .cw-set-panel .cw-cc-course {
   margin-top: 12px;
   border: 1px solid var(--divider-subtle);
@@ -7676,11 +7681,6 @@ button.rb-v-prompt {
   color: var(--text);
   font-size: var(--text-sm);
   line-height: 1.45;
-}
-.cw-grading-rows > .cm-folder-count-row:first-child {
-  border-top: 0;
-  margin-top: 0;
-  padding-top: 0;
 }
 
 /* Competency list: each card's name with its wording's first line under it

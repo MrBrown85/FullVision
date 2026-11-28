@@ -14,7 +14,10 @@
    a teacher makes their own set of terms without picking a school. It
    starts from a copy of the class's dates, saves on the course row like any
    terms (no new table), and other classes reuse it through Dates From's
-   Your Classes and Save's Also Use In. */
+   Your Classes and Save's Also Use In.
+
+   New Class (2026-11-27) draws this same section for the class being made,
+   under teacher/cm-terms-start.js's draft key (useDraft). */
 window.CmTerms = (function () {
   'use strict';
 
@@ -27,7 +30,24 @@ window.CmTerms = (function () {
     _host = opts;
   }
   function renderClassManager() {
-    if (_host) _host.renderClassManager();
+    if (_draft && _draft.active()) _draft.redraw();
+    else if (_host) _host.renderClassManager();
+  }
+  /* The New Class wizard's class, not made yet (teacher/cm-terms-start.js):
+     its terms are kept under the draft's key until Create Class saves them.
+     opening() is told before Edit Dates or Create New opens the editor, and
+     restore() puts back what was shown then, on Cancel. */
+  /** @type {{ key: string, active: () => boolean, saved: () => any[], redraw: () => void, changed: () => void, opening: (isNew?: boolean) => void, restore: () => void, currentLabel: () => string } | null} */
+  var _draft = null;
+  function useDraft(d) {
+    _draft = d;
+  }
+  function _isDraft(cid) {
+    return !!_draft && cid === _draft.key;
+  }
+  // The terms a class has saved; for the class being made, the ones it starts with.
+  function _cmSaved(cid) {
+    return _draft && cid === _draft.key ? _draft.saved() : getReportingTerms(cid);
   }
   /**
    * @param {Function} fn
@@ -35,7 +55,7 @@ window.CmTerms = (function () {
    */
   function _entry(fn) {
     return function () {
-      cmSelectedCourse = _host ? _host.selectedCourse() : null;
+      cmSelectedCourse = _draft && _draft.active() ? _draft.key : _host ? _host.selectedCourse() : null;
       return fn.apply(this, arguments);
     };
   }
@@ -49,7 +69,7 @@ window.CmTerms = (function () {
 
   function _cmTermRows(cid) {
     if (!_cmTermState[cid]) {
-      var saved = getReportingTerms(cid);
+      var saved = _cmSaved(cid);
       _cmTermState[cid] = {
         rows: saved.map(function (t) {
           return { ordinal: t.ordinal, label: t.label, starts_on: t.starts_on, ends_on: t.ends_on };
@@ -63,39 +83,9 @@ window.CmTerms = (function () {
     return _cmTermState[cid];
   }
 
-  // The school year a class is in: September of this year from August on,
-  // else September of last year.
-  function _cmSchoolYearStart(cid) {
-    var today = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
-    var y = parseInt(today.slice(0, 4), 10);
-    var m = parseInt(today.slice(5, 7), 10);
-    return m >= 8 ? y : y - 1;
-  }
-
-  var _CM_TERM_PRESETS = {
-    quarters: [
-      ['Term 1', '09-01', '11-15', 0, 0],
-      ['Term 2', '11-16', '01-31', 0, 1],
-      ['Term 3', '02-01', '04-15', 1, 1],
-      ['Term 4', '04-16', '06-30', 1, 1],
-    ],
-    trimesters: [
-      ['Term 1', '09-01', '11-30', 0, 0],
-      ['Term 2', '12-01', '03-15', 0, 1],
-      ['Term 3', '03-16', '06-30', 1, 1],
-    ],
-    semesters: [
-      ['Term 1', '09-01', '01-31', 0, 1],
-      ['Term 2', '02-01', '06-30', 1, 1],
-    ],
-  };
-
-  function _cmTermPresetRows(cid, name) {
-    var y = _cmSchoolYearStart(cid);
-    return (_CM_TERM_PRESETS[name] || []).map(function (p, i) {
-      return { ordinal: i + 1, label: p[0], starts_on: y + p[3] + '-' + p[1], ends_on: y + p[4] + '-' + p[2] };
-    });
-  }
+  // The generic layouts (4 Terms, 3 Terms, 2 Semesters): teacher/cm-terms-start.js.
+  var _CM_TERM_PRESETS = CmTermsStart.LAYOUTS;
+  var _cmTermPresetRows = CmTermsStart.layoutRows;
 
   /* The whole-year terms the class's rows were cut from: a Surrey school's
      preset or a generic one, matched term by term on number and dates. Null
@@ -220,6 +210,7 @@ window.CmTerms = (function () {
     if (strip) strip.innerHTML = _cmTermStripHtml(rows);
     var kept = document.getElementById('cm-term-kept-' + cid);
     if (kept) kept.innerHTML = _cmTermKeptHtml(cid);
+    if (_isDraft(cid) && _draft) _draft.changed();
   }
 
   /* ── The year strip ─────────────────────────────────────────
@@ -328,7 +319,7 @@ window.CmTerms = (function () {
   function _cmTermKeptHtml(cid) {
     var counts = _cmTermSavedReportCounts(cid);
     var draft = normalizeTermOrdinals(_cmTermRows(cid).rows);
-    var saved = getReportingTerms(cid);
+    var saved = _cmSaved(cid);
     var lines = [];
     Object.keys(counts).forEach(function (k) {
       var n = Number(k);
@@ -419,7 +410,7 @@ window.CmTerms = (function () {
      class has (not a school's, which the school stands for), listed once
      with the classes that share it. */
   function _cmTermOwnSets(cid) {
-    var mine = _cmTermSignature(getReportingTerms(cid));
+    var mine = _cmTermSignature(_cmSaved(cid));
     var seen = {};
     var sets = [];
     _cmTermOtherClasses(cid).forEach(function (c) {
@@ -640,14 +631,13 @@ window.CmTerms = (function () {
     { value: 'blank', label: 'Blank' },
   ];
 
-  // html-safe: values and labels are the fixed list above.
+  // html-safe: values and labels are the fixed list above; the draft's label goes through esc.
   function _cmRenderTermStart(cid) {
     var on = _cmTermStart[cid] || 'current';
-    var choices = getReportingTerms(cid).length
-      ? _CM_TERM_STARTS
-      : _CM_TERM_STARTS.filter(function (c) {
-          return c.value !== 'current';
-        });
+    var current = _draft && cid === _draft.key ? _draft.currentLabel() : '';
+    var choices = _CM_TERM_STARTS.filter(function (c) {
+      return c.value !== 'current' || _cmSaved(cid).length;
+    });
     return (
       '<div class="cm-term-start" role="group" aria-label="Start With"><span class="cm-term-span-label">Start With</span>' +
       choices
@@ -660,7 +650,7 @@ window.CmTerms = (function () {
             '" data-action="cmTermPreset" data-value="' +
             c.value +
             '">' +
-            c.label +
+            esc((c.value === 'current' && current) || c.label) +
             '</button>'
           );
         })
@@ -671,7 +661,7 @@ window.CmTerms = (function () {
 
   // html-safe: class names go through esc; ids are the course keys, escaped.
   function _cmRenderTermAlso(cid) {
-    var others = _cmTermOtherClasses(cid);
+    var others = _isDraft(cid) ? [] : _cmTermOtherClasses(cid);
     if (!others.length) return '';
     var picked = _cmTermAlso[cid] || {};
     return (
@@ -718,7 +708,7 @@ window.CmTerms = (function () {
       html += _cmRenderTermSpan(cid);
     } else {
       html +=
-        '<label class="cm-label">Reporting Terms</label>' +
+        (_isDraft(cid) ? '' : '<label class="cm-label">Reporting Terms</label>') +
         '<div class="cm-hint" style="margin-bottom:8px">Each term is a report date. Grades build all year: a report shows the year to date as of its term’s end. Up to six. Surrey secondary dates come from each school’s published calendar; a term ends on the day its report is published.</div>';
       html += _cmRenderTermSpan(cid);
       html += _cmRenderSchoolPreset(cid, rows.length > 0);
@@ -788,21 +778,31 @@ window.CmTerms = (function () {
       '">' +
       _cmTermFooterHtml(cid) +
       '</div>' +
-      '<button class="btn btn-primary cm-cat-save" id="cm-term-save-' +
-      cid +
-      '" data-action="cmTermSave"' +
-      (_cmTermCanSave(cid) ? '' : ' disabled') +
-      '>Save Terms</button>' +
+      _cmTermSaveBtn(cid) +
       '</div>' +
-      (getReportingTerms(cid).length || _cmTermOwn[cid] || st.dirty
+      (_cmSaved(cid).length || _cmTermOwn[cid] || st.dirty
         ? '<button type="button" class="cm-add-link cm-term-cancel" data-action="cmTermCancel">Cancel</button>'
         : '') +
       '</div>';
     return html;
   }
 
+  // Save Terms. The class being made has none: Create Class saves its terms.
+  function _cmTermSaveBtn(cid) {
+    if (_isDraft(cid)) return '';
+    var off = _cmTermCanSave(cid) ? '' : ' disabled';
+    return (
+      '<button class="btn btn-primary cm-cat-save" id="cm-term-save-' +
+      cid +
+      '" data-action="cmTermSave"' +
+      off +
+      '>Save Terms</button>'
+    );
+  }
+
   function cmTermEdit() {
     if (!cmSelectedCourse) return;
+    if (_draft && cmSelectedCourse === _draft.key) _draft.opening();
     // A class on its own dates edits them as Your Own Dates, even once
     // every row is removed.
     if (_cmTermOwnMode(cmSelectedCourse)) _cmTermOwn[cmSelectedCourse] = true;
@@ -823,6 +823,7 @@ window.CmTerms = (function () {
   function cmTermCancel() {
     if (!cmSelectedCourse) return;
     _cmTermForget(cmSelectedCourse);
+    if (_draft && cmSelectedCourse === _draft.key) _draft.restore();
     renderClassManager();
   }
 
@@ -831,16 +832,17 @@ window.CmTerms = (function () {
   function cmTermNew() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
+    if (_draft && cid === _draft.key) _draft.opening(true);
     _cmTermOwn[cid] = true;
     _cmTermEditing[cid] = true;
     delete _cmTermSchool[cid];
-    _cmTermUseStart(cid, getReportingTerms(cid).length ? 'current' : 'quarters');
+    _cmTermUseStart(cid, _cmSaved(cid).length ? 'current' : 'quarters');
     renderClassManager();
   }
 
   function _cmTermUseStart(cid, name) {
     var st = _cmTermRows(cid);
-    var saved = getReportingTerms(cid);
+    var saved = _cmSaved(cid);
     _cmTermStart[cid] = name;
     if (name === 'current') {
       st.rows = saved.map(function (t) {
@@ -861,8 +863,9 @@ window.CmTerms = (function () {
      carries only that semester's terms and keeps their school numbers. */
   function _cmRenderTermSpan(cid) {
     var st = _cmTermRows(cid);
-    // Typed terms are the class's own; the choice is for preset terms.
-    if (st.rows.length > 0 && !_cmTermTemplate(cid, st.rows)) return '';
+    // Typed terms are the class's own; the choice is for preset terms. New
+    // Class has its own This Class Runs, which drives the draft's span.
+    if (_isDraft(cid) || (st.rows.length > 0 && !_cmTermTemplate(cid, st.rows))) return '';
     var html =
       '<div class="cm-term-span"><span class="cm-term-span-label" id="cm-term-span-label-' +
       cid +
@@ -988,16 +991,6 @@ window.CmTerms = (function () {
     st.dirty = true;
     delete _cmTermOwn[cid];
     renderClassManager();
-  }
-
-  /* A new class starts with the default Surrey secondary school's terms
-     for the current school year, when the presets cover it: all four for a
-     full-year class, or one semester's two, keeping their numbers. */
-  function _cmDefaultReportingTerms(cid, span) {
-    if (typeof reportingTermPreset !== 'function') return null;
-    var full = reportingTermPreset(null, courseToday(cid));
-    if (!full) return null;
-    return termsInSpan(full, span || 'full', semesterTwoStart(full));
   }
 
   function cmTermAdd() {
@@ -1126,10 +1119,14 @@ window.CmTerms = (function () {
     configure: configure,
     _cmTermState: _cmTermState,
     _cmTermSchool: _cmTermSchool,
+    _cmTermOwn: _cmTermOwn,
+    _cmTermEditing: _cmTermEditing,
+    _cmTermStart: _cmTermStart,
     _cmTermRows: _entry(_cmTermRows),
     _cmTermError: _entry(_cmTermError),
     _cmTermDay: _entry(_cmTermDay),
-    _cmDefaultReportingTerms: _entry(_cmDefaultReportingTerms),
+    useDraft: useDraft,
+    forget: _cmTermForget,
     _cmRenderReportingTermsField: _entry(_cmRenderReportingTermsField),
     handleAction: _entry(handleAction),
     forgetPick: forgetPick,

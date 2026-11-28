@@ -118,7 +118,6 @@
     cwNameInput,
     cwOpenRow,
     cwSelectGrade,
-    cwSetRollup,
     cwSkipToCustom,
     cwToggleCourse,
     cwTogglePreset,
@@ -277,7 +276,6 @@
     if ('cwNameInput' in h) cwNameInput = h.cwNameInput;
     if ('cwOpenRow' in h) cwOpenRow = h.cwOpenRow;
     if ('cwSelectGrade' in h) cwSelectGrade = h.cwSelectGrade;
-    if ('cwSetRollup' in h) cwSetRollup = h.cwSetRollup;
     if ('cwSkipToCustom' in h) cwSkipToCustom = h.cwSkipToCustom;
     if ('cwToggleCourse' in h) cwToggleCourse = h.cwToggleCourse;
     if ('cwTogglePreset' in h) cwTogglePreset = h.cwTogglePreset;
@@ -837,10 +835,6 @@
     }
     if (el.dataset.actionChange === 'cwCompToggle') {
       cwCompToggle(el.dataset.key, el.checked);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cwRollup') {
-      cwSetRollup(el.dataset.key, el.checked);
       return true;
     }
     if (el.dataset.actionChange === 'cmCoursesCountEqually') {

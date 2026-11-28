@@ -83,6 +83,7 @@
     "teacher/cm-keep-draw.js",
     "teacher/cm-keep-menu.js",
     "teacher/focus-back.js",
+    "teacher/cm-terms-start.js",
     "teacher/cm-terms.js",
     "teacher/cm-grading-bars.js",
     "teacher/cm-pts-model.js",
