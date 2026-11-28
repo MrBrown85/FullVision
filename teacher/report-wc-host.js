@@ -120,7 +120,11 @@ window.ReportWcHost = (function () {
     h.factsKey = function () {
       var st = rq.current();
       return st
-        ? [rq.termId(), rq.scoreKey(), JSON.stringify(h.habitsStored(st)), JSON.stringify(h.attendance(st))].join('|')
+        ? [
+            rq.termId(),
+            rq.scoreKey(),
+            JSON.stringify([h.habitsStored(st), h.attendance(st), ReportWcHabits.choiceOf(st)]),
+          ].join('|')
         : '';
     };
     h.sentenceCount = function (t) {
@@ -147,6 +151,10 @@ window.ReportWcHost = (function () {
       if (mark) rq.markAdded(st, mark);
       rq.writeRows(st);
       if (toast) rq.undoToast(st, toast, snap);
+    };
+    // Rows put in place without a save: Generate writes them itself.
+    h.putRows = function (st, rows) {
+      rq.setRows(st, rows, true);
     };
     h.pickPiece = function (st, ri, aid) {
       var snap = rq.snapshot(st);

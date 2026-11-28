@@ -32,6 +32,7 @@ const REPORTS = [
   '/teacher/report-wc-look.js',
   '/teacher/report-wc-boxes-more.js',
   '/teacher/report-wc-boxes.js',
+  '/teacher/report-wc-habits.js',
   '/teacher/report-wc-draw.js',
   '/teacher/report-wc-comment.js',
   '/teacher/report-wc-class.js',

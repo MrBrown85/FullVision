@@ -240,50 +240,11 @@ window.ReportWcBoxes = (function () {
     };
   }
 
-  function habitsBox(env, mine) {
-    var taken = {};
-    var keys = CommentBank.HABITS.map(function (h) {
-      return h.key;
-    });
-    // A sentence sits under the last habit it names.
-    var lastOf = function (row) {
-      var at = -1;
-      keys.forEach(function (k, i) {
-        if (P.has(row, 'habit:' + k)) at = i;
-      });
-      return at;
-    };
-    var facts = CommentBank.HABITS.map(function (h, i) {
-      var lines = takeLines(env, mine, taken, '', function (r) {
-        return lastOf(r) === i;
-      });
-      var v = env.habitValue(h.key);
-      var f = fact({
-        id: 'habit:' + h.key,
-        name: h.name,
-        tip: /** @type {any} */ (h).desc || /** @type {any} */ (h).hint,
-        slider: h.key,
-        val: v ? CommentBank.SCALE[v - 1] : 'Not Rated',
-      });
-      f.lines = lines;
-      return f;
-    });
-    var left = mine.filter(function (x) {
-      return !taken[x.ri];
-    });
-    var more = !mine.length || left.length ? null : candidate(env, 'habits', '', env.ctx);
-    var foot = [];
-    // Under the six ratings, not beside the first, so the six bars line up.
-    if (!mine.length) foot.push(btn('+ Say This About Work Habits', 'wcSay', { box: 'habits', fact: '' }));
-    else if (more) foot.push(btn('+ Say More About Work Habits', 'wcSay', { box: 'habits', fact: '' }));
-    return { facts: facts, head: env.habitsText, foot: foot, top: left.map(env.line) };
-  }
-
   var BUILD = {
     grade: gradeBox,
     best: bestBox,
     strength: strengthBox,
-    habits: habitsBox,
+    habits: (env, mine) => ReportWcHabits.box(env, mine),
     att: M.att,
     voice: M.voice,
     obs: M.obs,
@@ -389,6 +350,7 @@ window.ReportWcBoxes = (function () {
   return {
     build: build,
     candidate: candidate,
+    poolFor: _poolFor,
     ctxFor: ctxFor,
     fact: fact,
     btn: btn,
