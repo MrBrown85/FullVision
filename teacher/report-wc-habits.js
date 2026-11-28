@@ -47,11 +47,11 @@ window.ReportWcHabits = (function () {
   }
   /* Whether the bank wrote this row for one habit slot and the teacher has not
      made it theirs: only such a row is worded again or dropped. */
-  function mine(row) {
+  function habitMine(row) {
     return !!row && !!row.s && !row.edited && !row.kept && !row.earlier && !row.classLine && !!row.prov;
   }
   function slotOf(row) {
-    return mine(row) ? CB().habitChoice.slotOf(row.s) : '';
+    return habitMine(row) ? CB().habitChoice.slotOf(row.s) : '';
   }
   function inBox(env, row) {
     return !env.required(row) && P.boxOf(row, env.isBest(row)) === 'habits';
@@ -61,7 +61,7 @@ window.ReportWcHabits = (function () {
      turned off) while a sentence the teacher wrote, or one the bank wrote
      for something other than one slot, names it. The habits box's rows are
      the `mine` the box is built from: { ri, row }. */
-  function state(mineRows, ratings) {
+  function habitState(mineRows, ratings) {
     var out = {};
     CB().HABITS.forEach(function (h) {
       var held = mineRows.filter(function (x) {
@@ -84,7 +84,7 @@ window.ReportWcHabits = (function () {
 
   /* ── The note when two sentences name one habit ──────────── */
 
-  function entries(rows) {
+  function habitEntries(rows) {
     return rows.map(function (row, ri) {
       return { ri: ri, row: row };
     });
@@ -93,7 +93,7 @@ window.ReportWcHabits = (function () {
   /* { text, buttons } for the first habit two sentences name, when the later
      of them is one the bank wrote; null otherwise. */
   function duplicateNote(rows) {
-    var list = entries(rows).filter(function (x) {
+    var list = habitEntries(rows).filter(function (x) {
       return P.boxOf(x.row, false) === 'habits' && keysOf(x.row).length;
     });
     var hs = CB().HABITS;
@@ -119,7 +119,7 @@ window.ReportWcHabits = (function () {
     var st = H.current();
     if (!st) return;
     var env = mk(st, H.facts(st, true));
-    var held = entries(env.rows).filter(function (x) {
+    var held = habitEntries(env.rows).filter(function (x) {
       return inBox(env, x.row) && keysOf(x.row).indexOf(key) >= 0;
     });
     var gone = held.slice(1).filter(duplicateOf).pop();
@@ -132,7 +132,7 @@ window.ReportWcHabits = (function () {
         return keysOf(r).indexOf(k) >= 0;
       });
     });
-    if (lost.length) save(st, lost, false);
+    if (lost.length) habitSave(st, lost, false);
     H.setRows(
       st,
       env.rows.filter((r, ri) => ri !== gone.ri),
@@ -155,7 +155,7 @@ window.ReportWcHabits = (function () {
     upsertTermRating(H.cid(), st.id, ReportBlocks.getTermId(), { draftMeta: meta });
   }
 
-  function save(st, keys, on) {
+  function habitSave(st, keys, on) {
     var c = CB().habitChoice.of(choiceOf(st));
     keys.forEach(function (k) {
       c.on = c.on.filter(function (x) {
@@ -192,7 +192,7 @@ window.ReportWcHabits = (function () {
      (ri) rewrites it, a part with none gets a new row after the box's last,
      a row whose part is gone goes. Returns { rows, added } or null when the
      bank has no sentence for a part. */
-  function apply(env, st, parts, was) {
+  function habitApply(env, st, parts, was) {
     var rows = env.rows.slice();
     var ctx = env.ctx;
     var added = null;
@@ -251,12 +251,12 @@ window.ReportWcHabits = (function () {
   }
 
   /* A change to one habit's place in the comment: the rows after it, or null. */
-  function change(env, st, key, on) {
+  function habitChange(env, st, key, on) {
     var have = partsOf(env);
     var next = on
       ? CB().habitChoice.add(have.parts, ratingsOf(st), env.f.family || '', key, have.held)
       : CB().habitChoice.remove(have.parts, key);
-    return next ? apply(env, st, next, have.parts) : null;
+    return next ? habitApply(env, st, next, have.parts) : null;
   }
 
   /* The habits the comment names now, in the grid's order. */
@@ -274,25 +274,25 @@ window.ReportWcHabits = (function () {
       });
   }
 
-  function toggle(key, on) {
+  function habitToggle(key, on) {
     var st = H.current();
     if (!st) return;
     var was = choiceOf(st);
     // Every habit the switches show on stays on when Generate writes the comment again.
-    save(
+    habitSave(
       st,
       namedNow(mk(st, H.facts(st, true))).filter(function (k) {
         return k !== key;
       }),
       true,
     );
-    save(st, [key], on);
+    habitSave(st, [key], on);
     var env = mk(st, H.facts(st, true));
     var named = env.rows.some(function (r) {
       return inBox(env, r) && keysOf(r).indexOf(key) >= 0;
     });
     // On when a sentence already names it, or off when none the bank wrote does: only the choice changes.
-    var made = on && named ? { rows: env.rows, added: null } : change(env, st, key, on);
+    var made = on && named ? { rows: env.rows, added: null } : habitChange(env, st, key, on);
     if (!made) {
       saveChoice(st, was);
       return H.nothingFits();
@@ -321,7 +321,7 @@ window.ReportWcHabits = (function () {
         return inBox(env, r) && keysOf(r).indexOf(key) >= 0;
       });
       if (named === on) return;
-      var made = change(env, st, key, on);
+      var made = habitChange(env, st, key, on);
       if (!made) return;
       H.putRows(st, made.rows);
       changed = true;
@@ -336,7 +336,7 @@ window.ReportWcHabits = (function () {
   }
 
   /* The Work Habits box: the six habits with their switches, each sentence under the first habit it names. */
-  function box(env, mine) {
+  function habitBox(env, mine) {
     var taken = {};
     var keys = CommentBank.HABITS.map(function (h) {
       return h.key;
@@ -387,14 +387,14 @@ window.ReportWcHabits = (function () {
   }
 
   return {
-    box: box,
+    box: habitBox,
     choiceOf: choiceOf,
     configure: configure,
-    state: state,
+    state: habitState,
     keysOf: keysOf,
     duplicateNote: duplicateNote,
     removeOne: removeOne,
-    toggle: toggle,
+    toggle: habitToggle,
     reconcile: reconcile,
   };
 })();
