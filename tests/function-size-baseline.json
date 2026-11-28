@@ -454,7 +454,7 @@
   "teacher/cm-std-help.js :: cmShowStdHelp": 144,
   "teacher/cm-students.js :: _cmRosterRowHtml": 56,
   "teacher/cm-students.js :: cmSaveStudent": 89,
-  "teacher/cm-terms.js :: _cmRenderReportingTermsField": 98,
+  "teacher/cm-terms.js :: _cmRenderReportingTermsField": 94,
   "teacher/cm-terms.js :: _cmRenderSchoolPreset": 99,
   "teacher/cm-terms.js :: _cmTermKeptHtml": 56,
   "teacher/cm-terms.js :: _cmTermStripHtml": 73,

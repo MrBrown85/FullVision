@@ -2635,6 +2635,11 @@ a.dash-ins-name:hover {
 .cw-set-panel {
   padding: 0 0 14px;
 }
+/* New Class › Reporting Terms is Class Settings' section in a narrower
+   column: a term's name gives way so its dates and ✕ stay in the row. */
+.cw-set-panel .cm-term-label {
+  min-width: 0;
+}
 .cw-set-panel .cw-cc-course {
   margin-top: 12px;
   border: 1px solid var(--divider-subtle);

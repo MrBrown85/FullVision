@@ -124,7 +124,8 @@
   }
 
   // The Reporting Terms section, as Class Settings draws it.
-  function html() {
+  // html-safe: _cmRenderReportingTermsField escapes every name, id and date.
+  function sectionHtml() {
     return /** @type {any} */ (window).CmTerms._cmRenderReportingTermsField(KEY);
   }
 
@@ -137,23 +138,24 @@
     var value = head && head.querySelector('.cw-set-value');
     if (value) value.textContent = summary();
     var panel = head && head.nextElementSibling;
-    if (redrawPanel === true && panel && panel.classList.contains('cw-set-panel')) panel.innerHTML = html();
+    if (redrawPanel === true && panel && panel.classList.contains('cw-set-panel')) panel.innerHTML = sectionHtml(); // html-safe: Class Settings' own section, escaped there.
     if (_host) _host.changed();
   }
 
   /* This Class Runs changed on step 2. Terms not changed yet start again
-     from the school's for the new span; a school's terms the teacher
-     changed are cut again, as Class Settings cuts them; own dates stay. */
+     from the school's for the new span; another school's terms are cut
+     again, as Class Settings cuts them; the teacher's own dates stay. */
   function spanChanged() {
     var st = /** @type {any} */ (window).CmTerms._cmTermState[KEY];
-    if (st && st.dirty) {
+    var school = st && (!st.rows.length || reportingTermsSchoolMatch(normalizeTermOrdinals(st.rows)));
+    if (st && st.dirty && school) {
       _quiet = true;
       try {
         /** @type {any} */ (window).CmTerms.cmTermSpan(_span());
       } finally {
         _quiet = false;
       }
-    } else if (st) delete (/** @type {any} */ (window).CmTerms._cmTermState[KEY]);
+    } else if (st && !st.dirty) delete (/** @type {any} */ (window).CmTerms._cmTermState[KEY]);
     _refresh(true);
   }
 
@@ -172,7 +174,7 @@
     terms: terms,
     error: error,
     summary: summary,
-    html: html,
+    html: sectionHtml,
     spanChanged: spanChanged,
     reset: reset,
   };

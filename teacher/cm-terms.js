@@ -14,7 +14,10 @@
    a teacher makes their own set of terms without picking a school. It
    starts from a copy of the class's dates, saves on the course row like any
    terms (no new table), and other classes reuse it through Dates From's
-   Your Classes and Save's Also Use In. */
+   Your Classes and Save's Also Use In.
+
+   New Class (2026-11-27) draws this same section for the class being made,
+   under teacher/cm-terms-start.js's draft key (useDraft). */
 window.CmTerms = (function () {
   'use strict';
 

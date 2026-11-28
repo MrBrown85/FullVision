@@ -50,7 +50,7 @@ shots:
 ![Choose Courses with Grade 8 and Humanities 8 ticked, and Your Class beside the list](img/create-a-class.jpg 'Choose Courses with Humanities 8 ticked.')
 
 3. **Name Your Class:** the **Class Name** comes from the courses. Change it if needed, and pick the **Block**, when **This Class Runs** and how **Grades Show As**.
-4. **Already Set for You** lists what the class starts with. Choose **Change** beside **Competencies** to untick any you won't assess, beside **Overall** to change how the courses and folders count, or beside **Calculation** to change how scores are combined. The **Reporting Terms** are your school's and can be changed on the Reporting Terms tab once the class is made.
+4. **Already Set for You** lists what the class starts with. Choose **Change** beside **Competencies** to untick any you won't assess, beside **Overall** to change how the courses and folders count, or beside **Calculation** to change how scores are combined. The **Reporting Terms** start as Grandview Heights Secondary's; choose **Change** beside them to take another school's dates, another class's, or your own.
 5. Choose **Create Class**.
 
 The new class opens on its **Students** tab. See [Add Your Students](add-your-students). A class's description and late work policy are on its Details tab in Class Settings.
