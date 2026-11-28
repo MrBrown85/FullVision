@@ -3235,8 +3235,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-comment-foot[hidden] {
   display: none;
 }
-/* The count under the comment: plain text; orange when a sentence runs
-   over 20 words. */
+/* The count under the comment: plain text. */
 .qn-count-wrap {
   flex: 1;
   display: flex;
@@ -3245,10 +3244,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text);
   padding: 2px 6px;
   border-radius: 6px;
-}
-.qn-count.over {
-  color: var(--score-2-text);
-  background: var(--report-callout-bg);
 }
 .qn-copy {
   border: 1px solid var(--border);

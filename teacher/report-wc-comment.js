@@ -12,7 +12,6 @@
 window.ReportWcComment = (function () {
   'use strict';
 
-  var P = ReportWcParts;
   var H = /** @type {any} */ (null);
   var ui = /** @type {any} */ (null);
   function configure(host, state) {
@@ -58,14 +57,6 @@ window.ReportWcComment = (function () {
     if (!st) return [];
     var rows = H.rows(st, H.facts(st));
     var out = [];
-    var run = P.sameOpening(
-      rows.map(function (r) {
-        return r.text;
-      }),
-    );
-    if (run) out.push({ text: P.openingNote(run), buttons: [{ label: 'Vary Them', act: 'wcVary', data: {} }] });
-    var dup = ReportWcHabits.duplicateNote(rows);
-    if (dup) out.push(dup);
     var habit = H.habitNote(st, rows);
     if (habit) out.push(habit);
     return out;
@@ -110,34 +101,6 @@ window.ReportWcComment = (function () {
     ICON +
     '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"></path><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"></path></svg>';
   var GEN_ICON = ICON + '<path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 4v5h-5"></path></svg>';
-
-  /* Vary Them: the second sentence of a run that opens alike is worded
-     another way (a bank wording that opens differently), one by one; Undo
-     puts the comment back. */
-  function vary() {
-    var st = H.current();
-    if (!st) return;
-    var f = H.facts(st);
-    var rows = H.rows(st, f).slice();
-    var run = P.sameOpening(
-      rows.map(function (r) {
-        return r.text;
-      }),
-    );
-    if (!run) return;
-    var snap = H.snapshot(st);
-    var changed = false;
-    for (var i = run.from + 1; i < run.from + run.n; i += 2) {
-      var next = H.otherOpening(st, f, rows, i, run.word);
-      if (next) {
-        rows[i] = next;
-        changed = true;
-      }
-    }
-    if (!changed) return H.nothingFits();
-    H.setRows(st, rows, null, '');
-    H.undoToast(st, 'Openings changed.', snap);
-  }
 
   function keepNote(kind) {
     if (kind === 'habit') H.keepHabitNote();
@@ -282,7 +245,6 @@ window.ReportWcComment = (function () {
     notes: notes,
     syncNotes: syncNotes,
     goesText: goesText,
-    vary: vary,
     keepNote: keepNote,
   };
 })();

@@ -204,15 +204,6 @@ test('typing in the comment is read back into sentences, with Undo', async ({ pa
   await expect.poll(() => comment(page)).toBe(old);
 });
 
-test('three sentences in a row that open alike are noted, with Vary Them', async ({ page }) => {
-  await open(page);
-  await page.locator('#tq-read').click();
-  await page.locator('#tq-narrative').fill('She asks good questions. She hands in her work. She helps her group.');
-  await page.locator('.wc-head-card').click();
-  await expect(page.locator('#wc-notes .wc-note')).toContainText('Three sentences in a row start with She.');
-  await expect(page.locator('#wc-notes [data-do="wcVary"]')).toHaveText('Vary Them');
-});
-
 test('the student list says who needs a look and why', async ({ page }) => {
   await open(page);
   const notes = page.locator('#gb-sidebar .student-row-note');

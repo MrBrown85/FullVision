@@ -5062,26 +5062,14 @@ window.CommentBank = (function () {
     }).length;
   }
 
-  /* The first word of the comment's last sentence: what follows the last
-     . ! ? or closing quote that has a space after it. (No lookbehind, which
-     Safari before 16.4 cannot parse.) */
-  function lastStart(text) {
-    var t = String(text || '').trim();
-    var re = /[.!?”]\s+(?=\S)/g;
-    var from = 0;
-    var m;
-    while ((m = re.exec(t))) from = m.index + m[0].length;
-    return t.slice(from).split(/\s+/)[0] || '';
-  }
-
   /* A row's note under its sentence. */
-  function rowMeta(repeats, used) {
+  function rowMeta(used) {
     var bits = [];
-    if (repeats) bits.push('Starts like your last sentence');
     if (used >= USED_BY) bits.push('Used for ' + used + ' classmates this term');
     return bits.join(' · ');
   }
-  /* Whether a sentence not yet added starts like the comment's last one. */
+  /* Whether a sentence starts with the word the draft's last one did (Generate
+     orders its own picks by it). */
   function repeatsLast(sentence, last) {
     return !!last && String(sentence).split(/\s+/)[0] === last;
   }
@@ -5096,7 +5084,6 @@ window.CommentBank = (function () {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
     var more = opts.more || {};
-    var last = lastStart(text);
     var first = opts.first || ctx.name;
     var titles = {
       habits: 'Work Habits',
@@ -5121,7 +5108,6 @@ window.CommentBank = (function () {
           added: String(text || '').indexOf(t) >= 0,
           used: used,
           crowded: used >= USED_BY,
-          repeats: false,
           at: at,
         };
       });
@@ -5144,8 +5130,7 @@ window.CommentBank = (function () {
       shown.forEach(function (r) {
         r.first = r.group !== prev;
         prev = r.group;
-        r.repeats = !r.added && repeatsLast(r.text, last);
-        r.meta = rowMeta(r.repeats, r.used);
+        r.meta = rowMeta(r.used);
       });
       return {
         id: part.id,
@@ -8354,7 +8339,6 @@ window.CommentBank = (function () {
     context: context,
     fits: fits,
     fill: fill,
-    lastStart: lastStart,
     rowMeta: rowMeta,
     repeatsLast: repeatsLast,
     pattern: pattern,
