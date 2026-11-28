@@ -50,6 +50,10 @@ window.ReportWcHabits = (function () {
   function habitMine(row) {
     return !!row && !!row.s && !row.edited && !row.kept && !row.earlier && !row.classLine && !!row.prov;
   }
+  /* Whether the bank wrote this row for one habit alone (a Habit Ratings frame). */
+  function singleOf(row) {
+    return habitMine(row) && !!row.s.habit && !row.s.mine;
+  }
   function slotOf(row) {
     return habitMine(row) ? CB().habitChoice.slotOf(row.s) : '';
   }
@@ -71,7 +75,7 @@ window.ReportWcHabits = (function () {
       out[h.key] = {
         on: held.length > 0,
         locked: held.some(function (x) {
-          return !slotOf(x.row);
+          return !slotOf(x.row) && !singleOf(x.row);
         }),
         disabled: !held.length && !rated,
         held: held.map(function (x) {
@@ -171,66 +175,6 @@ window.ReportWcHabits = (function () {
 
   /* ── Turning a switch on or off ──────────────────────────── */
 
-  /* The sentence a habit slot holds, for these habits: the same bank
-     sentence when only its habits changed, another for the same slot. */
-  function sentenceFor(env, rows, slot, keys, ctx, prefer) {
-    if (prefer && CB().habitChoice.slotOf(prefer) === slot) return prefer;
-    var taken = {};
-    rows.forEach(function (r) {
-      taken[r.id] = true;
-    });
-    var pool = B.poolFor(CB().habitChoice.stepOf(slot), taken, 'habit:' + keys[0], ctx).filter(function (s) {
-      return CB().habitChoice.slotOf(s) === slot;
-    });
-    pool.sort(function (a, b) {
-      return (env.usage[a.id] || 0) - (env.usage[b.id] || 0);
-    });
-    return pool[0] || null;
-  }
-
-  /* The rows with each habit part worded as `parts` says: a part with a row
-     (ri) rewrites it, a part with none gets a new row after the box's last,
-     a row whose part is gone goes. Returns { rows, added } or null when the
-     bank has no sentence for a part. */
-  function habitApply(env, st, parts, was) {
-    var rows = env.rows.slice();
-    var ctx = env.ctx;
-    var added = null;
-    var drop = {};
-    was.forEach(function (w) {
-      drop[w.ri] = true;
-    });
-    var fresh = [];
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i];
-      var ctxP = CB().habitChoice.withPart(ctx, p.slot, p.keys);
-      var old = p.ri != null ? env.rows[p.ri] : null;
-      if (old) {
-        delete drop[p.ri];
-        var sameWords = was.some(function (w) {
-          return w.ri === p.ri && w.slot === p.slot && w.keys.join() === p.keys.join();
-        });
-        if (sameWords) continue;
-      }
-      var s = sentenceFor(env, rows, p.slot, p.keys, ctxP, old && old.s);
-      if (!s) return null;
-      var row = H.rowFromSentence(s, ctxP, CB().habitChoice.stepOf(p.slot), false);
-      if (old) rows[p.ri] = row;
-      else fresh.push(row);
-    }
-    rows = rows.filter(function (r, ri) {
-      return !drop[ri];
-    });
-    fresh.forEach(function (row) {
-      var boxes = rows.map(function (r) {
-        return P.boxOf(r, env.isBest(r));
-      });
-      rows = H.insertRow(rows, row, P.insertAt(boxes, 'habits'));
-      added = row;
-    });
-    return { rows: rows, added: added };
-  }
-
   /* The habit parts the comment holds: { ri, slot, keys } for each sentence the bank wrote for
      a habit slot, and the slots the teacher's own sentences hold. */
   function partsOf(env) {
@@ -250,13 +194,62 @@ window.ReportWcHabits = (function () {
     return CB().effectiveHabits(H.habitsStored(st));
   }
 
-  /* A change to one habit's place in the comment: the rows after it, or null. */
+  /* A habit's own sentence from the bank (one habit at its rating), as a row; null when none fits. */
+  function singleRow(env, st, key, taken) {
+    var level = ratingsOf(st)[key];
+    var all = (window.COMMENT_BANK && window.COMMENT_BANK.sentences) || [];
+    var pool = all.filter(function (s) {
+      return s.habit === key && s.level === level && !taken[s.id] && CB().fits(s, env.ctx);
+    });
+    pool.sort(function (a, b) {
+      return (env.usage[a.id] || 0) - (env.usage[b.id] || 0);
+    });
+    return pool[0] ? H.rowFromSentence(pool[0], env.ctx, 'habits', false) : null;
+  }
+
+  /* A change to one habit's place in the comment: the rows after it, or null. Each habit gets
+     its own sentence, never merged into another's (Colin, Nov 27). Off takes its sentence out;
+     a combined sentence naming it is replaced by the single sentences of the habits that stay. */
   function habitChange(env, st, key, on) {
-    var have = partsOf(env);
-    var next = on
-      ? CB().habitChoice.add(have.parts, ratingsOf(st), env.f.family || '', key, have.held)
-      : CB().habitChoice.remove(have.parts, key);
-    return next ? habitApply(env, st, next, have.parts) : null;
+    var rows = env.rows.slice();
+    var taken = {};
+    rows.forEach(function (r) {
+      taken[r.id] = true;
+    });
+    var fresh = [];
+    var drop = {};
+    if (on) {
+      var row = singleRow(env, st, key, taken);
+      if (!row) return null;
+      fresh.push(row);
+    } else {
+      var bad = false;
+      rows.forEach(function (r, ri) {
+        if (!inBox(env, r) || !habitMine(r) || keysOf(r).indexOf(key) < 0) return;
+        drop[ri] = true;
+        keysOf(r).forEach(function (k) {
+          if (k === key) return;
+          var one = singleRow(env, st, k, taken);
+          if (one) {
+            taken[one.id] = true;
+            fresh.push(one);
+          } else bad = true;
+        });
+      });
+      if (bad) return null;
+    }
+    rows = rows.filter(function (r, ri) {
+      return !drop[ri];
+    });
+    var added = null;
+    fresh.forEach(function (r) {
+      var boxes = rows.map(function (x) {
+        return P.boxOf(x, env.isBest(x));
+      });
+      rows = H.insertRow(rows, r, P.insertAt(boxes, 'habits'));
+      added = r;
+    });
+    return { rows: rows, added: added };
   }
 
   /* The habits the comment names now, in the grid's order. */

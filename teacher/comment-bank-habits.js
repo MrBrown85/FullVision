@@ -147,10 +147,7 @@ window.CommentBankHabits = (function () {
     c.off.forEach(function (k) {
       parts = habitRemove(parts, k);
     });
-    c.on.forEach(function (k) {
-      if (c.off.indexOf(k) >= 0) return;
-      parts = habitAdd(parts, habits, family, k) || parts;
-    });
+    // A habit switched on gets its own sentence from the page (reconcile), never a place in another's.
     var help = parts.find(function (p) {
       return _formOfSlot(p.slot) === 'help';
     });
