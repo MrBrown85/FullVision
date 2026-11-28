@@ -82,65 +82,6 @@ window.ReportWcHabits = (function () {
     return out;
   }
 
-  /* ── The note when two sentences name one habit ──────────── */
-
-  function habitEntries(rows) {
-    return rows.map(function (row, ri) {
-      return { ri: ri, row: row };
-    });
-  }
-  var NUMBERS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
-  /* { text, buttons } for the first habit two sentences name, when the later
-     of them is one the bank wrote; null otherwise. */
-  function duplicateNote(rows) {
-    var list = habitEntries(rows).filter(function (x) {
-      return P.boxOf(x.row, false) === 'habits' && keysOf(x.row).length;
-    });
-    var hs = CB().HABITS;
-    for (var i = 0; i < hs.length; i++) {
-      var held = list.filter(function (x) {
-        return keysOf(x.row).indexOf(hs[i].key) >= 0;
-      });
-      if (held.length < 2 || !held.slice(1).some(duplicateOf)) continue;
-      return {
-        text: (NUMBERS[Math.min(held.length, 6)] || String(held.length)) + ' sentences name ' + hs[i].name + '.',
-        buttons: [{ label: 'Remove One', act: 'wcHabitDup', data: { habit: hs[i].key } }],
-      };
-    }
-    return null;
-  }
-  function duplicateOf(x) {
-    return !!slotOf(x.row);
-  }
-
-  /* Takes out the later bank sentence that repeats a habit, and keeps the
-     teacher's choice: a habit only that sentence named is switched off. */
-  function removeOne(key) {
-    var st = H.current();
-    if (!st) return;
-    var env = mk(st, H.facts(st, true));
-    var held = habitEntries(env.rows).filter(function (x) {
-      return inBox(env, x.row) && keysOf(x.row).indexOf(key) >= 0;
-    });
-    var gone = held.slice(1).filter(duplicateOf).pop();
-    if (!gone) return;
-    var others = env.rows.filter(function (r, ri) {
-      return ri !== gone.ri && inBox(env, r);
-    });
-    var lost = keysOf(gone.row).filter(function (k) {
-      return !others.some(function (r) {
-        return keysOf(r).indexOf(k) >= 0;
-      });
-    });
-    if (lost.length) habitSave(st, lost, false);
-    H.setRows(
-      st,
-      env.rows.filter((r, ri) => ri !== gone.ri),
-      null,
-      '',
-    );
-  }
-
   /* ── The choice, kept with the comment ───────────────────── */
 
   function ratingOf(st) {
@@ -392,8 +333,6 @@ window.ReportWcHabits = (function () {
     configure: configure,
     state: habitState,
     keysOf: keysOf,
-    duplicateNote: duplicateNote,
-    removeOne: removeOne,
     toggle: habitToggle,
     reconcile: reconcile,
   };

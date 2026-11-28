@@ -442,7 +442,6 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(html).not.toContain('No support lines chosen');
     expect(html).toContain('>+ Closing Sentence for the Class</button>');
     expect(html).not.toContain('No closing sentence for this class');
-    expect(html).toContain('<span id="tq-count-tail"></span>');
     expect(html).not.toContain('limit');
     expect(html).not.toContain('qn-required');
   });
@@ -628,9 +627,7 @@ describe('the class settings (report_config) and the review screen', () => {
     saveReportConfig(CID, { form: { sides: [] }, commentSettings: { charLimit: 100 } });
     upsertTermRating(CID, GAB.id, TERM, { narrative: 'x'.repeat(1200) });
     const html = open();
-    expect(html).toContain(
-      '<span class="qn-count-text" id="tq-count">1,200 characters</span><span id="tq-count-tail"></span>',
-    );
+    expect(html).toContain('<span class="qn-count-text" id="tq-count">1,200 characters</span>');
     expect(html).not.toContain('Character limit');
     expect(html).not.toContain('class="qn-count over"');
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];

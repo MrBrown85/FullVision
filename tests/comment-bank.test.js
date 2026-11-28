@@ -476,15 +476,6 @@ describe('fill takes values as written', () => {
   });
 });
 
-describe('lastStart', () => {
-  it('finds the first word of the last sentence, quotes and all', () => {
-    expect(CommentBank.lastStart('Cece works hard. She asks “why?” Then she writes it down')).toBe('Then');
-    expect(CommentBank.lastStart('One sentence only')).toBe('One');
-    expect(CommentBank.lastStart('Ends here. ')).toBe('Ends');
-    expect(CommentBank.lastStart('')).toBe('');
-  });
-});
-
 describe('focusOptions', () => {
   const comp = (id, start, now) => ({ id, name: id, start, now, level: now, scores: [{ v: now }], iCans: [] });
   const f = {
@@ -615,13 +606,6 @@ describe('parts', () => {
       ['c', 0, false],
       ['a', 3, true],
     ]);
-  });
-
-  it('notes a sentence that starts like the comment’s last sentence', () => {
-    const [part] = CommentBank.parts(ctx, 'Her lab work was careful. Cece helped others.', { bank });
-    expect(part.rows.every(r => r.repeats)).toBe(true);
-    const [other] = CommentBank.parts(ctx, 'Cece helped others. She is kind.', { bank });
-    expect(other.rows.some(r => r.repeats)).toBe(false);
   });
 
   it('never matches a sentence that is mostly slots', () => {

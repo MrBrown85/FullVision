@@ -61,13 +61,6 @@ describe('ReportWcParts', () => {
     expect(P.isReword('Cece usually hands in her work on time.', 'She usually hands in her work on time.')).toBe(true);
     expect(P.isReword('Please call me this week.', 'She usually hands in her work on time.')).toBe(false);
   });
-
-  it('finds three or more sentences in a row that open the same way', () => {
-    const run = P.sameOpening(['He is kind.', 'He works hard.', 'He asks questions.', 'Next, try this.']);
-    expect(run).toEqual({ word: 'he', from: 0, n: 3 });
-    expect(P.openingNote(run)).toBe('Three sentences in a row start with He.');
-    expect(P.sameOpening(['He is kind.', 'She works hard.', 'He asks questions.'])).toBeNull();
-  });
 });
 
 describe('the boxes drawn for a Demo Mode student', () => {

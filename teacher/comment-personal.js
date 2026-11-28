@@ -1159,10 +1159,6 @@ window.PersonalBank = (function () {
     var other = _classmateIn(text, e.names, f, student, opts);
     if (!out.blocked && other)
       out.blocked = _q(other) + ' is a classmate’s name; a bank sentence cannot name another student.';
-    var n = R.wordCount(text);
-    if (n < MIN_WORDS)
-      out.advice.push('This is ' + _plural(n, 'word', 'words') + '; a bank sentence needs six or more.');
-    else if (n > MAX_WORDS) out.advice.push('This is ' + n + ' words; a report sentence has 20 or fewer.');
     var oneDay = _oneTime(text);
     var date = _date(text);
     if (oneDay) out.advice.push('This is about one day; a bank sentence is used every term.');
