@@ -184,6 +184,15 @@ window.ReportWcParts = (function () {
     return (NUMBER_WORDS[Math.min(run.n, 10)] || String(run.n)) + ' sentences in a row start with ' + shown + '.';
   }
 
+  /* One sentence of the comment in place of another; with none, the old one
+     and a space beside it taken out. */
+  function swapSentence(text, before, after) {
+    if (after) return text.replace(before, after);
+    if (text.indexOf(before + ' ') >= 0) return text.replace(before + ' ', '');
+    if (text.indexOf(' ' + before) >= 0) return text.replace(' ' + before, '');
+    return text.replace(before, '');
+  }
+
   /* ── Where a new sentence goes ─────────────────────────────── */
 
   /* The place in the comment for a new sentence of a box: after the last
@@ -213,5 +222,6 @@ window.ReportWcParts = (function () {
     sameOpening: sameOpening,
     openingNote: openingNote,
     insertAt: insertAt,
+    swapSentence: swapSentence,
   };
 })();

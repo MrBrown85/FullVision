@@ -29,6 +29,7 @@ for (const f of [
   'teacher/report-scores.js',
   'shared/comment-bank.js',
   'teacher/comment-realiser.js',
+  'teacher/comment-bank-habits.js',
   'teacher/comment-bank.js',
 ])
   vm.runInContext(readFileSync(f, 'utf-8'), ctx, { filename: f });

@@ -2050,12 +2050,10 @@ window.CommentBank = (function () {
        lowest), in the grid's order; the strengths are then one sentence,
        the highest level the student has.
      A strength sentence names at most three habits, in the grid's order,
-     and no more words than HABIT_LIST_WORDS, so every frame stays within
+     and no more words than the list words, so every frame stays within
      20 words; a habit that would run past it is left out (Uses Devices,
      the longest and last, goes first). Not every habit is named: the
      sentences read as sentences, never a list of six. */
-  var HABIT_LIST_WORDS = 17;
-  var HABIT_SOME_MOST = 2;
   var HABIT_IE_WORDS = 16;
   var HABIT_GETS_WORK_DONE = { completes: true, ready: true, devices: true };
   // The slots the habits part fills, the rating each names a habit at, and
@@ -2093,13 +2091,15 @@ window.CommentBank = (function () {
     });
     return out;
   }
+  /* The Work Habits switches' choice of habits (teacher/comment-bank-habits.js). */
+  var HC = CommentBankHabits.make({ fit: _habitsThatFit, tokens: habitListTokens, text: _habitListText });
   /* What the habits part says, from the ratings in force (effectiveHabits)
      and the kind of class: { lead, more, help, ie }. lead and more are {
      slot, keys } or null; help is the habits that would help (keys, the
      grid's order); ie is the habits the IE comment names as strong.
      rated: the teacher's own ratings (effectiveHabits); with none rated
      there is no strength sentence (only the habit that would help). */
-  function habitPlan(habits, family, rated) {
+  function habitPlan(habits, family, rated, choice) {
     habits = habits || {};
     var any =
       rated === undefined ||
@@ -2123,9 +2123,8 @@ window.CommentBank = (function () {
       return sum.build.indexOf(k) >= 0;
     });
     var put = function (slot, keys) {
-      var def = HABIT_SLOTS[slot];
-      var most = slot === 'habitsSomeDays' ? HABIT_SOME_MOST : 3;
-      var ks = _habitsThatFit(keys, def.form, family, most, HABIT_LIST_WORDS);
+      var most = slot === 'habitsSomeDays' ? HC.SOME_MOST : 3;
+      var ks = _habitsThatFit(keys, HABIT_SLOTS[slot].form, family, most, HC.LIST_WORDS);
       return ks.length ? { slot: slot, keys: ks } : null;
     };
     var lead = null;
@@ -2159,20 +2158,22 @@ window.CommentBank = (function () {
         more = put(second, rest);
       } else lead = put(first, one);
     }
-    return {
+    var plan = {
       lead: lead,
       more: more,
       help: help.length <= 2 ? help : help.slice(0, 2),
       ie: _habitsThatFit(l4, 'well', family, 3, HABIT_IE_WORDS),
     };
+    return HC.chosenPlan(plan, habits, family, choice);
   }
+
   /* The plan's part that fills a slot: { slot, keys } or null. */
   function _planPart(plan, slot) {
     if (plan.lead && plan.lead.slot === slot) return plan.lead;
     if (plan.more && plan.more.slot === slot) return plan.more;
     if (slot === 'habitHelpOne' && plan.help.length === 1) return { slot: slot, keys: plan.help };
     if (slot === 'habitsHelpTwo' && plan.help.length === 2) return { slot: slot, keys: plan.help };
-    return null;
+    return HC.partOf(plan, slot);
   }
   /* Habits in one `say` form as the realiser's tokens, a list in the
      approved wording: "A and B", "A, B, and C"; the habits that would help
@@ -4212,7 +4213,7 @@ window.CommentBank = (function () {
     // The habits part for families (habitPlan): its slots, their facts
     // (the habits each names) and their tokens; '' for a slot the plan
     // does not fill.
-    var hplan = habitPlan(habits, f.family || '', effectiveHabits(picks.habits || f.habits));
+    var hplan = habitPlan(habits, f.family || '', effectiveHabits(picks.habits || f.habits), picks.habitChoice);
     var strongThree = hplan.ie;
     var hslot = {};
     var hslotKeys = {};
@@ -7470,15 +7471,9 @@ window.CommentBank = (function () {
         )
           checks.push(eff[m[1]] === pv.values[k]);
       });
-      var named = function (slot, ok, want) {
-        var ids = _ids(pv, slot, 'habit');
-        return (
-          ids.length > 0 &&
-          ids.join() === want.join() &&
-          ids.every(function (k) {
-            return ok.indexOf(eff[k]) >= 0;
-          })
-        );
+      var chose = HC.chosen((ctx._picks || {}).habitChoice);
+      var named = function (slot, ok, want, loose) {
+        return HC.ok(_ids(pv, slot, 'habit'), ok, want, eff, loose && (ctx._picks || {}).habitChoice);
       };
       if (_has(pv, 'habitsExcellent')) checks.push(sum.excellent);
       if (_has(pv, 'habitsGood')) checks.push(sum.good);
@@ -7496,8 +7491,8 @@ window.CommentBank = (function () {
       Object.keys(HABIT_SLOTS).forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var part = _planPart(plan, slot);
-        checks.push(!!part && named(slot, HABIT_SLOTS[slot].at, part.keys));
-        if (part && HABIT_SLOTS[slot].form === 'help')
+        checks.push((!!part || chose) && named(slot, HABIT_SLOTS[slot].at, part ? part.keys : [], true));
+        if (part && !chose && HABIT_SLOTS[slot].form === 'help')
           checks.push(
             part.keys.length === sum.build.length &&
               part.keys.every(function (k) {
@@ -8351,6 +8346,7 @@ window.CommentBank = (function () {
     habitSay: habitSay,
     SAY_FORMS: SAY_FORMS,
     habitPlan: habitPlan,
+    habitChoice: HC,
     HABIT_SLOTS: HABIT_SLOTS,
     facts: facts,
     notHandedIn: notHandedIn,

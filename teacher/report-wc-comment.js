@@ -64,6 +64,8 @@ window.ReportWcComment = (function () {
       }),
     );
     if (run) out.push({ text: P.openingNote(run), buttons: [{ label: 'Vary Them', act: 'wcVary', data: {} }] });
+    var dup = ReportWcHabits.duplicateNote(rows);
+    if (dup) out.push(dup);
     var habit = H.habitNote(st, rows);
     if (habit) out.push(habit);
     return out;

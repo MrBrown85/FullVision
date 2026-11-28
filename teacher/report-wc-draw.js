@@ -97,7 +97,14 @@ window.ReportWcDraw = (function () {
       out += `<span class="wc-bar" aria-hidden="true"><span style="width:${Math.max(0, Math.min(1, Number(f.bar))) * 100}%"></span></span>`;
     if (f.slider) out += sliderHtml(f);
     if (f.val) out += `<span class="wc-val">${esc(f.val)}</span>`;
+    if (f.sw) out += switchHtml(f);
     return out;
+  }
+  /* A habit's switch, In the Comment: on when a sentence names it. A habit the teacher's own
+     sentence names stays on and cannot be switched; one with no rating cannot be added. */
+  function switchHtml(f) {
+    var sw = f.sw;
+    return `<span class="gpd-switch wc-sw"><input type="checkbox" role="switch" aria-label="In the Comment" data-action="tqSentences" data-do="wcHabit" data-habit="${esc(f.id.replace(/^habit:/, ''))}"${sw.on ? ' checked' : ''}${sw.locked || sw.disabled ? ' disabled' : ''}><span class="gpd-switch-ui" aria-hidden="true"></span></span>`;
   }
   function extraHtml(f) {
     return f.extra.map(function (b) {
@@ -136,7 +143,7 @@ window.ReportWcDraw = (function () {
     if (f.loose) return `<div class="wc-fact-wrap" data-fact="${esc(f.id)}">${line(f.loose)}</div>`;
     if (f.html === 'obs') return `<div class="wc-fact-wrap">${host.obsHtml()}</div>`;
     return `<div class="wc-fact-wrap" data-fact="${esc(f.id)}">
-      <div class="wc-fact">${factRow(f, box)}</div>
+      <div class="wc-fact"${f.cover && f.cover.length ? ` data-rks="${esc(f.cover.join(' '))}"` : ''}>${factRow(f, box)}</div>
       ${f.lines.map(line).join('')}${subsHtml(f)}
     </div>`;
   }

@@ -78,6 +78,7 @@ const FILES = [
   'teacher/comment-realiser.js',
   'shared/bank-comment.js',
   'shared/bank-sets.js',
+  'teacher/comment-bank-habits.js',
   'teacher/comment-bank.js',
   'shared/questionnaire-templates.js',
   'shared/questionnaires.js',

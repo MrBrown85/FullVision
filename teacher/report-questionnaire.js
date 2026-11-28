@@ -595,6 +595,7 @@ window.ReportQuestionnaire = (function () {
     var meta = CommentBank.draftMeta(rows, f, { approvedAt: at, prev: prev });
     meta.teacher_text = teacherText(rows);
     if (prev && Array.isArray(prev.grade_kept)) meta.grade_kept = prev.grade_kept.slice();
+    if (prev && prev.habit_choice) meta.habit_choice = prev.habit_choice;
     return meta;
   }
 
@@ -701,7 +702,7 @@ window.ReportQuestionnaire = (function () {
       var todo = who(c) ? stale.changes.filter(who) : [c];
       var next = text;
       todo.forEach(function (x) {
-        var swapped = _swapSentence(next, x.before, x.after);
+        var swapped = ReportWcParts.swapSentence(next, x.before, x.after);
         if (swapped === next) return;
         next = swapped;
         var at = rows.findIndex(function (y) {
@@ -990,7 +991,7 @@ window.ReportQuestionnaire = (function () {
     var after = d.habits.after;
     var next;
     if (text.trim() === last.text.trim()) next = d.text;
-    else if (before && text.indexOf(before) >= 0) next = _swapSentence(text, before, after);
+    else if (before && text.indexOf(before) >= 0) next = ReportWcParts.swapSentence(text, before, after);
     else return;
     _lastDraft[key] = d;
     _adoptDraft(key, d);
@@ -1005,15 +1006,6 @@ window.ReportQuestionnaire = (function () {
     _alignNow();
     _syncMarks();
     _syncRequired();
-  }
-
-  /* One sentence of the comment in place of another; with none, the old one
-     and a space beside it taken out. */
-  function _swapSentence(text, before, after) {
-    if (after) return text.replace(before, after);
-    if (text.indexOf(before + ' ') >= 0) return text.replace(before + ' ', '');
-    if (text.indexOf(' ' + before) >= 0) return text.replace(' ' + before, '');
-    return text.replace(before, '');
   }
 
   /* The grader on one piece, this student only. Closing it reads the
@@ -1575,7 +1567,8 @@ window.ReportQuestionnaire = (function () {
      focus. */
   function _picksFor(cid, student, f, termId) {
     var rating = getStudentTermRating(cid, student.id, termId || getTermId()) || {};
-    return { habits: rating.habits || {}, focus: rating.focusSectionId || f.focusId };
+    var meta = rating.draftMeta || {};
+    return { habits: rating.habits || {}, focus: rating.focusSectionId || f.focusId, habitChoice: meta.habit_choice };
   }
   function _bankContext(cid, student, f) {
     return CommentBank.context(f, _picksFor(cid, student, f));
@@ -1658,7 +1651,7 @@ window.ReportQuestionnaire = (function () {
     if (!d.text) return;
     _lastDraft[key] = d;
     _lastSeed[key] = d.seed;
-    _adoptDraft(key, d);
+    _adoptDraft(key, d, true);
     if (!_ordered[key])
       _original[key] = d.sentences
         .map(function (x) {
@@ -2816,11 +2809,12 @@ window.ReportQuestionnaire = (function () {
   }
   /* A draft adopted as the rows: the teacher's typed sentences go back at
      their place (keepTyped). */
-  function _adoptDraft(key, d) {
+  function _adoptDraft(key, d, habits) {
     var old = _rows[key] || [];
-    var rows = keepTyped(old, rowsFromDraft(d, old));
-    _rows[key] = rows;
-    return rows;
+    _rows[key] = keepTyped(old, rowsFromDraft(d, old));
+    // Generate keeps the habits the teacher switched on and leaves out those switched off.
+    if (habits) ReportWcHabits.reconcile(_current());
+    return _rows[key];
   }
   /* A row for a sentence the teacher typed. */
   function typedRow(text, n) {
