@@ -62,8 +62,17 @@
   /* ── The New Class wizard's draft ── */
   /** @type {{ state: any, redraw: () => void, changed: () => void } | null} */
   var _host = null;
-  // While This Class Runs cuts the draft again, the row is redrawn once, after.
-  var _quiet = false;
+  /* What the section showed when Edit Dates or Create New first opened the
+     editor: Cancel puts it back, and Start With's first choice copies it. */
+  /** @type {{ st: any, school: any, own: any, editing: any, start: any } | null} */
+  var _snap = null;
+  // The terms the draft held when Create New was chosen: Start With's first choice.
+  /** @type {any[] | null} */
+  var _held = null;
+
+  function _cm() {
+    return /** @type {any} */ (window).CmTerms;
+  }
 
   function _span() {
     return (_host && _host.state.cwStep2Span) || 'full';
@@ -72,23 +81,104 @@
   /** @param {{ state: any, redraw: () => void, changed: () => void }} h */
   function configure(h) {
     _host = h;
-    /** @type {any} */ (window).CmTerms.useDraft({
+    _cm().useDraft({
       key: KEY,
       active: function () {
         return !!_host && _host.state.cmMode === 'create';
       },
-      saved: function () {
-        return defaultTerms(_span());
-      },
+      saved: _saved,
       redraw: function () {
-        if (!_quiet && _host) _host.redraw();
+        if (_host) _host.redraw();
       },
       changed: _refresh,
+      opening: _opening,
+      restore: _restore,
+      currentLabel: _currentLabel,
     });
   }
 
+  // Where the draft stands: what Create New or the editor opened from, else the school's terms.
+  function _saved() {
+    if (_held) return normalizeTermOrdinals(_held);
+    return _snap ? normalizeTermOrdinals(_snap.st.rows) : defaultTerms(_span());
+  }
+
+  function _opening(isNew) {
+    var cm = _cm();
+    var st = cm._cmTermRows(KEY);
+    if (isNew) _held = st.rows.map(_copy);
+    if (_snap) return;
+    _snap = {
+      st: { rows: st.rows.map(_copy), span: st.span, dirty: st.dirty },
+      school: cm._cmTermSchool[KEY],
+      own: cm._cmTermOwn[KEY],
+      editing: cm._cmTermEditing[KEY],
+      start: cm._cmTermStart[KEY],
+    };
+  }
+
+  // Cancel: CmTerms has forgotten the draft; put back what the editor opened from.
+  function _restore() {
+    var s = _snap;
+    _snap = null;
+    _held = null;
+    if (!s) return;
+    var cm = _cm();
+    cm._cmTermState[KEY] = s.st;
+    if (s.school !== undefined) cm._cmTermSchool[KEY] = s.school;
+    if (s.own !== undefined) cm._cmTermOwn[KEY] = s.own;
+    if (s.editing !== undefined) cm._cmTermEditing[KEY] = s.editing;
+    if (s.start !== undefined) cm._cmTermStart[KEY] = s.start;
+  }
+
+  // Start With's first choice, named by what the draft holds.
+  function _currentLabel() {
+    var match = reportingTermsSchoolMatch(_saved());
+    return match ? /** @type {any} */ (match.school).name + '’s Dates' : 'Current Dates';
+  }
+
+  function _copy(r) {
+    return Object.assign({}, r);
+  }
+
+  /* The whole-year terms rows were cut from, unchanged: a school's or a
+     Start With layout's, names and dates alike. Null for typed or edited
+     terms, which This Class Runs leaves as they are. */
+  function _wholeYear(rows) {
+    var n = normalizeTermOrdinals(rows);
+    if (!n.length) return null;
+    var schools = typeof reportingTermSchools === 'function' ? reportingTermSchools() : [];
+    var fulls = schools
+      .map(function (sc) {
+        return reportingTermPreset(sc.id, courseToday(null));
+      })
+      .concat(
+        Object.keys(LAYOUTS).map(function (k) {
+          return layoutRows(null, k);
+        }),
+      );
+    return (
+      fulls.find(function (full) {
+        return (
+          !!full &&
+          n.every(function (r) {
+            var t = full[r.ordinal - 1];
+            return !!t && t.label === r.label && t.starts_on === r.starts_on && t.ends_on === r.ends_on;
+          })
+        );
+      }) || null
+    );
+  }
+
+  function _recut(st, span) {
+    var full = _wholeYear(st.rows);
+    var next = full ? termsInSpan(full, span, semesterTwoStart(full)) : [];
+    if (next.length) st.rows = next.map(_copy);
+    st.span = span;
+  }
+
   function _draft() {
-    return /** @type {any} */ (window).CmTerms._cmTermRows(KEY);
+    return _cm()._cmTermRows(KEY);
   }
 
   // What Create Class saves: the terms the section shows, numbered.
@@ -126,7 +216,7 @@
   // The Reporting Terms section, as Class Settings draws it.
   // html-safe: _cmRenderReportingTermsField escapes every name, id and date.
   function sectionHtml() {
-    return /** @type {any} */ (window).CmTerms._cmRenderReportingTermsField(KEY);
+    return _cm()._cmRenderReportingTermsField(KEY);
   }
 
   /* The row's words and, when it is open, its section, drawn again in
@@ -143,25 +233,28 @@
   }
 
   /* This Class Runs changed on step 2. Terms not changed yet start again
-     from the school's for the new span; another school's terms are cut
-     again, as Class Settings cuts them; the teacher's own dates stay. */
+     from where the draft stands, for the new span; a school's or a Start
+     With layout's terms are cut again; typed or edited dates stay. What
+     Cancel would put back is cut the same way. */
   function spanChanged() {
-    var st = /** @type {any} */ (window).CmTerms._cmTermState[KEY];
-    var school = st && (!st.rows.length || reportingTermsSchoolMatch(normalizeTermOrdinals(st.rows)));
-    if (st && st.dirty && school) {
-      _quiet = true;
-      try {
-        /** @type {any} */ (window).CmTerms.cmTermSpan(_span());
-      } finally {
-        _quiet = false;
-      }
-    } else if (st && !st.dirty) delete (/** @type {any} */ (window).CmTerms._cmTermState[KEY]);
+    var span = _span();
+    var st = _cm()._cmTermState[KEY];
+    if (_snap) _recut(_snap.st, span);
+    if (_held) {
+      var held = { rows: _held, span: span };
+      _recut(held, span);
+      _held = held.rows;
+    }
+    if (st && st.dirty) _recut(st, span);
+    else if (st) delete _cm()._cmTermState[KEY];
     _refresh(true);
   }
 
   // A new wizard starts from the school's terms, with nothing picked.
   function reset() {
-    var cm = /** @type {any} */ (window).CmTerms;
+    _snap = null;
+    _held = null;
+    var cm = _cm();
     if (cm && cm.forget) cm.forget(KEY);
   }
 

@@ -33,9 +33,11 @@ window.CmTerms = (function () {
     if (_draft && _draft.active()) _draft.redraw();
     else if (_host) _host.renderClassManager();
   }
-  /* The New Class wizard's class, not made yet (teacher/cm-terms-draft.js):
-     its terms are kept under the draft's key until Create Class saves them. */
-  /** @type {{ key: string, active: () => boolean, saved: () => any[], redraw: () => void, changed: () => void } | null} */
+  /* The New Class wizard's class, not made yet (teacher/cm-terms-start.js):
+     its terms are kept under the draft's key until Create Class saves them.
+     opening() is told before Edit Dates or Create New opens the editor, and
+     restore() puts back what was shown then, on Cancel. */
+  /** @type {{ key: string, active: () => boolean, saved: () => any[], redraw: () => void, changed: () => void, opening: (isNew?: boolean) => void, restore: () => void, currentLabel: () => string } | null} */
   var _draft = null;
   function useDraft(d) {
     _draft = d;
@@ -629,14 +631,13 @@ window.CmTerms = (function () {
     { value: 'blank', label: 'Blank' },
   ];
 
-  // html-safe: values and labels are the fixed list above.
+  // html-safe: values and labels are the fixed list above; the draft's label goes through esc.
   function _cmRenderTermStart(cid) {
     var on = _cmTermStart[cid] || 'current';
-    var choices = _cmSaved(cid).length
-      ? _CM_TERM_STARTS
-      : _CM_TERM_STARTS.filter(function (c) {
-          return c.value !== 'current';
-        });
+    var current = _draft && cid === _draft.key ? _draft.currentLabel() : '';
+    var choices = _CM_TERM_STARTS.filter(function (c) {
+      return c.value !== 'current' || _cmSaved(cid).length;
+    });
     return (
       '<div class="cm-term-start" role="group" aria-label="Start With"><span class="cm-term-span-label">Start With</span>' +
       choices
@@ -649,7 +650,7 @@ window.CmTerms = (function () {
             '" data-action="cmTermPreset" data-value="' +
             c.value +
             '">' +
-            c.label +
+            esc((c.value === 'current' && current) || c.label) +
             '</button>'
           );
         })
@@ -707,7 +708,7 @@ window.CmTerms = (function () {
       html += _cmRenderTermSpan(cid);
     } else {
       html +=
-        '<label class="cm-label">Reporting Terms</label>' +
+        (_isDraft(cid) ? '' : '<label class="cm-label">Reporting Terms</label>') +
         '<div class="cm-hint" style="margin-bottom:8px">Each term is a report date. Grades build all year: a report shows the year to date as of its term’s end. Up to six. Surrey secondary dates come from each school’s published calendar; a term ends on the day its report is published.</div>';
       html += _cmRenderTermSpan(cid);
       html += _cmRenderSchoolPreset(cid, rows.length > 0);
@@ -801,6 +802,7 @@ window.CmTerms = (function () {
 
   function cmTermEdit() {
     if (!cmSelectedCourse) return;
+    if (_draft && cmSelectedCourse === _draft.key) _draft.opening();
     // A class on its own dates edits them as Your Own Dates, even once
     // every row is removed.
     if (_cmTermOwnMode(cmSelectedCourse)) _cmTermOwn[cmSelectedCourse] = true;
@@ -821,6 +823,7 @@ window.CmTerms = (function () {
   function cmTermCancel() {
     if (!cmSelectedCourse) return;
     _cmTermForget(cmSelectedCourse);
+    if (_draft && cmSelectedCourse === _draft.key) _draft.restore();
     renderClassManager();
   }
 
@@ -829,6 +832,7 @@ window.CmTerms = (function () {
   function cmTermNew() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
+    if (_draft && cid === _draft.key) _draft.opening(true);
     _cmTermOwn[cid] = true;
     _cmTermEditing[cid] = true;
     delete _cmTermSchool[cid];
@@ -1115,6 +1119,9 @@ window.CmTerms = (function () {
     configure: configure,
     _cmTermState: _cmTermState,
     _cmTermSchool: _cmTermSchool,
+    _cmTermOwn: _cmTermOwn,
+    _cmTermEditing: _cmTermEditing,
+    _cmTermStart: _cmTermStart,
     _cmTermRows: _entry(_cmTermRows),
     _cmTermError: _entry(_cmTermError),
     _cmTermDay: _entry(_cmTermDay),

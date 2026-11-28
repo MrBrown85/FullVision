@@ -225,4 +225,106 @@ describe('New Class › Reporting Terms', () => {
     await startWizard();
     expect(termsRow()).toBe('Grandview Heights Secondary, 4 terms');
   });
+  it('Edit Dates leaves out the section’s own Reporting Terms heading; Class Settings keeps it', async () => {
+    const heading = '<label class="cm-label">Reporting Terms</label>';
+    saveCourses({ real: { id: 'real', name: 'Real 8' } });
+    saveReportingTerms('real', school('grandviewheights'));
+    CmTerms._cmTermEditing.real = true;
+    expect(CmTerms._cmRenderReportingTermsField('real')).toContain(heading);
+    delete CmTerms._cmTermEditing.real;
+    await startWizard();
+    act('cwOpenRow', { row: 'terms' });
+    act('cmTermEdit');
+    expect(main.innerHTML).toContain('data-action="cmTermAdd"');
+    expect(main.innerHTML).not.toContain(heading);
+  });
+
+  it('Cancel goes back to what Edit Dates opened from', async () => {
+    await startWizard();
+    act('cwOpenRow', { row: 'terms' });
+    act('cmTermEdit');
+    act('cmTermDelete', { idx: '0' });
+    expect(termsRow()).toBe('Grandview Heights Secondary, 3 terms');
+    act('cmTermCancel');
+    expect(termsRow()).toBe('Grandview Heights Secondary, 4 terms');
+    expect(main.innerHTML).toContain('data-action="cmTermEdit"');
+  });
+
+  it('Cancel after Create New goes back to the school picked before it, not the default school', async () => {
+    await startWizard();
+    act('cwOpenRow', { row: 'terms' });
+    pickDates('fraserheights');
+    act('cmTermSchoolPreset');
+    act('cmTermNew');
+    act('cmTermPreset', { value: 'semesters' });
+    expect(termsRow()).toBe('Your own dates, 2 terms');
+    act('cmTermCancel');
+    expect(termsRow()).toBe('Fraser Heights Secondary, 4 terms');
+    const cid = await create('Cancelled 8');
+    expect(bare(getReportingTerms(cid))).toEqual(bare(school('fraserheights')));
+  });
+
+  it("Start With's first choice is named by what the draft holds, and copies it", async () => {
+    const first = () =>
+      [...main.innerHTML.matchAll(/data-action="cmTermPreset" data-value="(\w+)">([^<]+)</g)].find(
+        m => m[1] === 'current',
+      );
+    await startWizard();
+    act('cwOpenRow', { row: 'terms' });
+    act('cmTermNew');
+    expect(first()[2]).toBe('Grandview Heights Secondary’s Dates');
+    expect(main.innerHTML).not.toContain('This Class’s Dates');
+    act('cmTermCancel');
+    pickDates('fraserheights');
+    act('cmTermSchoolPreset');
+    act('cmTermNew');
+    expect(first()[2]).toBe('Fraser Heights Secondary’s Dates');
+    expect(bare(CmTermsStart.terms())).toEqual(bare(school('fraserheights')));
+    // Dates the teacher edited are Current Dates, and Create New starts from them.
+    act('cmTermCancel');
+    CmTerms.cmTermLive(1, 'ends_on', '2027-01-20');
+    act('cmTermNew');
+    expect(first()[2]).toBe('Current Dates');
+    expect(CmTermsStart.terms()[1].ends_on).toBe('2027-01-20');
+  });
+
+  it('Start With leaves its first choice out when the draft has no terms', async () => {
+    await startWizard();
+    act('cwOpenRow', { row: 'terms' });
+    pickDates('fraserheights');
+    act('cmTermSchoolPreset');
+    [0, 0, 0, 0].forEach(i => act('cmTermDelete', { idx: String(i) }));
+    act('cmTermNew');
+    expect(main.innerHTML).toContain('data-value="quarters"');
+    expect(main.innerHTML).not.toContain('data-value="current"');
+    expect(CmTermsStart.terms().map(t => t.label)).toEqual(['Term 1', 'Term 2', 'Term 3', 'Term 4']);
+  });
+
+  it('a Start With layout follows This Class Runs; typed dates stay', async () => {
+    await startWizard();
+    act('cwOpenRow', { row: 'terms' });
+    act('cmTermNew');
+    act('cmTermPreset', { value: 'quarters' });
+    setSpan('s2');
+    expect(CmTermsStart.terms().map(t => [t.ordinal, t.label])).toEqual([
+      [3, 'Term 3'],
+      [4, 'Term 4'],
+    ]);
+    setSpan('full');
+    expect(CmTermsStart.terms()).toHaveLength(4);
+    CmTerms.cmTermLive(0, 'ends_on', '2026-11-10');
+    setSpan('s1');
+    expect(CmTermsStart.terms()).toHaveLength(4);
+    expect(CmTermsStart.terms()[0].ends_on).toBe('2026-11-10');
+  });
+
+  it('Cancel puts back the dates for the span chosen since the editor opened', async () => {
+    await startWizard();
+    act('cwOpenRow', { row: 'terms' });
+    act('cmTermEdit');
+    act('cmTermDelete', { idx: '0' });
+    setSpan('s1');
+    act('cmTermCancel');
+    expect(termsRow()).toBe('Grandview Heights Secondary, 2 terms');
+  });
 });
