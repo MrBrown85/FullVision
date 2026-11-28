@@ -45,17 +45,10 @@ describe('habitPlan with the teacher’s choice', () => {
     expect(named(back)).not.toContain('completes');
   });
 
-  it('gives a fourth habit at one rating a sentence of its own', () => {
+  it('does not fold a habit switched on into another habit’s sentence: the page gives it its own', () => {
     const r = { completes: 4, ready: 4, others: 4, part: 4, feedback: 3 };
-    const plain = CB.habitPlan(r, '', r);
-    expect(named(plain)).not.toContain('part');
     const plan = CB.habitPlan(r, '', r, { on: ['part'], off: [] });
-    expect(named(plan)).toContain('part');
-    const all = [plan.lead, plan.more].concat(plan.extra || []).filter(Boolean);
-    // No sentence names more than three, and every habit is named once.
-    all.forEach(p => expect(p.keys.length).toBeLessThanOrEqual(3));
-    const flat = all.reduce((a, p) => a.concat(p.keys), []);
-    expect(flat.length).toBe(new Set(flat).size);
+    expect(named(plan)).toEqual(named(CB.habitPlan(r, '', r)));
   });
 
   it('never names a habit that has no rating', () => {
