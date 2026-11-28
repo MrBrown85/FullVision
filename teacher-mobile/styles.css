@@ -35,6 +35,8 @@ body.mobile-mode {
 html.m-root {
   overflow: hidden;
   overscroll-behavior: none;
+  /* No double-tap zoom (teachers zoomed by accident, Colin Nov 27 2026); pinch-to-zoom stays. */
+  touch-action: manipulation;
   background: var(--surface);
 }
 

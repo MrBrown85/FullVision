@@ -66,7 +66,7 @@ window.ReportWcDraw = (function () {
     var cls = 'wc-line' + (l.added ? ' added' : '') + (l.claim ? ' flag' : '');
     return `<div class="${cls}" data-row="${l.ri}" data-rk="${esc(l.rk)}" data-wc-part="${esc(l.box)}">
       <div class="wc-line-main">
-        <span class="wc-grip" role="button" tabindex="0" data-wc-grip="${l.ri}" aria-label="Move this sentence. Drag it, or use the arrow keys." title="Drag to move">${GRIP}</span>
+        ${l.move ? `<span class="wc-grip" role="button" tabindex="0" data-wc-grip="${l.ri}" aria-label="Move this sentence. Drag it, or use the arrow keys." title="Drag to move">${GRIP}</span>` : ''}
         ${edit}${badge}${keep}${bank}${ways}
         <button type="button" class="wc-btn wc-x" data-action="tqSentences" data-do="remove" data-row="${l.ri}" aria-label="Remove From Comment" title="Remove From Comment">✕</button>
       </div>
@@ -133,6 +133,7 @@ window.ReportWcDraw = (function () {
       .join('');
   }
   function factHtml(f, box) {
+    if (f.loose) return `<div class="wc-fact-wrap" data-fact="${esc(f.id)}">${line(f.loose)}</div>`;
     if (f.html === 'obs') return `<div class="wc-fact-wrap">${host.obsHtml()}</div>`;
     return `<div class="wc-fact-wrap" data-fact="${esc(f.id)}">
       <div class="wc-fact">${factRow(f, box)}</div>
@@ -167,18 +168,21 @@ window.ReportWcDraw = (function () {
       foot.push(
         `<button type="button" class="wc-link" data-action="tqSentences" data-do="wcBrowse" data-part="${esc(b.browse.part)}">${esc(b.browse.label)}</button>`,
       );
-    return `<section class="wc-box open" data-bk="${b.key}" data-part="${b.key}" aria-label="${esc(b.label)}" style="--tint:${b.tint}">
+    return `<section class="wc-box open" data-bk="${b.key}" data-part="${b.key}"${b.float ? ' data-float="1"' : ''} aria-label="${esc(b.label)}" style="--tint:${b.tint}">
       ${head}
       <div class="wc-body">
         ${b.required || ''}${b.top.map(line).join('')}${b.facts
-          .map(function (f) {
-            return factHtml(f, b);
+          .map(function (f, i) {
+            return (i === 0 && b.float && f.lines.length ? GROUP : '') + factHtml(f, b);
           })
           .join('')}${write}
         ${foot.length ? `<div class="wc-foot">${foot.join('')}</div>` : ''}
       </div>
     </section>`;
   }
+
+  /* In a box of skills, the rows that hold a sentence come first; this names them. */
+  var GROUP = '<h3 class="wc-group">In the Comment</h3>';
 
   function boxes(list, ui) {
     return list

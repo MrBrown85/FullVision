@@ -5,9 +5,9 @@
    One card: the name (a tap for All Students), the overall level in words
    with four bars up to it (a Letter class shows its letter, no bars),
    + Observe and Profile, To Grade, To Return, then the five newest pieces
-   with a result and All N Pieces. In a class whose student page is on, a
-   piece returned and not opened since carries a blue dot, with "N Not
-   Opened" over the list. The card's list scrolls inside it; tab-students.js
+   with a result and All N Pieces. No mark for a piece the student has not
+   opened yet (Colin, Nov 27 2026: the blue dots took up attention for nothing
+   the teacher acts on). The card's list scrolls inside it; tab-students.js
    says "More Below" when it runs past the bottom.
 
    Every tap is one the app already answers: m-all-students,
@@ -70,16 +70,6 @@
     if (cell.kind === 'level' || (cell.kind === 'dibels' && cell.text !== '—'))
       return { text: cell.text, tone: String(cell.level || 0) };
     return null;
-  }
-
-  /* Returned and not opened since: the student page keeps when a student
-     last opened a piece (seen_at). Only in a class whose student page is on. */
-  /** @param {string} cid @param {string} sid @param {string} aid */
-  function _notOpened(cid, sid, aid) {
-    var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
-    if (!row || !row.returned_at) return false;
-    var since = Date.parse(row.updated_at || row.returned_at) || 0;
-    return !row.seen_at || Date.parse(row.seen_at) < since;
   }
 
   /* ── To Return ───────────────────────────────────────────────────
@@ -153,23 +143,15 @@
   /** @param {any} st @param {string} cid */
   function render(st, cid) {
     var pieces = _pieces(cid, st.id);
-    var page = getReturnSettings(cid).student_page;
-    var unopened = page
-      ? pieces.filter(function (/** @type {any} */ p) {
-          return _notOpened(cid, st.id, p.a.id);
-        }).length
-      : 0;
     var rows = pieces
       .slice(0, WORK_ROWS)
       .map(function (/** @type {any} */ p) {
-        var dot = page && _notOpened(cid, st.id, p.a.id);
         return (
           '<button type="button" class="m-sc-row" data-action="m-assess-grade" data-sid="' +
           esc(st.id) +
           '" data-aid="' +
           esc(p.a.id) +
           '">' +
-          (dot ? '<span class="m-sc-dot" role="img" aria-label="Not opened"></span>' : '') +
           '<span class="m-sc-row-title">' +
           esc(p.a.title) +
           '</span><span class="m-sc-pill t' +
@@ -204,9 +186,6 @@
       (boxes ? '<div class="m-sc-boxes">' + boxes + '</div>' : '') +
       (rows
         ? '<div class="m-sc-work">' +
-          (unopened
-            ? '<span class="m-sc-unopened"><span class="m-sc-dot"></span>' + unopened + ' Not Opened</span>'
-            : '') +
           rows +
           (pieces.length > WORK_ROWS
             ? '<button type="button" class="m-sc-row m-sc-all" data-action="m-student-detail" data-sid="' +

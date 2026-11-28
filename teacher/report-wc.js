@@ -60,6 +60,73 @@ window.ReportWc = (function () {
     </div>`;
   }
 
+  /* Keeping the teacher's place. A row that jumps into the In the Comment group (or back out) and the
+     heading that comes with the first one change the box's height above what the teacher is looking
+     at. The row just below the one under the pointer stays where it is on screen: the page scrolls
+     by the change, before the glide is measured, so the glide and the scroll are one motion. */
+  var _ptr = /** @type {any} */ (null);
+  function notePointer(/** @type {any} */ e) {
+    var t = e.target;
+    var y = e.clientY;
+    if (!e.detail && t && t.getBoundingClientRect) {
+      // Pressed from the keyboard: the button's own place.
+      var r = t.getBoundingClientRect();
+      y = r.top + r.height / 2;
+    }
+    _ptr = { y: y, at: Date.now() };
+  }
+  function scroller(/** @type {any} */ el) {
+    for (var p = el && el.parentElement; p; p = p.parentElement) {
+      var oy = getComputedStyle(p).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+  /* The element after the row under the pointer, as a way to find it again once the boxes are drawn:
+     { bk, fact } or { bk, foot }. */
+  function placeMark(/** @type {any} */ host) {
+    var at = _ptr;
+    _ptr = null; // one press, one redraw: a drag's redraws do not use an old press
+    if (!at || Date.now() - at.at > 1500) return null;
+    var wraps = host.querySelectorAll('.wc-body > .wc-fact-wrap');
+    for (var i = 0; i < wraps.length; i++) {
+      var r = wraps[i].getBoundingClientRect();
+      if (at.y < r.top || at.y > r.bottom) continue;
+      var next = wraps[i].nextElementSibling;
+      var box = wraps[i].closest('[data-bk]');
+      if (!next || !box) return null;
+      var mark = { bk: box.getAttribute('data-bk'), fact: next.getAttribute('data-fact'), foot: false, top: 0 };
+      if (!mark.fact && next.classList.contains('wc-foot')) mark.foot = true;
+      else if (!mark.fact) return null;
+      mark.top = next.getBoundingClientRect().top;
+      return mark;
+    }
+    return null;
+  }
+  function holdPlace(/** @type {any} */ host, /** @type {any} */ mark) {
+    if (!mark) return 0;
+    var box = host.querySelector('[data-bk="' + mark.bk + '"]');
+    var el = box
+      ? mark.foot
+        ? box.querySelector('.wc-foot')
+        : Array.prototype.find.call(box.querySelectorAll('.wc-fact-wrap'), function (/** @type {any} */ w) {
+            return w.getAttribute('data-fact') === mark.fact;
+          })
+      : null;
+    if (!el) return 0;
+    var by = el.getBoundingClientRect().top - mark.top;
+    if (Math.abs(by) < 0.5) return 0;
+    var sc = scroller(host);
+    var was = sc.scrollTop;
+    sc.scrollTop += by;
+    var kept = sc.scrollTop;
+    // The press may move focus to a link after this draw, which scrolls to it; the place is kept.
+    Promise.resolve().then(function () {
+      if (Math.abs(sc.scrollTop - kept) > 0.5) sc.scrollTop = kept;
+    });
+    return kept - was;
+  }
+
   /* The boxes redrawn in place, gliding what moved; the comment's own
      sentences follow. Nothing redraws while the teacher types in the box. */
   function redraw() {
@@ -72,16 +139,27 @@ window.ReportWc = (function () {
     }
     ui.dirty = false;
     var active = document.activeElement;
-    var grip = active && active.getAttribute ? active.getAttribute('data-wc-grip') : null;
+    // The handle in focus is found again by its sentence: a move changes the row numbers.
+    var gripLine =
+      active && active.hasAttribute && active.hasAttribute('data-wc-grip') ? active.closest('.wc-line') : null;
+    var grip = gripLine ? gripLine.getAttribute('data-rk') : null;
     var before = ReportQnMotion.measure(host);
+    var mark = placeMark(host);
     // html-safe: boxes drawn by ReportWcDraw with esc()
     host.innerHTML = D.boxes(mapped(B.build(env(st, H.facts(st)))), ui);
-    ReportQnMotion.play(host, before);
     syncReading();
     hot(ui.hot);
+    // Whatever those two change is in place before the page is held and the glide measured.
+    var scrolled = holdPlace(host, mark);
+    // The scroll is not a glide: every place measured before is seen from where the page now stands.
+    if (scrolled)
+      Object.keys(before.pos).forEach(function (k) {
+        before.pos[k].top -= scrolled;
+      });
+    ReportQnMotion.play(host, before, ReportQnMotion.dragKey());
     var habit =
       active && active.classList && active.classList.contains('qn-hs') ? active.getAttribute('data-habit') : null;
-    var g = grip != null ? host.querySelector('.wc-grip[data-wc-grip="' + grip + '"]') : null;
+    var g = grip != null ? host.querySelector('.wc-line[data-rk="' + grip + '"] .wc-grip') : null;
     if (!g && habit) g = host.querySelector('.qn-hs[data-habit="' + habit + '"]');
     if (g) /** @type {HTMLElement} */ (g).focus();
   }
@@ -143,6 +221,7 @@ window.ReportWc = (function () {
   /* Clicking or tabbing into a box picks it; a click in the left column
      outside every box lets go. */
   function wirePick() {
+    document.addEventListener('click', notePointer, true);
     document.addEventListener('focusin', function (e) {
       var t = /** @type {any} */ (e.target);
       var box = t && t.closest && t.closest('.wc-box');

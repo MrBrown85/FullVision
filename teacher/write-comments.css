@@ -81,7 +81,13 @@
   max-height: none;
   margin: 0;
 }
+.wc-boxes,
+.wc-boxes * {
+  /* The page keeps the teacher's place itself (report-wc.js, holdPlace). */
+  overflow-anchor: none;
+}
 .wc-boxes {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -214,6 +220,12 @@
 }
 .wc-body {
   margin-top: 4px;
+}
+/* Names the skill rows that hold a sentence, in a box of skills. */
+.wc-group {
+  margin: 4px 0 2px;
+  font-size: 14.5px;
+  font-weight: 600;
 }
 
 /* Chips and buttons */
@@ -424,11 +436,26 @@
 .wc-line.flag {
   background: var(--wc-warn-bg);
 }
-.wc-line.lift {
-  opacity: 0.45;
+/* A sentence lifted by its handle follows the pointer; a slot marks where it lands. */
+.wc-line.lifted {
+  position: relative;
+  z-index: 20;
+  background: var(--lift-bg, var(--wc-sent-bg));
+  box-shadow:
+    0 0 0 4px var(--lift-bg, var(--wc-sent-bg)),
+    0 14px 34px 6px rgba(0, 0, 0, 0.2);
+  cursor: grabbing;
+  transition: none;
 }
-.wc-line.drop {
-  box-shadow: inset 0 3px 0 var(--link);
+.wc-boxes .qn-slot {
+  left: 6px;
+  right: 6px;
+  background: color-mix(in srgb, var(--link) 14%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--link) 55%, transparent);
+  box-sizing: border-box;
+}
+.wc-boxes.dragging {
+  user-select: none;
 }
 .wc-line-main {
   display: flex;

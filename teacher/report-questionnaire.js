@@ -3681,21 +3681,20 @@ window.ReportQuestionnaire = (function () {
   function _undoToast(st, message, snap) {
     if (typeof showUndoToast !== 'function' || !snap) return;
     if (typeof document === 'undefined' || typeof document.createElement !== 'function') return;
-    showUndoToast(
-      message,
-      function () {
-        if (getTermId() !== snap.termId) return;
-        _rows[snap.key] = snap.rows;
-        if (snap.last) _lastDraft[snap.key] = snap.last;
-        else delete _lastDraft[snap.key];
-        if (snap.seed != null) _lastSeed[snap.key] = snap.seed;
-        else delete _lastSeed[snap.key];
-        _writeRows(st, snap.text);
-        if (_browse) _syncBrowse();
-      },
-      null,
-      6000,
-    );
+    showUndoToast(message, _restore.bind(null, st, snap), null, 6000);
+  }
+  /* The comment put back as a snapshot had it. */
+  function _restore(st, snap) {
+    if (getTermId() !== snap.termId) return;
+    _rows[snap.key] = snap.rows.map(function (x) {
+      return Object.assign({}, x);
+    });
+    if (snap.last) _lastDraft[snap.key] = snap.last;
+    else delete _lastDraft[snap.key];
+    if (snap.seed != null) _lastSeed[snap.key] = snap.seed;
+    else delete _lastSeed[snap.key];
+    _writeRows(st, snap.text);
+    if (_browse) _syncBrowse();
   }
 
   function _writeRows(st, given) {
@@ -6963,6 +6962,7 @@ window.ReportQuestionnaire = (function () {
     writeRows: _writeRows,
     snapshot: _snapshot,
     undoToast: _undoToast,
+    restore: _restore,
     repick: _repick,
     bankById: _bankById,
     applyEdit: _applyEdit,

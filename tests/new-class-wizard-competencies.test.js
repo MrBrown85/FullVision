@@ -156,13 +156,12 @@ describe('Name Your Class: Competencies', () => {
     expect(main.innerHTML).toContain('27 of 27 Competencies');
   });
 
-  it('builds the class from what is ticked', async () => {
+  // Overall is not asked in New Class (Colin, 2026-11-27); one course counts its folders as one.
+  it('builds the class from what is ticked, with one course’s default for the overall', async () => {
     act('cwOpenRow', { row: 'comps' });
     change('cwCompToggle', { key: bankId('DF3') }, false);
-    act('cwOpenRow', { row: 'grading' });
-    expect(main.innerHTML).toContain('Folders Count as One');
-    expect(main.innerHTML).not.toContain('Each Course Counts Equally');
-    expect(main.innerHTML).toContain('You can change this later in Grading.');
+    expect(main.innerHTML).not.toContain('data-row="grading"');
+    expect(main.innerHTML).not.toContain('Folders Count as One');
     await act('cwFinishCreate');
     await new Promise(r => setTimeout(r, 50));
     var cid = Object.keys(COURSES).find(id => COURSES[id].name === 'Drafting 10');
@@ -187,24 +186,17 @@ describe('Name Your Class for Humanities 8', () => {
 
   it('names the class Humanities 8', () => {
     expect(main.innerHTML).toMatch(/id="cm-new-name"[^>]*value="Humanities 8"/);
-    expect(main.innerHTML).toContain('Each Course Counts Equally · Every Competency Counts the Same');
+    expect(main.innerHTML).not.toContain('data-row="grading"');
+    expect(main.innerHTML).not.toContain('Each Course Counts Equally');
   });
 
-  it('starts with each course counted equally and folders off, and the teacher can flip them', async () => {
-    act('cwOpenRow', { row: 'grading' });
-    expect(main.innerHTML).toMatch(/id="cw-courses-equal"[^>]*checked/);
-    expect(main.innerHTML).toContain(
-      'English Language Arts 8 and Social Studies 8 each make up half of the overall. You can change this later in Grading.',
-    );
-    expect(main.innerHTML).not.toMatch(/id="cw-folders-count"[^>]*checked/);
-    change('cwRollup', { key: 'folders' }, true);
-    expect(main.innerHTML).toMatch(/id="cw-folders-count"[^>]*checked/);
-    expect(main.innerHTML).toContain('Each Course Counts Equally · Folders Count as One');
+  it('a combined class counts each course equally and folders not as one, with no Overall row to ask', async () => {
+    expect(main.innerHTML).toContain('English Language Arts 8 and Social Studies 8 each make up half of the overall.');
     await act('cwFinishCreate');
     await new Promise(r => setTimeout(r, 50));
     var cid = Object.keys(COURSES).find(id => COURSES[id].name === 'Humanities 8');
     expect(getCoursesCountEqually(cid)).toBe(true);
-    expect(getFoldersCountAsOne(cid)).toBe(true);
+    expect(getFoldersCountAsOne(cid)).toBe(false);
     expect(getLearningMap(cid).sections).toHaveLength(28);
   });
 });

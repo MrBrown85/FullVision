@@ -825,7 +825,10 @@ describe('the card drawn for a Demo Mode student', () => {
     // Every sentence is a line of a box, none of them a class line twice.
     const lines = (html.match(/class="wc-line[ "]/g) || []).length;
     expect(lines).toBe(RQ.rowsFromDraft(d).length);
-    expect((html.match(/data-wc-grip="/g) || []).length).toBe(lines);
+    // A handle only where the sentence has another to pass: a lone sentence in its box has none.
+    const grips = (html.match(/data-wc-grip="/g) || []).length;
+    expect(grips).toBeGreaterThan(0);
+    expect(grips).toBeLessThan(lines);
     expect((html.match(/data-do="remove"/g) || []).length).toBe(lines);
     expect(html).toContain('data-do="wcWays"');
     // Each part has its own box, in the comment's order; the sentence sheet opens on it.

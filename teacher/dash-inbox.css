@@ -264,3 +264,71 @@
 :root[data-theme='dark'] .dash-inbox-action.is-return {
   color: #052e12;
 }
+
+/* A student's question, waiting: one line above the stacks (DashInboxQuestions). */
+.dash-inbox-qs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 10px;
+}
+.dash-inbox-q {
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--divider-subtle);
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.dash-inbox-q-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-inbox-q-text b {
+  font-weight: 700;
+}
+.dash-inbox-q:hover {
+  background: var(--overlay-hover);
+}
+.dash-inbox-q {
+  padding-block: 6px;
+}
+/* Answer is the app's grey button (styles.css .btn-ghost). */
+.dash-inbox-q-answer {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 14px;
+  font-weight: 600;
+}
+.dash-inbox-q-more {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.dash-inbox-q-answer:focus-visible,
+.dash-inbox-q-more:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+/* On an iPad every control is 44 px (teacher/tablet.css). */
+html.fv-tablet .dash-inbox-q-answer,
+html.fv-tablet .dash-inbox-q-more {
+  min-height: 44px;
+}

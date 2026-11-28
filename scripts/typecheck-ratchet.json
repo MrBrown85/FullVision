@@ -1,5 +1,6 @@
 {
   "checked": [
+    "teacher/preview-send.js",
     "teacher/obs-roster.js",
     "teacher/obs-toolbar.js",
     "teacher/card-show.js",
@@ -40,6 +41,7 @@
     "teacher/cm-keep-draw.js",
     "teacher/cm-keep-menu.js",
     "teacher/focus-back.js",
+    "teacher/cm-terms-start.js",
     "teacher/cm-terms.js",
     "teacher/dash-competencies.js",
     "teacher/dash-recent.js",
@@ -54,6 +56,7 @@
     "teacher/dash-inbox-targets.js",
     "teacher/dash-tile-redraw.js",
     "teacher/dash-next-report.js",
+    "teacher/dash-inbox-questions.js",
     "teacher/cm-grading-bars.js",
     "teacher/cm-pts-model.js",
     "teacher/cm-pts-ruler.js",
@@ -170,6 +173,7 @@
     "s/quiz.js",
     "s/seen-watch.js",
     "s/keyboard-settle.js",
+    "s/home-screen-card.js",
     "s/send-note.js",
     "s/rubric-whole.js",
     "shared/website-ask.js",

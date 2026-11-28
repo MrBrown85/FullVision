@@ -456,6 +456,7 @@ declare var DashClassManager: any;
 declare var DashOverview: any; // teacher/dash-overview.js
 declare var DashTileRedraw: any; // teacher/dash-tile-redraw.js
 declare var DashNextReport: any; // teacher/dash-next-report.js
+declare var DashInboxQuestions: any; // teacher/dash-inbox-questions.js
 declare var DashInsights: any; // teacher/dash-insights.js
 declare var DashInboxModel: any; // teacher/dash-inbox-model.js
 declare var DashInboxDrop: any; // teacher/dash-inbox-drop.js
@@ -569,6 +570,7 @@ declare var CmPtsPointer: any;
 declare var FVBackupRestore: any;
 declare var openColorPop: any;
 declare var CmTerms: any;
+declare var CmTermsStart: any;
 declare var CompetencyWording: any;
 declare var RubricDraft: any;
 declare var RubricPrint: any;

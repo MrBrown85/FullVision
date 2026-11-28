@@ -97,7 +97,8 @@ window.ReportQnMotion = (function () {
      the lead rows { prev, next } of the units around row i (-1 for none);
      step(i, dir) moves row i one place in memory and draws the card again,
      returning its new index (-1 when it cannot move); commit() saves the
-     order; cancel() puts the order back. */
+     order; cancel() puts the order back; bounds(rk), if given, keeps the
+     lifted sentence inside { top, bottom } of the card. */
   function configure(h) {
     host = h;
   }
@@ -123,9 +124,15 @@ window.ReportQnMotion = (function () {
     var ty = d.y - d.grab - natural;
     var lo = -natural + 8;
     var hi = card.offsetHeight - natural - el.offsetHeight - 8;
+    // The page may keep the sentence in its own box: bounds(rk) is { top, bottom } within the card.
+    var in_ = host.bounds && host.bounds(d.rk);
+    if (in_) {
+      lo = in_.top - natural;
+      hi = in_.bottom - natural - el.offsetHeight;
+    }
     ty = Math.max(lo, Math.min(hi, ty));
     d.ty = ty;
-    var bg = getComputedStyle(el.closest('.qn-box') || el).backgroundColor;
+    var bg = getComputedStyle(el.closest('.qn-box, .wc-box') || el).backgroundColor;
     el.classList.add('lifted');
     el.style.setProperty('--lift-bg', bg);
     el.style.transform = 'translateY(' + ty + 'px) scale(1.012)';
@@ -161,22 +168,32 @@ window.ReportQnMotion = (function () {
       card.classList.add('dragging');
     }
     apply();
-    var n = host.neighbors(d.idx);
     var mid = function (i) {
       var el = card.querySelector('[data-row="' + i + '"]');
       return el ? layoutTop(el, card) + el.offsetHeight / 2 : null;
     };
-    var m;
-    if (n.prev >= 0 && (m = mid(n.prev)) != null && d.y < m) d.idx = host.step(d.idx, -1);
-    else if (n.next >= 0 && (m = mid(n.next)) != null && d.y > m) d.idx = host.step(d.idx, 1);
-    else return;
-    var cur = host.card();
-    var again = cur && cur.querySelector('[data-row="' + d.idx + '"]');
-    if (again) d.rk = again.getAttribute('data-rk');
-    afterDraw();
+    // A quick flick can pass several sentences in one move: step until it is no longer past one.
+    var moved = false;
+    for (var guard = 0; guard < 60; guard++) {
+      var n = host.neighbors(d.idx);
+      var m;
+      var to = -1;
+      if (n.prev >= 0 && (m = mid(n.prev)) != null && d.y < m) to = host.step(d.idx, -1);
+      else if (n.next >= 0 && (m = mid(n.next)) != null && d.y > m) to = host.step(d.idx, 1);
+      if (to < 0) break;
+      d.idx = to;
+      moved = true;
+      var again = host.card().querySelector('[data-row="' + d.idx + '"]');
+      if (again) d.rk = again.getAttribute('data-rk');
+    }
+    if (moved) afterDraw();
   }
 
   function stop() {
+    // The slot is the card's to take away: the page may not draw it again.
+    var card = host && host.card();
+    var slot = card && card.querySelector('.qn-slot');
+    if (slot) slot.remove();
     document.removeEventListener('pointermove', move);
     document.removeEventListener('pointerup', up);
     document.removeEventListener('pointercancel', cancel);

@@ -1054,14 +1054,14 @@ window.StudentView = (function () {
     return { ok: true, v: 1, reflect_on_feedback: on, assessments: assessments };
   }
 
-  /* The part of the `work` reply that says what is in, for Preview as
-     Student: each piece the student (or the teacher, for them) has handed
-     work in for, with its page count, as the server counts it for the
-     student's own page (the newest work in; none on paper). Send Work is
-     given as off, so the preview's cards stay as they were: build() reads
-     only the page counts from it (pagesBy). The student's group's pages on
-     a One per Group piece come with the group's counts (getStudentGroupWork). */
+  /* The `work` reply for Preview as Student, read from the teacher's copy (getStudentWork, no network): each
+     piece's Student Work setting and what is in, so a card shows Send My Work, Sent, Replace as the student's
+     page does. Without that reader (no data layer) Send Work is off and only page counts come (pagesBy). */
   function workReplyFromCache(cid, sid, page) {
+    if (typeof getStudentWork === 'function') {
+      var got = getStudentWork(cid, sid);
+      if (got && got.ok === true) return got;
+    }
     var newest = typeof getStudentSubmission === 'function' ? getStudentSubmission : null;
     var assessments = [];
     list(page && page.assessments).forEach(function (row) {
