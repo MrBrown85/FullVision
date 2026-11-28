@@ -219,15 +219,14 @@ test('before Generate: no comment yet with the habits rated; it goes once there 
   await expect(page.locator('#tq-generate-first')).toBeHidden();
 });
 
-test('a sentence over 20 words leaves Approve on; there is no character limit', async ({ page }) => {
+test('a long sentence is not marked and leaves Approve on; there is no character limit', async ({ page }) => {
   await open(page, 'st1');
   const long = 'She ' + 'always '.repeat(21) + 'tries.';
   await page.locator('#tq-narrative').evaluate((el, t) => {
     el.value = t;
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }, long);
-  await expect(page.locator('#tq-count-tail')).toHaveText(' · one sentence is over 20 words');
-  await expect(page.locator('#tq-count-pill')).toHaveClass(/over/);
+  await expect(page.locator('#tq-count-pill')).not.toHaveClass(/over/);
   await expect(page.locator('#tq-approve-next')).toBeEnabled();
   // The count is not a button: no character limit opens from it.
   await expect(page.locator('#tq-count-pill')).not.toHaveAttribute('role', /.+/);

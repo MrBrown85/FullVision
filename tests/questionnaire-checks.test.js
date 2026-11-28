@@ -93,16 +93,6 @@ function open(sid) {
 }
 const current = () => RQ.getTqStudents()[RQ.tqStudentIndex];
 
-describe('longSentences', () => {
-  it('finds a sentence over 20 words, a quoted title counting as one', () => {
-    const long = 'He ' + 'always '.repeat(20) + 'tries.';
-    expect(RQ.longSentences('Short one. ' + long)).toEqual([long]);
-    const title = 'His best piece was “' + 'word '.repeat(25).trim() + '”, where he linked two ideas.';
-    expect(RQ.longSentences(title)).toEqual([]);
-    expect(RQ.longSentences('')).toEqual([]);
-  });
-});
-
 describe('the Not Handed In row and Approve and Next', () => {
   it('shows the row with its count and no tick; Approve and Next stays on', () => {
     seed({ missing: ['a3', 'a7'] });
@@ -125,7 +115,7 @@ describe('the Not Handed In row and Approve and Next', () => {
   });
 });
 
-describe('the character count and the 20-word rule', () => {
+describe('the character count', () => {
   it('a limit saved by older code is not read: the count is only the count', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: SIX });
@@ -141,26 +131,22 @@ describe('the character count and the 20-word rule', () => {
     expect(btn.disabled).toBe(false);
     expect(ready.textContent).toBe('0 of 2 Ready');
   });
-  it('a sentence over 20 words: the count says so and Approve stays on', () => {
+  it('a long sentence is not marked: the count is the count and Approve stays on', () => {
     seed();
     const long = 'Gabriel ' + 'really '.repeat(20) + 'tries.';
     upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' His work habits are steady.' });
     const html = open();
-    expect(html).toContain('class="qn-count over"');
-    expect(html).toContain('<span id="tq-count-tail"> · one sentence is over 20 words</span>');
+    expect(html).not.toContain('class="qn-count over"');
+    expect(html).not.toContain('over 20 words');
+    expect(html).not.toContain('tq-count-tail');
     expect(RQ.approveBlockers(current())).toEqual([]);
     RQ.syncApprove();
     expect(btn.disabled).toBe(false);
-    upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' ' + long });
-    expect(open()).toContain('<span id="tq-count-tail"> · two sentences are over 20 words</span>');
-    expect(RQ.approveBlockers(current())).toEqual([]);
   });
-  it('a comment with no long sentence shows the count alone', () => {
+  it('a comment shows the count alone', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: SIX });
-    expect(open()).toContain(
-      '<span class="qn-count-text" id="tq-count">' + SIX.length + ' characters</span><span id="tq-count-tail"></span>',
-    );
+    expect(open()).toContain('<span class="qn-count-text" id="tq-count">' + SIX.length + ' characters</span>');
     expect(RQ.approveBlockers(current())).toEqual([]);
   });
 });

@@ -908,7 +908,7 @@ describe('a sentence of the teacher’s own', () => {
     expect(PB.plainWords('In {course}, {he} [is|are] ready.')).toBe('In [class name], [he/she/they] is ready.');
   });
 
-  it('gives the lint, the word count, a date and a one-day marker as advice in plain words, and still saves', () => {
+  it('gives the lint, a date and a one-day marker as advice in plain words, and still saves', () => {
     const out = composeFor('Gabriel needs to keep up his bright work.', { step: 'overall' });
     expect(out.blocked).toBe('');
     expect(out.template).toBeTruthy();
@@ -916,15 +916,6 @@ describe('a sentence of the teacher’s own', () => {
       '“keep up” is a phrase families may not know; try “continue”.',
       '“bright” praises the person; say what the work or the habit showed instead.',
     ]);
-    expect(composeFor('Gabriel reads.', { step: 'overall' }).advice).toEqual([
-      'This is 2 words; a bank sentence needs six or more.',
-    ]);
-    expect(
-      composeFor(
-        'Gabriel reads every page of every chapter of every unit of the course twice before each and every quiz in class.',
-        { step: 'overall' },
-      ).advice[0],
-    ).toMatch(/^This is 2\d words; a report sentence has 20 or fewer\.$/);
     expect(composeFor('Gabriel led the group discussion on Tuesday with care.', { step: 'overall' }).advice).toEqual([
       'This is about one day; a bank sentence is used every term.',
     ]);

@@ -10,8 +10,6 @@
 window.ReportWcHost = (function () {
   'use strict';
 
-  var P = ReportWcParts;
-
   /* What the main file already has, passed through. */
   function passThrough(rq, h) {
     h.current = rq.current;
@@ -193,7 +191,6 @@ window.ReportWcHost = (function () {
 
   /* Class lines and the wordings of a row. */
   function wordings(rq, h) {
-    var cid = rq.cid;
     h.classLineRow = function (st, f, kind) {
       var text = '';
       var step = { support: 'support', closing: 'closer', late: 'lateWork', lang: 'languageGoals' }[kind];
@@ -204,24 +201,6 @@ window.ReportWcHost = (function () {
       else if (kind === 'lang')
         text = ctx.languageGoalLine ? CommentBank.fill({ text: ctx.languageGoalLine }, ctx) : '';
       return text && step ? rq.classRow(step, text) : null;
-    };
-
-    /* Another wording of row i that opens with a different word, used for
-       Vary Them; null when the bank has none. */
-    h.otherOpening = function (st, f, rows, i, word) {
-      var row = rows[i];
-      if (!row || !row.s || row.edited || !row.step) return null;
-      var ctx = rq.ctx(rq.cid(), st, f);
-      var taken = {};
-      rows.forEach(function (r) {
-        taken[r.id] = true;
-      });
-      var alts = h.alternatives(row, ctx, rq.usage(cid(), st), taken, 12);
-      for (var k = 0; k < alts.length; k++) {
-        var made = rq.rowFromSentence(alts[k], ctx, row.step, false);
-        if (P.firstWord(made.text) !== word) return made;
-      }
-      return null;
     };
   }
 

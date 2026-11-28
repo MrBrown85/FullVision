@@ -253,40 +253,16 @@ window.ReportQuestionnaire = (function () {
     var n = String(text || '').length;
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (n === 1 ? ' character' : ' characters');
   }
-  /* The sentences of a comment over 20 words, a quoted title counting as
-     one (the realiser's rule; a teacher's edit can pass it). */
-  var _long = { text: null, list: [] }; // the last text's: a key asks two or three times
-  function longSentences(text) {
-    if (text !== _long.text) _long = { text: text, list: sentencesOf(text).filter(CommentRealiser.tooLong) };
-    return _long.list.slice();
-  }
-  /* After the count: that a sentence is over 20 words (the count turns
-     orange). Only information: nothing is blocked, and there is no length
-     limit (Colin, 2026-11-02: "don't restrict users"; 2026-11-26: the
-     character limit box is gone). */
-  function _countTail(text) {
-    var n = longSentences(text).length;
-    if (n === 1) return ' · one sentence is over 20 words';
-    if (n > 1) return ' · ' + CommentBank.numberWords(n) + ' sentences are over 20 words';
-    return '';
-  }
-  function _countFlag(text) {
-    return longSentences(text).length > 0;
-  }
   function _syncCount() {
     var el = _box();
     var out = document.getElementById('tq-count');
     if (el && out) out.textContent = _countText(el.value);
-    var tail = document.getElementById('tq-count-tail');
-    if (el && tail) tail.textContent = _countTail(el.value);
-    var btn = document.getElementById('tq-count-pill');
-    if (el && btn) btn.classList.toggle('over', _countFlag(el.value));
     syncApprove();
   }
 
   /* The count under the comment. */
   function _countHtml(cid, text) {
-    return `<span class="qn-count-wrap"><span class="qn-count${_countFlag(text) ? ' over' : ''}" id="tq-count-pill"><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-count-tail">${esc(_countTail(text))}</span></span></span>`;
+    return `<span class="qn-count-wrap"><span class="qn-count" id="tq-count-pill"><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span></span></span>`;
   }
 
   /* Copy: the comment as plain text, ready to paste (⌘⇧C too). */
@@ -2122,8 +2098,7 @@ window.ReportQuestionnaire = (function () {
      on screen: 'deadline' until an IE's deadline is picked, 'claims' while
      a sentence no longer matches the gradebook. The button is never off:
      pressing it with a blocker goes to the box that needs the teacher
-     (_pointAtBlocker). The length never blocks: the count says when the
-     comment is past the class's limit or a sentence is over 20 words. */
+     (_pointAtBlocker). The length never blocks. */
   function approveBlockers(st) {
     if (!st) return [];
     var f = _facts(st);
@@ -7126,7 +7101,6 @@ window.ReportQuestionnaire = (function () {
     closeLines: closeLines,
     approveBlockers: approveBlockers,
     syncApprove: syncApprove,
-    longSentences: longSentences,
     nearTwin: nearTwin,
     tqShowBoth: tqShowBoth,
     tqCloseBoth: tqCloseBoth,

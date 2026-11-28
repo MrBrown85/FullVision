@@ -340,9 +340,7 @@ window.ReportWc = (function () {
       wcWriteAdd: () => A.writeAdd(),
       wcBrowse: () => H.openBrowse(ds.part),
       wcBank: () => A.bank(),
-      wcVary: () => ReportWcComment.vary(),
       wcHabit: () => ReportWcHabits.toggle(ds.habit, !!(el && /** @type {any} */ (el).checked)),
-      wcHabitDup: () => ReportWcHabits.removeOne(ds.habit),
       wcType: () => A.startTyping(),
     };
     if (table[what]) table[what]();

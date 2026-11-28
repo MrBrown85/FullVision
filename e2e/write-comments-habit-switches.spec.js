@@ -6,7 +6,7 @@ import { FONTS, useFont } from './wide-font.js';
    takes it out. The bank's sentence is worded again for the habits it now
    names; a sentence the teacher edited is never rewritten; Generate Again
    keeps the choices; a sentence sits under the first habit it names; two
-   sentences naming one habit show a note with Remove One. Demo Mode,
+   sentences naming one habit show no note. Demo Mode,
    Science 8's Report 2, Cece. */
 test.use({ viewport: { width: 1440, height: 1100 } });
 
@@ -208,23 +208,11 @@ for (const font of FONTS) {
       expect((await placed(page)).map(a => a[0])).toEqual(['ready', 'others']);
     });
 
-    test('two sentences naming one habit show a note; Remove One takes out the later bank sentence', async ({
-      page,
-    }) => {
+    test('two sentences naming one habit show no note and both stay', async ({ page }) => {
       await open(page);
       await useFont(page, font);
-      await expect(page.locator('#wc-notes .wc-note', { hasText: 'name' })).toHaveCount(0);
       await page.locator('.wc-box[data-part="habits"] [data-do="wcSay"]').click();
-      const note = page.locator('#wc-notes .wc-note', { hasText: /sentences name / });
-      await expect(note).toHaveCount(1);
-      await expect(note.locator('.wc-note-text')).toHaveText(/^Two sentences name [A-Z][\w ,]+\.$/);
-      const before = await lines(page).count();
-      const text = await comment(page);
-      await note.getByRole('button', { name: 'Remove One' }).click();
-      await expect(note).toHaveCount(0);
-      expect(await lines(page).count()).toBe(before - 1);
-      expect((await comment(page)).length).toBeLessThan(text.length);
-      // The first sentence stays; the habits it names are still on.
+      await expect(page.locator('#wc-notes .wc-note', { hasText: /sentences name / })).toHaveCount(0);
       expect((await states(page)).completes).toBe(true);
     });
   });

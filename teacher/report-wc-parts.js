@@ -160,30 +160,6 @@ window.ReportWcParts = (function () {
 
   /* ── The checks under the comment ──────────────────────────── */
 
-  var NUMBER_WORDS = ['', '', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
-  function firstWord(t) {
-    var m = /^[“"(]*([A-Za-z’']+)/.exec(String(t || '').trim());
-    return m ? m[1].toLowerCase() : '';
-  }
-  /* The longest run of sentences in a row that start with the same word,
-     and where it begins: { word, from, n }, or null under three. The
-     student's name starts one only when the sentences start with it. */
-  function sameOpening(texts) {
-    var best = /** @type {{ word: string, from: number, n: number } | null} */ (null);
-    var from = 0;
-    for (var i = 1; i <= texts.length; i++) {
-      if (i < texts.length && firstWord(texts[i]) && firstWord(texts[i]) === firstWord(texts[from])) continue;
-      var n = i - from;
-      if (n >= 3 && (!best || n > best.n)) best = { word: firstWord(texts[from]), from: from, n: n };
-      from = i;
-    }
-    return best;
-  }
-  function openingNote(run) {
-    var shown = run.word.charAt(0).toUpperCase() + run.word.slice(1);
-    return (NUMBER_WORDS[Math.min(run.n, 10)] || String(run.n)) + ' sentences in a row start with ' + shown + '.';
-  }
-
   /* One sentence of the comment in place of another; with none, the old one
      and a space beside it taken out. */
   function swapSentence(text, before, after) {
@@ -218,9 +194,6 @@ window.ReportWcParts = (function () {
     has: has,
     overlap: overlap,
     isReword: isReword,
-    firstWord: firstWord,
-    sameOpening: sameOpening,
-    openingNote: openingNote,
     insertAt: insertAt,
     swapSentence: swapSentence,
   };
