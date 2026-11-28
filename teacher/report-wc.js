@@ -72,16 +72,19 @@ window.ReportWc = (function () {
     }
     ui.dirty = false;
     var active = document.activeElement;
-    var grip = active && active.getAttribute ? active.getAttribute('data-wc-grip') : null;
+    // The handle in focus is found again by its sentence: a move changes the row numbers.
+    var gripLine =
+      active && active.hasAttribute && active.hasAttribute('data-wc-grip') ? active.closest('.wc-line') : null;
+    var grip = gripLine ? gripLine.getAttribute('data-rk') : null;
     var before = ReportQnMotion.measure(host);
     // html-safe: boxes drawn by ReportWcDraw with esc()
     host.innerHTML = D.boxes(mapped(B.build(env(st, H.facts(st)))), ui);
-    ReportQnMotion.play(host, before);
+    ReportQnMotion.play(host, before, ReportQnMotion.dragKey());
     syncReading();
     hot(ui.hot);
     var habit =
       active && active.classList && active.classList.contains('qn-hs') ? active.getAttribute('data-habit') : null;
-    var g = grip != null ? host.querySelector('.wc-grip[data-wc-grip="' + grip + '"]') : null;
+    var g = grip != null ? host.querySelector('.wc-line[data-rk="' + grip + '"] .wc-grip') : null;
     if (!g && habit) g = host.querySelector('.qn-hs[data-habit="' + habit + '"]');
     if (g) /** @type {HTMLElement} */ (g).focus();
   }

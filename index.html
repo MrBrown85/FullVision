@@ -484,16 +484,6 @@
       .feat.narrow {
         grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
       }
-      .feat.phone-row {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      }
-      .phone-row .feat-text {
-        max-width: 480px;
-        justify-self: end;
-      }
-      .phone-row .phone-col {
-        justify-self: start;
-      }
       .phone-col {
         max-width: 300px;
         justify-self: center;
@@ -515,6 +505,42 @@
         right: 0;
         bottom: 0;
         width: 30%;
+      }
+      /* Three phones in a row, each with its caption */
+      .apps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: auto auto;
+        column-gap: 56px;
+        max-width: 960px;
+        width: 100%;
+        margin: 0 auto;
+      }
+      .apps figure {
+        display: grid;
+        grid-row: span 2;
+        grid-template-rows: subgrid;
+        row-gap: 32px;
+        justify-items: center;
+        margin: 0;
+      }
+      .apps .phone {
+        max-width: 270px;
+      }
+      .apps figcaption {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-width: 270px;
+        text-align: center;
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--ink-2);
+      }
+      .apps figcaption b {
+        color: #ffffff;
+        font-size: 17px;
+        letter-spacing: -0.01em;
       }
       /* Student work */
       .work {
@@ -1025,16 +1051,12 @@
         .feat,
         .feat.flip,
         .feat.narrow,
-        .feat.phone-row,
         .work {
           grid-template-columns: minmax(0, 1fr);
           gap: 44px;
         }
         .feat.flip .feat-text {
           order: 0;
-        }
-        .phone-row .feat-text {
-          justify-self: start;
         }
         .cards {
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1044,6 +1066,9 @@
         }
         .work .phone-col {
           max-width: 260px;
+        }
+        .apps {
+          column-gap: 32px;
         }
         .h1 {
           font-size: 58px;
@@ -1074,6 +1099,18 @@
         .choices.two,
         .faq {
           grid-template-columns: minmax(0, 1fr);
+        }
+        .apps {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: none;
+          row-gap: 56px;
+        }
+        .apps figure {
+          grid-row: auto;
+          grid-template-rows: auto auto;
+        }
+        .apps .phone {
+          max-width: 240px;
         }
         .navcta-demo {
           display: none;
@@ -1121,7 +1158,8 @@
           <nav class="navlinks" aria-label="Main">
             <a class="navlink" href="#grading">Assessment</a>
             <a class="navlink" href="#student-work">Student Work</a>
-            <a class="navlink" href="#reports">Reports</a>
+            <a class="navlink" href="#comments">Reports</a>
+            <a class="navlink" href="#apps">Apps</a>
             <a class="navlink" href="#schools">Privacy</a>
             <a class="navlink" href="#questions">Questions</a>
           </nav>
@@ -1209,7 +1247,7 @@
               <h2 class="h2">Students Hand In Work and Read Your Feedback, <em>With No Accounts</em></h2>
               <p class="lede">
                 Each student gets a printed card with a code. It opens their own page in a browser: no email, no
-                password, nothing to install.
+                password, no app store.
               </p>
             </div>
             <ol class="steps">
@@ -1258,29 +1296,29 @@
             </div>
           </div>
         </section>
-        <section id="paper" class="band band-white">
+        <section id="comments" class="band band-white">
           <div class="wrap feat">
             <div class="feat-text stack reveal">
-              <p class="eyebrow">Paper Work<span class="new">New</span></p>
-              <h2 class="h2">Scan the Class’s Pile. <em>Each Student Gets Their Own Pages.</em></h2>
+              <p class="eyebrow">Write Comments<span class="new">New</span></p>
+              <h2 class="h2">See the Whole Student <em>While You Write</em></h2>
               <p class="lede">
-                Scan a stack of paper on the school photocopier and open the PDF in Add Work for the Class. FullVision
-                splits it into each student’s pages and files them under the assessment.
+                Each student’s grade, best piece, strengths, work habits, observations and their own words sit beside
+                the comment. Press Generate for a draft built from that record, edit it, then copy it into MyEducation
+                BC.
               </p>
               <ul class="ticks">
-                <li>A pile in class-list order names itself; or type two letters of a name</li>
-                <li>Blank backs are left out, and a page fed in upside down turns with one click</li>
+                <li>A Comment Bank of written sentences, filled in from each student’s grades and work habits</li>
                 <li>
-                  <b>Nothing reads the handwriting.</b> The scan is split on your computer, and only each student’s
-                  pages upload.
+                  Generate uses a sentence only when the student’s record supports it, and shows where each came from
                 </li>
+                <li>Work through the class one student at a time, approving each comment as you go</li>
               </ul>
             </div>
             <img
               class="shot reveal from-right tilt"
               loading="lazy"
-              src="/assets/splash/add-work.jpg"
-              alt="Split the Scan: a 27-page scan of a Chemical Reactions Lab, cut into one piece per student, each named in class-list order."
+              src="/assets/splash/write-comments.jpg"
+              alt="Write Comments: a student’s grade, best piece, strength and six work habits beside the teacher comment, with the work habits sentences marked in it."
             />
           </div>
         </section>
@@ -1288,15 +1326,14 @@
           <div class="wrap feat flip">
             <div class="feat-text stack reveal">
               <p class="eyebrow">Reports</p>
-              <h2 class="h2">Write Report Comments <em>From Your Own Records</em></h2>
+              <h2 class="h2">Print Reports <em>From Your Own Records</em></h2>
               <p class="lede">
-                While you write a comment, the student’s grades, your observations and their self-assessment are on the
-                same screen. Every report fills in from your gradebook, and you choose what prints.
+                Every report fills in from your gradebook: grades, your comment and the student’s self-assessment. You
+                choose what prints.
               </p>
               <ul class="ticks">
-                <li>A Comment Bank of written sentences, filled in from each student’s grades and work habits</li>
-                <li>Generate drafts a comment, using a sentence only when the student’s record supports it</li>
                 <li>Start from Grades, Report Card, Interim Update or Conference Pack, then switch parts on or off</li>
+                <li>A Parent / Guardian Response slip with a return-by date</li>
                 <li>Black and white, on Letter or Legal</li>
               </ul>
             </div>
@@ -1327,23 +1364,53 @@
             />
           </div>
         </section>
-        <section id="phone" class="band">
-          <div class="wrap feat phone-row">
-            <div class="feat-text stack reveal">
-              <p class="eyebrow">On Your Phone</p>
-              <h2 class="h2">Record Observations <em>on Your Phone</em></h2>
+        <section id="apps" class="band">
+          <div class="wrap stack" style="gap: 56px">
+            <div class="stack reveal" style="max-width: 780px">
+              <p class="eyebrow">Apps<span class="new">New</span></p>
+              <h2 class="h2">An App for You, <em>and One for Your Students</em></h2>
               <p class="lede">
-                Record a Strength, Growth or Concern during class, in the lab or on a field trip. Each note is saved to
-                the student’s profile and is there when you write their report. Post a bulletin from the same app.
+                Open FullVision on a phone and add it to your home screen. There is nothing to download from an app
+                store, and your students need only their printed card.
               </p>
             </div>
-            <div class="phone-col reveal from-right">
-              <img
-                class="phone float"
-                loading="lazy"
-                src="/assets/splash/phone-app.jpg"
-                alt="Observations on a phone: notes tagged Strength, Growth and Note."
-              />
+            <div class="apps">
+              <figure class="reveal">
+                <img
+                  class="phone float"
+                  loading="lazy"
+                  src="/assets/splash/teacher-grade.jpg"
+                  alt="The teacher app grading a Light Refraction Lab on the page, with Proficient picked and Return and Next."
+                />
+                <figcaption>
+                  <b>Grade on Your Phone</b>Score the work students send, with their page in front of you, and hand it
+                  back.
+                </figcaption>
+              </figure>
+              <figure class="reveal" style="--d: 0.12s">
+                <img
+                  class="phone float b"
+                  loading="lazy"
+                  src="/assets/splash/teacher-students.jpg"
+                  alt="The teacher app on one student: Proficient, an Observe button, work to grade and recent results."
+                />
+                <figcaption>
+                  <b>Observe in Class</b>Record a Strength, Growth or Concern on the spot, and post a bulletin from the
+                  same app.
+                </figcaption>
+              </figure>
+              <figure class="reveal" style="--d: 0.24s">
+                <img
+                  class="phone float"
+                  loading="lazy"
+                  src="/assets/splash/student-bulletins.jpg"
+                  alt="The student app’s Bulletins tab: a pinned reminder, a returned lab and a photo of the board."
+                />
+                <figcaption>
+                  <b>Your Students’ App</b>Students read your bulletins, send work, see your feedback and answer
+                  reflections. Their printed card signs them in.
+                </figcaption>
+              </figure>
             </div>
           </div>
         </section>
@@ -1366,11 +1433,17 @@
               </div>
               <div class="card reveal" style="--d: 0.08s">
                 <h3>Student Records Stay in Canada</h3>
-                <p>Stored in Canada and seen only by the teacher who owns the class.</p>
+                <p>
+                  Stored in Canada. Only the teacher who owns the class sees it, and each student sees only their own
+                  page.
+                </p>
               </div>
               <div class="card reveal" style="--d: 0.16s">
                 <h3>No AI Writing About Students</h3>
-                <p>Nothing is sent to an AI service. Every comment is the teacher’s own words.</p>
+                <p>
+                  Nothing is sent to an AI service. Generate draws on a bank of written sentences, and you edit every
+                  comment.
+                </p>
               </div>
             </div>
             <a href="/privacy.html" style="font-size: 17px; font-weight: 700; text-decoration: none"

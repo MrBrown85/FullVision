@@ -350,6 +350,7 @@ window.ReportWcBoxes = (function () {
       });
       var openNow = env.openOf(b.key) || !!q || !!requiredHere || attention;
       var model = BUILD[b.key](Object.assign({}, env, { open: true }), mine);
+      var float = M.arrange(b.key, model);
       var facts = model.facts.filter(function (f) {
         return hit(f, q);
       });
@@ -357,6 +358,7 @@ window.ReportWcBoxes = (function () {
       var top = (model.top || []).filter(function (l) {
         return !q || String(l.text).toLowerCase().indexOf(q) >= 0;
       });
+      M.markMovable(facts, top, float);
       var label = b.key === 'voice' ? env.first + '’s Voice' : b.label;
       var show = b.key === 'yours' ? mine.length > 0 : !q || facts.length > 0 || top.length > 0;
       var part = BROWSE_PART[b.key];
@@ -370,6 +372,7 @@ window.ReportWcBoxes = (function () {
         only: model.only || '',
         said: mine.length,
         open: openNow,
+        float: float,
         facts: facts,
         top: top,
         foot: model.foot || [],

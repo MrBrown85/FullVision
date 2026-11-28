@@ -253,14 +253,16 @@ test('an edited sentence is marked Yours and a typed one is kept; Generate Again
 test('the grip moves a sentence with the arrow keys and the comment follows', async ({ page }) => {
   await open(page);
   await generated(page);
-  await openBox(page, 'grade');
+  await openBox(page, 'strength');
+  // A sentence with none to pass has no grip; two more give the Strength box three.
+  await expect(page.locator('[data-wc-grip]')).toHaveCount(0);
+  for (let i = 0; i < 2; i++) await page.locator('.wc-box[data-part="strength"] [data-do="wcSay"]').first().click();
+  await expect(page.locator('.wc-box[data-part="strength"] .wc-grip')).toHaveCount(3);
   const before = await comment(page);
-  const grip = page.locator('[data-wc-grip]').first();
-  const first = (await page.locator('#tq-read .wc-sent').first().textContent()).trim();
+  const grip = page.locator('.wc-box[data-part="strength"] .wc-grip').first();
   await grip.focus();
   await page.keyboard.press('ArrowDown');
   await expect.poll(() => comment(page)).not.toBe(before);
-  expect((await comment(page)).startsWith(first)).toBe(false);
   expect((await comment(page)).split(' ').sort()).toEqual(before.split(' ').sort());
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => comment(page)).toBe(before);

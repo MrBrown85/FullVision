@@ -306,8 +306,7 @@ window.DashInboxStacks = (function () {
     if (!avail) return;
     var solo = !!el.querySelector('.dash-inbox-returns.is-solo'),
       open = el.classList.contains('has-open');
-    var col = /** @type {HTMLElement} */ (el.closest('.dash-row-left') || el);
-    var sh = open ? avail - 76 : (col.clientHeight - 12) * (col.classList.contains('has-bulletins') ? 0.6 : 1) - 192;
+    var sh = open ? avail - 76 : DashInboxQuestions.stackRoom(el); // closed: under any question lines
     if (open && el.querySelector('.dash-inbox-return'))
       sh = Math.min(sh, (avail - (solo ? 120 : 140)) / (solo ? 0.9 : 0.8));
     sh = Math.max(open ? MIN_SH : 96, Math.min(STACK_H, Math.floor(sh)));

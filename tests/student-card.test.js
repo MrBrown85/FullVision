@@ -2,8 +2,8 @@
  * The phone's Students card (docs/plans/phone-look-plan.md, L5):
  * teacher-mobile/student-card.js. The student's My Learning: the name (a tap
  * for every student), the level in words with four bars, + Observe and
- * Profile, To Grade and To Return, the newest pieces with a result, and the
- * Not Opened chip and dots.
+ * Profile, To Grade and To Return, and the newest pieces with a result. No
+ * Not Opened chip or dots (Colin, Nov 27 2026).
  */
 import './setup-mobile.js';
 import { parseHTML } from 'linkedom';
@@ -120,25 +120,11 @@ describe('the pieces', () => {
     expect(all.getAttribute('data-action')).toBe('m-student-detail');
   });
 
-  it('marks what was returned and not opened since, only where the student page is on', () => {
-    let d = card();
-    expect(d.querySelector('.m-sc-unopened').textContent).toBe('1 Not Opened');
-    const lab = [...d.querySelectorAll('.m-sc-row')].find(r => r.textContent.includes('Lab One'));
-    expect(lab.querySelector('.m-sc-dot')).toBeTruthy();
-    mock({ getReturnSettings: () => ({ student_page: false }) });
-    d = card();
+  it('marks nothing as not opened, even where the student page is on', () => {
+    const d = card();
     expect(d.querySelector('.m-sc-unopened')).toBeNull();
-    expect(d.querySelector('.m-sc-row .m-sc-dot')).toBeNull();
-  });
-
-  it('a piece opened since it was returned again counts as not opened', () => {
-    mock({
-      getGradeReturn: (cid, sid, aid) =>
-        aid === 'a2'
-          ? { returned_at: '2026-11-06T10:00:00Z', updated_at: '2026-11-08T10:00:00Z', seen_at: '2026-11-07T10:00:00Z' }
-          : { returned_at: '2026-11-02T10:00:00Z', seen_at: '2026-11-03T10:00:00Z' },
-    });
-    expect(card().querySelector('.m-sc-unopened').textContent).toBe('1 Not Opened');
+    expect(d.querySelector('.m-sc-dot')).toBeNull();
+    expect(MStudentCard.render(st, CID)).not.toMatch(/Not Opened/);
   });
 });
 

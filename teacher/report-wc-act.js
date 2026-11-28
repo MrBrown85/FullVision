@@ -166,87 +166,136 @@ window.ReportWcAct = (function () {
 
   /* ── The drag handle ─────────────────────────────────────── */
 
-  /* A sentence goes in front of the one it is dropped on, in the comment. */
-  function place(from, before) {
+  /* A sentence moves only where its box shows it move: see ReportWcBoxesMore.arrange. A line with
+     nowhere to go has no handle. */
+  function lineEl(i) {
+    return document.querySelector('#wc-boxes .wc-line[data-row="' + i + '"]');
+  }
+  function rowOf(el) {
+    return el ? Number(el.getAttribute('data-row')) : -1;
+  }
+  /* The rows of the lines a sentence can pass: { prev, next }, -1 for none.
+     prev is the row to go in front of, next the row to go after. */
+  function reach(i) {
+    var none = { prev: -1, next: -1 };
+    var el = lineEl(i);
+    var box = el && el.closest('.wc-box');
+    if (!el || !box) return none;
+    var wrap = el.closest('.wc-fact-wrap');
+    var own = Array.prototype.slice.call(
+      wrap ? wrap.querySelectorAll('.wc-line') : box.querySelectorAll('.wc-body > .wc-line'),
+    );
+    var k = own.indexOf(el);
+    if (box.getAttribute('data-float') !== '1' || own.length > 1)
+      return { prev: rowOf(own[k - 1]), next: rowOf(own[k + 1]) };
+    // A sentence alone on its skill passes the whole of the next skill's.
+    var units = Array.prototype.slice.call(box.querySelectorAll('.wc-fact-wrap')).filter(function (w) {
+      return w.querySelector('.wc-line');
+    });
+    var u = units.indexOf(wrap);
+    var before = units[u - 1] ? units[u - 1].querySelector('.wc-line') : null;
+    var after = units[u + 1] ? units[u + 1].querySelectorAll('.wc-line') : [];
+    return { prev: rowOf(before), next: rowOf(after[after.length - 1]) };
+  }
+  function sameOrder(a, b) {
+    return (
+      a.length === b.length &&
+      a.every(function (r, i) {
+        return String(r.id) + '|' + r.text === String(b[i].id) + '|' + b[i].text;
+      })
+    );
+  }
+  /* Row i one place on in the comment, in front of or after the row the box
+     shows it passing; draws the boxes again. Returns its new index, -1 when
+     it has nowhere to go. */
+  function step(i, dir) {
     var st = H.current();
-    if (!st) return;
+    if (!st) return -1;
+    var n = reach(i);
+    var to = dir < 0 ? n.prev : n.next;
     var rows = H.rows(st, H.facts(st));
-    var row = rows[from];
-    var target = rows[before];
-    if (!row || !target || row === target) return;
+    var row = rows[i];
+    var target = rows[to];
+    if (!row || !target || to < 0) return -1;
     var out = rows.filter(function (r) {
       return r !== row;
     });
-    out.splice(out.indexOf(target), 0, row);
-    H.setRows(st, out, null, 'Moved.');
+    var at = out.indexOf(target);
+    out.splice(dir < 0 ? at : at + 1, 0, row);
+    H.moveRows(st, out);
+    redraw();
+    return out.indexOf(row);
+  }
+  /* The comment as it was when the move began; the toast waits for the drop. */
+  function toastIf(st, snap) {
+    var now = H.rows(st, H.facts(st));
+    if (!snap || sameOrder(snap.rows, now)) return;
+    H.undoToast(st, 'Moved.', snap);
   }
   function nudge(i, by) {
     var st = H.current();
-    var rows = st ? H.rows(st, H.facts(st)).slice() : [];
-    var j = i + by;
-    if (j < 0 || j >= rows.length) return;
-    var r = rows.splice(i, 1)[0];
-    rows.splice(j, 0, r);
-    H.setRows(st, rows, null, '');
-    var g = document.querySelector('.wc-line[data-row="' + j + '"] .wc-grip');
-    if (g) /** @type {HTMLElement} */ (g).focus();
+    if (!st) return;
+    var snap = H.snapshot(st);
+    if (step(i, by) < 0) return;
+    toastIf(st, snap);
   }
 
-  var _drag = /** @type {any} */ (null);
-  function lineUnder(x, y) {
-    var el = document.elementFromPoint(x, y);
-    return el && el.closest ? el.closest('.wc-line') : null;
-  }
-  function clearDrop() {
-    document.querySelectorAll('.wc-line.drop').forEach(function (el) {
-      el.classList.remove('drop');
-    });
+  var _snap = /** @type {any} */ (null);
+  function dragHost() {
+    return {
+      card: function () {
+        return document.getElementById('wc-boxes');
+      },
+      neighbors: reach,
+      step: function (i, dir) {
+        var st = H.current();
+        if (st && !_snap) _snap = H.snapshot(st);
+        return step(i, dir);
+      },
+      bounds: function (rk) {
+        var el = document.querySelector('#wc-boxes .wc-line[data-rk="' + rk + '"]');
+        var box = el && el.closest('.wc-box');
+        var card = document.getElementById('wc-boxes');
+        if (!box || !card) return null;
+        var c = card.getBoundingClientRect();
+        var b = box.getBoundingClientRect();
+        return { top: b.top - c.top, bottom: b.bottom - c.top };
+      },
+      commit: function () {
+        var st = H.current();
+        var snap = _snap;
+        _snap = null;
+        if (st) toastIf(st, snap);
+      },
+      cancel: function () {
+        var st = H.current();
+        var snap = _snap;
+        _snap = null;
+        if (st && snap) {
+          H.restore(st, snap);
+          redraw();
+        }
+      },
+    };
   }
   function dragStart(e) {
     var g = e.target && e.target.closest && e.target.closest('.wc-grip');
     if (!g || e.button !== 0) return;
-    _drag = { from: Number(g.dataset.wcGrip), line: g.closest('.wc-line'), moved: false, x: e.clientX, y: e.clientY };
-    e.preventDefault();
-  }
-  function dragMove(e) {
-    if (!_drag) return;
-    if (!_drag.moved && Math.abs(e.clientX - _drag.x) + Math.abs(e.clientY - _drag.y) < 4) return;
-    if (!_drag.moved) {
-      _drag.moved = true;
-      _drag.line.classList.add('lift');
-    }
-    clearDrop();
-    var t = lineUnder(e.clientX, e.clientY);
-    if (t && t !== _drag.line) t.classList.add('drop');
-  }
-  function dragEnd(e, cancel) {
-    if (!_drag) return;
-    var d = _drag;
-    _drag = null;
-    d.line.classList.remove('lift');
-    var t = e && !cancel ? lineUnder(e.clientX, e.clientY) : null;
-    clearDrop();
-    if (d.moved && t && t !== d.line) place(d.from, Number(/** @type {HTMLElement} */ (t).dataset.row));
+    var st = H.current();
+    _snap = st ? H.snapshot(st) : null;
+    ReportQnMotion.begin(e, g);
   }
   function gripKey(e) {
     var g = e.target && e.target.closest && e.target.closest('.wc-grip');
     if (g && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault();
       e.stopPropagation();
-      nudge(Number(g.dataset.wcGrip), e.key === 'ArrowUp' ? -1 : 1);
-    } else if (_drag && e.key === 'Escape') {
-      dragEnd(null, true);
+      nudge(Number(g.closest('.wc-line').getAttribute('data-row')), e.key === 'ArrowUp' ? -1 : 1);
     }
   }
   function wireDrag() {
+    ReportQnMotion.configure(dragHost());
     document.addEventListener('pointerdown', dragStart);
-    document.addEventListener('pointermove', dragMove);
-    document.addEventListener('pointerup', function (e) {
-      dragEnd(e, false);
-    });
-    document.addEventListener('pointercancel', function () {
-      dragEnd(null, true);
-    });
     document.addEventListener('keydown', gripKey);
   }
 

@@ -393,6 +393,7 @@ load('teacher/cm-competency-import.js');
 load('teacher/cm-withdrawn.js');
 load('teacher/cm-competency-cards.js');
 load('teacher/dash-class-manager.js');
+load('teacher/dash-inbox-questions.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-competencies.js');
 load('teacher/dash-recent.js');

@@ -205,7 +205,7 @@ window.DashOverview = (function () {
     if (!window.GraderWork || !GraderWork.workOnInClass(cid)) return '';
     var c = classWorkCounts(cid, studentIds);
     // A question waiting (S10-F4) rides in the same cell: "· 1 Question".
-    var asked = questionsIn(cid).length;
+    var asked = DashInboxQuestions.questionsIn(cid).length;
     var parts = [];
     if (!c.tograde && !c.toreturn && !asked) {
       parts.push('All Caught Up');
@@ -261,20 +261,6 @@ window.DashOverview = (function () {
      grader clears all three. A question is the student's own words, shown
      as theirs, exactly. '' (no card) when none is waiting, and in every
      class whose student page or Reflect on Feedback is off. */
-  function questionsIn(cid) {
-    if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return [];
-    return getQuestionsWaiting(cid);
-  }
-
-  // The question waiting: a follow-up after an answer, or the first one.
-  function _waitingWords(r) {
-    var follow = !!(r.follow_up && !r.follow_up_answer);
-    return {
-      text: follow ? r.follow_up : r.question,
-      at: follow ? r.sense_now_at || r.sent_at : r.sent_at,
-    };
-  }
-
   // The classes to look in: the one shown first, then the others not archived.
   function questionsCardHtml(activeCid) {
     var cids = Object.keys(typeof COURSES === 'object' && COURSES ? COURSES : {}).filter(function (c) {
@@ -291,10 +277,10 @@ window.DashOverview = (function () {
       (getAssignedAssessments(cid) || []).forEach(function (a) {
         if (a && a.id) pieces[a.id] = a;
       });
-      questionsIn(cid).forEach(function (r) {
+      DashInboxQuestions.questionsIn(cid).forEach(function (r) {
         var st = students[r.enrollment_id];
         var a = pieces[r.assessment_id];
-        var w = _waitingWords(r);
+        var w = DashInboxQuestions.waitingWords(r);
         if (!st || !a || !w.text) return;
         rows.push({ cid: cid, st: st, a: a, text: w.text, at: String(w.at || '') });
       });

@@ -313,20 +313,19 @@ for (const [w, h] of [
 }
 
 /* With Questions From Students waiting (the front page's Demo Mode has one),
-   that card sits above the top bar, so the row starts lower and its tiles run
-   past the first view; the cards may sit below the fold (Colin). The page
+   it is a line in the Inbox (Nov 27; the card above the top bar is gone where
+   the Inbox is), and the Inbox may have 70% of the left column. The page
    scrolls cleanly to the row's foot and nothing in the row is cut off. */
-test('with a question waiting the row starts lower, the page scrolls to its foot, and nothing is cut off', async ({
+test('with a question waiting it is a line in the Inbox, the page scrolls to the row’s foot, and nothing is cut off', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/login.html?demo=1&student=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.locator('#dash-inbox').waitFor();
-  await expect(page.locator('.dash-questions')).toBeVisible();
+  await expect(page.locator('.dash-questions')).toHaveCount(0);
+  await expect(page.locator('#dash-inbox .dash-inbox-q')).toBeVisible();
   const before = await box(page, '.dash-row');
-  expect(before.top).toBeGreaterThan(278);
-  expect(Math.round(before.height)).toBe(510);
   await page.locator('.dash-row').evaluate(el => el.scrollIntoView({ block: 'end' }));
   await page.waitForTimeout(200);
   const m = await page.evaluate(() => {
@@ -347,12 +346,13 @@ test('with a question waiting the row starts lower, the page scrolls to its foot
     };
   });
   // The whole row can be brought into view: the Inbox and the Bulletins tile under it share the left column
-  // (the Inbox as tall as its stacks, 299 px at most; Bulletins the rest, 12 apart), and Competencies is the row's full height.
+  // (the Inbox as tall as its stacks and its question, 70% at most; Bulletins the rest, 12 apart), and Competencies is the row's full height.
+  const H = Math.round(before.height);
   expect(m.rowBottom).toBeLessThanOrEqual(m.winH + 0.5);
   expect(m.rowTop).toBeGreaterThanOrEqual(0);
-  expect(m.tiles[0]).toBeLessThanOrEqual(300);
-  expect(m.tiles[0] + 12 + m.tiles[1]).toBe(510);
-  expect(m.tiles[2]).toBe(510);
+  expect(m.tiles[0]).toBeLessThanOrEqual((H - 12) * 0.7 + 1);
+  expect(m.tiles[0] + 12 + m.tiles[1]).toBe(H);
+  expect(m.tiles[2]).toBe(H);
   expect(m.sideways).toEqual([0, 0]);
   // The Students heading follows the row, 12 px under it.
   const heading = await box(page, '.dash-students-head');
