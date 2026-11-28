@@ -28,25 +28,13 @@ test('the page has a Home Screen manifest of its own', async ({ page, request })
   expect(m.scope).toBe('/s/');
 });
 
-test('from the Home Screen the page does not bounce', async ({ page }) => {
+test('the page does not bounce, in Safari or from the Home Screen', async ({ page }) => {
   await page.goto('/s/');
-  const rule = await page.evaluate(() => {
-    for (const sheet of document.styleSheets) {
-      let rules;
-      try {
-        rules = sheet.cssRules;
-      } catch {
-        continue;
-      }
-      for (const r of rules) {
-        if (r instanceof CSSMediaRule && /display-mode:\s*standalone/.test(r.conditionText)) {
-          for (const inner of r.cssRules) if (inner.selectorText === 'html') return inner.style.overscrollBehavior;
-        }
-      }
-    }
-    return null;
-  });
-  expect(rule).toBe('none');
+  // Apps don't bounce (Colin, Nov 27 2026): the rule is on the page itself, not only in Home Screen mode.
+  const html = await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY);
+  const body = await page.evaluate(() => getComputedStyle(document.body).overscrollBehaviorY);
+  expect(html).toBe('none');
+  expect(body).toBe('none');
 });
 
 test('the header and the tabs stay on the edges while the page scrolls', async ({ page }) => {
