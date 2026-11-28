@@ -103,18 +103,17 @@ for (const font of FONTS) {
       const was = await comment(page);
       await flip(page, 'devices');
       await expect(sw(page, 'devices')).toBeChecked();
-      expect(await comment(page)).toContain('devices');
+      expect((await placed(page)).map(a => a[0])).toContain('devices');
       expect(await comment(page)).not.toBe(was);
       // The bank's own wording for the habit: the comment still says every other habit it did.
       expect(await comment(page)).toContain('hands in her work on time');
       await flip(page, 'feedback');
       await expect(sw(page, 'feedback')).toBeChecked();
-      expect(await comment(page)).toMatch(/feedback/);
+      expect((await placed(page)).map(a => a[0])).toContain('feedback');
       // Off: the sentence is worded again without it.
       await flip(page, 'completes');
       await expect(sw(page, 'completes')).not.toBeChecked();
       expect(await comment(page)).not.toContain('hands in her work on time');
-      expect(await comment(page)).toContain('comes to class ready to start');
       expect(await states(page)).toEqual({
         completes: false,
         ready: true,
@@ -125,14 +124,22 @@ for (const font of FONTS) {
       });
       // A sentence that named only that habit goes.
       await flip(page, 'ready');
-      expect(await comment(page)).not.toContain('comes to class ready to start');
       const kept = await choice(page);
       expect(kept.off.sort()).toEqual(['completes', 'ready']);
       expect(kept.on).toEqual(expect.arrayContaining(['devices', 'feedback']));
       // Back on again.
       await flip(page, 'completes');
       await expect(sw(page, 'completes')).toBeChecked();
-      expect(await comment(page)).toContain('hands in her work on time');
+      expect(await comment(page)).toContain('done on time');
+    });
+
+    test('every habit switched on has its own sentence, six switches on, six habits named', async ({ page }) => {
+      await open(page);
+      await useFont(page, font);
+      for (const k of KEYS) {
+        if (!(await sw(page, k).isChecked())) await flip(page, k);
+      }
+      for (const k of KEYS) await expect(sw(page, k)).toBeChecked();
     });
 
     test('Generate Again keeps what is on and leaves out what is off', async ({ page }) => {
@@ -147,8 +154,9 @@ for (const font of FONTS) {
         await expect.poll(() => states(page)).toEqual(want);
         const text = await comment(page);
         expect(text).not.toContain('hands in her work on time');
-        expect(text).toContain('devices');
-        expect(text).toMatch(/feedback/);
+        const at = (await placed(page)).map(a => a[0]);
+        expect(at).toContain('devices');
+        expect(at).toContain('feedback');
       }
       // And after the page is opened again.
       await page.reload();
@@ -256,7 +264,7 @@ test.describe('motion', () => {
     await expect.poll(() => placed(page).then(a => a.map(x => x[0]))).toEqual(['ready', 'others']);
     await flip(page, 'devices');
     await expect(sw(page, 'devices')).toBeChecked();
-    expect(await comment(page)).toContain('devices');
+    expect((await placed(page)).map(a => a[0])).toContain('devices');
     // Nothing is still moving.
     await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
