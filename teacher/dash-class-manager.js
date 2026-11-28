@@ -889,6 +889,7 @@ window.DashClassManager = (function () {
     state.cwStep2Grade = '';
     state.cwStep2Block = '';
     state.cwStep2Span = 'full';
+    CmTermsStart.reset();
     state.cwStep2Grading = '';
     state.cwStep2Calc = '';
     state.cwStep2Decay = '65';
@@ -912,7 +913,7 @@ window.DashClassManager = (function () {
     segSelect(btn);
     if (containerId === 'cm-cg-span') {
       state.cwStep2Span = btn.dataset.val || 'full';
-      _cwRailSync();
+      CmWizard.cwSpanChanged();
     }
     if (containerId === 'cm-cg-calc') {
       state.cwStep2Calc = btn.dataset.val;
@@ -971,15 +972,8 @@ window.DashClassManager = (function () {
   var _cmTermSchool = CmTerms._cmTermSchool;
   var _cmTermRows = CmTerms._cmTermRows;
   var _cmTermError = CmTerms._cmTermError;
-  var _cmTermDay = CmTerms._cmTermDay;
-  var _cmDefaultReportingTerms = CmTerms._cmDefaultReportingTerms;
-  CmWizard.configure({
-    CALC_METHODS: CALC_METHODS,
-    CW_PRESETS: CW_PRESETS,
-    GRADING_SYSTEMS: GRADING_SYSTEMS,
-    _cmDefaultReportingTerms: _cmDefaultReportingTerms,
-    _cmTermDay: _cmTermDay,
-  });
+  CmWizard.configure({ CALC_METHODS: CALC_METHODS, CW_PRESETS: CW_PRESETS, GRADING_SYSTEMS: GRADING_SYSTEMS });
+  CmTermsStart.configure({ state: state, redraw: CmWizard.redraw, changed: CmWizard.cwSyncCreate });
   var _cmRenderReportingTermsField = CmTerms._cmRenderReportingTermsField;
   CmOtherClasses.configure({
     _cmRenderReportingTermsField: _cmRenderReportingTermsField,
@@ -1100,6 +1094,7 @@ window.DashClassManager = (function () {
       state.cwStep2Grade = '';
       state.cwStep2Block = '';
       state.cwStep2Span = 'full';
+      CmTermsStart.reset();
       state.cwStep2Grading = '';
       state.cwStep2Calc = '';
       state.cwStep2Decay = '65';

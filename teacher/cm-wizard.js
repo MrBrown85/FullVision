@@ -9,8 +9,6 @@
   var CALC_METHODS,
     CW_PRESETS,
     GRADING_SYSTEMS,
-    _cmDefaultReportingTerms,
-    _cmTermDay,
     _cwCourseRow,
     _cwSeg,
     _cwSetRow,
@@ -30,8 +28,6 @@
     if ('CALC_METHODS' in h) CALC_METHODS = h.CALC_METHODS;
     if ('CW_PRESETS' in h) CW_PRESETS = h.CW_PRESETS;
     if ('GRADING_SYSTEMS' in h) GRADING_SYSTEMS = h.GRADING_SYSTEMS;
-    if ('_cmDefaultReportingTerms' in h) _cmDefaultReportingTerms = h._cmDefaultReportingTerms;
-    if ('_cmTermDay' in h) _cmTermDay = h._cmTermDay;
     if ('_cwCourseRow' in h) _cwCourseRow = h._cwCourseRow;
     if ('_cwSeg' in h) _cwSeg = h._cwSeg;
     if ('_cwSetRow' in h) _cwSetRow = h._cwSetRow;
@@ -524,7 +520,7 @@
       html,
       _cwCancelBtn() +
         '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate"' +
-        (name.trim() ? '' : ' disabled') +
+        (name.trim() && !CmTermsStart.error() ? '' : ' disabled') +
         '>Create Class</button>',
     );
   }
@@ -670,36 +666,11 @@
     return html + '</div>';
   }
 
-  /* What Create Class sets without asking that is changed elsewhere: the
-     reporting terms (the default school's, for the chosen span) and, for a
-     grade that reports a letter, Counts As. */
+  /* Reporting Terms, which opens Class Settings' own Reporting Terms
+     section for the class being made (teacher/cm-terms-start.js), and, for
+     a grade that reports a letter, Counts As. */
   function _cwTermsRows(gradeLevel) {
-    var terms = _cmDefaultReportingTerms(null, state.cwStep2Span);
-    var school = terms && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
-    var html = _cwSetRow(
-      state.cwOpen,
-      'terms',
-      'Reporting Terms',
-      terms && terms.length
-        ? esc(school ? /** @type {any} */ (school.school).name + ', ' : '') +
-            terms.length +
-            (terms.length === 1 ? ' term' : ' terms')
-        : 'None. You can add them later in Reporting Terms.',
-      terms && terms.length
-        ? function () {
-            return (
-              '<p class="cw-desc">' +
-              terms
-                .map(function (t) {
-                  return esc(t.label + ' ' + _cmTermDay(t.starts_on) + ' – ' + _cmTermDay(t.ends_on));
-                })
-                .join(' · ') +
-              '. Another school, or other dates? Change them in Reporting Terms once the class is made.</p>'
-            );
-          }
-        : null,
-      true,
-    );
+    var html = _cwSetRow(state.cwOpen, 'terms', 'Reporting Terms', esc(CmTermsStart.summary()), CmTermsStart.html);
     if (_cmDefaultGradingScale(gradeLevel))
       html += _cwSetRow(
         state.cwOpen,
@@ -870,12 +841,22 @@
   function cwNameInput(el) {
     var typed = el.value || '';
     state.cwStep2Name = typed === _cwDefaultName() ? null : typed;
-    var named = !!typed.trim();
-    var next = document.querySelector('[data-action="cwFinishCreate"]');
-    if (next) /** @type {any} */ (next).disabled = !named;
+    cwSyncCreate();
     var hint = document.getElementById('cm-new-name-hint');
-    if (hint) hint.hidden = named;
+    if (hint) hint.hidden = !!typed.trim();
     _cwRailSync();
+  }
+
+  // Create Class is on once the class has a name and its terms have no problem.
+  function cwSyncCreate() {
+    var next = document.querySelector('[data-action="cwFinishCreate"]');
+    if (next) /** @type {any} */ (next).disabled = !cwGetPreName().trim() || !!CmTermsStart.error();
+  }
+
+  // This Class Runs: Your Class and Reporting Terms follow it.
+  function cwSpanChanged() {
+    _cwRailSync();
+    CmTermsStart.spanChanged();
   }
 
   function cwGoBack() {
@@ -906,6 +887,7 @@
 
   async function cwFinishCreate() {
     _cwReadDetails();
+    if (CmTermsStart.error()) return;
     var name = cwGetPreName();
     if (!name.trim()) {
       // Back to Name Your Class, where the name is typed.
@@ -960,9 +942,8 @@
     cc.levelOrder = _cmDefaultLevelOrder(course.gradeLevel);
     var startScale = _cmDefaultGradingScale(course.gradeLevel);
     if (startScale) cc.gradingScale = startScale;
-    var defaultTerms = _cmDefaultReportingTerms(course.id, state.cwStep2Span);
-    if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
-      cc.reportingTerms = defaultTerms;
+    // Exactly the terms Reporting Terms shows, none included.
+    cc.reportingTerms = CmTermsStart.terms();
     // The grading switches: by default one course counts its
     // folders as one, and a combined class counts each course equally.
     if (state.cwSelectedTags.length > 0) Object.assign(cc, _cwGrading());
@@ -1018,6 +999,9 @@
     cwOpenRow: cwOpenRow,
     cwSelectGrade: cwSelectGrade,
     cwSetRollup: cwSetRollup,
+    cwSpanChanged: cwSpanChanged,
+    cwSyncCreate: cwSyncCreate,
+    redraw: _cwRedraw,
     cwSkipToCustom: cwSkipToCustom,
     cwToggleCourse: cwToggleCourse,
     cwTogglePreset: cwTogglePreset,

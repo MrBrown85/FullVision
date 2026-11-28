@@ -570,6 +570,7 @@ declare var CmPtsPointer: any;
 declare var FVBackupRestore: any;
 declare var openColorPop: any;
 declare var CmTerms: any;
+declare var CmTermsStart: any;
 declare var CompetencyWording: any;
 declare var RubricDraft: any;
 declare var RubricPrint: any;
