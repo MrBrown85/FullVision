@@ -164,15 +164,16 @@ test('the drag handle moves a sentence in front of another; the arrow keys move 
   await grip.focus();
   await page.keyboard.press('ArrowUp');
   await expect.poll(async () => (await texts()).findIndex(t => tail(t) === tail(strengthText))).toBe(at - 1);
-  // Drag: the last Strength sentence onto the first one goes in front of it (the drag itself is in
-  // write-comments-drag.spec.js).
+  // Drag: the last Strength sentence onto the top of the first one goes in front of it (the drag itself
+  // is in write-comments-drag.spec.js). The top edge, not the centre: the centre is exactly where the
+  // sentence is level with the first one's middle, and a pixel either way decides.
   const strengthLines = () => page.locator('.wc-box[data-part="strength"] .wc-line .wc-text');
   const firstNow = tail((await strengthLines().first().textContent()) || '');
   const lastNow = tail((await strengthLines().last().textContent()) || '');
   await page
     .locator('.wc-box[data-part="strength"] .wc-grip')
     .last()
-    .dragTo(page.locator('.wc-box[data-part="strength"] .wc-line').first());
+    .dragTo(page.locator('.wc-box[data-part="strength"] .wc-line').first(), { targetPosition: { x: 20, y: 6 } });
   await expect.poll(async () => tail((await strengthLines().first().textContent()) || '')).toBe(lastNow);
   // Undo puts it back.
   await page.locator('#undo-toast button', { hasText: 'Undo' }).click();
