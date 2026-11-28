@@ -217,10 +217,10 @@ teacher/cm-reflect-builder.js,800,4,innerHTML,REVIEWED,marked at the sink,,"box.
 teacher/cm-std-help.js,202,4,innerHTML,REVIEWED,marked at the sink,,"overlay.innerHTML = '<div class=""cm-help-card"">' + '<div class=""cm-help-head"">' + '<h2 class=""cm-help-title"" id=""cm-help-title"">Where These Appear</h2>' + '<button type=""button"" c…"
 teacher/cm-std-help.js,243,6,innerHTML,REVIEWED,marked at the sink,,"panel.innerHTML = '<div class=""cm-help-picture"" aria-hidden=""true"">' + parts[i].picture + '</div>' + '<div class=""cm-help-caption""><span class=""cm-help-caption-name"">' + esc(parts…"
 teacher/cm-students.js,652,4,innerHTML,ESC_WRAPPED,fn-return,,"picker.innerHTML = Object.keys(BC_DESIGNATIONS) .filter(function (code) { return have.indexOf(code) < 0; }) .map(function (code) { return ( '<button type=""button"" role=""menuitem"" …"
-teacher/cm-terms-start.js,141,83,innerHTML,REVIEWED,marked at the sink,,panel.innerHTML = sectionHtml()
-teacher/cm-terms.js,185,14,innerHTML,REVIEWED,helper:_cmTermFooterHtml,,foot.innerHTML = _cmTermFooterHtml(cid)
-teacher/cm-terms.js,205,15,innerHTML,REVIEWED,helper:_cmTermStripHtml,,strip.innerHTML = _cmTermStripHtml(rows)
-teacher/cm-terms.js,207,14,innerHTML,REVIEWED,helper:_cmTermKeptHtml,,kept.innerHTML = _cmTermKeptHtml(cid)
+teacher/cm-terms-start.js,231,83,innerHTML,REVIEWED,marked at the sink,,panel.innerHTML = sectionHtml()
+teacher/cm-terms.js,190,14,innerHTML,REVIEWED,helper:_cmTermFooterHtml,,foot.innerHTML = _cmTermFooterHtml(cid)
+teacher/cm-terms.js,210,15,innerHTML,REVIEWED,helper:_cmTermStripHtml,,strip.innerHTML = _cmTermStripHtml(rows)
+teacher/cm-terms.js,212,14,innerHTML,REVIEWED,helper:_cmTermKeptHtml,,kept.innerHTML = _cmTermKeptHtml(cid)
 teacher/cm-withdrawn.js,116,4,innerHTML,ESC_WRAPPED,concat,,"keep.innerHTML = '<span class=""cm-keep-copy-text""><strong>Keep a copy first</strong><span>A CSV of ' + esc(name) + '’s scores and observations in ' + esc((COURSES[cid] && COURSES[…"
 teacher/comment-personal.js,1712,4,innerHTML,REVIEWED,helper:_sheetHtml,,o.innerHTML = _sheetHtml()
 teacher/competency-evidence.js,310,4,innerHTML,REVIEWED,marked at the sink,,"drawer.innerHTML = innerHtml(_cid, _sid, sec, tag)"
@@ -232,8 +232,8 @@ teacher/crit-comment.js,406,4,insertAdjacentHTML,REVIEWED,marked at the sink,,"a
 teacher/crit-comment.js,422,4,innerHTML,REVIEWED,marked at the sink,,"box.innerHTML = _critOwnFieldsHtml(st.cid, st.aid, st.sid, crit)"
 teacher/crit-comment.js,492,6,insertAdjacentHTML,REVIEWED,marked at the sink,,"edit.insertAdjacentHTML('beforebegin', _critNoteHtml(st.cid, st.aid, st.sid, crit, note))"
 teacher/dash-bulletins.js,380,4,innerHTML,REVIEWED,marked at the sink,,slot.innerHTML = next
-teacher/dash-class-manager.js,921,16,innerHTML,ESC_WRAPPED,helper:_cmCalcMethodDescription,,desc.innerHTML = _cmCalcMethodDescription(btn.dataset.val)
-teacher/dash-class-manager.js,926,17,innerHTML,ESC_WRAPPED,helper:_cmGradingSystemDescription,,gdesc.innerHTML = _cmGradingSystemDescription(btn.dataset.val)
+teacher/dash-class-manager.js,914,16,innerHTML,ESC_WRAPPED,helper:_cmCalcMethodDescription,,desc.innerHTML = _cmCalcMethodDescription(btn.dataset.val)
+teacher/dash-class-manager.js,919,17,innerHTML,ESC_WRAPPED,helper:_cmGradingSystemDescription,,gdesc.innerHTML = _cmGradingSystemDescription(btn.dataset.val)
 teacher/dash-competencies.js,725,4,innerHTML,REVIEWED,marked at the sink,,pop.innerHTML = inner
 teacher/dash-inbox-rollcall.js,478,4,innerHTML,REVIEWED,marked at the sink,,"pop.innerHTML = list .map(function (p) { return ( '<button type=""button"" role=""option"" class=""dash-inbox-rc-opt"" data-dash-rc=""opt"" data-aid=""' + esc(p.aid) + '"" aria-selected=""' …"
 teacher/dash-inbox-rollcall.js,535,4,innerHTML,REVIEWED,marked at the sink,,pop.innerHTML = _menuItems(sid)

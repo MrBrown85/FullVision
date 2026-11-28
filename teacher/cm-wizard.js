@@ -469,19 +469,6 @@
         (on === all ? 'All ' + all : on + ' of ' + all) + ' from the BC curriculum',
         _cwCompsHtml,
       );
-      var g = _cwGrading();
-      var folders = _cwCourseCounts(state.cwSelectedTags).folders > 0;
-      rows += _cwSetRow(
-        state.cwOpen,
-        'grading',
-        'Overall',
-        (state.cwSelectedTags.length > 1
-          ? (g.coursesCountEqually ? 'Each Course Counts Equally' : 'Each Course by Its Size') + ' · '
-          : '') + (g.foldersCountAsOne ? 'Folders Count as One' : 'Every Competency Counts the Same'),
-        function () {
-          return _cwRenderGradingRows(folders);
-        },
-      );
     }
     var calcLabel = (
       CALC_METHODS.find(function (m) {
@@ -607,65 +594,6 @@
     return html;
   }
 
-  /* The grading switches, worded as the Grading tab words them: Each Course
-     Counts Equally for a combined class, and Folders Count as One. Both can
-     change later in Grading. */
-  function _cwRenderGradingRows(anyFolder) {
-    var g = _cwGrading();
-    var later = ' You can change this later in Grading.';
-    function row(key, id, label, hint, on) {
-      return (
-        '<div class="cm-recent-limit cm-folder-count-row">' +
-        '<span class="cm-recent-text"><label class="cm-label" for="' +
-        id +
-        '">' +
-        label +
-        '</label><span class="cm-hint">' +
-        hint +
-        later +
-        '</span></span>' +
-        '<span class="gpd-switch"><input type="checkbox" role="switch" id="' +
-        id +
-        '" data-action-change="cwRollup" data-key="' +
-        key +
-        '"' +
-        (on ? ' checked' : '') +
-        '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
-        '</div>'
-      );
-    }
-    var names = state.cwSelectedTags
-      .map(function (tag) {
-        return /** @type {any} */ (CURRICULUM_INDEX)[tag] && /** @type {any} */ (CURRICULUM_INDEX)[tag].course_name;
-      })
-      .filter(Boolean);
-    var html = '<div class="cw-grading-rows">';
-    if (names.length > 1)
-      html += row(
-        'courses',
-        'cw-courses-equal',
-        'Each Course Counts Equally',
-        g.coursesCountEqually
-          ? names.length === 2
-            ? esc(names[0]) + ' and ' + esc(names[1]) + ' each make up half of the overall.'
-            : 'Each of the ' + names.length + ' courses makes up an equal share of the overall.'
-          : 'A course with more competencies or folders counts for more in the overall.',
-        g.coursesCountEqually,
-      );
-    html += row(
-      'folders',
-      'cw-folders-count',
-      'Folders Count as One',
-      !anyFolder
-        ? 'This class has no folders with competencies yet.'
-        : g.foldersCountAsOne
-          ? 'Each folder is averaged first and counts as one competency in the overall.'
-          : 'Every competency counts the same in the overall. Folders only group them.',
-      g.foldersCountAsOne,
-    );
-    return html + '</div>';
-  }
-
   /* Reporting Terms, which opens Class Settings' own Reporting Terms
      section for the class being made (teacher/cm-terms-start.js), and, for
      a grade that reports a letter, Counts As. */
@@ -694,8 +622,6 @@
     state.cwSelectedTags = [];
     state.cwSkipped = {};
     state.cwPreset = null;
-    state.cwFoldersOn = null;
-    state.cwCoursesEqual = null;
     state.cwFindText = '';
     // Another grade is another class: a name typed for the last one goes.
     state.cwStep2Name = null;
@@ -706,8 +632,6 @@
     var idx = state.cwSelectedTags.indexOf(tag);
     if (idx >= 0) state.cwSelectedTags.splice(idx, 1);
     else state.cwSelectedTags.push(tag);
-    state.cwFoldersOn = null;
-    state.cwCoursesEqual = null;
     _cwRedraw();
   }
 
@@ -726,8 +650,6 @@
       state.cwPreset = id;
       state.cwSelectedTags = p.tags.concat(state.cwSelectedTags);
     }
-    state.cwFoldersOn = null;
-    state.cwCoursesEqual = null;
     _cwRedraw();
   }
 
@@ -820,21 +742,12 @@
     _cwShowStep(2);
   }
 
-  // The grading switches. They don't touch any class until Create Class.
-  function cwSetRollup(key, on) {
-    if (key === 'courses') state.cwCoursesEqual = !!on;
-    else state.cwFoldersOn = !!on;
-    _cwRedraw();
-  }
-
-  /* The wizard's grading switches: what the teacher set, else the default
-     for one course or a combined class. */
+  /* How the overall counts, which New Class no longer asks (Colin,
+     2026-11-27): one course counts its folders as one, a combined class
+     counts each course equally. Both change later in Grading. */
   function _cwGrading() {
     var d = curriculumGradingDefaults(state.cwSelectedTags);
-    return {
-      foldersCountAsOne: state.cwFoldersOn != null ? state.cwFoldersOn : d.foldersCountAsOne,
-      coursesCountEqually: state.cwCoursesEqual != null ? state.cwCoursesEqual : d.coursesCountEqually,
-    };
+    return { foldersCountAsOne: d.foldersCountAsOne, coursesCountEqually: d.coursesCountEqually };
   }
 
   // Create Class comes on once the class has a name; Your Class follows it.
@@ -998,7 +911,6 @@
     cwNameInput: cwNameInput,
     cwOpenRow: cwOpenRow,
     cwSelectGrade: cwSelectGrade,
-    cwSetRollup: cwSetRollup,
     cwSpanChanged: cwSpanChanged,
     cwSyncCreate: cwSyncCreate,
     redraw: _cwRedraw,

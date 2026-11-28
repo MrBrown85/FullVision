@@ -159,7 +159,6 @@ window.DashClassManager = (function () {
   var cwNameInput = CmWizard.cwNameInput;
   var cwOpenRow = CmWizard.cwOpenRow;
   var cwSelectGrade = CmWizard.cwSelectGrade;
-  var cwSetRollup = CmWizard.cwSetRollup;
   var cwSkipToCustom = CmWizard.cwSkipToCustom;
   var cwToggleCourse = CmWizard.cwToggleCourse;
   var cwTogglePreset = CmWizard.cwTogglePreset;
@@ -536,7 +535,6 @@ window.DashClassManager = (function () {
     cwNameInput: cwNameInput,
     cwOpenRow: cwOpenRow,
     cwSelectGrade: cwSelectGrade,
-    cwSetRollup: cwSetRollup,
     cwSkipToCustom: cwSkipToCustom,
     cwToggleCourse: cwToggleCourse,
     cwTogglePreset: cwTogglePreset,
@@ -827,13 +825,10 @@ window.DashClassManager = (function () {
     return null;
   }
 
-  // Choose Competencies: bank ids the teacher unticked, the preset picked
-  // in Choose Courses (Humanities 8), and the review's grading switches
-  // (null: the default for one course or a combined class).
+  // Choose Competencies: bank ids the teacher unticked, and the preset
+  // picked in Choose Courses (Humanities 8).
   state.cwSkipped = {};
   state.cwPreset = null;
-  state.cwFoldersOn = null;
-  state.cwCoursesEqual = null;
   // The Choose Courses find box, and the Already Set for You row open.
   state.cwFindText = '';
   state.cwOpen = '';
@@ -882,8 +877,6 @@ window.DashClassManager = (function () {
     state.cwSelectedTags = [];
     state.cwSkipped = {};
     state.cwPreset = null;
-    state.cwFoldersOn = null;
-    state.cwCoursesEqual = null;
     state.cwLoadError = false;
     state.cwStep2Name = null;
     state.cwStep2Grade = '';

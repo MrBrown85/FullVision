@@ -7682,11 +7682,6 @@ button.rb-v-prompt {
   font-size: var(--text-sm);
   line-height: 1.45;
 }
-.cw-grading-rows > .cm-folder-count-row:first-child {
-  border-top: 0;
-  margin-top: 0;
-  padding-top: 0;
-}
 
 /* Competency list: each card's name with its wording's first line under it
    (hidden once the card is open), and runs of competencies outside folders
