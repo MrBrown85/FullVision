@@ -658,5 +658,7 @@ declare var ReportWcHost: any;
 declare var ReportWcEnv: any;
 declare var ReportWcAct: any;
 declare var ReportWcLook: any;
+declare var ReportWcHabits: any;
+declare var CommentBankHabits: any;
 declare var ReportQnMotion: any;
 declare var COMMENT_BANK: { sentences: any[]; [key: string]: any };

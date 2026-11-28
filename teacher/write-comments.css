@@ -402,6 +402,26 @@
 .wc-fact .qn-hs.set .qn-hs-dot::after {
   opacity: clamp(0, calc((var(--at) + 1 - var(--i)) * 1000), 1);
 }
+/* The In the Comment switch at the right end of a habit's row: a habit's row keeps one line. */
+.wc-fact:has(.wc-sw) {
+  flex-wrap: nowrap;
+  gap: 4px 8px;
+}
+.wc-fact:has(.wc-sw) .qn-hs {
+  flex-basis: 128px;
+  width: 128px;
+  --hs-w: 128px;
+}
+.wc-fact:has(.wc-sw) .qn-hs + .wc-val {
+  min-width: 11ch;
+}
+.wc-fact .wc-sw {
+  margin-left: 2px;
+}
+.wc-fact.hot {
+  border-radius: 9px;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.45);
+}
 .wc-fact .qn-att-field {
   flex: 0 0 auto;
 }

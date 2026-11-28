@@ -41,7 +41,7 @@ window.Router = (function () {
         '/teacher/report-qn-browse-cases.js',
         '/teacher/report-qn-voice-observations.js',
         '/teacher/report-qn-motion.js',
-        ...'parts look boxes-more boxes draw comment class card host env act'
+        ...'parts look boxes-more boxes habits draw comment class card host env act'
           .split(' ')
           .map(n => '/teacher/report-wc-' + n + '.js'),
         '/teacher/report-wc.js',

@@ -161,6 +161,7 @@ window.ReportWcEnv = (function () {
     var att = H.attendance(st);
     var entered = att.absences != null || att.lates != null;
     env.habitValue = H.habitValue;
+    env.habitRatings = CommentBank.effectiveHabits(stored);
     env.habitsText = rated === 6 ? 'Six Ratings' : rated + ' of 6 Rated';
     env.attCount = att.absences == null ? '—' : String(att.absences);
     env.attHead = entered ? (att.absences || 0) + ' Absent · ' + (att.lates || 0) + ' Late' : 'Not Entered';

@@ -43,6 +43,7 @@ window.ReportWc = (function () {
     ReportWcEnv.configure(host, ui);
     ReportWcComment.configure(host, ui);
     A.configure(host, ui, env, redraw);
+    ReportWcHabits.configure(host, env, redraw);
   }
 
   /* ── Drawing ─────────────────────────────────────────────── */
@@ -214,6 +215,11 @@ window.ReportWc = (function () {
     document.querySelectorAll('.wc [data-rk]').forEach(function (el) {
       el.classList.toggle('hot', !!rk && el.getAttribute('data-rk') === rk);
     });
+    // A habit's row is lit with each sentence that names it.
+    document.querySelectorAll('.wc [data-rks]').forEach(function (el) {
+      var on = !!rk && (' ' + el.getAttribute('data-rks') + ' ').indexOf(' ' + rk + ' ') >= 0;
+      el.classList.toggle('hot', on);
+    });
     document.querySelectorAll('.wc-box').forEach(function (b) {
       b.classList.toggle('lit', !!rk && !!b.querySelector('.wc-line.hot'));
     });
@@ -335,6 +341,8 @@ window.ReportWc = (function () {
       wcBrowse: () => H.openBrowse(ds.part),
       wcBank: () => A.bank(),
       wcVary: () => ReportWcComment.vary(),
+      wcHabit: () => ReportWcHabits.toggle(ds.habit, !!(el && /** @type {any} */ (el).checked)),
+      wcHabitDup: () => ReportWcHabits.removeOne(ds.habit),
       wcType: () => A.startTyping(),
     };
     if (table[what]) table[what]();
