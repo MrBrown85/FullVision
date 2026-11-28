@@ -85,7 +85,7 @@ test('Students: hide one student’s overall grade, see the exception, Undo, and
   await expect(filters.getByRole('radio', { name: /^Grade Exceptions/ })).toHaveAttribute('aria-checked', 'true');
   await expect(card.locator('.sc-name')).toHaveText([at.name]);
 
-  // Preview as the student: My Learning has no overall grade, and Doesn't See says why.
+  // Preview as the student: My Learning has no overall grade.
   await name.click();
   await panel.getByRole('button', { name: 'Preview as ' + at.first }).click();
   const overlay = page.locator('#preview-student');
@@ -93,9 +93,6 @@ test('Students: hide one student’s overall grade, see the exception, Undo, and
   await overlay.locator('.ps-screen .sp-tabs-bottom [data-act="tab"][data-tab="learning"]').click();
   await expect(overlay.locator('.ps-screen .sp-ml-work')).toBeVisible();
   await expect(overlay.locator('.ps-screen .sp-ml-period')).toHaveCount(0);
-  await expect(overlay.locator('.ps-side-right')).toContainText(
-    'Show Overall Grade is off for ' + at.first + '. Change it in Class Settings › Student Page.',
-  );
   expect(await page.evaluate(a => effectiveShowOverallGrade(a.cid, a.sid), at)).toBe(false);
   // Every other student still sees it.
   expect(

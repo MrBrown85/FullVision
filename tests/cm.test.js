@@ -1251,7 +1251,6 @@ describe('cm-student-page-my-learning', () => {
         ]),
       ).toEqual([['Returned Essay', essay.result.text]]);
       expect(overlay().innerHTML).not.toMatch(SECRET);
-      expect(text(overlay().querySelector('#ps-sees-title').parentNode)).not.toContain('My Learning');
     });
 
     it('on, Preview as Student shows My Learning, from returned work only', () => {
@@ -1274,7 +1273,6 @@ describe('cm-student-page-my-learning', () => {
       expect(html.indexOf('sp-ml-overall')).toBeLessThan(html.indexOf('sp-ml-work'));
       expect([...screen.querySelectorAll('.sp-ml-work .sp-row-title')].map(text)).toEqual(['Returned Essay']);
       expect(overlay().innerHTML).not.toMatch(SECRET);
-      expect(text(overlay().querySelector('#ps-sees-title').parentNode)).toContain('My Learning');
     });
 
     it('a stray change where the row is not drawn saves nothing', () => {
@@ -1352,7 +1350,6 @@ describe('cm-student-page-my-learning', () => {
       expect(text(screen.querySelector('.sp-tabs-bottom .sp-tab-on .sp-tab-label'))).toBe('My Learning');
       expect(screen.querySelector('.sp-ml-overall')).toBeTruthy();
       expect(el.innerHTML).not.toMatch(SECRET);
-      expect(text(el.querySelector('#ps-sees-title').parentNode)).toContain('My Learning');
       // A press inside keeps My Learning shown (Assignments, then back).
       click(screen.querySelector('.sp-tabs-bottom [data-act="tab"][data-tab="assignments"]'));
       expect(pressMyLearning().querySelector('.sp-ml-overall')).toBeTruthy();

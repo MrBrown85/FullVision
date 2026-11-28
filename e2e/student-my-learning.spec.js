@@ -54,9 +54,6 @@ test('with Show My Learning off: Your Work, and no grade', async ({ page }) => {
   await expect(screen.locator('.sp-ml-work .sp-ml-row').first()).toBeVisible();
   await expect(screen.locator('.sp-ml-overall')).toHaveCount(0);
   await expect(screen.getByText('Your teacher hasn’t turned on My Learning for this class.')).toHaveCount(0);
-  await expect(
-    dialog.getByText('Show Overall Grade is off for this class. Turn it on in Class Settings › Student Page.'),
-  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -89,7 +86,6 @@ test('a Proficiency class: You’re at and Your Work, with no Work On Next', asy
   await expect(screen.locator('[data-act="skill"]')).toHaveCount(0);
   await expect(screen.locator('.sp-ml-strongest')).toHaveCount(0);
   await expect(screen.getByRole('heading', { name: 'What Makes Up Your Grade' })).toHaveCount(0);
-  await expect(dialog.getByText('Their grade, only from work you’ve returned.')).toBeVisible();
   await shot(page, 'S13-F2-proficiency-phone');
 
   // A returned row opens Your Feedback, and its back button goes to My Learning.

@@ -119,4 +119,11 @@ test('View as Student opens the student selected in the roster', async ({ page }
   }, sid);
   await expect(page.locator('#preview-student')).toContainText('Previewing as');
   await expect(page.locator('#preview-student #ps-title')).toContainText(name);
+  // The dialog and the device's screen never rubber-band.
+  const over = await page.evaluate(() =>
+    ['#preview-student', '#preview-student .ps-body', '#preview-student .ps-screen'].map(
+      q => getComputedStyle(document.querySelector(q)).overscrollBehaviorY,
+    ),
+  );
+  expect(over.every(v => v === 'none' || v === 'contain')).toBe(true);
 });
